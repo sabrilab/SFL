@@ -30,7 +30,6 @@
 // /ligue/contrats y renvoie.
 
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
-import { heureLisible } from "@/lib/sfl/revelation";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { FORMAT_CARTE } from "@/components/sfl/mini-carte";
 import { useIdentites } from "@/hooks/use-identites";
@@ -80,7 +79,7 @@ function Moment({ lg }: { lg: Ligue }) {
       </span>
     );
   return (
-    <span className="mono-label shrink-0 text-encre-3">{lg.phase === "en-jeu" ? `Verdict à ${heureLisible(lg.d.finDuJour)}` : "Verdict"}</span>
+    <span className="mono-label shrink-0 text-encre-3">{lg.phase === "en-jeu" ? `Verdict ${lg.d.verdict}` : "Verdict"}</span>
   );
 }
 

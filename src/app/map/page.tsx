@@ -126,6 +126,7 @@ import {
   terrainDuMatch,
   updateJournee,
 } from "@/lib/sfl/saisie/mutations";
+import { journeeTerminee } from "@/lib/sfl/saisie/engine";
 import type { JourneeMeta, Saison, Terrain } from "@/lib/sfl/saisie/types";
 import { ovr, rankPlayers } from "@/lib/sfl/engine";
 import {
@@ -145,7 +146,7 @@ import { ciblesDuDimanche, contratsSignes, foyerDesCibles, villesDesCibles } fro
 import { ContratsSur } from "@/components/sfl/map/contrats-sur";
 import { cleVille, type ContratPlan, type VillePlan } from "@/components/sfl/map/joueurs";
 import { useMaintenant, useMissionsDeLaLigue } from "@/hooks/use-missions";
-import { finDuVote, libelleFinDuVote, libelleRevelation } from "@/lib/sfl/revelation";
+import { etatRevelation, finDuVote, libelleFinDuVote, libelleRevelation, nouveauRegime } from "@/lib/sfl/revelation";
 import { TOUTES_AMBIANCES, type Ambiance } from "@/components/sfl/map/ambiances";
 import { calculerZones, dansContour, numeroZone, type Foyer, type VilleZone, type Zone } from "@/lib/sfl/zones";
 import { maVille, villeOuLigue } from "@/lib/sfl/villes";
@@ -1344,13 +1345,21 @@ export default function MapPage() {
     const fin = meta ? finDuVote(meta, saison.numero ?? 0, instant) : null;
     const votesClos = joue && (fin ? instant.getTime() >= fin.getTime() : (ecartJours(choisi.dateLabel, aujourdhui) ?? 0) < 0);
     const j = choisi.j;
+    // La feuille est faite quand chaque match a son résultat, pas au premier but.
+    const feuilleFaite = j != null ? journeeTerminee(saison, j) : joue;
+    // Les divisions à la révélation, dès la J5 (revelation.ts) ; une journée
+    // bloquée n'a pas d'heure à promettre.
+    const etapeDivisions =
+      j != null && divisions && nouveauRegime(saison.numero ?? 0, j)
+        ? [{ nom: "Les divisions", sous: etatRevelation(saison, j, instant) === "bloquee" ? undefined : libelleRevelation(saison, j, instant), faite: revelation.comptees.has(j) }]
+        : [];
     return [
       { nom: "Convocation", sous: convocation && !joue && p.presents.length ? `${p.presents.length} je viens` : "le lundi", faite: convocation },
       { nom: "Les équipes", sous: "vendredi 19 h", faite: joue || feuille.length > 0 },
       { nom: "Coup d'envoi", sous: choisi.heure, faite: joue || enDirect },
-      { nom: "Feuille de match", sous: "buts, passes, MVP", faite: joue },
+      { nom: "Feuille de match", sous: "buts, passes, MVP", faite: feuilleFaite },
       { nom: "Les votes", sous: j != null ? `jusqu'à ${libelleFinDuVote(saison, j, instant)}` : "jusqu'à minuit", faite: votesClos },
-      ...(j != null && divisions ? [{ nom: "Les divisions", sous: libelleRevelation(saison, j, instant), faite: revelation.comptees.has(j) }] : []),
+      ...etapeDivisions,
     ];
   }, [choisi, aujourdhui, feuille.length, p.presents.length, enDirect, saison, instant, divisions, revelation.comptees]);
   // Le tableau de bord du match (31/10) : le grand chiffre, puis la journée en étapes.

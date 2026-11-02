@@ -22,7 +22,25 @@
 //       lundi ; un match fini à 17 h 40 et à 23 h 15 ; votesPrets ;
 //   9 · figer : idempotente, même référence, feuille posée intacte, jamais
 //       enregistrée (saisieStore.save) ;
-//   10 · lireSaisonServeur rend la même vue que le SeasonProvider.
+//   10 · lireSaisonServeur rend la même vue que le SeasonProvider ;
+//   relecture du 02/11 :
+//   11 · une journée rouverte avant sa révélation (un match ajouté, un
+//        résultat effacé) perd sa fin des matchs et la retrouve à sa
+//        nouvelle dernière feuille : rien ne bouge avant, tout entre en une
+//        fois (21 h 40, 21 h 20), au moins une heure de vote pour le dernier
+//        match ; après la révélation, F ne bouge plus (tenirFinDesMatchs) ;
+//   12 · une date illisible ne s'écrit pas (I11) ;
+//   13 · la nuit : la feuille d'un match tardif se prend jusqu'à 1 h, rien
+//        n'est « bloqué » avant ; le vote, lui, ferme à minuit ;
+//   14 · l'heure du serveur (horloge.ts) : un téléphone en avance de 2 h ne
+//        révèle pas à 17 h, en retard de 30 min ne vote plus à 18 h 10 ;
+//   15 · la cérémonie de la J1 d'une saison ; la fin des matchs rendue par la
+//        base, adoptée par l'appareil de l'admin ;
+//   16 · l'admin : la J6 à préparer le dimanche soir (le 15, pas le 8), une
+//        journée bloquée ouverte d'abord ;
+//   et les libellés : jamais « 1 h après », qui se lit 1 h du matin ;
+//   « minuit » le lendemain ; pas de « 18 h » promis quand un match est
+//   prévu à 16 h ou plus tard.
 //   npx tsx tools/revelation-check.ts
 import assert from "node:assert/strict";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -31,6 +49,9 @@ import {
   jourMoisDuLibelle,
 } from "../src/lib/sfl/convocation-temps";
 import {
+  aLHeure,
+  avecFinsDeLaBase,
+  estUneHeure,
   etatRevelation,
   figer,
   finDuVote,
@@ -42,17 +63,23 @@ import {
   prochaineTransition,
   revelation,
   revelationAttendue,
+  tenirFinDesMatchs,
   titresTombes,
+  uneJourneeDePlus,
+  verdictDeJournee,
   voteOuvertA,
 } from "../src/lib/sfl/revelation";
+import { decalageHorloge, maintenant as heureDeLaLigue, noterHeureServeur } from "../src/lib/sfl/horloge";
+import { droitDePrendre } from "../src/lib/sfl/feuille-direct";
+import { nouveauxEcarts, verifierFeuille } from "../src/lib/sfl/saisie/integrite";
 import { dernierBilan, etatDivisions, type Division } from "../src/lib/sfl/divisions";
 import { computeJournees, deriveSeason, journeeJouee } from "../src/lib/sfl/saisie/engine";
 import { heuresDeJournee } from "../src/lib/sfl/missions";
 import { appliquerVotes, titresFaibles, type VoteFigure } from "../src/lib/sfl/votes";
 import { lireSaisonServeur, saisonAvecVotes } from "../src/lib/sfl/saison-serveur.server";
 import { saisieStore } from "../src/lib/sfl/saisie/store";
-import { etatJournee, gesteDuMoment } from "../src/lib/sfl/saisie/etat-journee";
-import { cloturerSaison } from "../src/lib/sfl/saisie/mutations";
+import { etatJournee, gesteDuMoment, journeeAPreparer, prochaineJournee } from "../src/lib/sfl/saisie/etat-journee";
+import { cloturerSaison, dimancheDeJournee } from "../src/lib/sfl/saisie/mutations";
 import type { JourneeMeta, MatchEntry, Saison } from "../src/lib/sfl/saisie/types";
 
 /** Une heure de Paris en hiver (UTC+1) : « 2026-11-08 18:00 ». */
@@ -99,9 +126,28 @@ const meta = (j: number, date: string, extra: Partial<JourneeMeta> = {}): Journe
   assert.equal(libelleRevelation(s(cas[3][1]), 5, ref), "minuit");
   assert.equal(libelleFinDuVote(s(cas[4][1]), 5, ref), "minuit");
   assert.equal(libelleFinDuVote(s(meta(5, "8 nov.")), 5, hiver("2026-11-08 16:59")), "18 h", "F inconnu avant 17 h");
-  assert.equal(libelleFinDuVote(s(meta(5, "8 nov.")), 5, hiver("2026-11-08 17:00")), "1 h après le dernier match");
+  assert.equal(libelleFinDuVote(s(meta(5, "8 nov.")), 5, hiver("2026-11-08 17:00")), "une heure après le dernier match", "jamais « 1 h », qui se lit 1 h du matin");
   assert.equal(libelleRevelation(s(meta(5, "8 nov.")), 5, hiver("2026-11-08 16:00")), "19 h");
-  assert.equal(libelleRevelation(s(meta(5, "8 nov.")), 5, hiver("2026-11-08 17:30")), "2 h après le dernier match");
+  assert.equal(libelleRevelation(s(meta(5, "8 nov.")), 5, hiver("2026-11-08 17:30")), "deux heures après le dernier match");
+  // Le lendemain, sans fin des matchs : le vote a fermé à minuit (« fermé depuis minuit »).
+  assert.equal(libelleFinDuVote(s(meta(5, "8 nov.")), 5, hiver("2026-11-09 08:00")), "minuit");
+  assert.equal(libelleRevelation(s(meta(5, "8 nov.")), 5, hiver("2026-11-09 08:00")), "minuit");
+  // Un dernier match prévu à 23 h (ou à 16 h) : midi ne promet pas « 18 h ».
+  const tard = (heure: string) =>
+    s(meta(5, "8 nov.", { matchsDuJour: [{ equipes: ["Noirs 1", "Blancs 1"], heure: "12h30" }, { equipes: ["Noirs 2", "Blancs 2"], heure }] }));
+  assert.equal(libelleFinDuVote(tard("23h00"), 5, hiver("2026-11-08 12:00")), "une heure après le dernier match");
+  assert.equal(libelleRevelation(tard("23h00"), 5, hiver("2026-11-08 12:00")), "deux heures après le dernier match");
+  assert.equal(libelleFinDuVote(tard("16h00"), 5, hiver("2026-11-08 12:00")), "une heure après le dernier match");
+  assert.equal(libelleFinDuVote(tard("15h00"), 5, hiver("2026-11-08 12:00")), "18 h", "un dernier match à 15 h finit avant 17 h");
+  assert.equal(libelleFinDuVote(s(meta(5, "8 nov.", { heure: "17h30" })), 5, hiver("2026-11-08 09:00")), "une heure après le dernier match", "l'heure de la journée, sans matchs écrits");
+  // À l'écran : « à 19 h », « à minuit », la durée telle quelle ; le verdict court dit « ce soir ».
+  assert.equal(aLHeure("19 h"), "à 19 h");
+  assert.equal(aLHeure("minuit"), "à minuit");
+  assert.equal(aLHeure("deux heures après le dernier match"), "deux heures après le dernier match");
+  assert.ok(estUneHeure("18 h 40") && estUneHeure("minuit") && !estUneHeure("une heure après le dernier match"));
+  assert.equal(verdictDeJournee(s(cas[1][1]), 5, ref), "à 19 h");
+  assert.equal(verdictDeJournee(s(meta(5, "8 nov.")), 5, hiver("2026-11-08 17:30")), "ce soir");
+  assert.equal(verdictDeJournee(s(meta(4, "1 nov.")), 4, hiver("2026-11-01 15:00")), "à minuit");
 }
 
 /* -------------------------- 2 · estLeJour = l'ancien voteOuvert -------------------------- */
@@ -366,6 +412,201 @@ const cle = (m: Map<string, unknown>) => JSON.stringify([...m].sort());
   assert.equal(appliquerVotes(d, computeJournees(d), VOTES, t), d);
 }
 
+/* --------- 11 · Rouverte avant la révélation : la fin des matchs suit la dernière feuille --------- */
+// La base tient F comme tenirFinDesMatchs (public.saison_fin_des_matchs) : à
+// chaque écriture, posée à la dernière feuille, retirée d'une journée rouverte
+// avant sa révélation. Le dimanche est rejoué écriture par écriture.
+type Ecriture = { a: string; f: (s: Saison) => Saison };
+const surJ5 = (f: (e: MatchEntry) => MatchEntry) => (s: Saison): Saison => ({ ...s, entries: s.entries.map((e) => (e.j === 5 ? f(e) : e)) });
+const resultat = (team: string, r: MatchEntry["result"]) => surJ5((e) => (e.team === team ? { ...e, result: r } : e));
+const butsDe = (player: string, n: number) => surJ5((e) => (e.player === player ? { ...e, buts: n } : e));
+const m3 = { noirs: NOMS.slice(40, 45), blancs: NOMS.slice(45, 50) };
+const ajouterMatch3 = (s: Saison): Saison => ({ ...s, entries: [...s.entries, ...poser(5, m3, 3)] });
+const MATIN: Ecriture[] = [
+  { a: "13:10", f: butsDe("J61", 1) },
+  { a: "13:40", f: butsDe("J61", 4) },
+  { a: "14:00", f: (s) => resultat("Blancs 1", "Défaite")(resultat("Noirs 1", "Victoire")(s)) },
+  { a: "14:30", f: butsDe("J26", 1) },
+  { a: "15:10", f: (s) => resultat("Blancs 2", "Défaite")(resultat("Noirs 2", "Victoire")(s)) },
+];
+function dimancheEcrit(ecritures: Ecriture[]): (t: Date) => Saison {
+  const etats: { a: number; s: Saison }[] = [];
+  let doc = SAMEDI;
+  for (const e of ecritures) {
+    const t = hiver(`2026-11-08 ${e.a}`);
+    doc = tenirFinDesMatchs(e.f(doc), t);
+    etats.push({ a: t.getTime(), s: doc });
+  }
+  return (t) => etats.filter((x) => x.a <= t.getTime()).at(-1)?.s ?? SAMEDI;
+}
+/** Le dimanche minute par minute : quand points et divisions bougent, et l'invariant D1/D2. */
+function filmer(d: (t: Date) => Saison, de: Date, a: Date) {
+  const vueA = (t: Date) => figer(saisonAvecVotes(d(t), VOTES, t), t);
+  const cache = new Map<string, { pp: string; div: string; invariant: boolean }>();
+  const lire = (t: Date) => {
+    const v = vueA(t);
+    const k = JSON.stringify([v.entries.filter((e) => e.j === 5), v.figee?.caches ?? null]);
+    let r = cache.get(k);
+    if (!r) {
+      const pp = ppDe(v);
+      const etat = etatDivisions(v)!;
+      const de_ = (x: Division) => etat.decoupage.divisions[x].map((p) => pp.get(p.nom)!);
+      r = { pp: cle(pp), div: cle(etat.actuelle), invariant: Math.max(...de_(2)) <= Math.min(...de_(1)) && Math.max(...de_(3)) <= Math.min(...de_(2)) };
+      cache.set(k, r);
+    }
+    return r;
+  };
+  let avant = lire(de);
+  const bouge: { t: string; quoi: "points" | "divisions" }[] = [];
+  let invariant = avant.invariant;
+  for (let t = de.getTime() + 60_000; t <= a.getTime(); t += 60_000) {
+    const r = lire(new Date(t));
+    invariant &&= r.invariant;
+    if (r.pp !== avant.pp) bouge.push({ t: new Date(t).toISOString(), quoi: "points" });
+    if (r.div !== avant.div) bouge.push({ t: new Date(t).toISOString(), quoi: "divisions" });
+    avant = r;
+  }
+  return { bouge, invariant };
+}
+{
+  const h = (x: string) => hiver(`2026-11-08 ${x}`);
+  const f5 = (s: Saison) => s.journees.find((m) => m.j === 5)!.finDesMatchs ?? null;
+  // Un Match 3 ajouté à 16 h (F était 15 h 10), joué de 18 h 30 à 19 h 30, feuille à 19 h 40.
+  const d = dimancheEcrit([
+    ...MATIN,
+    { a: "16:00", f: ajouterMatch3 },
+    { a: "19:10", f: butsDe("J41", 3) },
+    { a: "19:40", f: (s) => resultat("Blancs 3", "Défaite")(resultat("Noirs 3", "Victoire")(s)) },
+  ]);
+  assert.equal(f5(d(h("15:30"))), iso(h("15:10")), "la dernière feuille à 15 h 10 : F");
+  assert.equal(f5(d(h("16:30"))), null, "un match ajouté avant la révélation : F retirée");
+  assert.equal(journeeComptee(d(h("19:00")), 5, h("19:00")), false, "pas finie : pas de révélation à 19 h");
+  assert.equal(voteOuvertA(d(h("18:30")), 5, h("18:30")), true, "le vote rouvert, la dernière feuille pas remplie");
+  assert.equal(f5(d(h("19:45"))), iso(h("19:40")), "reposée à la nouvelle dernière feuille");
+  assert.equal(voteOuvertA(d(h("19:45")), 5, h("19:45")), true, "ceux du Match 3 votent");
+  assert.equal(voteOuvertA(d(h("20:39")), 5, h("20:39")), true);
+  assert.equal(voteOuvertA(d(h("20:40")), 5, h("20:40")), false, "une heure après leur feuille");
+  assert.equal(libelleRevelation(d(h("19:45")), 5, h("19:45")), "21 h 40");
+  const film = filmer(d, h("12:00"), h("23:30"));
+  assert.ok(film.invariant, "jamais un D2 au-dessus d'un D1");
+  assert.deepEqual(film.bouge, [
+    { t: h("21:40").toISOString(), quoi: "points" },
+    { t: h("21:40").toISOString(), quoi: "divisions" },
+  ], "rien ne bouge avant la révélation, tout entre en une fois");
+
+  // Un résultat effacé à 16 h (une correction), remis à 19 h 20 : F = 19 h 20, révélation à 21 h 20.
+  const e = dimancheEcrit([
+    ...MATIN,
+    { a: "16:00", f: (s) => resultat("Blancs 2", null)(resultat("Noirs 2", null)(s)) },
+    { a: "19:20", f: (s) => resultat("Blancs 2", "Nul")(resultat("Noirs 2", "Nul")(s)) },
+  ]);
+  const filmE = filmer(e, h("12:00"), h("23:30"));
+  assert.ok(filmE.invariant);
+  assert.deepEqual(filmE.bouge, [
+    { t: h("21:20").toISOString(), quoi: "points" },
+    { t: h("21:20").toISOString(), quoi: "divisions" },
+  ]);
+  // Après la révélation, une correction ne déplace plus F : la journée reste comptée.
+  const revelee = dimancheEcrit([...MATIN, { a: "21:00", f: ajouterMatch3 }]);
+  assert.equal(f5(revelee(h("21:05"))), iso(h("15:10")), "après la révélation : F gardée");
+  assert.equal(journeeComptee(revelee(h("21:05")), 5, h("21:05")), true);
+  // tenirFinDesMatchs, cas par cas.
+  const fini = direct(h("15:30"));
+  assert.equal(tenirFinDesMatchs(fini, h("15:30")), fini, "finie, F posée : rien");
+  const sansF: Saison = { ...fini, journees: fini.journees.map((m) => (m.j === 5 ? { ...m, finDesMatchs: undefined } : m)) };
+  assert.equal(f5(tenirFinDesMatchs(sansF, h("15:31"))), iso(h("15:31")), "finie le jour même : l'heure du téléphone");
+  assert.equal(f5(tenirFinDesMatchs(sansF, hiver("2026-11-09 08:00"))), null, "finie le lendemain : pas de F");
+  const j4 = { ...SAMEDI, journees: SAMEDI.journees.filter((m) => m.j <= 4) };
+  assert.equal(tenirFinDesMatchs(j4, hiver("2026-11-01 15:00")), j4, "la J4 : jamais");
+}
+
+/* ----------------------- 12 · Une date que l'app ne lit pas (I11) ----------------------- */
+{
+  const illisible: Saison = { ...SAMEDI, journees: SAMEDI.journees.map((m) => (m.j === 5 ? { ...m, date: "08/11" } : m)) };
+  assert.ok(verifierFeuille(illisible, 5).some((e) => e.r === "I11"));
+  assert.ok(nouveauxEcarts(SAMEDI, illisible).some((e) => e.r === "I11"), "une date illisible ne s'écrit pas");
+  assert.ok(!nouveauxEcarts(illisible, illisible).some((e) => e.r === "I11"), "déjà là : elle ne bloque rien d'autre");
+  assert.ok(!verifierFeuille(SAMEDI, 5).some((e) => e.r === "I11"));
+}
+
+/* ----------------------- 13 · La nuit : un match tardif qui déborde ----------------------- */
+{
+  // Le Match 2 encore en cours (sa feuille pas remplie), passé minuit.
+  const nuit = direct(hiver("2026-11-08 14:45"));
+  const prise = (t: string) => droitDePrendre(nuit, 5, ["Noirs 2", "Blancs 2"], "J26", hiver(t));
+  assert.equal(prise("2026-11-09 00:05"), null, "à 00 h 05, sa feuille se prend encore");
+  assert.equal(prise("2026-11-09 00:59"), null);
+  assert.equal(prise("2026-11-09 01:00"), "pas-du-jour", "1 h passée : non");
+  assert.equal(prise("2026-11-07 23:00"), "pas-du-jour", "la veille : non");
+  assert.equal(voteOuvertA(nuit, 5, hiver("2026-11-09 00:05")), false, "le vote, lui, a fermé à minuit");
+  assert.equal(etatRevelation(nuit, 5, hiver("2026-11-09 00:10")), "en-direct", "pas « bloquée » en pleine nuit de match");
+  assert.equal(etatRevelation(nuit, 5, hiver("2026-11-09 01:00")), "bloquee");
+  assert.equal(prochaineTransition(nuit, hiver("2026-11-09 00:30"))!.getTime(), hiver("2026-11-09 01:00").getTime());
+}
+
+/* ----------------------- 14 · L'heure du serveur (horloge.ts) ----------------------- */
+{
+  const vraie = hiver("2026-11-08 17:00").getTime();
+  const avant = Date.now;
+  try {
+    // Un téléphone en avance de deux heures.
+    Date.now = () => vraie + 2 * 3600_000;
+    noterHeureServeur(vraie, Date.now() - 150, Date.now() + 150);
+    assert.ok(Math.abs(heureDeLaLigue().getTime() - vraie) < 1000, "l'heure de la ligue est celle du serveur");
+    const t = heureDeLaLigue();
+    assert.equal(journeeComptee(direct(t), 5, t), false, "à 17 h réelles, rien n'est révélé");
+    assert.equal(voteOuvertA(direct(t), 5, t), true, "et le vote est ouvert");
+    // Un téléphone en retard de 30 min : à 18 h 10 réelles, le vote est fermé.
+    const r = hiver("2026-11-08 18:10").getTime();
+    Date.now = () => r - 30 * 60_000;
+    noterHeureServeur(r, Date.now() - 100, Date.now() + 100);
+    assert.equal(voteOuvertA(direct(heureDeLaLigue()), 5, heureDeLaLigue()), false);
+    // Une mesure trop lente ne compte pas ; un écart de moins de 2 s non plus.
+    const d0 = decalageHorloge();
+    noterHeureServeur(r + 3_600_000, Date.now() - 3000, Date.now() + 3000);
+    assert.equal(decalageHorloge(), d0, "aller-retour de 6 s : ignorée");
+    Date.now = () => r + 1500;
+    noterHeureServeur(r, Date.now() - 50, Date.now() + 50);
+    assert.equal(decalageHorloge(), 0, "1,5 s d'écart : l'heure du téléphone");
+  } finally {
+    Date.now = avant;
+    noterHeureServeur(Date.now(), Date.now(), Date.now());
+  }
+  assert.equal(decalageHorloge(), 0);
+}
+
+/* ----------------- 15 · Le moment de la cérémonie, la fin des matchs de la base ----------------- */
+{
+  assert.ok(uneJourneeDePlus("1,2,3,4", "1,2,3,4,5"));
+  assert.ok(uneJourneeDePlus("", "1"), "la J1 d'une saison révélée, l'app ouverte : la cérémonie part");
+  assert.ok(!uneJourneeDePlus("1,2", "1,2") && !uneJourneeDePlus("1,2,3", "1,2"));
+  // publier_saison rend la fin des matchs gardée par la base : l'appareil de l'admin l'adopte.
+  const d = direct(hiver("2026-11-08 15:30"));
+  const base = iso(hiver("2026-11-08 15:12"));
+  const adopte = avecFinsDeLaBase(d, { "5": base, "4": null });
+  assert.equal(adopte.journees.find((m) => m.j === 5)!.finDesMatchs, base);
+  assert.equal(libelleFinDuVote(adopte, 5, hiver("2026-11-08 15:30")), "18 h");
+  assert.equal(avecFinsDeLaBase(adopte, { "5": base }), adopte, "déjà d'accord : même référence");
+  assert.ok(!("finDesMatchs" in avecFinsDeLaBase(adopte, { "5": null }).journees.find((m) => m.j === 5)!), "retirée par la base");
+  assert.equal(avecFinsDeLaBase(d, {}), d);
+}
+
+/* ----------------------- 16 · L'admin : la J6 à préparer, la journée bloquée ----------------------- */
+{
+  const a1905 = hiver("2026-11-08 19:05");
+  assert.equal(dimancheDeJournee(a1905), "8 nov.");
+  assert.equal(dimancheDeJournee(a1905, SAMEDI), "15 nov.", "le dimanche a déjà sa journée : le suivant");
+  assert.deepEqual(journeeAPreparer(direct(a1905), a1905), { j: 6, date: "15 nov." });
+  assert.equal(dimancheDeJournee(hiver("2026-11-06 12:00"), SAMEDI), "8 nov.", "un vendredi : le dimanche qui vient");
+  // Le lundi d'une J5 bloquée, l'admin s'ouvre sur elle.
+  const lundi = hiver("2026-11-09 10:00");
+  const bloquee = direct(hiver("2026-11-08 14:45"));
+  assert.equal(prochaineJournee(bloquee, lundi), 5);
+  const avecJ6: Saison = { ...bloquee, journees: [...bloquee.journees, meta(6, "15 nov.")] };
+  assert.equal(prochaineJournee(avecJ6, lundi), 5, "avant la J6 à venir");
+  assert.equal(prochaineJournee(direct(a1905), lundi), null, "rien de bloqué, rien à venir");
+}
+
 /* ------------------------------------ 10 · Les portes ------------------------------------ */
 function faux(doc: Saison, votes: VoteFigure[]): SupabaseClient {
   const requete = (table: string) => {
@@ -398,7 +639,7 @@ void (async () => {
     assert.ok(!lue.brute.entries.some((e) => e.j === 5 && e.result) || h === "19:00", "brute aussi figée");
   }
   console.log(
-    "revelation-check : heures et libellés, estLeJour, voteOuvertA, dimanche minute par minute (rien ne bouge avant 19 h, tout à 19 h, jamais un D2 au-dessus d'un D1), J4 à minuit, cas limites, figer, portes — ok"
+    "revelation-check : heures et libellés, estLeJour, voteOuvertA, dimanche minute par minute (rien ne bouge avant 19 h, tout à 19 h, jamais un D2 au-dessus d'un D1), J4 à minuit, cas limites, figer, rouverte avant la révélation, date illisible, la nuit, l'heure du serveur, la fin des matchs de la base, l'admin, portes — ok"
   );
 })().catch((e) => {
   console.error(e);

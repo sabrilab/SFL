@@ -49,6 +49,7 @@ import type { Enjeu, Voisins } from "@/lib/sfl/actus-toi";
 import { exploitsDe } from "@/lib/sfl/exploits";
 import { entryPP } from "@/lib/sfl/saisie/engine";
 import { rangPepiteApres } from "@/lib/sfl/rangs";
+import { nomDivision } from "@/lib/sfl/divisions";
 import { journeeJouee } from "@/lib/sfl/saisie/mutations";
 import { projeter, trace, vue } from "@/lib/sfl/terrain-vu";
 import { metal, NOM_METAL, TROPHEES } from "@/lib/sfl/trophees";
@@ -582,10 +583,14 @@ function rang(noms: string[], v: number, ecart: number, taille: number, d0: numb
   return noms.map((nom, i) => ({ nom, u: MILIEU + (i - (noms.length - 1) / 2) * ecart, v, taille, d: tour(i, d0), moi: nom === moi }));
 }
 
-/** Ton dimanche : ta carte à côté du but, tes buts au fond du filet, tes chiffres autour. */
+/**
+ * Ton dimanche : ta carte à côté du but, tes buts au fond du filet, tes
+ * chiffres autour ; ta place au Pépite d'Or, et ta division quand la
+ * journée la change (« D3 → D2 », à la révélation : revelation.ts).
+ */
 export function RubriqueToi({ j, date, className }: { j: number; date: string; className?: string }) {
   const { player, me } = useMyPlayer();
-  const { saison, evolution } = useSeason();
+  const { saison, evolution, divisions } = useSeason();
   const lignes = saison.entries.filter((e) => e.j === j && e.player === me);
   const joue = lignes.some((e) => e.statut === "Présent" && !e.extraTime);
   const delta = useMemo(() => {
@@ -600,6 +605,9 @@ export function RubriqueToi({ j, date, className }: { j: number; date: string; c
   const buts = lignes.reduce((t, e) => t + e.buts, 0);
   const passes = lignes.reduce((t, e) => t + e.passes, 0);
   const pp = lignes.reduce((t, e) => t + entryPP(e), 0);
+  const mouvement = divisions?.journees.find((x) => x.j === j)?.mouvements.find((m) => m.nom === me);
+  const place = delta > 0 ? `▲ ${delta} au Pépite d'Or` : delta < 0 ? `▼ ${-delta} au Pépite d'Or` : "Même place au Pépite d'Or";
+  const division = mouvement && mouvement.de !== mouvement.vers ? ` · ${nomDivision(mouvement.de)} → ${nomDivision(mouvement.vers)}` : "";
   return (
     <Scene
       className={className}
@@ -607,7 +615,7 @@ export function RubriqueToi({ j, date, className }: { j: number; date: string; c
       titre="Ton dimanche"
       places={[{ nom: me, ...A_COTE_DU_BUT, taille: T.vedette, d: 0.15, moi: true }]}
       jusqua={225}
-      texte={delta > 0 ? `▲ ${delta} au Pépite d'Or` : delta < 0 ? `▼ ${-delta} au Pépite d'Or` : "Même place au Pépite d'Or"}
+      texte={`${place}${division}`}
       partage={{ titre: "Mon dimanche", j, lignes: [{ n: me, v: `${buts} buts · ${passes} passes · +${pp} pts` }] }}
       action={<BoutonStoryDimanche j={j} date={date} buts={buts} passes={passes} points={pp} delta={delta} />}
     >

@@ -21,6 +21,7 @@ import { useMyPlayer } from "@/components/sfl/player-provider";
 import { useFeuillesDirect, type FeuillesDirect } from "@/hooks/use-feuilles-direct";
 import { droitDePrendre, etatDeLaFeuille, joueursDuMatch, MOTS_DU_REFUS, peutPrendre, scoreDeLaFeuille, type Equipes } from "@/lib/sfl/feuille-direct";
 import { voteOuvertA } from "@/lib/sfl/revelation";
+import { maintenant as heureDeLaLigue } from "@/lib/sfl/horloge";
 import { journeeAvecVote } from "@/lib/sfl/votes";
 import { haptique } from "@/lib/sfl/haptique";
 import { cn } from "@/lib/utils";
@@ -46,7 +47,7 @@ export function DirectDuMatch({
   const [envoi, setEnvoi] = useState(false);
   const feuille = direct.feuilleDe(equipes);
   const etat = etatDeLaFeuille(feuille, direct.monId);
-  const droit = droitDePrendre(saisonLue, j, equipes, me, new Date());
+  const droit = droitDePrendre(saisonLue, j, equipes, me, heureDeLaLigue());
   // Libre et à moi de la prendre (une feuille rouverte puis libérée aussi) ;
   // une feuille libérée se suit encore en lecture par toute la ligue.
   const prenable = peutPrendre(feuille, droit);
@@ -87,7 +88,7 @@ export function DirectDuMatch({
   // Le vote du soir, pour qui a joué ce match.
   const jn = journees.find((x) => x.j === j);
   const { noirs, blancs } = joueursDuMatch(saisonLue, j, equipes);
-  const voter = etat === "scellee" && !!jn && journeeAvecVote(jn) && voteOuvertA(saisonLue, j, new Date()) && [...noirs, ...blancs].includes(me);
+  const voter = etat === "scellee" && !!jn && journeeAvecVote(jn) && voteOuvertA(saisonLue, j, heureDeLaLigue()) && [...noirs, ...blancs].includes(me);
   return (
     <>
       <div className="glass flex flex-col gap-3 rounded-[22px] px-4 py-3.5">

@@ -33,7 +33,6 @@
 // rangée où l'on choisit, petite une fois choisie.
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { heureLisible } from "@/lib/sfl/revelation";
 import { toast } from "sonner";
 import { FORMAT_CARTE } from "@/components/sfl/mini-carte";
 import { PlayerCard } from "@/components/sfl/player-card";
@@ -419,7 +418,7 @@ function EnTete({ mp, id, titre, sujets }: { mp: MesPronos; id: string; titre: s
           <FermeDans fin={mp.p.coupEnvoi} />
         ) : juge ? (
           <span className={cn("mono-label shrink-0", gagne ? "text-[#9fe0a8]" : "text-white/55")}>
-            {mp.phase === "en-jeu" ? `Verdict à ${heureLisible(mp.p.finDuJour)} · ` : ""}+{gagne} XP
+            {mp.phase === "en-jeu" ? `Verdict ${mp.p.verdict} · ` : ""}+{gagne} XP
           </span>
         ) : (
           <span className="mono-label flex shrink-0 items-center gap-2 text-white/80">
@@ -444,7 +443,7 @@ function Pied({ mp }: { mp: MesPronos }) {
   return (
     <p className="mono-label text-white/45">
       {`Toute la journée · ${mp.plafond} XP au plus${tribune ? " depuis la tribune" : ""} · `}
-      {mp.phase === "ouvert" ? "ferme au premier coup d'envoi" : `définitif à ${heureLisible(mp.p.finDuJour)}`}
+      {mp.phase === "ouvert" ? "ferme au premier coup d'envoi" : `définitif ${mp.p.verdict}`}
     </p>
   );
 }

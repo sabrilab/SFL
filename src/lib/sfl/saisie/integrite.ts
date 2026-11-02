@@ -25,6 +25,9 @@
 //       défaut à corriger avant d'être publiée
 //   I10 une vue figée (revelation.ts, figer) : ses journées en attente de la
 //       révélation n'ont plus leurs résultats, l'écrire les effacerait
+//   I11 une date que l'app ne lit pas (« 08/11 ») : ni vote, ni révélation,
+//       ni fin des matchs (02/11/2026 ; la base refuse aussi,
+//       public.dates_illisibles)
 //
 // Pur.
 
@@ -34,6 +37,7 @@ import { suspendusPour } from "../cartons";
 import { estBrouillon } from "./brouillon";
 import type { MatchDuJour, MatchEntry, Saison } from "./types";
 import { libelleCourt } from "./mutations";
+import { jourMoisDuLibelle } from "../convocation-temps";
 
 export type Ecart =
   | { r: "I0"; j: number; joueur: string }
@@ -46,12 +50,13 @@ export type Ecart =
   | { r: "I7"; j: number; equipe: string }
   | { r: "I8"; j: number }
   | { r: "I9"; j: number; joueur: string }
-  | { r: "I10" };
+  | { r: "I10" }
+  | { r: "I11"; j: number; date: string };
 
 export type Regle = Ecart["r"];
 
-export const BLOQUE_L_ECRITURE: ReadonlySet<Regle> = new Set(["I0", "I1", "I2", "I6", "I8", "I9", "I10"]);
-export const BLOQUE_LA_PUBLICATION: ReadonlySet<Regle> = new Set(["I0", "I1", "I2", "I3", "I4", "I5", "I6", "I7", "I9"]);
+export const BLOQUE_L_ECRITURE: ReadonlySet<Regle> = new Set(["I0", "I1", "I2", "I6", "I8", "I9", "I10", "I11"]);
+export const BLOQUE_LA_PUBLICATION: ReadonlySet<Regle> = new Set(["I0", "I1", "I2", "I3", "I4", "I5", "I6", "I7", "I9", "I11"]);
 
 const cle = (n: string) => n.trim().toLowerCase();
 const dateCle = (d: string) => libelleCourt(d).normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
@@ -76,6 +81,8 @@ export function cleEcart(e: Ecart): string {
       return `I8|${e.j}`;
     case "I10":
       return "I10";
+    case "I11":
+      return `I11|${e.j}|${e.date}`;
   }
 }
 
@@ -104,6 +111,8 @@ export function libelleEcart(e: Ecart): string {
       return `${e.joueur} · suspendu`;
     case "I10":
       return "Vue figée";
+    case "I11":
+      return `${e.date} · date illisible`;
   }
 }
 
@@ -165,6 +174,9 @@ export function verifierFeuille(s: Saison, j: number, terrainsMax = TERRAINS_MAX
     parHeure.set(h, n);
     if (h && n > terrainsMax && !out.some((x) => x.r === "I5" && x.j === j && x.match === i + 1)) out.push({ r: "I5", j, match: i + 1 });
   });
+
+  // I11 : une date que l'app ne lit pas.
+  if (meta && !jourMoisDuLibelle(meta.date)) out.push({ r: "I11", j, date: meta.date });
 
   // I6
   if (meta) {

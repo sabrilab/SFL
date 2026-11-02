@@ -17,6 +17,7 @@ import { useIdentites } from "@/hooks/use-identites";
 import { useIsClient } from "@/hooks/use-is-client";
 import { buteursDe, type Actu } from "@/lib/sfl/actus";
 import { voteOuvertA } from "@/lib/sfl/revelation";
+import { useMaintenant } from "@/hooks/use-missions";
 import { dernierBilan, nomDivision } from "@/lib/sfl/divisions";
 import { rankPlayers } from "@/lib/sfl/engine";
 import { isHidden } from "@/lib/sfl/hidden";
@@ -462,12 +463,9 @@ export function VoteDuJour({ me }: { me: string }) {
   const isClient = useIsClient();
   // Le direct : la feuille remplie ouvre le vote bien avant la révélation.
   const { journeesDirect: journees, saisonLue } = useSeason();
-  // Se relit chaque minute : à la fin du vote, la section disparaît d'elle-même.
-  const [maintenant, setMaintenant] = useState(() => new Date());
-  useEffect(() => {
-    const id = window.setInterval(() => setMaintenant(new Date()), 60_000);
-    return () => window.clearInterval(id);
-  }, []);
+  // Se relit chaque minute, à l'heure du serveur : à la fin du vote, la
+  // section disparaît d'elle-même.
+  const maintenant = useMaintenant();
   if (!isClient) return null;
   const ouvertes = journees.filter((j) => journeeAvecVote(j) && voteOuvertA(saisonLue, j.j, maintenant));
   return (

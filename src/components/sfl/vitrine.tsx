@@ -79,6 +79,7 @@ import {
 import { cn } from "@/lib/utils";
 import { Nom } from "@/components/sfl/nom";
 import { saisonsBolaDe } from "@/lib/sfl/carte-bola";
+import { apresLaCeremonie } from "@/lib/sfl/ceremonie";
 
 /** Les métaux : le dégradé, l'encre gravée dessus, le listel du bord. */
 const METAL: Record<Metal, { stops: [string, string, string]; encre: string; listel: string; trait: string }> = {
@@ -1078,7 +1079,11 @@ export function NouveauxBadges() {
 
     const nouveaux = vus ? cles.filter((c) => !vus!.includes(c)) : cles;
     if (!nouveaux.length) return;
-    const timer = setTimeout(() => {
+    // Jamais par-dessus une cérémonie (ta division, tes cartes) : après elle
+    // (ceremonie.ts). Une fois promises, elles sortent, même si l'on quitte
+    // l'app entre-temps : elles sont déjà notées vues.
+    const timer = setTimeout(() => apresLaCeremonie(annoncer), 2500);
+    function annoncer() {
       if (!vus) {
         toast(`Tu as ${nouveaux.length} badge${nouveaux.length > 1 ? "s" : ""}`, {
           description: "Ils t'attendent dans Ma carte.",
@@ -1096,7 +1101,7 @@ export function NouveauxBadges() {
           action: { label: "Voir", onClick: () => (window.location.href = "/profil/badges") },
         });
       }
-    }, 2500);
+    }
     return () => clearTimeout(timer);
   }, [actif, me, moment]);
 

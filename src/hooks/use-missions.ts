@@ -20,6 +20,7 @@ import { useSession } from "@/hooks/use-session";
 import { useListePronos } from "@/hooks/use-liste-pronos";
 import { useRecrues } from "@/hooks/use-recrues";
 import { useVotes } from "@/hooks/use-votes";
+import { HORLOGE_EVENT, maintenantMs } from "@/lib/sfl/horloge";
 import {
   aJoue,
   bilanDe,
@@ -182,12 +183,26 @@ function cartesDe(
 /** Les épreuves du passe de ce joueur : celles d'un joueur Bola pour moi si je joue en Bola, sinon celles de la SFL. */
 const epreuvesDe = (nom: string, bola: string | null): readonly Epreuve[] | undefined => (bola && nom === bola ? EPREUVES_BOLA : undefined);
 
-/** L'heure, à la minute : le coup d'envoi et la révélation se voient sans recharger. */
+/**
+ * L'heure, à la minute : le coup d'envoi et la révélation se voient sans
+ * recharger. Celle du serveur (horloge.ts), recalée dès qu'une mesure la
+ * corrige, et à chaque minute ronde : 19 h se voit à 19 h 00.
+ */
 export function useMaintenant(): Date {
-  const [t, setT] = useState(() => Date.now());
+  const [t, setT] = useState(() => maintenantMs());
   useEffect(() => {
-    const id = window.setInterval(() => setT(Date.now()), 60_000);
-    return () => window.clearInterval(id);
+    let id = 0;
+    const tic = () => {
+      setT(maintenantMs());
+      window.clearTimeout(id);
+      id = window.setTimeout(tic, 60_000 - (maintenantMs() % 60_000) + 50);
+    };
+    id = window.setTimeout(tic, 60_000 - (maintenantMs() % 60_000) + 50);
+    window.addEventListener(HORLOGE_EVENT, tic);
+    return () => {
+      window.clearTimeout(id);
+      window.removeEventListener(HORLOGE_EVENT, tic);
+    };
   }, []);
   return useMemo(() => new Date(t), [t]);
 }

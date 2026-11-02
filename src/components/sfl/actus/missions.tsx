@@ -28,7 +28,6 @@
 // ta fiche le dit, « Abdel a signé contre toi », que tu aies signé ou non.
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { heureLisible } from "@/lib/sfl/revelation";
 import { toast } from "sonner";
 import { CarteDe, FORMAT_CARTE, MiniCarte } from "@/components/sfl/mini-carte";
 import { Nom } from "@/components/sfl/nom";
@@ -137,7 +136,7 @@ function Moment({ mm }: { mm: MesMissions }) {
       </span>
     );
   return (
-    <span className="mono-label shrink-0 text-encre-3">{mm.phase === "en-jeu" ? `Verdict à ${heureLisible(mm.d.finDuJour)}` : "Verdict"}</span>
+    <span className="mono-label shrink-0 text-encre-3">{mm.phase === "en-jeu" ? `Verdict ${mm.d.verdict}` : "Verdict"}</span>
   );
 }
 
@@ -321,7 +320,7 @@ function Champs({ l, mm }: { l: LigneMission; mm: MesMissions }) {
       <div>
         <span className="mono-label text-white/45">{mm.phase === "ouvert" ? "Avant" : "Verdict"}</span>
         <span className="truncate text-lecture leading-[25px] font-bold">
-          {mm.phase === "ouvert" ? limite(mm.d.coupEnvoi, mm.d.heure) : mm.phase === "en-jeu" ? capitale(heureLisible(mm.d.finDuJour)) : "Définitif"}
+          {mm.phase === "ouvert" ? limite(mm.d.coupEnvoi, mm.d.heure) : mm.phase === "en-jeu" ? capitale(mm.d.verdict) : "Définitif"}
         </span>
       </div>
     </div>

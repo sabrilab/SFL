@@ -24,7 +24,23 @@
 // Exemples (dernière feuille → fin du vote · révélation) : 15 h 10 → 18 h ·
 // 19 h ; 17 h 40 → 18 h 40 · 19 h 40 ; 22 h 30 → 23 h 30 · minuit ; 23 h 15 →
 // minuit · minuit ; jamais → minuit · aucune (la journée est « bloquée », et
-// l'admin le voit).
+// l'admin le voit, passé la nuit : 1 h du matin, NUIT_MS).
+//
+// F suit la DERNIÈRE feuille (relecture du 02/11) : une journée rouverte
+// avant sa révélation — un match ajouté, un résultat effacé — perd sa fin
+// des matchs, et la retrouve quand sa dernière feuille est de nouveau
+// remplie ; une feuille rouverte puis scellée de nouveau (feuille_admin,
+// sceller_feuille) la déplace à ce sceau. Le vote rouvre alors jusqu'à une
+// heure au moins après elle, et la révélation recule d'autant : rien ne
+// bouge avant, tout entre en une fois.
+// Après la révélation, F ne bouge plus : une correction (un résultat changé,
+// un match ajouté) se voit tout de suite, la journée reste comptée. C'est la
+// base qui tient F (public.saison_fin_des_matchs, gardé dans
+// public.fins_des_matchs) ; l'app fait de même sur l'appareil de l'admin
+// (tenirFinDesMatchs) et adopte les heures que la base lui rend.
+//
+// L'heure, côté téléphone, est celle du serveur (horloge.ts) : un téléphone
+// à l'heure fausse ne révèle ni avant, ni après les autres.
 //
 // La vue figée (figer) est la saison que lit toute la ligue : les deux
 // portes de lecture, le SeasonProvider et lireSaisonServeur, la rendent. Ses
@@ -39,7 +55,7 @@
 // Pur et isomorphe : l'instant est toujours donné par l'appelant. Heure de
 // Paris partout, changement d'heure compris.
 
-import { estLeJour, heureDuJour, minuitDuSoir } from "./convocation-temps";
+import { estLeJour, estLeJourOuSaNuit, heureDuJour, minuitDuSoir, NUIT_MS } from "./convocation-temps";
 import { journeeJouee, journeeTerminee } from "./saisie/engine";
 import { estBrouillon } from "./saisie/brouillon";
 import { numeroSaison, type JourneeMeta, type MatchEntry, type Saison } from "./saisie/types";
@@ -123,8 +139,11 @@ function avecVote(s: Pick<Saison, "entries">, meta: JourneeMeta): boolean {
 /**
  * Une journée compte-t-elle à l'instant t ? Se calcule sur la saison PUBLIÉE
  * (le direct), jamais sur une vue figée. Ancien régime : dès qu'elle est
- * jouée. Nouveau régime : à la révélation ; sans F (feuille finie après
- * minuit, ou base sans le déclencheur), la feuille finie et la nuit passée.
+ * jouée. Nouveau régime : à la révélation (F connu : la base l'a retiré si la
+ * journée a été rouverte avant, si bien qu'une révélation passée vaut pour
+ * une journée finie ; une correction faite après se voit tout de suite) ;
+ * sans F (feuille finie après minuit, journée rouverte, ou base sans le
+ * déclencheur), la feuille finie et minuit passé.
  * `votesPrets: false` (un téléphone qui n'a pas encore ses votes) retient
  * une journée avec vote : sans eux, elle serait coupée sans ses Impact et
  * Défensive, puis recoupée une seconde plus tard.
@@ -139,6 +158,16 @@ export function journeeComptee(s: SaisonLignes, j: number, t: Date, o: { votesPr
   if (rev) return t.getTime() >= rev.getTime();
   const minuit = minuitDuSoir(meta.date, t);
   return journeeTerminee(s, j) && (!minuit || t.getTime() >= minuit.getTime());
+}
+
+/**
+ * Une journée de plus compte-t-elle ? Les listes « 1,2,3,4 » (journées
+ * comptées, triées) d'avant et d'après. « » est zéro journée : la J1 d'une
+ * saison qui se révèle, l'app ouverte, a sa cérémonie (use-moment-annonce).
+ */
+export function uneJourneeDePlus(avant: string, apres: string): boolean {
+  const nombre = (x: string) => (x ? x.split(",").length : 0);
+  return nombre(apres) > nombre(avant);
 }
 
 /** Les journées qui comptent à l'instant t. */
@@ -184,11 +213,12 @@ export type EtatRevelation = "a-venir" | "en-direct" | "vote" | "attente" | "rev
 /**
  * Où en est une journée, pour l'admin et la frise de la Map :
  *   · a-venir : rien de saisi ;
- *   · en-direct : des chiffres entrent, une feuille au moins n'est pas finie ;
+ *   · en-direct : des chiffres entrent, une feuille au moins n'est pas finie
+ *     (jusqu'à 1 h du matin : un match tardif déborde encore) ;
  *   · vote : les feuilles finies, le vote ouvert ;
  *   · attente : le vote fermé, la révélation pas encore là ;
  *   · revelee : la journée compte ;
- *   · bloquee : le jour est passé et une feuille n'a jamais été finie.
+ *   · bloquee : la nuit est passée et une feuille n'a jamais été finie.
  */
 export function etatRevelation(s: SaisonLignes, j: number, t: Date): EtatRevelation {
   if (!journeeJouee(s, j)) return "a-venir";
@@ -204,14 +234,15 @@ export function etatRevelation(s: SaisonLignes, j: number, t: Date): EtatRevelat
   const fin = finDuVote(meta, numero, t);
   if (finDesMatchs(meta)) return fin && t.getTime() < fin.getTime() ? "vote" : "attente";
   if (journeeTerminee(s, j)) return leJour ? "vote" : "attente";
-  return leJour ? "en-direct" : "bloquee";
+  return estLeJourOuSaNuit(meta.date, t) ? "en-direct" : "bloquee";
 }
 
 /**
  * La prochaine heure après t où ce que la ligue voit peut changer : une fin
- * de vote, une révélation, un minuit, ou 17 h (le libellé de la fin du vote,
- * tant que F est inconnu). null s'il n'y en a plus. Le minuteur du
- * SeasonProvider s'y règle.
+ * de vote, une révélation, un minuit, la fin de la nuit (une journée qui
+ * devient « bloquée »), ou 17 h (le libellé de la fin du vote, tant que F
+ * est inconnu). null s'il n'y en a plus. Le minuteur du SeasonProvider s'y
+ * règle.
  */
 export function prochaineTransition(s: SaisonHeures, t: Date): Date | null {
   const numero = numeroSaison(s);
@@ -223,8 +254,12 @@ export function prochaineTransition(s: SaisonHeures, t: Date): Date | null {
     if (estBrouillon(meta)) continue;
     garder(finDuVote(meta, numero, t));
     garder(revelation(meta, numero, t));
-    garder(minuitDuSoir(meta.date, t));
-    if (nouveauRegime(numero, meta.j)) garder(heureDuJour(meta.date, t, 17));
+    const minuit = minuitDuSoir(meta.date, t);
+    garder(minuit);
+    if (nouveauRegime(numero, meta.j)) {
+      garder(heureDuJour(meta.date, t, 17));
+      garder(minuit && new Date(minuit.getTime() + NUIT_MS));
+    }
   }
   return prochaine == null ? null : new Date(prochaine);
 }
@@ -267,19 +302,58 @@ export function figer(s: Saison, t: Date, o: { votesPrets?: boolean } = {}): Sai
 }
 
 /**
- * La fin des matchs proposée par l'app (saisieStore.save) : sur chaque
- * journée du nouveau régime qui devient terminée aujourd'hui sans tampon,
- * l'heure du téléphone. La base la garde si elle est à 5 min de la sienne,
- * sinon pose la sienne (public.saison_fin_des_matchs) ; une fois posée,
- * elle ne bouge plus. Même référence si rien n'est posé.
+ * La fin des matchs tenue par l'app (saisieStore.save, sur l'appareil de
+ * l'admin), comme la base la tient (public.saison_fin_des_matchs) :
+ *   · une journée du nouveau régime qui devient terminée le jour même, sans
+ *     fin des matchs : l'heure du téléphone (la base la garde à 5 min près,
+ *     sinon pose la sienne, et publier_saison la rend : sync.ts l'adopte) ;
+ *   · une journée rouverte AVANT sa révélation (un match ajouté, un résultat
+ *     effacé) : sa fin des matchs est retirée — sa dernière feuille n'est
+ *     plus remplie. Elle revient avec elle ; après la révélation, plus rien
+ *     ne la déplace.
+ * Seulement les journées du nouveau régime : la J4 et avant ne changent
+ * jamais. Même référence si rien ne change.
  */
-export function proposerFinDesMatchs(s: Saison, t: Date): Saison {
+export function tenirFinDesMatchs(s: Saison, t: Date): Saison {
   const numero = numeroSaison(s);
   let change = false;
   const journees = s.journees.map((m) => {
-    if (m.finDesMatchs || estBrouillon(m) || !nouveauRegime(numero, m.j) || !estLeJour(m.date, t) || !journeeTerminee(s, m.j)) return m;
+    if (estBrouillon(m) || !nouveauRegime(numero, m.j)) return m;
+    if (m.finDesMatchs) {
+      const rev = finDesMatchs(m) ? revelation(m, numero, t) : null;
+      if (rev && t.getTime() >= rev.getTime()) return m;
+      if (rev && journeeTerminee(s, m.j)) return m;
+      // Rouverte avant sa révélation (ou une valeur illisible) : retirée.
+      change = true;
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { finDesMatchs: _retiree, ...reste } = m;
+      return reste;
+    }
+    if (!estLeJour(m.date, t) || !journeeTerminee(s, m.j)) return m;
     change = true;
     return { ...m, finDesMatchs: t.toISOString() };
+  });
+  return change ? { ...s, journees } : s;
+}
+
+/**
+ * La fin des matchs que la base a gardée, reprise par l'appareil de l'admin
+ * (publier_saison rend `fins` : « 5 » → l'instant, ou null). Seules les
+ * journées que la réponse nomme changent ; même référence si tout est déjà
+ * d'accord.
+ */
+export function avecFinsDeLaBase(s: Saison, fins: Record<string, string | null | undefined>): Saison {
+  let change = false;
+  const journees = s.journees.map((m) => {
+    const k = String(m.j);
+    if (!(k in fins)) return m;
+    const f = fins[k] ?? null;
+    if ((m.finDesMatchs ?? null) === f) return m;
+    change = true;
+    if (f) return { ...m, finDesMatchs: f };
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { finDesMatchs: _retiree, ...reste } = m;
+    return reste;
   });
   return change ? { ...s, journees } : s;
 }
@@ -295,32 +369,65 @@ export function heureLisible(d: Date): string {
   return m ? `${h} h ${String(m).padStart(2, "0")}` : `${h} h`;
 }
 
-/** Avant 17 h, le jour d'une journée dont la fin des matchs est encore inconnue. */
-function tot(meta: JourneeMeta, t: Date): boolean {
+/** Ce que disent les libellés tant que la fin des matchs est inconnue. */
+export const APRES_LE_DERNIER_MATCH = {
+  vote: "une heure après le dernier match",
+  revelation: "deux heures après le dernier match",
+} as const;
+
+/** Un match qui commence à 16 h ou plus tard ne finit pas avant 17 h : le vote ne fermera pas à 18 h. */
+const COUP_D_ENVOI_TARDIF = 16 * 60;
+
+/** Le coup d'envoi le plus tardif prévu (matchsDuJour, sinon l'heure de la journée), en minutes ; null sans heure lisible. */
+function dernierCoupDEnvoi(meta: JourneeMeta): number | null {
+  const heures = meta.matchsDuJour?.length ? meta.matchsDuJour.map((m) => m.heure ?? meta.heure) : [meta.heure];
+  let tard: number | null = null;
+  for (const h of heures) {
+    const lu = h ? /(\d{1,2})\s*[h:]\s*(\d{2})?/i.exec(h) : null;
+    if (!lu) continue;
+    const v = Number(lu[1]) * 60 + Number(lu[2] ?? 0);
+    if (tard == null || v > tard) tard = v;
+  }
+  return tard;
+}
+
+/**
+ * La fin des matchs encore inconnue, l'heure fixe (18 h, 19 h) se promet-elle
+ * encore ? Avant 17 h le jour même (ou avant le jour), et seulement si aucun
+ * match n'est prévu à 16 h ou plus tard.
+ */
+function heureFixeEncore(meta: JourneeMeta, t: Date): boolean {
   const dixSept = heureDuJour(meta.date, t, 17);
-  return !dixSept || t.getTime() < dixSept.getTime();
+  if (!dixSept || t.getTime() >= dixSept.getTime()) return false;
+  const tard = dernierCoupDEnvoi(meta);
+  return tard == null || tard < COUP_D_ENVOI_TARDIF;
 }
 
 /**
  * L'heure de la fin du vote, à l'écran : « 18 h », « 18 h 40 », « minuit ».
- * Tant que la fin des matchs est inconnue : « 18 h » avant 17 h, puis « 1 h
- * après le dernier match ». La J4 et avant : « minuit ».
+ * Tant que la fin des matchs est inconnue : « 18 h » avant 17 h (sauf un
+ * match prévu à 16 h ou plus tard), puis « une heure après le dernier
+ * match » ; le lendemain, « minuit » (la butée : le vote a fermé à minuit).
+ * La J4 et avant : « minuit ».
  */
 export function libelleFinDuVote(s: SaisonHeures, j: number, t: Date): string {
   const meta = metaDe(s, j);
   const numero = numeroSaison(s);
   if (!meta || !nouveauRegime(numero, j)) return "minuit";
   const fin = finDuVote(meta, numero, t);
-  if (finDesMatchs(meta) && fin) return heureLisible(fin);
+  if (!fin) return "minuit";
+  if (finDesMatchs(meta) || t.getTime() >= fin.getTime()) return heureLisible(fin);
+  if (!heureFixeEncore(meta, t)) return APRES_LE_DERNIER_MATCH.vote;
   const { h, min } = REGLES_REVELATION.FIN_DU_VOTE;
-  const ferme = heureDuJour(meta.date, t, h, min);
-  return tot(meta, t) && ferme ? heureLisible(ferme) : "1 h après le dernier match";
+  return heureLisible(heureDuJour(meta.date, t, h, min)!);
 }
 
 /**
  * L'heure de la révélation, à l'écran : « 19 h », « 19 h 40 », « minuit ».
- * Tant que la fin des matchs est inconnue : « 19 h » avant 17 h, puis « 2 h
- * après le dernier match ». La J4 et avant : « minuit ».
+ * Tant que la fin des matchs est inconnue : « 19 h » avant 17 h (sauf un
+ * match prévu à 16 h ou plus tard), puis « deux heures après le dernier
+ * match » ; le lendemain, « minuit ». La J4 et avant : « minuit ». Une
+ * journée bloquée n'a pas d'heure : l'écran ne la dit pas (etatRevelation).
  */
 export function libelleRevelation(s: SaisonHeures, j: number, t: Date): string {
   const meta = metaDe(s, j);
@@ -328,7 +435,25 @@ export function libelleRevelation(s: SaisonHeures, j: number, t: Date): string {
   if (!meta || !nouveauRegime(numero, j)) return "minuit";
   const rev = revelation(meta, numero, t);
   if (rev) return heureLisible(rev);
+  const minuit = minuitDuSoir(meta.date, t);
+  if (!minuit || t.getTime() >= minuit.getTime()) return "minuit";
+  if (!heureFixeEncore(meta, t)) return APRES_LE_DERNIER_MATCH.revelation;
   const { h, min } = REGLES_REVELATION.REVELATION;
-  const tombe = heureDuJour(meta.date, t, h, min);
-  return tot(meta, t) && tombe ? heureLisible(tombe) : "2 h après le dernier match";
+  return heureLisible(heureDuJour(meta.date, t, h, min)!);
+}
+
+/** Un libellé d'heure (« 19 h », « minuit ») ou une durée (« deux heures après le dernier match ») ? */
+export function estUneHeure(libelle: string): boolean {
+  return libelle === "minuit" || /^\d/.test(libelle);
+}
+
+/** « à 19 h », « à minuit », « deux heures après le dernier match ». */
+export function aLHeure(libelle: string): string {
+  return estUneHeure(libelle) ? `à ${libelle}` : libelle;
+}
+
+/** Le verdict des missions et du Flair, en court : « à 19 h », « à minuit », sinon « ce soir ». */
+export function verdictDeJournee(s: SaisonHeures, j: number, t: Date): string {
+  const l = libelleRevelation(s, j, t);
+  return estUneHeure(l) ? `à ${l}` : "ce soir";
 }

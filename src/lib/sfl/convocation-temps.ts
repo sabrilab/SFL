@@ -136,6 +136,19 @@ export function estLeJour(libelleJournee: string, maintenant: Date): boolean {
   return get("day") === jm.jour && get("month") === jm.mois;
 }
 
+/**
+ * La nuit d'une journée : jusqu'à 1 h du matin, un match tardif qui déborde
+ * se joue encore (02/11/2026). Sa feuille se prend toujours (feuille-direct,
+ * public.droit_feuille) et l'admin ne la voit pas « bloquée » ; le vote, lui,
+ * ferme à minuit (revelation.ts).
+ */
+export const NUIT_MS = 60 * 60_000;
+
+/** Le jour de la journée, ou sa nuit (jusqu'à 1 h, Paris). */
+export function estLeJourOuSaNuit(libelleJournee: string, maintenant: Date): boolean {
+  return estLeJour(libelleJournee, maintenant) || estLeJour(libelleJournee, new Date(maintenant.getTime() - NUIT_MS));
+}
+
 /* ------------------------------ Les heures ------------------------------ */
 
 /** De combien Paris est en avance sur l'heure universelle à cet instant, en ms. */

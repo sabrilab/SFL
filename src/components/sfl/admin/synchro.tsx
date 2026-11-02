@@ -83,6 +83,7 @@ export function lireDefaut(d: string): string {
   if (r === "I0") return `${j} · ${reste} · vitrine`;
   if (r === "I6") return `${reste} · deux journées`;
   if (r === "I10") return "Vue figée";
+  if (r === "I11") return `${j} · ${reste} · date illisible`;
   return d;
 }
 

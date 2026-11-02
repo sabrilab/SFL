@@ -65,7 +65,11 @@ assert.equal(droitDePrendre(saison, 5, N1, "Théo", maintenant), "brouillon");
 assert.equal(droitDePrendre(saison, 3, N1, "Ilyes", maintenant), "pas-du-jour");
 assert.equal(droitDePrendre(saison, 4, ["Noirs 1", "Blancs 2"], "Théo", maintenant), "match");
 assert.equal(droitDePrendre(saison, 9, N1, "Théo", maintenant), "journee");
-assert.equal(droitDePrendre(saison, 4, N1, "Théo", new Date("2026-11-02T00:30:00Z")), "pas-du-jour", "minuit passé à Paris");
+assert.equal(droitDePrendre(saison, 4, N1, "Théo", new Date("2026-11-02T00:30:00Z")), "pas-du-jour", "1 h passée à Paris");
+// Sa nuit, jusqu'à 1 h (02/11/2026, NUIT_MS) : un match tardif qui déborde se prend encore.
+assert.equal(droitDePrendre(saison, 4, N1, "Théo", new Date("2026-11-01T23:30:00Z")), null, "00 h 30 à Paris : encore");
+assert.equal(droitDePrendre(saison, 4, N1, "Théo", new Date("2026-11-01T23:59:59Z")), null, "00 h 59 à Paris : encore");
+assert.equal(droitDePrendre(saison, 4, N1, "Théo", new Date("2026-11-02T00:00:00Z")), "pas-du-jour", "1 h pile : non");
 const terminee = { ...saison, entries: saison.entries.map((e) => (e.j === 4 && e.team === "Noirs 1" ? { ...e, result: "Victoire" as const } : e)) };
 assert.equal(droitDePrendre(terminee, 4, N1, "Théo", maintenant), "terminee");
 // « Pas ton match » avant « terminé » (relecture du 01/11) : une feuille

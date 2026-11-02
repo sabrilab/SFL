@@ -129,6 +129,8 @@ export interface JourneePronos {
   date: string;
   coupEnvoi: Date;
   finDuJour: Date;
+  /** « à 19 h », « à minuit », « ce soir » (missions.ts, heuresDeJournee). */
+  verdict: string;
   joue: boolean;
   matchs: MatchProno[];
   /** Tous les joueurs de la feuille, masqués exclus. */
@@ -166,6 +168,7 @@ export function pronosDeJournee(
     date: d.date,
     coupEnvoi: d.coupEnvoi,
     finDuJour: d.finDuJour,
+    verdict: d.verdict,
     joue: d.joue,
     matchs,
     joueurs: matchs.flatMap((m) => [...m.noirs, ...m.blancs]),
@@ -494,6 +497,8 @@ export interface FlairDeJournee {
   plafond: number;
   /** Le verdict définitif : la révélation de la journée (revelation.ts : 19 h dès la J5, minuit avant). */
   finDuJour: Date;
+  /** Son heure à l'écran : « à 19 h », « à minuit », « ce soir ». */
+  verdict: string;
 }
 
 /** L'ordre de lecture : chaque match, sujet par sujet, puis la journée. */
@@ -567,6 +572,7 @@ export function flairsDuJoueur(
       xp: Math.min(plafondDe(p, joueur), justes.reduce((a, c) => a + c.xp, 0)),
       plafond: plafondDe(p, joueur),
       finDuJour: p.finDuJour,
+      verdict: p.verdict,
     });
   }
   return out;

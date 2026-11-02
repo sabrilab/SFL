@@ -21,7 +21,10 @@
 // ta division passe de l'ancienne à la nouvelle, sur son métal — « Tu montes
 // en D2 », « Tu descends en D3 », « Tu restes en D1 ». Une fois par joueur,
 // par journée et par appareil ; seulement une journée comptée (votes
-// chargés), jamais dans l'admin.
+// chargés), jamais dans l'admin, et jamais le bilan d'une journée d'avant le
+// jour où la suivante se joue (le 8, celui de la J4 n'a plus de sens). Un
+// toucher n'importe où la referme. Pendant la cérémonie, les autres
+// annonces attendent (ceremonie.ts : les badges).
 
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
@@ -36,6 +39,10 @@ import { useSession } from "@/hooks/use-session";
 import { useMomentAnnonce } from "@/hooks/use-moment-annonce";
 import { sonRevelation } from "@/lib/sfl/son";
 import type { BoostCardData } from "@/lib/sfl/engine";
+import { estLeJour } from "@/lib/sfl/convocation-temps";
+import { maintenant } from "@/lib/sfl/horloge";
+import { ouvrirCeremonie } from "@/lib/sfl/ceremonie";
+import type { Saison } from "@/lib/sfl/saisie/types";
 
 const GLOW: Record<string, string> = {
   def: "rgba(127,212,255,.75)",
@@ -75,11 +82,23 @@ interface BilanAMontrer {
   phrase: string;
 }
 
-/** Le bilan de la dernière journée comptée pour moi, s'il n'est pas encore vu ; null sinon. */
-function bilanAMontrer(etat: EtatDivisions | null, comptees: Set<number>, numero: number, me: string): BilanAMontrer | null {
+/**
+ * Le bilan de la dernière journée comptée pour moi, s'il n'est pas encore vu ;
+ * null sinon, et null le jour où une journée suivante se joue (son bilan
+ * viendra à sa révélation).
+ */
+function bilanAMontrer(
+  etat: EtatDivisions | null,
+  comptees: Set<number>,
+  numero: number,
+  me: string,
+  saison: Pick<Saison, "journees">,
+  t: Date
+): BilanAMontrer | null {
   if (!etat || isHidden(me)) return null;
   const b = dernierBilan(etat);
   if (!b || !comptees.has(b.j)) return null;
+  if (saison.journees.some((m) => m.j > b.j && estLeJour(m.date, t))) return null;
   const m = b.parNom.get(me);
   const phrase = phraseBilan(etat, b, me);
   if (!m || !phrase) return null;
@@ -97,11 +116,14 @@ export function NouvellesCartes() {
   // Les cartes du moment, lues par l'effet sans le relancer : une saisie en
   // direct ne doit ni ouvrir la cérémonie, ni annuler celle qui s'apprête.
   const cartes = useRef(boostCards);
-  const ligue = useRef({ divisions, comptees: revelation.comptees, numero: saison.numero ?? 0 });
+  // Les journées (leurs dates) : la vue figée les garde toutes, jouées ou non.
+  const ligue = useRef({ divisions, comptees: revelation.comptees, numero: saison.numero ?? 0, journees: saison as Pick<Saison, "journees"> });
   useEffect(() => {
     cartes.current = boostCards;
-    ligue.current = { divisions, comptees: revelation.comptees, numero: saison.numero ?? 0 };
-  }, [boostCards, divisions, revelation.comptees, saison.numero]);
+    ligue.current = { divisions, comptees: revelation.comptees, numero: saison.numero ?? 0, journees: saison };
+  }, [boostCards, divisions, revelation.comptees, saison]);
+  // La cérémonie en cours, déclarée dès qu'elle se décide : les badges attendent sa fin.
+  const finCeremonie = useRef<(() => void) | null>(null);
   /** Le premier temps de la cérémonie : ta division, avant tes cartes. */
   const [bilan, setBilan] = useState<BilanAMontrer | null>(null);
   const [arrivee, setArrivee] = useState(false);
@@ -117,7 +139,7 @@ export function NouvellesCartes() {
     const cle = `${moment}|${me}`;
     if (moment === 0 || cle === traite.current) return;
     traite.current = cle;
-    const division = bilanAMontrer(ligue.current.divisions, ligue.current.comptees, ligue.current.numero, me);
+    const division = bilanAMontrer(ligue.current.divisions, ligue.current.comptees, ligue.current.numero, me, ligue.current.journees, maintenant());
     const mine = cartes.current.filter((c) => c.player === me);
     const keys = mine.map(carteKey);
     const raw = localStorage.getItem(vuKey(me));
@@ -141,16 +163,31 @@ export function NouvellesCartes() {
     }
     if (fresh.length === 0 && !division) return;
 
+    finCeremonie.current?.();
+    const fin = ouvrirCeremonie();
+    finCeremonie.current = fin;
+    let ouverte = false;
     // Un temps de respiration après le splash d'ouverture, puis la cérémonie.
     const timer = setTimeout(() => {
+      ouverte = true;
       setBilan(division);
       setArrivee(false);
       setQueue(fresh.length ? fresh : null);
       setIndex(0);
       setRevealed(false);
     }, 1400);
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+      if (!ouverte) fin();
+    };
   }, [connecte, me, moment]);
+
+  // La cérémonie finie (ta division vue, tes cartes révélées ou remises à plus tard) : les annonces reprennent.
+  useEffect(() => {
+    if (bilan || queue) return;
+    finCeremonie.current?.();
+    finCeremonie.current = null;
+  }, [bilan, queue]);
 
   // La division arrive d'abord, sur son ancien métal, puis passe au nouveau.
   useEffect(() => {
@@ -172,9 +209,18 @@ export function NouvellesCartes() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
+          onClick={fermer}
           className="dark fixed inset-0 z-[60] flex flex-col items-center justify-center overflow-hidden bg-black/92 px-6 text-foreground backdrop-blur-sm"
         >
-          <button type="button" onClick={fermer} className="flex flex-col items-center gap-6" aria-label="Continuer">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              fermer();
+            }}
+            className="flex flex-col items-center gap-6"
+            aria-label="Continuer"
+          >
             <span className="rounded-full bg-white/10 px-4 py-1.5 text-[11px] font-black tracking-[0.3em] text-white uppercase">
               Les divisions · J{bilan.j}
             </span>

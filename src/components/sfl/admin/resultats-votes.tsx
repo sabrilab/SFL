@@ -18,6 +18,7 @@ import { useSeason } from "@/components/sfl/season-provider";
 import { useVotes } from "@/hooks/use-votes";
 import { useSession } from "@/hooks/use-session";
 import { etatRevelation, libelleFinDuVote, libelleRevelation, voteOuvertA } from "@/lib/sfl/revelation";
+import { maintenant as heureDeLaLigue } from "@/lib/sfl/horloge";
 import { CATEGORIES_VOTE, LIBELLES_VOTE, bilanJournee, journeeAvecVote, type Decompte } from "@/lib/sfl/votes";
 import { Nom } from "@/components/sfl/nom";
 import { cn } from "@/lib/utils";
@@ -81,7 +82,7 @@ export function ResultatsVotes({ j }: { j?: number } = {}) {
   if (!jn || !bilan) {
     return <p className="px-1 text-corps text-muted-foreground">Aucune journée avec vote pour l&apos;instant.</p>;
   }
-  const t = new Date();
+  const t = heureDeLaLigue();
   const ouvert = voteOuvertA(saison, jn.j, t);
   const etat = etatRevelation(saison, jn.j, t);
   const pastille = ouvert

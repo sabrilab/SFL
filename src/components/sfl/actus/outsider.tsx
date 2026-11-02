@@ -32,7 +32,6 @@
 // (mode-passe-autres.tsx), en une colonne (`colonne`).
 
 import { useEffect, useMemo, useRef, type ReactNode } from "react";
-import { heureLisible } from "@/lib/sfl/revelation";
 import { useRouter } from "next/navigation";
 import { MessageCircle } from "lucide-react";
 import { ciblesDe, contratsSignes } from "@/components/sfl/map/contrats-map";
@@ -78,7 +77,7 @@ function Moment({ lg, j }: { lg: MissionsDeLaLigue | null; j: number }) {
         <Pouls bat /> En jeu
       </span>
     );
-  return <span className="mono-label shrink-0 text-encre-3">Verdict à {heureLisible(lg.d.finDuJour)}</span>;
+  return <span className="mono-label shrink-0 text-encre-3">Verdict {lg.d.verdict}</span>;
 }
 
 /** Ce que dit un chapitre fermé, à la troisième personne ou à toi. */

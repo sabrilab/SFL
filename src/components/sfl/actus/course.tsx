@@ -83,8 +83,10 @@ import { usePresence } from "@/hooks/use-presence";
 import { ReponseScellee } from "@/components/sfl/reponse-scellee";
 import { MeteoMatch } from "@/components/sfl/meteo-match";
 import { dateIsoDuLibelle, joursJusquA } from "@/lib/sfl/meteo";
-import { estLeJour } from "@/lib/sfl/convocation-temps";
-import { journeeComptee } from "@/lib/sfl/revelation";
+import { estLeJourOuSaNuit } from "@/lib/sfl/convocation-temps";
+import { journeeComptee, verdictDeJournee } from "@/lib/sfl/revelation";
+import { journeeTerminee } from "@/lib/sfl/saisie/engine";
+import { useMaintenant } from "@/hooks/use-missions";
 import { annonceEnCours, J_DECOUPAGE, nomDivision, type Division } from "@/lib/sfl/divisions";
 import { METAL, PastilleDivision, parDivision, useDecoupageClassement } from "@/components/sfl/metal-division";
 import { divisionsDeLaJournee } from "@/lib/sfl/equipes-division";
@@ -654,28 +656,36 @@ function Convocation({ p, className }: { p: ReturnType<typeof usePresence>; clas
 }
 
 /**
- * Le dimanche en direct : le jour du match, la feuille se remplit sous tes
- * yeux (la base pousse chaque saisie). Lue sur le direct (journeesDirect),
- * elle reste là tant que la journée jouée ne compte pas (revelation.ts).
+ * Le dimanche du jour : la feuille se remplit sous tes yeux (la base pousse
+ * chaque saisie), lue sur le direct (journeesDirect), jusqu'à ce que la
+ * journée compte (revelation.ts). Le point rouge et « En direct » tant qu'un
+ * match se joue ; les matchs finis, l'heure de la révélation (« J5 · 19 h »).
+ * Le jour passé (et sa nuit, jusqu'à 1 h), plus rien : une journée bloquée
+ * se règle dans l'admin, pas dans le fil.
  */
 function EnDirect({ ouvrir, sauf }: { ouvrir: (j: number) => void; sauf?: number }) {
   const { journeesDirect: journees, saisonLue } = useSeason();
-  const [maintenant] = useState(() => new Date());
+  const maintenant = useMaintenant();
   const live = journees.find(
-    (j) =>
-      (j.matches?.length ?? 0) > 0 &&
-      (estLeJour(j.date, maintenant) || (journeeJouee(saisonLue, j.j) && !journeeComptee(saisonLue, j.j, maintenant)))
+    (j) => (j.matches?.length ?? 0) > 0 && estLeJourOuSaNuit(j.date, maintenant) && !journeeComptee(saisonLue, j.j, maintenant)
   );
   // Le dimanche en tête du fil a déjà son terrain, qui se remplit de même.
   if (!live || live.j === sauf) return null;
+  const joue = journeeJouee(saisonLue, live.j);
+  const fini = joue && journeeTerminee(saisonLue, live.j);
+  const verdict = verdictDeJournee(saisonLue, live.j, maintenant);
   return (
     <section className="flex flex-col gap-3 px-5 md:px-0">
       <span className="flex items-center gap-2">
-        <span className="relative flex size-2.5">
-          <span className="absolute inset-0 animate-ping rounded-full bg-red-500 opacity-70 motion-reduce:animate-none" />
-          <span className="relative size-2.5 rounded-full bg-red-500" />
+        {joue && !fini && (
+          <span className="relative flex size-2.5">
+            <span className="absolute inset-0 animate-ping rounded-full bg-red-500 opacity-70 motion-reduce:animate-none" />
+            <span className="relative size-2.5 rounded-full bg-red-500" />
+          </span>
+        )}
+        <span className="mono-label text-encre-2">
+          {!joue ? `Aujourd'hui · J${live.j}` : fini ? `J${live.j} · ${verdict.replace(/^à /, "")}` : `En direct · J${live.j}`}
         </span>
-        <span className="mono-label text-encre-2">En direct · J{live.j}</span>
       </span>
       <CarteJournee journee={live} onOuvrir={() => ouvrir(live.j)} />
     </section>

@@ -30,7 +30,9 @@ import { estBrouillon } from "@/lib/sfl/saisie/brouillon";
 import { numeroSaison, type Saison } from "@/lib/sfl/saisie/types";
 import { deriveSeason } from "@/lib/sfl/saisie/engine";
 import { appliquerVotes, titresFaibles, votesCharges } from "@/lib/sfl/votes";
-import { libelleRevelation, revelationAttendue } from "@/lib/sfl/revelation";
+import { aLHeure, etatRevelation, libelleRevelation, revelationAttendue } from "@/lib/sfl/revelation";
+import { equipesSansResultat } from "@/lib/sfl/saisie/etat-journee";
+import { maintenant as heureDeLaLigue } from "@/lib/sfl/horloge";
 import { useVotes } from "@/hooks/use-votes";
 
 function dateCourte(iso: string) {
@@ -61,13 +63,16 @@ export function Saisons({
   const titres = useMemo(() => {
     if (!ouvert) return null;
     const brut = deriveSeason(saison);
-    const maintenant = new Date();
+    const maintenant = heureDeLaLigue();
     return {
       entries: appliquerVotes(saison, brut.journees, votes, maintenant).entries,
       faibles: titresFaibles(saison, brut.journees, votes, maintenant),
       attente: (() => {
         const j = revelationAttendue(saison, maintenant);
-        return j == null ? null : `Révélation de la J${j} à ${libelleRevelation(saison, j, maintenant)}`;
+        if (j == null) return null;
+        // Bloquée : ce qui manque, pas une heure (il n'y en a pas).
+        if (etatRevelation(saison, j, maintenant) === "bloquee") return `J${j} bloquée · ${equipesSansResultat(saison, j).join(", ")} sans résultat`;
+        return `Révélation de la J${j} ${aLHeure(libelleRevelation(saison, j, maintenant))}`;
       })(),
     };
   }, [ouvert, saison, votes]);

@@ -18,6 +18,7 @@ import type { Journee, Player } from "@/lib/sfl/engine";
 import { isHidden, publicOnly } from "@/lib/sfl/hidden";
 import { appliquerVotes, titresFaibles, votesCharges } from "@/lib/sfl/votes";
 import { figer, journeesComptees, prochaineTransition, voteOuvertA } from "@/lib/sfl/revelation";
+import { HORLOGE_EVENT, maintenant as heureDeLaLigue, maintenantMs, mesurerHorloge } from "@/lib/sfl/horloge";
 import { etatDivisions, type EtatDivisions } from "@/lib/sfl/divisions";
 import { amorcerDemo, ARBITRES_EVENT, arbitresRevision } from "@/lib/sfl/arbitres";
 import { useSuiviVotes, useVotes } from "@/hooks/use-votes";
@@ -210,13 +211,14 @@ export function SeasonProvider({ children }: { children: React.ReactNode }) {
   const votesPrets = !session?.server || votesCharges();
   // L'horloge : un minuteur réglé sur la prochaine fin de vote, révélation ou
   // minuit (borné entre 1 s et 5 min), et un recalcul au retour au premier
-  // plan. 19 h se voit à 19 h, pas à 19 h 04.
+  // plan. 19 h se voit à 19 h, pas à 19 h 04. L'heure est celle du serveur
+  // (horloge.ts) : un téléphone à l'heure fausse révèle avec les autres.
   const [horloge, setHorloge] = useState(0);
   useEffect(() => {
     let id = 0;
     const armer = () => {
       window.clearTimeout(id);
-      const maintenant = Date.now();
+      const maintenant = maintenantMs();
       const prochaine = prochaineTransition(saison, new Date(maintenant));
       const attente = prochaine ? prochaine.getTime() - maintenant + 250 : 5 * 60_000;
       id = window.setTimeout(() => {
@@ -224,17 +226,24 @@ export function SeasonProvider({ children }: { children: React.ReactNode }) {
         armer();
       }, Math.min(5 * 60_000, Math.max(1000, attente)));
     };
+    const recalculer = () => {
+      setHorloge((h) => h + 1);
+      armer();
+    };
     const auPremierPlan = () => {
       if (document.visibilityState === "visible") {
-        setHorloge((h) => h + 1);
-        armer();
+        recalculer();
+        void mesurerHorloge();
       }
     };
     armer();
+    void mesurerHorloge();
     document.addEventListener("visibilitychange", auPremierPlan);
+    window.addEventListener(HORLOGE_EVENT, recalculer);
     return () => {
       window.clearTimeout(id);
       document.removeEventListener("visibilitychange", auPremierPlan);
+      window.removeEventListener(HORLOGE_EVENT, recalculer);
     };
   }, [saison]);
   // Ce que l'horloge change vraiment : quelles journées comptent, et
@@ -244,7 +253,7 @@ export function SeasonProvider({ children }: { children: React.ReactNode }) {
   // (courbes, rangs, divisions).
   const etatDesJournees = useMemo(() => {
     void horloge;
-    const maintenant = new Date();
+    const maintenant = heureDeLaLigue();
     const comptees = [...journeesComptees(saison, maintenant, { votesPrets })].sort((a, b) => a - b).join(",");
     const ouverts = saison.journees
       .filter((m) => voteOuvertA(saison, m.j, maintenant))
@@ -255,7 +264,7 @@ export function SeasonProvider({ children }: { children: React.ReactNode }) {
   const derived = useMemo(() => {
     void etatDesJournees;
     const brut = deriveSeason(saison);
-    const maintenant = new Date();
+    const maintenant = heureDeLaLigue();
     const vote = appliquerVotes(saison, brut.journees, votes, maintenant);
     // Un titre élu à une seule voix ne fait pas monter la note (saisie/evolution.ts).
     // Il ne porte que sur les journées comptées (titresTombes, comme les élus).

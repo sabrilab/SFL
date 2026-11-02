@@ -29,7 +29,7 @@
 // tools/sql/feuille-direct-check.sql). Mode Bola : rien de tout ça.
 
 import type { Journee } from "./engine";
-import { estLeJour } from "./convocation-temps";
+import { estLeJourOuSaNuit } from "./convocation-temps";
 import { estBrouillon } from "./saisie/brouillon";
 import type { MatchEntry, Saison } from "./saisie/types";
 import { numeroSaison } from "./saisie/types";
@@ -271,8 +271,9 @@ export function droitDePrendre(
     const n = equipes[0].match(/^Noirs (\d+)$/)?.[1];
     if (!n || equipes[1] !== `Blancs ${n}`) return "match";
   }
-  // Le jour même, pas « vote ouvert » : un match tardif se prend encore après 18 h (public.droit_feuille).
-  if (!estLeJour(meta.date, maintenant)) return "pas-du-jour";
+  // Le jour même, pas « vote ouvert » : un match tardif se prend encore après
+  // 18 h, et jusqu'à 1 h du matin s'il déborde (public.droit_feuille).
+  if (!estLeJourOuSaNuit(meta.date, maintenant)) return "pas-du-jour";
   const lignes = lignesDuMatch(saison, j, equipes);
   if (!moi || !lignes.some((l) => memeNom(l.e.player, moi))) return "pas-ton-match";
   if (lignes.some((l) => !l.extra && !!l.e.result)) return "terminee";

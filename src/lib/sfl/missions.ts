@@ -41,7 +41,7 @@
 
 import { computeJournees, computeStandings, entryPP } from "./saisie/engine";
 import { anneeProche, dateDeParis } from "./convocation-temps";
-import { revelation } from "./revelation";
+import { revelation, verdictDeJournee } from "./revelation";
 import { journeeJouee } from "./saisie/mutations";
 import { isHidden } from "./hidden";
 import { matchsDeJournee, premierCoupDEnvoi } from "./matchs-du-jour";
@@ -158,8 +158,14 @@ export interface DimancheMissions {
   date: string;
   heure: string;
   coupEnvoi: Date;
-  /** Minuit à Paris, le soir du match : le verdict devient définitif. */
+  /**
+   * Le verdict définitif : la révélation (revelation.ts : 19 h dès la J5 ;
+   * minuit jusqu'à la J4, ou tant que la fin des matchs est inconnue). C'est
+   * la PHASE ; l'écran dit `verdict`.
+   */
   finDuJour: Date;
+  /** L'heure du verdict, à l'écran : « à 19 h », « à minuit », « ce soir » (la fin des matchs encore inconnue). */
+  verdict: string;
   /** La feuille porte des résultats. */
   joue: boolean;
   /** Le vote Impact et Défensive a lieu ce jour-là (journée au MVP calculé). */
@@ -327,7 +333,10 @@ export function heuresDeJournee(s: SaisonLue, j: number, reference: Date) {
     : new Date(0);
   /** Le mardi à minuit : deux jours pour noter l'arbitre. */
   const finDesNotes = jm ? dateDeParis(annee, jm.mois, jm.jour + 3) : new Date(0);
-  return { meta, journee, heure, coupEnvoi, finDuJour, finDesNotes };
+  // À l'écran, l'heure que dit la frise (« à 19 h ») : finDuJour vaut minuit
+  // tant que la fin des matchs est inconnue, mais le verdict tombera plus tôt.
+  const verdict = verdictDeJournee(s as Pick<Saison, "numero" | "journees">, j, reference);
+  return { meta, journee, heure, coupEnvoi, finDuJour, finDesNotes, verdict };
 }
 
 export function missionsDeJournee(
@@ -339,7 +348,7 @@ export function missionsDeJournee(
 ): DimancheMissions | null {
   const heures = heuresDeJournee(s, j, reference);
   if (!heures) return null;
-  const { meta, journee, heure, coupEnvoi, finDuJour } = heures;
+  const { meta, journee, heure, coupEnvoi, finDuJour, verdict } = heures;
 
   const avant = pointsAvant(s, j);
   const notes = new Map<string, number>(
@@ -432,6 +441,7 @@ export function missionsDeJournee(
     heure,
     coupEnvoi,
     finDuJour,
+    verdict,
     joue: journeeJouee(s, j),
     vote: !!journee.mvpAuto,
     avant,

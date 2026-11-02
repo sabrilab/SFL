@@ -36,6 +36,7 @@ import { Nom } from "@/components/sfl/nom";
 import { isHidden } from "@/lib/sfl/hidden";
 import { libelleFinDuVote, voteOuvertA } from "@/lib/sfl/revelation";
 import { useMaintenant } from "@/hooks/use-missions";
+import { maintenant as heureDeLaLigue } from "@/lib/sfl/horloge";
 
 export function VoteFigures({ journee, me }: { journee: Journee; me: string }) {
   const { saisonLue: saison, allPlayers } = useSeason();
@@ -52,8 +53,9 @@ export function VoteFigures({ journee, me }: { journee: Journee; me: string }) {
 
   async function choisir(cat: CategorieVote, candidat: string) {
     if (!place || !ouvert || envoi) return;
-    // L'écran a pu rester ouvert après la fin du vote : la base refuserait aussi.
-    const t = new Date();
+    // L'écran a pu rester ouvert après la fin du vote : la base refuserait
+    // aussi. L'heure du serveur (horloge.ts), pas celle du téléphone.
+    const t = heureDeLaLigue();
     if (!voteOuvertA(saison, journee.j, t)) {
       toast.error(`Le vote est fermé depuis ${libelleFinDuVote(saison, journee.j, t)}.`);
       return;
@@ -75,8 +77,8 @@ export function VoteFigures({ journee, me }: { journee: Journee; me: string }) {
     <div className="flex flex-col gap-4">
       {place && !ouvert ? (
         <p className="rounded-2xl bg-foreground/[0.06] px-3.5 py-2.5 text-[12.5px] font-medium text-foreground/55">
-          <span className="font-bold">Vote fermé</span>
-          {` · Il s'ouvre quand la feuille du ${place.match.label} est remplie, jusqu'à ${jusqua}.`}
+          <span className="font-bold">Vote à la fin du {place.match.label}</span>
+          {` · jusqu'à ${jusqua}`}
         </p>
       ) : (
         <p className="rounded-2xl bg-primary/10 px-3.5 py-2.5 text-[12.5px] font-medium text-primary">

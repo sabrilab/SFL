@@ -21,6 +21,7 @@
 import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { SAISIE_EVENT, useSeason } from "@/components/sfl/season-provider";
+import { uneJourneeDePlus } from "@/lib/sfl/revelation";
 
 const CALME = 2500;
 const OUVERTURE_MAX = 12_000;
@@ -67,7 +68,7 @@ export function useMomentAnnonce(): number {
   const avant = useRef(comptees);
   useEffect(() => {
     if (admin || comptees === avant.current) return;
-    const plus = comptees.split(",").length > avant.current.split(",").length;
+    const plus = uneJourneeDePlus(avant.current, comptees);
     avant.current = comptees;
     if (!plus) return;
     // Dans un callback, pas dans le corps de l'effet.

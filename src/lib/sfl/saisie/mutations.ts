@@ -9,6 +9,7 @@ import { equipesDuMatch, equipesDuMatchSuivant } from "./equipes";
 import { dejaSurLaFeuille, jouable } from "./effectif";
 import { resteUnBrouillon } from "./brouillon";
 import { revelationAttendue } from "../revelation";
+import { maintenant } from "../horloge";
 import { suspendusPour } from "../cartons";
 import { numeroSaison, type MatchDuJour, type SaisonArchivee, type Terrain } from "./types";
 import type {
@@ -136,10 +137,15 @@ export function newEntry(j: number, player: string, team: string | null): MatchE
  * aujourd'hui si l'on est dimanche à Paris, sinon le prochain. Avant, une
  * journée préparée le vendredi portait la date du vendredi : son vote
  * s'ouvrait et se fermait ce jour-là, et la convocation ne la retrouvait pas.
+ * Avec la saison : un dimanche qui a déjà sa journée cède la place au
+ * suivant (le soir de la J5, « Préparer la J6 » visait encore le jour même,
+ * et rouvrait la J5).
  */
-export function dimancheDeJournee(maintenant = new Date()): string {
+export function dimancheDeJournee(maintenant = new Date(), saison?: Pick<Saison, "journees">): string {
   const jour = new Intl.DateTimeFormat("en-US", { timeZone: "Europe/Paris", weekday: "short" }).format(maintenant);
-  return libelleCourt(labelDateFr(jour === "Sun" ? maintenant : prochainDimanche(maintenant)));
+  const ceDimanche = libelleCourt(labelDateFr(jour === "Sun" ? maintenant : prochainDimanche(maintenant)));
+  if (jour !== "Sun" || !saison || !journeeDeLaDate(saison, ceDimanche)) return ceDimanche;
+  return libelleCourt(labelDateFr(prochainDimanche(maintenant)));
 }
 
 /** Les deux journées ont-elles la même date ? « 1 nov. » et « 1 novembre », sans casse. */
@@ -459,7 +465,7 @@ export function poserEquipes(
         ...s.journees,
         {
           j,
-          date: date ?? dimancheDeJournee(),
+          date: date ?? dimancheDeJournee(new Date(), s),
           sflTime: avant?.sflTime ?? false,
           mvpAuto: true,
           ...(avant?.terrainId != null ? { terrainId: avant.terrainId } : {}),
@@ -593,7 +599,7 @@ export function cloturerSaison(
   // en archive sans que la ligue l'ait jamais vue.
   if (resteUnBrouillon(saison)) return saison;
   // Ni avant la dernière révélation (revelation.ts) : l'archive y perdrait ses titres votés.
-  if (revelationAttendue(saison, new Date()) != null) return saison;
+  if (revelationAttendue(saison, maintenant()) != null) return saison;
   const numero = numeroSaison(saison);
   const faibles = titres ? [...titres.faibles] : [];
   const archive: SaisonArchivee = {

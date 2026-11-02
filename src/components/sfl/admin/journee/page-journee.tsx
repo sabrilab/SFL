@@ -42,6 +42,7 @@ import { CarteDe, FORMAT_CARTE } from "@/components/sfl/mini-carte";
 import { usePresence } from "@/hooks/use-presence";
 import { useSaisieAdmin } from "@/hooks/use-saisie-admin";
 import { useFeuillesDirect } from "@/hooks/use-feuilles-direct";
+import { useMaintenant } from "@/hooks/use-missions";
 import { FeuilleDuMatch } from "@/components/sfl/direct/feuille-du-match";
 import { scoreDeLaFeuille } from "@/lib/sfl/feuille-direct";
 import { isAdmin } from "@/lib/sfl/admin";
@@ -52,7 +53,7 @@ import { computeJournees } from "@/lib/sfl/saisie/engine";
 import { choixDEquipe } from "@/lib/sfl/saisie/equipes";
 import { placementsDeLaJournee } from "@/lib/sfl/saisie/effectif";
 import { etatJournee, gesteDuMoment, prochaineJournee } from "@/lib/sfl/saisie/etat-journee";
-import { libelleFinDuVote, libelleRevelation } from "@/lib/sfl/revelation";
+import { aLHeure, libelleFinDuVote, libelleRevelation } from "@/lib/sfl/revelation";
 import { verifierFeuille } from "@/lib/sfl/saisie/integrite";
 import { mvpAutomatique } from "@/lib/sfl/saisie/mvp";
 import { addEntry, ajouterMatch, matchsDeclares, memeDate, newEntry, poserEquipes, retirerMatchVide } from "@/lib/sfl/saisie/mutations";
@@ -80,7 +81,9 @@ export function PageJournee() {
   const { saison, faire, commit, supprimer, undo, redo, history, future, isClient } = admin;
   const { journees: vuesLigue, divisions } = useSeason();
   const presence = usePresence();
-  const [maintenant] = useState(() => new Date());
+  // L'heure du serveur, à la minute (horloge.ts) : 18 h, 19 h et la journée
+  // bloquée se voient sans rouvrir la page.
+  const maintenant = useMaintenant();
 
   const [choix, setChoix] = useState<number | null | undefined>(undefined);
   const j = choix === undefined ? prochaineJournee(saison, maintenant) : choix;
@@ -213,7 +216,8 @@ export function PageJournee() {
       <div ref={frise} className="-mx-5 flex gap-1.5 overflow-x-auto px-5 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" role="tablist" aria-label="Journées">
         {triees.map((m) => {
           const actif = m.j === j;
-          const defaut = verifierFeuille(saison, m.j).some((e) => e.r !== "I5" || estBrouillon(m));
+          // « ! » : un défaut de la feuille, ou une journée bloquée (une équipe sans résultat, la nuit passée).
+          const defaut = verifierFeuille(saison, m.j).some((e) => e.r !== "I5" || estBrouillon(m)) || etatJournee(saison, m.j, maintenant) === "bloquee";
           return (
             <button
               key={m.j}
@@ -433,7 +437,7 @@ export function PageJournee() {
             </button>
           ) : geste.t === "revelation" ? (
             <span className="mono-label flex h-12 items-center justify-center gap-2 rounded-full bg-foreground text-background">
-              ◐ Révélation à {geste.heure}
+              ◐ Révélation {aLHeure(geste.heure)}
             </span>
           ) : geste.t === "bloquee" ? (
             <button type="button" onClick={() => setEnDirect(true)} className="bouton-principal h-12 text-lecture font-semibold">

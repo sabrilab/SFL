@@ -51,16 +51,20 @@ function aujourdhui(maintenant: Date): number {
 }
 
 /**
- * La journée ouverte par défaut : celle du jour, sinon la prochaine à venir
- * (un brouillon compris). Jamais la dernière jouée : le 28/10, la grille
- * rouvrait la J3, déjà jouée, et c'est là qu'ont poussé les matchs 5 et 6.
- * null : aucune journée à venir (le geste est alors « Préparer la J5 »).
+ * La journée ouverte par défaut : une journée bloquée d'abord (la dernière :
+ * toute la ligue l'attend, 02/11/2026), puis celle du jour, sinon la
+ * prochaine à venir (un brouillon compris). Jamais la dernière jouée : le
+ * 28/10, la grille rouvrait la J3, déjà jouée, et c'est là qu'ont poussé les
+ * matchs 5 et 6. null : aucune journée à venir (le geste est alors
+ * « Préparer la J5 »).
  */
 export function prochaineJournee(s: Saison, maintenant: Date): number | null {
   const ajd = aujourdhui(maintenant);
   const datees = [...s.journees]
     .map((m) => ({ m, jour: jourDe(m.date, maintenant) }))
     .sort((a, b) => a.m.j - b.m.j);
+  const bloquee = datees.filter((x) => !estBrouillon(x.m) && etatJournee(s, x.m.j, maintenant) === "bloquee").at(-1);
+  if (bloquee) return bloquee.m.j;
   const duJour = datees.find((x) => x.jour === ajd);
   if (duJour) return duJour.m.j;
   const avenir = datees.filter((x) => x.jour != null && x.jour > ajd).sort((a, b) => a.jour! - b.jour! || a.m.j - b.m.j)[0];
@@ -70,9 +74,9 @@ export function prochaineJournee(s: Saison, maintenant: Date): number | null {
   return brouillon?.m.j ?? null;
 }
 
-/** Le numéro et le dimanche de la journée à préparer. */
+/** Le numéro et le dimanche de la journée à préparer (le dimanche qui n'a pas encore la sienne). */
 export function journeeAPreparer(s: Saison, maintenant: Date): { j: number; date: string } {
-  return { j: s.journees.reduce((m, x) => Math.max(m, x.j), 0) + 1, date: dimancheDeJournee(maintenant) };
+  return { j: s.journees.reduce((m, x) => Math.max(m, x.j), 0) + 1, date: dimancheDeJournee(maintenant, s) };
 }
 
 export type Geste =
