@@ -75,13 +75,14 @@ function quand(ts: number | null): string {
 
 /** « I1 J4 Ilyes » (public.feuille_saine) → « J4 · Ilyes ×2 ». */
 export function lireDefaut(d: string): string {
-  const m = /^(I\d)\s+(J\d+)?\s*(.*)$/.exec(d.trim());
+  const m = /^(I\d+)\s+(J\d+)?\s*(.*)$/.exec(d.trim());
   if (!m) return d;
   const [, r, j, reste] = m;
   if (r === "I1") return `${j} · ${reste} ×2`;
   if (r === "I2") return `${j} · ${reste} · ne joue pas`;
   if (r === "I0") return `${j} · ${reste} · vitrine`;
   if (r === "I6") return `${reste} · deux journées`;
+  if (r === "I10") return "Vue figée";
   return d;
 }
 
