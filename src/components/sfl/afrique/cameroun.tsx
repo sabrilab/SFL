@@ -22,8 +22,9 @@
 //     rayonnent, la lune dans l'oculus ; en haut et en bas, une bande de
 //     velours brodé.
 //   · le totem (totems/cameroun.tsx, 02/11/2026) : le lion qui rugit, en
-//     buste, modelé dans l'argile en bas à gauche du dos ; la coupole et la
-//     lune montent en haut à droite (LUNE_CAMEROUN) ; la bande de velours
+//     buste de profil, taillé dans l'argile au milieu à gauche du dos, la
+//     crinière qui frôle le bord ; la coupole et la lune montent en haut à
+//     droite (LUNE_CAMEROUN), vers où il rugit ; la bande de velours
 //     du haut laisse la place, celle du bas reste ; l'enduit a séché (de la
 //     graine : quelques fentes de retrait larges à la racine et effilées,
 //     leur lèvre claire, qui naissent loin du lion et de la coupole et les
@@ -327,7 +328,7 @@ function dos(graine: number) {
     // et la coupole (elles naissent loin d'eux et tournent quand elles s'en approchent) ; le sable et la paille, à peine.
     const ru = alea(graine ^ 0x7365);
     const libre = (x: number, y: number) =>
-      Math.hypot(x - cx, y - cy) > COUPOLE.r + 26 && !(x < 760 && y > 440 && y < 1130) && y < LISSE.y0 - 10 && x > 20 && x < W - 20;
+      Math.hypot(x - cx, y - cy) > COUPOLE.r + 26 && !(x < 700 && y > 310 && y < 1130) && y < LISSE.y0 - 10 && x > 20 && x < W - 20;
     let fentes = "";
     let levres = "";
     for (let i = 0, essais = 0; i < 6 && essais < 80; essais++) {

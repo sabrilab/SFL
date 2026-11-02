@@ -4,26 +4,30 @@
 // Le springbok (Antidorcas marsupialis), l'animal national, saisi dans le
 // bond qui lui donne son nom (spring, sauter ; bok, l'antilope) : le
 // « pronk », où il saute sur place, les quatre pieds quittant le sol ensemble.
-// Le dos en voûte, le cou fin qui plonge, la tête basse ; les quatre pattes
-// raides et serrées sous lui, ramenées en faisceau, les sabots groupés, et
-// pourtant articulées : la cuisse, le jarret pointé en arrière, le genou, le
-// boulet. La crête de poils blancs ouverte sur la croupe ; le miroir blanc
-// de la fesse, la queue à pointe noire. La tête courte en coin : le
-// chanfrein fauve, la face blanche, la raie brun-rouge de l'œil à la
+// Le dos en voûte, un cran au garrot (le sommet des épaules), le cou fin à
+// sa base qui plonge, la tête basse ; les quatre pattes raides et serrées
+// sous lui, ramenées en faisceau, les sabots groupés, et pourtant
+// articulées : la cuisse, le jarret pointé en arrière, le genou, le boulet ;
+// le ventre presque à plat (le coude à la hauteur du grasset, en plein
+// bond). La crête de poils blancs ouverte sur l'échine : un éventail de
+// longs poils couchés vers la croupe ; le miroir blanc de la fesse, la
+// queue à pointe noire. La tête en coin, à la mesure du corps (celle d'une
+// antilope, pas d'un oiseau) : le chanfrein fauve, la face blanche, l'œil
+// sombre cerné d'un filet de chaux, la raie brun-rouge de l'œil à la
 // commissure ; l'oreille longue et étroite couchée le long du cou ; les
-// cornes en lyre, qui montent, partent en arrière, puis dont la pointe
-// revient en avant, annelées sur les deux tiers du bas. La bande brun-rouge
-// du flanc, du coude au grasset, qui épouse la ligne du ventre, entre le
-// fauve cannelle du dos et le blanc du ventre. Ni le bond allongé ni la tête
-// de l'emblème du rugby.
+// cornes en lyre, fines, qui montent, partent en arrière, puis dont la
+// pointe revient en avant, annelées sur les deux tiers du bas. La bande
+// brun-rouge du flanc, tout le long du bas du tronc, du coude au devant de
+// la cuisse, entre le fauve cannelle du dos et le blanc du ventre. Ni le
+// bond allongé ni la tête de l'emblème du rugby.
 //
 // Il est peint comme un mur ndebele (../afrique-du-sud.tsx), à la règle :
 // rien que des segments droits, un cerne de suie d'épaisseur constante,
 // doublé dedans d'un filet de chaux, puis les champs remplis des terres
 // d'avant les pigments du commerce (le fauve cannelle, la terre brun-rouge,
 // la chaux) ; la bande du flanc devient une frise de losanges de chaux au
-// cœur noir, la crête une frange de dents de chaux ; deux traits de
-// construction, comme sur le mur, disent la cuisse et l'épaule.
+// cœur noir ; la crête, un éventail de chaux posé dans le fauve, cerné d'un
+// filet fin, ses poils tirés à la règle (rien ne déborde sur le mur).
 //   · au dos : le héros, centré, en plein bond sous la lune et le couvercle
 //     de panier d'ilala, plus petit et monté en haut (LUNE_AFRIQUE_DU_SUD, que
 //     le skin lit) ; son ombre, un aplat de suie loin sous les sabots, ne
@@ -41,10 +45,10 @@ export const LUNE_AFRIQUE_DU_SUD = { cx: 512, cy: 318, d: 140 } as const;
 // <tracés>
 /** Le corps, la tête et les pattes proches, d'un seul cerne : la voûte du dos, le cou qui plonge, la tête basse, l'avant-bras, le genou, le canon, le boulet ; la cuisse, le jarret. */
 const CORPS =
-  "M26 118L42 84L66 66L104 50L148 42L192 45L228 57L257 72L294 106L328 138L362.1 163.2L371.4 170.6L378.2 181.4L380.3 187.7L387.5 203.9L394 218.7L397.5 228.8L397.3 234.6L394.7 238.1L390.5 238.8L386.4 236.7L383.5 236.6L379.6 233.4L371.4 223.4L361.1 212.9L351.8 205.5L345.3 198.2L342.4 190.6L343.1 182.6L346 175.1L332 184L304 167L277 156L268 180L269 200L263 222L249 270L245 282L239 296L223 338L223 350L217 364L216 380L199 378L202 364L206 350L213 296L219 282L227 242L230 213L208 193L180 177L156 168L153 184L147 208L138 234L131 254L137 270L166 332L169 345L174 360L180 378L163 380L159 366L154 352L124 286L114 271L105 256L90 238L70 215L52 191L39 166L31 140Z";
+  "M26 118L42 84L66 66L104 50L148 42L192 45L226 56L248 59L260 71L294 104L328 138L364.4 161.8L377.2 171.9L386.5 186.8L389.3 195.5L399.4 217.7L408.2 238.1L413 252L412.8 259.9L409.3 264.7L403.4 265.8L397.7 262.8L393.8 262.7L388.4 258.3L377.2 244.5L363 230.1L350.2 219.9L341.3 209.9L337.3 199.4L338.3 188.5L342.2 178.2L332 184L306 164L284 148L270 176L269 200L263 222L249 270L245 282L239 296L223 338L223 350L217 364L216 380L199 378L202 364L206 350L213 296L219 282L227 238L232 194L208 187L182 182L158 176L153 184L147 208L138 234L131 254L137 270L166 332L169 345L174 360L180 378L163 380L159 366L154 352L124 286L114 271L105 256L90 238L70 215L52 191L39 166L31 140Z";
 /** Les pattes lointaines, serrées contre les proches. */
 const LOIN =
-  "M267 182L252 216L238 264L234 276L228 290L212 332L212 344L206 358L205 374L188 372L191 358L195 344L202 290L208 276L216 236L219 207L213 188ZM170 156L165 178L159 202L150 228L143 248L149 264L178 326L181 339L186 354L192 372L175 374L171 360L166 346L136 280L126 265L117 250L102 232L82 209L92 220L112 164Z";
+  "M267 182L252 216L238 264L234 276L228 290L212 332L212 344L206 358L205 374L188 372L191 358L195 344L202 290L208 276L216 232L221 188L213 188ZM172 164L165 178L159 202L150 228L143 248L149 264L178 326L181 339L186 354L192 372L175 374L171 360L166 346L136 280L126 265L117 250L102 232L82 209L92 220L112 164Z";
 /** Les sabots, groupés. */
 const SABOTS =
   "M199.6 365L217.1 365L216.5 380L199 380ZM161.4 365L178.4 365L180 380L163 380ZM188.6 359L206.1 359L205.5 374L188 374ZM173.4 359L190.4 359L192 374L175 374Z";
@@ -53,49 +57,48 @@ const QUEUE =
   "M31 116L22 136L18 156L28 158L32 140L40 122Z";
 const POINTE =
   "M18 156L15 172L27 172L28 158Z";
-/** La crête dorsale ouverte : une frange de dents de chaux, de la croupe au milieu du dos. */
+/** La crête dorsale ouverte : un éventail de longs poils blancs couchés vers l'arrière, posé dans le fauve le long de l'échine, cerné d'un filet fin. */
 const CRETE =
-  "M55.3 86L69.9 73L106.2 57.7L148.5 50L189.4 53L182.2 40.9L177.4 37.1L171.2 40.1L166.5 35.7L160.3 37.6L155.9 29L149.6 34L141 24.1L136.5 33.3L129.3 21.6L125.4 33.3L117.9 20.3L114.3 34L106.8 20.4L103.4 35.4L90.7 24.2L90.9 40.1L81.1 29.7L81.1 45.3L72 36.5L71.7 51.1L63.5 44.5L62.4 57.6L52.5 57L54 67.9L48 68.5L47.7 77.4Z";
+  "M65.3 78.3L70.8 75.8L76.2 73.3L81.7 70.9L87.2 68.4L92.6 65.9L98.1 63.5L103.6 61L106.4 59.7L112.3 58.6L118.2 57.5L124.1 56.5L130 55.4L135.9 54.3L141.8 53.3L147.7 52.2L151.3 52.3L157.3 52.8L163.3 53.3L169.3 53.8L175.2 54.3L181.2 54.8L187.2 55.3L193.2 55.8L192.8 59.8L186.7 60.7L180.5 63.4L174.3 66L168 68.4L161.8 70.6L155.7 72.6L149.5 74.3L152 75.6L146.4 78.1L140.6 80.2L134.8 81.8L129 83L123 83.8L117 84.1L110.8 84L113.1 82L106.8 82.7L100.4 83.1L93.8 83.2L87.2 83.1L80.5 82.8L73.7 82.4L66.9 81.9Z";
+const POILS_CRETE =
+  "M84.8 82.5L70.3 77.1M96.9 82.7L75.7 74.7M108.7 82.1L82.1 71.8M111.8 83.6L90.3 68.1M122.9 83.3L98.5 64.4M133.8 81.6L105.6 60.9M144.4 78.4L117.4 58.7M146.5 74.5L130.2 56.4M157.8 71.5L145 53.7M169.1 67.5L157.2 53.8M180.5 62.9L173.2 55.1";
 /** Le blanc du ventre. */
 const VENTRE =
-  "M240 216L230 213L208 193L180 177L156 168L148 167L149.9 152.1L160.5 153.7L186.5 163.5L216.8 180.8L238.8 200.8L244.3 201.6Z";
+  "M232 194L208 187L182 182L158 176L148 175L149.3 162.1L160.6 163.3L184.8 169.3L211 174.4L235.6 181.5Z";
 /** La bande du flanc, du coude au grasset, qui suit la ligne du ventre. */
 const BANDE =
-  "M244.3 201.6L238.8 200.8L216.8 180.8L186.5 163.5L160.5 153.7L149.9 152.1L152.7 129.3L167.3 131.7L196.5 142.8L230.2 162.2L252.2 182.1L250.9 179.6Z";
+  "M235.6 181.5L211 174.4L184.8 169.3L160.6 163.3L149.3 162.1L140 160L136 148L141 140L158 147L182 153L208 158L237 162Z";
 /** Ses losanges de chaux, et leur cœur noir. */
 const LOSANGES =
-  "M242.9 189.1L240.2 177.9L228.8 176.3L231.5 187.5ZM223.7 171.6L218.7 161.2L207.2 162.1L212.2 172.5ZM201.1 158.7L196.1 148.3L184.6 149.2L189.6 159.6ZM177.6 147.9L171 138.4L159.8 141.1L166.4 150.6Z";
+  "M220.5 171.4L213.1 164.1L203.8 168.6L211.2 175.9ZM196.9 167.4L189.7 159.9L180.2 164.2L187.4 171.7ZM173.3 162.8L166.8 154.7L157 158.1L163.5 166.2Z";
 const COEURS =
-  "M238.4 185L237.5 181L233.3 180.4L234.2 184.5ZM218.4 168.6L216.6 164.8L212.5 165.2L214.2 168.9ZM195.8 155.6L194.1 151.8L189.9 152.2L191.7 156ZM171.8 145.7L169.5 142.3L165.5 143.3L167.8 146.7Z";
+  "M215.1 170.5L212.5 167.9L209.2 169.5L211.8 172.2ZM191.5 166.4L189 163.6L185.6 165.2L188.1 168ZM168 161.3L165.8 158.4L162.3 159.7L164.6 162.6Z";
 /** Le miroir blanc de la fesse, qui descend en culotte le long de l'arrière de la cuisse jusqu'au jarret. */
 const MIROIR =
   "M18 106L22 140L30 168L44 194L62 220L84 246L104 268L118 256L105 232L89 209L73 185L61 161L55 135L53 106Z";
-/** Les traits de construction : le devant de la cuisse, l'arrière de l'épaule. */
-const TRAITS =
-  "M156 168L140 140L118 116L92 100M244 156L249 130L252 100";
 /** La face blanche, sous le chanfrein fauve. */
 const FACE =
-  "M362.3 180.1L368.5 193.1L378.6 207.6L385.7 222L390.3 232.4L392.3 238.7L390.5 238.8L386.4 236.7L383.5 236.6L379.6 233.4L371.4 223.4L361.1 212.9L351.8 205.5L345.3 198.2L342.4 190.6L343.1 182.6L346 175.1L354.6 175.4Z";
+  "M364.6 185L373.3 202.9L387 222.9L396.8 242.7L403.1 256.9L405.9 265.5L403.4 265.8L397.7 262.8L393.8 262.7L388.4 258.3L377.2 244.5L363 230.1L350.2 219.9L341.3 209.9L337.3 199.4L338.3 188.5L342.2 178.2L354.1 178.5Z";
 /** La raie brun-rouge, de l'œil à la commissure. */
 const RAIE =
-  "M370.9 187.9L377.4 195.2L390 237.3L384.9 236.7L368.7 194.9Z";
+  "M376.5 195.7L385.4 205.7L402.7 263.6L395.8 262.8L373.5 205.4Z";
 /** L'œil. */
 const OEIL =
-  "M370.1 182.7L376.4 185.4L378.2 192.7L371.5 190.3Z";
+  "M374.8 192.9L384.3 196.7L387 207.3L377 203.8Z";
 /** L'oreille, longue et étroite, couchée le long du cou, et son dedans blanc. */
 const OREILLE =
-  "M374.1 176.4L371.9 153.3L345 119.2L355 156.3L364.1 169.5Z";
+  "M381 179.9L377.9 148.1L340.8 101.2L354.6 152.3L367.2 170.4Z";
 const OREILLE_IN =
-  "M368.9 166.5L367.7 154L348.7 128.2L358.5 156Z";
+  "M373.7 166.3L372.1 149.2L346 113.6L359.5 151.8Z";
 /** La corne proche, en lyre : elle monte, part en arrière, puis sa pointe revient en avant. */
 const CORNE =
-  "M372.1 178.1L382 154.7L382.3 128.3L373.4 107.1L361.9 93.4L359.5 78.5L367.2 68.1L369.2 69.5L363 79.1L366.1 91L378.6 103.8L389.7 126.7L391 156.2L382.6 182Z";
+  "M379.5 182.8L391.5 154.4L391.8 122.2L380.9 96.4L366.9 79.9L364 62.1L373.3 49.7L375.3 51L367.8 62.8L371.5 77.4L386.6 92.9L399.9 120.5L401.4 156L391.2 187.1Z";
 /** La corne lointaine. */
 const CORNE_LOIN =
-  "M363.9 181.4L373.6 157.8L373.8 131.2L364.7 109.9L353.1 96.3L350.6 81.5L358.2 71.1L360.2 72.5L353.9 82.1L356.9 94.1L369.3 107L380.3 129.8L381.4 159.1L372.9 184.7Z";
+  "M371.2 186L383.1 157.5L383.2 125.1L372.2 99.3L358.1 82.8L355.1 65.1L364.3 52.7L366.3 54L358.7 65.8L362.3 80.5L377.3 96.1L390.5 123.6L391.9 158.9L381.5 189.9Z";
 /** Les anneaux, sur les deux tiers du bas. */
 const ANNEAUX =
-  "M376 173.1L383 175.7M378.8 166.2L385.3 168.6M381.6 159.2L387.8 161.5M383.4 153.3L389.5 153.2M383.5 145.8L389.2 145.7M383.6 138.3L388.9 138.2M383.6 130.8L388.5 130.7M382.2 124.5L386.3 122.7M379.3 117.6L383.1 115.9M376.3 110.7L379.8 109.1";
+  "M383.5 177.9L391.4 180.8M386.4 170.9L393.8 173.7M389.2 164L396.2 166.6M392 157L398.6 159.5M393.1 151L399.7 150.9M393.1 143.5L399.4 143.4M393.2 136L399.1 135.9M393.2 128.5L398.7 128.4M393.3 122.1L398.1 119.9M390.4 115.2L394.8 113.2M387.4 108.3L391.5 106.4M384.5 101.4L388.3 99.6M381.6 95.2L384.4 92.6";
 // </tracés>
 
 const CHAUX = "#f2eee4";
@@ -120,12 +123,11 @@ function Springbok({ id }: { id: string }) {
       </defs>
       {/* Son ombre, un aplat de suie loin sous les sabots groupés : il est en l'air */}
       <path d="M122 390L154 386L230 386L258 390L230 394L154 394Z" fill={SUIE} opacity={0.16} />
-      {/* Les pattes lointaines, la corne de derrière, la queue, la crête ouverte */}
+      {/* Les pattes lointaines, la corne de derrière, la queue */}
       <path d={LOIN} fill={FAUVE_LOIN} {...champ} />
       <path d={CORNE_LOIN} fill="#3b2e26" stroke={SUIE} strokeWidth={1.5} strokeLinejoin="miter" />
       <path d={QUEUE} fill={CHAUX} {...champ} />
       <path d={POINTE} fill={SUIE} />
-      <path d={CRETE} fill={CHAUX} {...champ} strokeWidth={CERNE * 0.55} />
       {/* Le corps : le fauve, puis les champs, le filet de chaux dans le cerne */}
       <path d={CORPS} fill={FAUVE} />
       <g clipPath={`url(#zc-${id})`}>
@@ -133,7 +135,9 @@ function Springbok({ id }: { id: string }) {
         <path d={BANDE} fill={TERRE} {...champ} />
         <path d={LOSANGES} fill={CHAUX} stroke={SUIE} strokeWidth={2.2} strokeLinejoin="miter" />
         <path d={COEURS} fill={SUIE} />
-        <path d={TRAITS} fill="none" {...champ} />
+        {/* La crête : l'éventail de poils blancs le long de l'échine, cerné d'un filet fin ; ses poils couchés vers la croupe */}
+        <path d={CRETE} fill={CHAUX} stroke={SUIE} strokeWidth={1.6} strokeLinejoin="miter" strokeMiterlimit={4} />
+        <path d={POILS_CRETE} fill="none" stroke={SUIE} strokeWidth={1.2} strokeLinecap="butt" />
         <path d={FACE} fill={CHAUX} {...champ} strokeWidth={CERNE * 0.5} />
         <path d={RAIE} fill={TERRE} />
         <path d={CORPS} fill="none" stroke={CHAUX} strokeWidth={CERNE + 2 * FILET} />
@@ -143,7 +147,9 @@ function Springbok({ id }: { id: string }) {
       <path d={OREILLE_IN} fill={CHAUX} />
       <path d={CORNE} fill={SUIE} stroke={SUIE} strokeWidth={1.5} strokeLinejoin="miter" />
       <path d={ANNEAUX} fill="none" stroke={CHAUX} strokeWidth={1.6} />
-      <path d={OEIL + SABOTS} fill={SUIE} />
+      <path d={SABOTS} fill={SUIE} />
+      {/* L'œil, cerné d'un filet de chaux : il se lit contre le cerne et la raie */}
+      <path d={OEIL} fill={SUIE} stroke={CHAUX} strokeWidth={2.2} strokeLinejoin="miter" />
     </g>
   );
 }
@@ -182,7 +188,7 @@ function Dessin({ couche, photo, id }: PropsTotem) {
 const totem: TotemNation = {
   nation: "za",
   animal: "springbok",
-  quoi: "Le springbok en plein pronk, le dos en voûte, la tête basse, les quatre pattes raides ramenées en faisceau, la crête blanche ouverte : peint à la règle comme un mur ndebele, un cerne de suie constant doublé de chaux, le fauve cannelle, la terre et la chaux, la bande du flanc en frise de losanges ; entier et cerné de même dans le coin du portrait.",
+  quoi: "Le springbok en plein pronk, le dos en voûte, un cran au garrot, la tête basse, les quatre pattes raides ramenées en faisceau, l'éventail blanc de la crête ouvert sur l'échine : peint à la règle comme un mur ndebele, un cerne de suie constant doublé de chaux, le fauve cannelle, la terre et la chaux, la bande du flanc en frise de losanges du coude à la cuisse ; entier et cerné de même dans le coin du portrait.",
   sources: [
     { titre: "Animal Diversity Web, Antidorcas marsupialis : le bond, la crête dorsale, les cornes, la robe", url: "https://animaldiversity.org/accounts/Antidorcas_marsupialis" },
     { titre: "Britannica, le springbok : le « pronking », la crête blanche, la bande du flanc", url: "https://www.britannica.com/animal/springbok-mammal" },

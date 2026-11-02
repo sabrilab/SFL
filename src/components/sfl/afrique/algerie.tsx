@@ -28,7 +28,8 @@
 //     de l'anneau : la lune est sertie en haut de l'anneau, entre ses
 //     oreilles, à la place de la rosace du haut ; restent trois rosaces
 //     d'émail (les flancs, le bas) et deux cabochons de corail (en bas, de
-//     biais) ; sous le logotype, le ksar, ses terrasses et ses ombres.
+//     biais) ; sous le logotype, le ksar, ses terrasses et ses ombres ;
+//     pas de microtexte au dos : il s'imprimerait sur le fennec d'argent.
 // Ce qu'on évite : tout emprunt au zellige marocain (ni étoile à huit
 // branches, ni tesselles) ; les figures du Tassili ; les minarets et toute
 // silhouette de mosquée ; l'émail bleu des bijoux (bleu cobalt : la DA le
@@ -620,7 +621,9 @@ const aitYenni: SkinNation = {
     lueur: "rgba(255,255,255,0.9)",
     rayures: 0.05,
     micro: 0.04,
-    dos: { micro: 0.016 },
+    // Au dos, pas de microtexte : dos-carte.tsx l'imprime par-dessus le motif, donc sur le fennec d'argent,
+    // le héros (le totem passe sous lui) ; la face garde le sien.
+    dos: { micro: 0 },
     reflet: 0.3,
     coins: 0.55,
     etiquette: { fond: "transparent", bord: `rgba(${BRUN},0.5)`, texte: `rgba(${BRUN},0.8)` },

@@ -29,7 +29,7 @@
 
 import type { PropsMotifNation, SkinNation } from "./types";
 import { alea, f, H, W } from "./outils";
-import { LUNE_TANZANIE } from "./totems/tanzanie";
+import { LUNE_TANZANIE, OSSICONES_TANZANIE } from "./totems/tanzanie";
 
 /** La lune et le médaillon au dos : montés en haut à droite, au bout du museau de la girafe (totems/tanzanie.tsx). */
 const CENTRE_DOS = { cx: LUNE_TANZANIE.cx, cy: LUNE_TANZANIE.cy } as const;
@@ -176,6 +176,8 @@ const PAS_MJI = 34;
  * Le médaillon du dos : une couronne de pétales effilés autour de la lune, à
  * la manière tingatinga, un long pétale d'aplat de Sienne cerné de noir et
  * pointillé de crème, puis un court pétale noir et un point crème au-delà, en alternance.
+ * Le long pétale qui pointerait derrière les ossicônes de la girafe (OSSICONES_TANZANIE)
+ * n'est pas peint : il s'y lirait comme un chapeau ou une troisième corne.
  */
 function medaillon(): { longs: string; pointilles: string; courts: string; coeurs: string } {
   const { cx, cy } = CENTRE_DOS;
@@ -194,10 +196,14 @@ function medaillon(): { longs: string; pointilles: string; courts: string; coeur
     const d = P(m, a + large / m);
     return `M${f(b[0])} ${f(b[1])}Q${f(g[0])} ${f(g[1])} ${f(t[0])} ${f(t[1])}Q${f(d[0])} ${f(d[1])} ${f(b[0])} ${f(b[1])}Z`;
   };
+  const ossicones = Math.atan2(OSSICONES_TANZANIE.y - cy, OSSICONES_TANZANIE.x - cx);
   for (let i = 0; i < n; i++) {
     const a = (i / n) * Math.PI * 2 - Math.PI / 2;
-    longs += petale(a, r0, 426 * K, 33 * K);
-    pointilles += petale(a, r0 + 16 * K, 407 * K, 18 * K);
+    const ecart = Math.abs(Math.atan2(Math.sin(a - ossicones), Math.cos(a - ossicones)));
+    if (ecart > Math.PI / n) {
+      longs += petale(a, r0, 426 * K, 33 * K);
+      pointilles += petale(a, r0 + 16 * K, 407 * K, 18 * K);
+    }
     const a2 = a + Math.PI / n;
     courts += petale(a2, r0 + 4 * K, 392 * K, 18 * K);
     const [hx, hy] = P(404 * K, a2);

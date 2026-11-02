@@ -17,8 +17,10 @@
 //     chacun une géométrie simple (carrés emboîtés, semis de points, croix,
 //     échelle, chevrons, cercles peignés, losange, damier), tirée de la graine
 //     du joueur : une étoffe par carte ; l'aigle (le totem, totems/nigeria.tsx)
-//     y freine, et les cases qu'il touche restent unies (entières ou rien,
-//     jamais un motif coupé par ses ailes) ; la lisière rayée d'une bande
+//     s'y pose, les serres sur un perchoir tendu sur la couture du cinquième
+//     rang (y 950 : son PERCHOIR_CARTE recopie HAUT_GRILLE), et les cases qu'il
+//     touche restent unies (entières ou rien, jamais un motif coupé par ses
+//     ailes) ; la lisière rayée d'une bande
 //     d'aso-oke de chaque côté ; autour de la lune, en haut à gauche sous son
 //     regard (LUNE_NG), une rosace en relief,
 //     comme les zayyana des façades hausa de Zaria : un bourrelet d'enduit,
@@ -211,6 +213,8 @@ const R_OUT = 392 * K;
 const R_CERNE = 410 * K;
 
 const MARGE = 60;
+// La couture du cinquième rang (y 950) porte le perchoir de l'aigle : totems/nigeria.tsx la recopie
+// (PERCHOIR_CARTE) ; changer l'une et l'autre ensemble.
 const HAUT_GRILLE = { y0: 60, y1: 1128, rangs: 6 };
 const BAS_GRILLE = { y0: 1312, y1: 1520 };
 const COLS = 5;

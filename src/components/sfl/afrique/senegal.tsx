@@ -21,10 +21,11 @@
 //     rayures de trame ocre et verte, quelques fils d'argent (les tisserands
 //     d'aujourd'hui y passent du lurex) ; au centre, la lune dans un cercle
 //     de toile nue, cousu.
-//   · le totem (totems/senegal.tsx, 02/11/2026) : le lion assis, tissé en
-//     flottés, sur un panneau de toile nue cousu au point de surjet sur le
-//     pagne (PANNEAU_SENEGAL) ; la lune monte en haut à gauche dans son
-//     cercle cousu (LUNE_SENEGAL) ; le coton filé main s'use (flammes de fil
+//   · le totem (totems/senegal.tsx, 02/11/2026) : le lion assis, la tête
+//     tournée vers nous, tissé en flottés sur un panneau de toile fine cousu
+//     au point de surjet sur le pagne (PANNEAU_SENEGAL) ; la lune monte en
+//     haut à droite, au-dessus de son dos, dans son cercle cousu, sa rosace
+//     tout entière dans le panneau (LUNE_SENEGAL) ; le coton filé main s'use (flammes de fil
 //     épais, fils tirés, bourre, plis pris dans la lumière, de la graine) ;
 //     à la face, les aplats du liseré gardent les passes du pinceau, et le
 //     lion est brodé au point avant dans le coin du portrait.
@@ -379,7 +380,7 @@ function Manjak({ cote, m, graine, id }: PropsMotifNation) {
   const u = usure(graine);
   const { cx, cy } = LUNE_SENEGAL;
   const P = PANNEAU_SENEGAL;
-  // Le cercle cousu, serré autour de la lune (elle est descendue près du regard du lion).
+  // Le cercle cousu, serré autour de la lune (elle est descendue au-dessus du dos du lion).
   const rl = LUNE_SENEGAL.d / 2 + 26;
   const bandeau = { y: LOGOTYPE_DOS.cy - 70, h: 140 };
   let pointsRond = "";

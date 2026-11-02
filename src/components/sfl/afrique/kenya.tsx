@@ -17,12 +17,15 @@
 //     de sisal), ses rangs de torsades qui changent de sens d'un rang à
 //     l'autre, une couronne de triangles teints ; sous le logotype, la lisière
 //     rayée d'un kikoi et sa frange nouée ;
-//   · le totem (totems/kenya.tsx, 02/11/2026) : le rhinocéros noir taillé en
-//     bas-relief dans la porte, à la manière des sculpteurs akamba (des
-//     facettes tranchées à la gouge), sur sa marche, au-dessus du logotype ;
-//     la lune et le kiondo montent au-dessus de son dos (LUNE_KENYA), à 240 au
-//     lieu de 300, et sa grande corne monte vers eux ; au dos, le microtexte
-//     se fait discret (0,02) pour ne pas courir sur le relief ;
+//   · le totem (totems/kenya.tsx, 02/11/2026) : le rhinocéros noir au pas,
+//     la tête haute, taillé en relief dans le bois de la porte comme la
+//     chaîne et les rosettes (trois plans nets, un biseau à facettes, plis
+//     et peau craquelée taillés en V), sur une moulure en chaîne, au-dessus du
+//     logotype ; la lune et le kiondo montent au-dessus de son dos
+//     (LUNE_KENYA), la lune à 240 au lieu de 300, la spirale resserrée autour
+//     d'elle (elle commence à LUNE_KENYA.kiondo) et sans rosace guillochée,
+//     pour que la corne et les oreilles restent à distance de l'anneau ; au
+//     dos, pas de microtexte : dos-carte.tsx l'imprimerait sur le relief ;
 //   · le bois vit : le fil s'écarte autour de deux ou trois nœuds (sur les
 //     bords), des pores courent dans son sens, les lés des planches sont un
 //     peu plus clairs ou plus sombres, et la porte porte ses rayures et ses
@@ -37,7 +40,7 @@ import { LUNE_KENYA } from "./totems/kenya";
 
 /** La lune et le kiondo au dos : montés au-dessus du dos du rhinocéros (totems/kenya.tsx). */
 const CENTRE_DOS = { cx: LUNE_KENYA.cx, cy: LUNE_KENYA.cy } as const;
-/** L'échelle du kiondo : la lune passe de 300 à LUNE_KENYA.d. */
+/** L'échelle des rangs du kiondo : la lune passe de 300 à LUNE_KENYA.d. */
 const K = LUNE_KENYA.d / 300;
 
 type Pt = [number, number];
@@ -288,7 +291,8 @@ function fil(seed: number): Bois {
  */
 function kiondo(): { nature: string; teint: string; ombre: string; filets: string } {
   const { cx, cy } = CENTRE_DOS;
-  const r0 = 330 * K;
+  // La spirale commence près de la lune (LUNE_KENYA.kiondo) : resserrée, sans rosace entre elles.
+  const r0 = LUNE_KENYA.kiondo;
   const rangs = 9;
   const h = 10.5 * K;
   const pointes = 20;
@@ -506,8 +510,8 @@ const lamu: SkinNation = {
     voile: "rgba(10,6,4,0.82)",
     onglet: { fond: "#efe7da", encre: "#1a120c" },
     vive: "#d4c6a6",
-    // Au dos, le microtexte s'écrit par-dessus le relief du rhinocéros : à peine.
-    dos: { micro: 0.02 },
+    // Au dos, pas de microtexte : dos-carte.tsx l'imprime par-dessus le motif, donc sur le relief du rhinocéros.
+    dos: { micro: 0 },
     tranche: { couleur: "#22170f", metal: 0.08, rugosite: 0.62 },
     holo: { force: 0.22, teinte: [1, 0.9, 0.76] },
   },

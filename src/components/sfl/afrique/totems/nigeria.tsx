@@ -1,20 +1,27 @@
 // Le totem du Nigeria (PACK AFRIQUE 2027 ; Ilyes, 02/11/2026 : « une belle silhouette,
 // un beau truc de chaque équipe »).
 //
-// L'aigle martial (les Super Eagles), de trois quarts, au moment où il
-// freine pour se poser : le corps dressé, les ailes levées, sans symétrie ;
-// l'aile proche grande ouverte sur le côté, l'aile loin plus haute et
-// raccourcie par la perspective ; les sept rémiges primaires de chaque main
-// écartées en doigts effilés, un peu relevés, de longueurs graduées ; le
-// poignet marqué ; le bord de fuite en S, des secondaires inégales ; la
-// queue ouverte en éventail ; les pattes jetées en avant, culottes et tarses
-// emplumés, trois doigts devant, le pouce derrière, les serres ouvertes. La
-// tête de trois quarts, tournée vers la lune : celle de l'aigle martial, et
-// non d'un pygargue : sombre, comme la gorge et le haut du poitrail (le
-// plastron), une courte huppe à la nuque, l'arcade en léger surplomb, l'œil
-// grand, le bec noir et la cire claire ; sous le plastron, le ventre blanc
-// semé de gouttes sombres. L'aigle du Mali, lui, plane vu de dessous ; le
-// faucon d'Égypte est perché : trois oiseaux qu'on ne confond pas.
+// L'aigle martial (les Super Eagles), de trois quarts, à l'instant où il
+// se pose : les serres viennent de se refermer sur le perchoir, les ailes
+// sont encore levées, sans symétrie ; l'aile proche grande ouverte sur le
+// côté, l'aile loin plus haute et raccourcie par la perspective ; les sept
+// rémiges primaires de chaque main écartées en doigts effilés, un peu
+// relevés, de longueurs graduées ; le poignet marqué ; le bord de fuite en
+// S, des secondaires inégales ; la queue, étroite, qui tombe derrière le
+// perchoir ; les culottes et les tarses emplumés jusqu'aux doigts ; trois
+// doigts devant, refermés sur le perchoir, l'ongle du pouce qui revient
+// dessous, et des serres qui le débordent (le pied d'un rapace, grand).
+// Le perchoir est posé sur la couture de la grille d'adire (le skin la
+// trace à y 950) : un bâton de réserve, ses points de couture au milieu.
+// La tête de trois quarts, tournée vers la lune : celle de l'aigle martial,
+// et non d'un pygargue ni d'un perroquet : sombre, comme la gorge et le
+// haut du poitrail (le plastron), le crâne plat, une courte huppe couchée
+// à la nuque ; l'œil en amande, l'iris crème et paille, la pupille grande,
+// sous une arcade sombre qui lui mange le tiers du haut ; le bec noir fermé,
+// crochu, la cire réduite à une bande étroite gris d'indigo ; sous le
+// plastron, le ventre blanc semé de gouttes sombres. L'aigle du Mali, lui,
+// plane vu de dessous ; le faucon d'Égypte est perché de profil sur sa
+// pierre : trois oiseaux qu'on ne confond pas.
 // Il est peint en adire eleko (../nigeria.tsx) : la pâte d'amidon posée à
 // la plume sur le coton, puis l'indigo. Le blanc bleui est ce que la pâte a
 // protégé : les pennes, le ventre, les culottes ; le dessin des plumes est
@@ -27,21 +34,22 @@
 // la plume (les contours, les barres, les craquelures), jamais la silhouette.
 // Ni écusson ni symétrie : l'aigle ne se pose pas sur la lune, il la regarde.
 //   · au dos : le héros, grand, les ailes d'un bord à l'autre du haut de
-//     l'étoffe ; la lune en bas à gauche, sous son regard, dans la rosace de
-//     Zaria (LUNE_NG : le skin la redessine autour), loin de ses serres ;
+//     l'étoffe, posé sur la couture du cinquième rang (PERCHOIR_CARTE) ; la
+//     lune en haut à gauche, sous son regard, dans la rosace de Zaria
+//     (LUNE_NG : le skin la redessine autour), loin de ses serres ;
 //   · à la face : le même aigle, en gaufrage dans le coin bas gauche du
 //     portrait, à droite de l'équerre : une arête de lumière, une ombre.
 
 import type { PropsTotem, TotemNation } from "../types";
 import { alea, f } from "../outils";
 
-/** La lune, en bas à gauche, sous le regard de l'aigle (le skin, ../nigeria.tsx, y pose la rosace de Zaria). */
+/** La lune, en haut à gauche, sous le regard de l'aigle (le skin, ../nigeria.tsx, y pose la rosace de Zaria). */
 export const LUNE_NG = { cx: 215, cy: 212, d: 120 } as const;
-/** Le repère : les points sont posés dans un repère plus large, ramené par DECALE_NG dans la boîte 980 × 1040 qui serre l'aigle. */
+/** Le repère : les points sont posés dans un repère plus large, ramené par DECALE_NG dans la boîte 1032 × 950 qui serre l'aigle et son perchoir. */
 export const DECALE_NG = "translate(-40 -60)";
-const BOITE = { w: 1032, h: 936 } as const;
+const BOITE = { w: 1032, h: 950 } as const;
 /** Ce que l'aigle couvre au dos, dans le repère de la carte (le skin y laisse l'étoffe unie). */
-export const POSE_DOS_NG = { x: 512 - (BOITE.w * 0.915) / 2, y: 118, echelle: 0.915 } as const;
+export const POSE_DOS_NG = { x: 512 - (BOITE.w * 0.915) / 2, y: 178, echelle: 0.915 } as const;
 
 /* ------------------------------ Les tracés ------------------------------ */
 
@@ -254,22 +262,25 @@ const projette = (a: Pose2, [x, y]: Pt): Pt => [a.S[0] + a.u[0] * x + a.v[0] * y
 
 /* ------------------------------ Le corps ------------------------------ */
 
-/** Le plastron sombre : la tête levée vers la lune, la gorge, le haut du poitrail ; la huppe courte à la nuque ; le bord du plastron en mèches. */
+/** Le plastron sombre : la tête tournée vers la lune, le crâne plat, la courte huppe couchée à la nuque, la gorge, le haut du poitrail ; le bord du plastron en mèches. */
 const PTS_CAPUCHON: P[] = [
-  [424, 391], [438, 372], [461, 359], [488, 352], [514, 354], [534, 345, 1], [530, 366], [557, 359, 1], [544, 379], [564, 384, 1],
-  [548, 396], [562, 432], [580, 481], [588, 516], [606, 556], [610, 598], [600, 630], [584, 644], [568, 628, 1], [550, 650],
+  [426, 392], [437, 377], [457, 367], [484, 362], [510, 362], [530, 366], [552, 363, 1], [543, 377], [565, 380, 1],
+  [550, 393], [562, 432], [580, 481], [588, 516], [606, 556], [610, 598], [600, 630], [584, 644], [568, 628, 1], [550, 650],
   [530, 634, 1], [512, 654], [492, 636, 1], [472, 652], [456, 632, 1], [440, 640], [430, 610], [428, 570], [432, 530], [440, 494],
-  [436, 471], [431, 446], [426, 428],
+  [436, 471], [431, 446], [427, 428],
 ];
-/** Le bec, de trois quarts, levé : l'arête qui s'arque dès la cire jusqu'au crochet, le bord tranchant jusqu'à la commissure. */
-const PTS_BEC: P[] = [[424, 389], [406, 379], [387, 375], [370, 377], [357, 386], [352, 400], [354, 414, 1], [362, 402], [373, 400], [392, 407], [410, 416], [429, 425, 1], [431, 407]];
-const PTS_MANDIBULE: P[] = [[364, 407], [380, 407], [399, 414], [417, 423], [429, 428, 1], [417, 432], [399, 428], [378, 418]];
-const PTS_CIRE: P[] = [[417, 384], [431, 377], [442, 386], [442, 407], [436, 423], [429, 428, 1], [422, 412], [417, 398]];
-const NARINE = "M425 394C430 388 437 389 437 396C433 400 427 400 425 394Z";
-/** L'œil (grand), l'arcade en léger surplomb, la commissure jusque sous l'œil. */
-const OEIL = { cx: 461, cy: 391, r: 15.5 };
-const ARCADE: P[] = [[436, 375], [452, 367], [472, 367], [491, 375]];
-const COMMISSURE: P[] = [[429, 428], [447, 425], [465, 416]];
+/** Le bec, de trois quarts, fermé : l'arête qui s'arque dès la cire jusqu'au crochet, le bord tranchant qui court jusqu'à la commissure. */
+const PTS_BEC: P[] = [[430, 383], [414, 378], [397, 376], [381, 378], [367, 386], [358, 398], [356, 410], [361, 420, 1], [366, 410], [376, 404], [392, 405], [410, 411], [436, 420, 1], [437, 401]];
+/** La mandibule, à peine visible sous le bord tranchant du bec fermé. */
+const PTS_MANDIBULE: P[] = [[372, 409], [390, 409], [409, 415], [436, 421, 1], [421, 425], [400, 421], [382, 415]];
+/** La cire : une bande étroite, gris d'indigo, à la base du bec ; la narine dessus. */
+const PTS_CIRE: P[] = [[426, 381, 1], [434, 379], [441, 391], [440, 408], [435, 418, 1], [431, 404], [428, 392]];
+const NARINE = "M431 391C433 388 437 389 437 393C435 396 432 395 431 391Z";
+/** L'œil en amande, l'iris crème et jaune, une grande pupille ; l'arcade sombre en surplomb lui mange le tiers du haut ; la commissure jusque sous l'œil. */
+const OEIL = { cx: 462, cy: 392 };
+const PTS_OEIL: P[] = [[445, 394, 1], [452, 387], [463, 384], [474, 386], [481, 391, 1], [474, 398], [463, 401], [452, 399]];
+const PTS_ARCADE: P[] = [[436, 391, 1], [443, 381], [458, 375], [476, 376], [490, 383], [494, 389, 1], [478, 388], [463, 388.5], [450, 390.5]];
+const COMMISSURE: P[] = [[436, 421], [449, 421], [458, 419]];
 
 /** Le ventre blanc, sous le plastron. */
 const PTS_VENTRE: P[] = [
@@ -278,55 +289,106 @@ const PTS_VENTRE: P[] = [
 ];
 
 /** Les culottes : la cuisse emplumée qui se fond dans le ventre, le tarse emplumé jusqu'aux doigts. */
-const PTS_CULOTTE_PRES: P[] = [[566, 752], [602, 740], [634, 752], [644, 783], [640, 817], [632, 843], [630, 860], [622, 872, 1], [586, 872, 1], [580, 857], [572, 831], [564, 803], [560, 777]];
-const PTS_CULOTTE_LOIN: P[] = [[450, 755], [484, 745], [512, 758], [518, 789], [512, 822], [506, 846], [504, 863], [496, 875, 1], [460, 875, 1], [454, 860], [448, 834], [444, 807], [444, 781]];
+const PTS_CULOTTE_PRES: P[] = [[566, 752], [602, 740], [634, 752], [644, 783], [640, 817], [634, 845], [632, 866], [626, 886, 1], [586, 886, 1], [580, 866], [572, 836], [564, 806], [560, 777]];
+const PTS_CULOTTE_LOIN: P[] = [[450, 755], [484, 745], [512, 758], [518, 789], [512, 822], [506, 848], [504, 868], [500, 888, 1], [462, 888, 1], [456, 866], [448, 836], [444, 807], [444, 781]];
 
-/** Un pied ouvert, vu de face : trois doigts devant en éventail, le pouce derrière ; chacun sa serre. */
+/**
+ * Un pied qui serre le perchoir, vu de face : trois doigts devant, posés sur le perchoir et refermés
+ * dessus, l'ongle du pouce qui revient dessous ; chacun sa serre, qui déborde du perchoir.
+ * Un doigt part de sa base b dans la direction a (degrés), long de l, large de w à la base ; il se
+ * courbe de c degrés sur sa longueur (vers le doigt du milieu : le pied qui se referme) et
+ * s'amincit vers le bout ; la serre continue la courbe, plus fort, noire, épaisse à sa base, en
+ * croc. Le pied d'un rapace, plus grand d'un cinquième que celui de l'aigle qui freinait.
+ */
 interface Doigt {
   b: Pt;
   a: number;
   l: number;
   w: number;
+  c: number;
+  /** La longueur de la serre, en part de celle du doigt (0,6 par défaut). */
+  k?: number;
 }
+/**
+ * Le perchoir : posé sur la couture de la grille d'adire, un bâton de réserve, cerné d'indigo, ses points
+ * de couture au milieu ; il dépasse des pieds. PERCHOIR_CARTE recopie la couture du cinquième rang du skin
+ * (../nigeria.tsx : HAUT_GRILLE.y0 + 5 × (y1 − y0) / 6 = 60 + 5 × 178 = 950) : changer l'un et l'autre ensemble.
+ */
+const PERCHOIR_CARTE = 950;
+const PERCH = { x0: 404, x1: 704, e: 11 };
+/** Le milieu du perchoir, dans le repère des points : la couture de la carte ramenée par la pose. */
+const PERCH_Y = 60 + (PERCHOIR_CARTE - POSE_DOS_NG.y) / POSE_DOS_NG.echelle;
+/** Le bâton : ses bouts arrondis, à peine plus épais au milieu. */
+const PTS_PERCHOIR: P[] = [
+  [PERCH.x0, PERCH_Y + 1],
+  [PERCH.x0 + 14, PERCH_Y - PERCH.e],
+  [(PERCH.x0 + PERCH.x1) / 2, PERCH_Y - PERCH.e - 1],
+  [PERCH.x1 - 14, PERCH_Y - PERCH.e + 1],
+  [PERCH.x1, PERCH_Y],
+  [PERCH.x1 - 14, PERCH_Y + PERCH.e],
+  [(PERCH.x0 + PERCH.x1) / 2, PERCH_Y + PERCH.e + 1],
+  [PERCH.x0 + 14, PERCH_Y + PERCH.e],
+];
 const PIED_PRES: Doigt[] = [
-  { b: [592, 866], a: 124, l: 74, w: 17 },
-  { b: [607, 870], a: 95, l: 84, w: 18 },
-  { b: [621, 866], a: 64, l: 72, w: 17 },
-  { b: [630, 852], a: 12, l: 48, w: 18 },
+  { b: [589, 883], a: 108, l: 40, w: 17, c: -40, k: 0.85 },
+  { b: [606, 887], a: 92, l: 43, w: 17.5, c: -12, k: 0.85 },
+  { b: [623, 883], a: 76, l: 40, w: 17, c: 40, k: 0.85 },
 ];
 const PIED_LOIN: Doigt[] = [
-  { b: [468, 868], a: 130, l: 68, w: 16 },
-  { b: [483, 872], a: 101, l: 78, w: 17 },
-  { b: [497, 868], a: 72, l: 66, w: 16 },
-  { b: [460, 854], a: 168, l: 44, w: 17 },
+  { b: [465, 885], a: 110, l: 38, w: 16, c: -40, k: 0.85 },
+  { b: [481, 889], a: 94, l: 41, w: 16.5, c: -12, k: 0.85 },
+  { b: [497, 885], a: 78, l: 38, w: 16, c: 40, k: 0.85 },
+];
+/** Les pouces, derrière le perchoir : seule leur serre se voit, qui revient dessous, vers l'avant. */
+const POUCES: Doigt[] = [
+  { b: [599, 912], a: 100, l: 12, w: 16, c: 44, k: 1.3 },
+  { b: [475, 913], a: 100, l: 11, w: 15, c: 44, k: 1.3 },
 ];
 
-function doigt(d: Doigt): { doigt: P[]; serre: P[] } {
-  const r = (d.a * Math.PI) / 180;
-  const [ux, uy] = [Math.cos(r), Math.sin(r)];
-  const [nx, ny] = [-uy, ux];
-  const h = d.w / 2;
-  const at = (t: number, s: number): Pt => [d.b[0] + ux * d.l * t + nx * s, d.b[1] + uy * d.l * t + ny * s];
-  // Le doigt s'affine vers le bout ; trois coussinets le renflent à peine.
-  const doigtPts: P[] = [at(0, -h), at(0.3, -h * 0.94), at(0.55, -h * 0.86), at(0.8, -h * 0.72), at(1, -h * 0.5), at(1.04, 0), at(1, h * 0.5), at(0.8, h * 0.74), at(0.55, h * 0.9), at(0.3, h * 0.96), at(0, h)];
-  // La serre : noire, recourbée vers le dessous du doigt, de la longueur d'une phalange.
-  const k = 0.46 * d.l;
-  const [ex, ey] = at(0.97, 0);
-  const serre: P[] = [
-    [ex + nx * h * 0.55, ey + ny * h * 0.55],
-    [ex + ux * k * 0.5 + nx * h * 0.45, ey + uy * k * 0.5 + ny * h * 0.45],
-    [ex + ux * k * 0.9 - nx * h * 0.1, ey + uy * k * 0.9 - ny * h * 0.1],
-    [ex + ux * k * 0.92 - nx * h * 1.05, ey + uy * k * 0.92 - ny * h * 1.05, 1],
-    [ex + ux * k * 0.5 - nx * h * 0.2, ey + uy * k * 0.5 - ny * h * 0.2],
-    [ex - nx * h * 0.5, ey - ny * h * 0.5],
-  ];
-  return { doigt: doigtPts, serre };
+/** Le point et la direction d'un arc parti de b dans la direction a (degrés), tourné de c degrés sur la longueur l, à s de la base. */
+function surArc(b: Pt, a: number, c: number, l: number, s: number): [number, number, number] {
+  const a0 = (a * Math.PI) / 180;
+  const th = (c * Math.PI) / 180;
+  const ang = a0 + (th * s) / l;
+  if (Math.abs(th) < 1e-6) return [b[0] + Math.cos(a0) * s, b[1] + Math.sin(a0) * s, ang];
+  const R = l / th;
+  return [b[0] + R * (Math.sin(ang) - Math.sin(a0)), b[1] - R * (Math.cos(ang) - Math.cos(a0)), ang];
 }
 
-/** La queue en éventail : douze rectrices, sous le ventre, derrière les pattes. */
+function doigt(d: Doigt): { doigt: P[]; serre: P[]; bout: [number, number, number]; barres: [Pt, Pt][] } {
+  const h = d.w / 2;
+  const cote = (s: number, k: number): Pt => {
+    const [x, y, ang] = surArc(d.b, d.a, d.c, d.l, s);
+    return [x - Math.sin(ang) * k, y + Math.cos(ang) * k];
+  };
+  // Le doigt : plein à la base, une phalange qui renfle à peine, aminci au bout (0,62).
+  const largeur = (t: number) => h * (1 - 0.38 * t + 0.05 * Math.sin(t * Math.PI * 2));
+  const ts = [0, 0.22, 0.45, 0.68, 0.88, 1];
+  const g = ts.map((t) => cote(t * d.l, -largeur(t)));
+  const dr = ts.map((t) => cote(t * d.l, largeur(t))).reverse();
+  const bout = surArc(d.b, d.a, d.c, d.l, d.l);
+  const [bx, by, ba] = bout;
+  const doigtPts: P[] = [...g, [bx + Math.cos(ba) * h * 0.5, by + Math.sin(ba) * h * 0.5], ...dr];
+  // La serre : elle sort du bout du doigt, continue sa courbe (60° de plus, dans le même sens), épaisse
+  // comme le bout du doigt, et finit en pointe.
+  const sens = d.c === 0 ? 1 : Math.sign(d.c);
+  const k = (d.k ?? 0.6) * d.l;
+  const cs = d.c * 0.6 + sens * 62;
+  const pt = (s: number, off: number): Pt => {
+    const [x, y, ang] = surArc([bx, by], (ba * 180) / Math.PI, cs, k, s);
+    return [x - Math.sin(ang) * off, y + Math.cos(ang) * off];
+  };
+  const e = h * 0.7;
+  const serre: P[] = [pt(0, -e), pt(k * 0.35, -e * 0.82), pt(k * 0.7, -e * 0.45), [...pt(k, 0), 1] as P, pt(k * 0.7, e * 0.3), pt(k * 0.35, e * 0.7), pt(0, e)];
+  // Les écailles du doigt : deux barres en travers, aux jointures.
+  const barres: [Pt, Pt][] = [0.36, 0.66].map((t) => [cote(t * d.l, -largeur(t) * 0.8), cote(t * d.l, largeur(t) * 0.8)]);
+  return { doigt: doigtPts, serre, bout, barres };
+}
+
+/** La queue, plus étroite : douze rectrices serrées, sous le ventre, qui tombent derrière le perchoir. */
 const QUEUE: Penne[] = Array.from({ length: 12 }, (_, i) => {
   const k = i - 5.5;
-  return { b: [528 + k * 5, 806] as Pt, a: 92 - k * 6.2, l: 158 - k * k * 0.7, w: 40, cintre: 0, fin: 0.9 };
+  return { b: [530 + k * 3.4, 806] as Pt, a: 91 - k * 2.5, l: 176 - k * k * 0.42, w: 33, cintre: 0, fin: 0.9 };
 });
 
 /* ------------------------------ La peinture ------------------------------ */
@@ -390,7 +452,7 @@ function peindre(graine: number) {
     }
   let gouttesCulottes = "";
   for (const [x0, x1] of [[446, 514], [564, 640]] as Pt[])
-    for (let y = 770, i = 0; y < 862; y += 20, i++)
+    for (let y = 770, i = 0; y < 878; y += 20, i++)
       for (let x = x0 + 10 + (i % 2) * 10; x < x1 - 6; x += 21) gouttesCulottes += grain(x + (rnd() - 0.5) * 4, y + (rnd() - 0.5) * 4, 3.2 + rnd() * 1.4);
   // Le plastron : des plumes en écailles, tracées en blanc dans le bleu ; la tête, des traits courts.
   let plumesPlastron = "";
@@ -402,25 +464,28 @@ function peindre(graine: number) {
       if (Math.hypot(x - OEIL.cx, y - OEIL.cy) < 28) continue;
       plumesTete += trait(x, y, x + 6, y + 3, rnd, 1);
     }
-  // Les pattes : les doigts, les serres, les écailles des doigts.
+  // Les pattes : les doigts, les serres, les écailles des doigts (deux barres, aux jointures) ; les pouces,
+  // derrière le perchoir, leur serre seulement.
   const pieds = [PIED_LOIN, PIED_PRES].map((pd) => {
     let doigts = "";
     let serres = "";
     let ecailles = "";
     for (const d of pd) {
       const g = doigt(d);
-      doigts += plumeQuiPeint(g.doigt, rnd, { w: [2.6, 3.8], amp: 0.8, pas: 3 }).forme;
+      doigts += plumeQuiPeint(g.doigt, rnd, { w: [2.2, 3], amp: 0.5, pas: 3 }).forme;
       serres += lisse(g.serre);
-      const r = (d.a * Math.PI) / 180;
-      const [ux, uy] = [Math.cos(r), Math.sin(r)];
-      const [nx, ny] = [-uy, ux];
-      for (let t = 0.3; t < 0.92; t += 0.16) {
-        const [x, y] = [d.b[0] + ux * d.l * t, d.b[1] + uy * d.l * t];
-        ecailles += `M${f(x - nx * d.w * 0.4)} ${f(y - ny * d.w * 0.4)}L${f(x + nx * d.w * 0.4)} ${f(y + ny * d.w * 0.4)}`;
-      }
+      for (const [[x0, y0], [x1, y1]] of g.barres) ecailles += trait(x0, y0, x1, y1, rnd, 0.6);
     }
     return { doigts, serres, ecailles };
   });
+  const pouces = POUCES.map((d) => {
+    const g = doigt(d);
+    return lisse(g.doigt) + lisse(g.serre);
+  }).join("");
+  // Le perchoir : un bâton de réserve, cerné à la plume, ses points de couture le long du milieu.
+  const perchoir = plumeQuiPeint(PTS_PERCHOIR, rnd, { w: [2.6, 4], amp: 0.8 });
+  let points = "";
+  for (let x = PERCH.x0 + 18; x < PERCH.x1 - 12; x += 17) points += grain(x + (rnd() - 0.5) * 2, PERCH_Y + (rnd() - 0.5) * 2, 2.3);
   // La queue : ses pennes, ses barres, son bord sombre.
   const queue = [5, 6, 4, 7, 3, 8, 2, 9, 1, 10, 0, 11].map((i) => {
     const p = QUEUE[i];
@@ -445,9 +510,9 @@ function peindre(graine: number) {
       craquelures += `L${f(x)} ${f(y)}`;
     }
   }
-  const arcade = plumeQuiPeint(ARCADE, rnd, { ferme: false, w: [2.4, 4.6], amp: 0.6, pas: 3 }).ruban;
+  const arcade = plumeQuiPeint(PTS_ARCADE, rnd, { w: [1.6, 2.4], amp: 0.3, pas: 3 });
   const commissure = plumeQuiPeint(COMMISSURE, rnd, { ferme: false, w: [2, 3.4], amp: 0.5, pas: 3 }).ruban;
-  return { ailes, capuchon, ventre, culottes, gouttes, gouttesCulottes, plumesPlastron, plumesTete, pieds, queue, craquelures, arcade, commissure };
+  return { ailes, capuchon, ventre, culottes, gouttes, gouttesCulottes, plumesPlastron, plumesTete, pieds, pouces, perchoir, points, queue, craquelures, arcade, commissure };
 }
 
 function peinture(graine: number) {
@@ -463,6 +528,12 @@ function peinture(graine: number) {
 const RESERVE = "208,218,232";
 const KAOLIN = "236,234,226";
 const INDIGO = "#0f1422";
+/** L'iris de l'aigle martial : un crème qui tire au jaune paille (jamais l'or). */
+const IRIS = "#e2d6a0";
+/** Les serres : un bleu d'indigo plus franc que la pâte mince, qui se lit sur la réserve comme sur le fond. */
+const SERRE = "#2e3a5c";
+/** La cire : la pâte posée plus mince encore, gris d'indigo. */
+const CIRE = "#7a849e";
 /** La pâte posée mince : l'indigo l'a gagnée à moitié (la tête, le plastron, les couvertures). */
 const MI = "#46526e";
 
@@ -523,7 +594,12 @@ function Adire({ graine, id }: PropsTotem) {
       </g>
       <path d={p.ventre.ruban} fill={INDIGO} />
       {aile(1)}
-      {/* Les pattes : les culottes et leurs gouttes, les doigts, les serres. */}
+      {/* Le perchoir, sur la couture : les serres des pouces, qui reviennent dessous, puis le bâton. */}
+      <path d={p.pouces} fill={SERRE} stroke={blanc} strokeWidth={2} strokeLinejoin="round" />
+      <path d={p.perchoir.forme} fill={blanc} />
+      <path d={p.points} fill={INDIGO} opacity={0.75} />
+      <path d={p.perchoir.ruban} fill={INDIGO} />
+      {/* Les pattes : les culottes et leurs gouttes, les doigts refermés sur le perchoir, les serres qui le débordent. */}
       {p.culottes.map((c, i) => (
         <g key={i}>
           <path d={c.forme} fill={blanc} />
@@ -533,27 +609,28 @@ function Adire({ graine, id }: PropsTotem) {
       <path d={p.gouttesCulottes} fill={INDIGO} opacity={0.8} />
       {p.pieds.map((pd, i) => (
         <g key={i}>
-          <path d={pd.serres} fill={INDIGO} stroke={blanc} strokeWidth={1.4} />
-          <path d={pd.doigts} fill={`rgb(${KAOLIN})`} stroke={INDIGO} strokeWidth={3.2} strokeLinejoin="round" />
-          <path d={pd.ecailles} {...ligne} strokeWidth={1.8} opacity={0.8} />
+          <path d={pd.serres} fill={SERRE} stroke={blanc} strokeWidth={2} strokeLinejoin="round" />
+          <path d={pd.doigts} fill={`rgb(${KAOLIN})`} stroke={INDIGO} strokeWidth={2.6} strokeLinejoin="round" />
+          <path d={pd.ecailles} {...ligne} strokeWidth={1.5} opacity={0.75} />
         </g>
       ))}
-      {/* La tête et le plastron : la pâte mince, le dessin des plumes en blanc ; le bec noir, la cire claire, l'œil. */}
+      {/* La tête et le plastron : la pâte mince, le dessin des plumes en blanc ; le bec noir fermé, la cire étroite, l'œil sous l'arcade. */}
       <path d={p.capuchon.forme} fill={MI} />
       <g clipPath={`url(#ngh${id})`}>
         <path d={p.plumesPlastron + p.plumesTete} fill="none" stroke={blanc} strokeWidth={2} strokeLinecap="round" opacity={0.8} />
       </g>
       <path d={p.capuchon.ruban} fill={blanc} />
-      <path d={lisse(PTS_MANDIBULE)} fill={INDIGO} stroke={blanc} strokeWidth={2.4} strokeLinejoin="round" />
+      <path d={lisse(PTS_MANDIBULE)} fill={INDIGO} stroke={blanc} strokeWidth={2} strokeLinejoin="round" />
       <path d={lisse(PTS_BEC)} fill={INDIGO} stroke={blanc} strokeWidth={3} strokeLinejoin="round" />
-      <path d="M420 386C404 380 388 380 375 387" fill="none" stroke={blanc} strokeWidth={1.8} strokeLinecap="round" opacity={0.75} />
-      <path d={lisse(PTS_CIRE)} fill={`rgb(${KAOLIN})`} stroke={INDIGO} strokeWidth={2} />
+      <path d="M424 384C408 378 392 378 378 385" fill="none" stroke={blanc} strokeWidth={1.8} strokeLinecap="round" opacity={0.7} />
+      <path d={lisse(PTS_CIRE)} fill={CIRE} stroke={INDIGO} strokeWidth={1.8} strokeLinejoin="round" />
       <path d={NARINE} fill={INDIGO} />
       <path d={p.commissure} fill={blanc} />
-      <circle cx={OEIL.cx} cy={OEIL.cy} r={OEIL.r} fill={`rgb(${KAOLIN})`} stroke={INDIGO} strokeWidth={2.4} />
-      <circle cx={OEIL.cx - 1.5} cy={OEIL.cy + 0.5} r={7.8} fill={INDIGO} />
-      <circle cx={OEIL.cx - 4} cy={OEIL.cy - 3} r={2.3} fill={`rgb(${KAOLIN})`} />
-      <path d={p.arcade} fill={blanc} />
+      <path d={lisse(PTS_OEIL)} fill={IRIS} stroke={INDIGO} strokeWidth={2.4} strokeLinejoin="round" />
+      <circle cx={OEIL.cx - 1.5} cy={OEIL.cy + 0.5} r={6.6} fill={INDIGO} />
+      <circle cx={OEIL.cx - 4.2} cy={OEIL.cy - 1.2} r={1.6} fill={`rgb(${KAOLIN})`} />
+      <path d={p.arcade.forme} fill={INDIGO} />
+      <path d={p.arcade.ruban} fill={INDIGO} />
     </g>
   );
 }
@@ -648,22 +725,26 @@ export function sousAigleNG(x: number, y: number, marge: number): boolean {
 function Gaufre({ photo, tons, id }: PropsTotem) {
   const ombre = photo ? "rgba(6,8,16,0.6)" : "rgba(0,0,0,0.55)";
   const lumiere = photo ? "rgba(236,240,248,0.55)" : `rgba(${RESERVE},0.42)`;
+  const perchoir = lisse(PTS_PERCHOIR);
+  // Le masque couvre toute l'envergure (le bout de l'aile proche passe x 1000 dans le repère des points).
+  const [mx, my, mw, mh] = [-200, -200, 1500, 1500];
   return (
     <g transform={DECALE_NG} strokeLinejoin="round">
       <defs>
-        <mask id={`ngg${id}`} maskUnits="userSpaceOnUse" x={-100} y={-60} width={1100} height={1200}>
-          <rect x={-100} y={-60} width={1100} height={1200} fill="#fff" />
-          <path d={SILHOUETTE_NG} fill="#000" />
+        <mask id={`ngg${id}`} maskUnits="userSpaceOnUse" x={mx} y={my} width={mw} height={mh}>
+          <rect x={mx} y={my} width={mw} height={mh} fill="#fff" />
+          <path d={SILHOUETTE_NG + perchoir} fill="#000" />
         </mask>
       </defs>
-      <path d={SILHOUETTE_NG} fill={photo ? "rgba(236,240,248,0.1)" : `rgba(${tons.encre},0.04)`} />
+      <path d={SILHOUETTE_NG + perchoir} fill={photo ? "rgba(236,240,248,0.1)" : `rgba(${tons.encre},0.04)`} />
       <g mask={`url(#ngg${id})`} fill="none" strokeWidth={12}>
-        <path d={SILHOUETTE_NG} stroke={ombre} transform="translate(4 5)" />
-        <path d={SILHOUETTE_NG} stroke={lumiere} transform="translate(-4 -5)" />
+        <path d={SILHOUETTE_NG + perchoir} stroke={ombre} transform="translate(4 5)" />
+        <path d={SILHOUETTE_NG + perchoir} stroke={lumiere} transform="translate(-4 -5)" />
       </g>
       <path d={lisse(PTS_CAPUCHON)} fill="none" stroke={ombre} strokeWidth={4} transform="translate(-1.5 -2)" />
       <path d={lisse(PTS_CAPUCHON)} fill="none" stroke={lumiere} strokeWidth={4} transform="translate(1.5 2)" />
-      <circle cx={OEIL.cx} cy={OEIL.cy} r={OEIL.r} fill={ombre} />
+      <path d={lisse(PTS_ARCADE)} fill={ombre} />
+      <path d={lisse(PTS_OEIL)} fill={ombre} />
     </g>
   );
 }
@@ -671,7 +752,7 @@ function Gaufre({ photo, tons, id }: PropsTotem) {
 const totem: TotemNation = {
   nation: "ng",
   animal: "aigle",
-  quoi: "L'aigle martial de trois quarts qui freine, les ailes levées sans symétrie, la tête sombre tournée vers la lune : peint à l'amidon sur l'indigo comme un adire eleko, hampes, barres, gouttes et craquelures.",
+  quoi: "L'aigle martial de trois quarts qui se pose, les serres refermées sur un perchoir tendu sur la couture de l'étoffe, les ailes encore levées sans symétrie, la tête sombre au crâne plat, l'œil en amande sous l'arcade, le bec fermé, tournée vers la lune : peint à l'amidon sur l'indigo comme un adire eleko, hampes, barres, gouttes et craquelures.",
   sources: [
     { titre: "eBird (Cornell Lab), aigle martial : tête, dos et haut du poitrail brun sombre, ventre blanc semé de taches, courte huppe", url: "https://ebird.org/species/mareag1" },
     { titre: "World Land Trust, aigle martial : plumage, envergure, pattes emplumées", url: "https://www.worldlandtrust.org/species/martial-eagle/" },
