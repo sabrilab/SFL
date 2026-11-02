@@ -463,19 +463,36 @@ void (async () => {
 
   /* ------------------------------- 13 · L'annonce et la pastille ------------------------------- */
   {
-    const L = (cle: string, source: LigneXpS["source"], quoi: string, xps: number, titre?: LigneXpS["titre"]): LigneXpS => ({ saison: 1, j: 5, date: "8 nov.", quoi, xps, source, cle, rattache: cle, ...(titre ? { titre } : {}) });
-    const avant = [L("sfl-time:1:4:Ana", "sfl-time", "SFL Time", 10)];
-    const premier = annonceXpS("Ana", 10, avant, null);
+    const ICI = hiver("2026-11-08 19:00");
+    const L = (cle: string, source: LigneXpS["source"], quoi: string, xps: number, titre?: LigneXpS["titre"], le = ICI): LigneXpS => ({
+      saison: 1, j: 5, date: "8 nov.", quoi, xps, source, cle, rattache: cle, le: le.toISOString(), ...(titre ? { titre } : {}),
+    });
+    const avant = [L("sfl-time:1:4:Ana", "sfl-time", "SFL Time", 10, undefined, hiver("2026-11-02 00:00"))];
+    const premier = annonceXpS("Ana", avant, null, ICI);
     assert.equal(premier.annonce, null, "la première fois : rien, le stock se lit sur la tuile");
     const apres = [...avant, L("flair:1:5:Ana", "flair", "Flair", 4), L("titre:mvp:1:5:Ana", "titre", "MVP", 9, "mvp")];
-    const r = annonceXpS("Ana", 23, apres, premier.vu);
+    const r = annonceXpS("Ana", apres, premier.vu, ICI);
     assert.deepEqual(r.annonce, { plus: 13, sources: ["MVP", "Flair"] }, "+13 : MVP · Flair (les lignes neuves seules)");
-    assert.equal(annonceXpS("Ana", 23, apres, r.vu).annonce, null, "une seule fois");
-    assert.equal(annonceXpS("Ana", 18, apres, r.vu).annonce, null, "une feuille corrigée qui retire : rien");
-    assert.equal(annonceXpS("Ana", 20, apres, annonceXpS("Ana", 18, apres, r.vu).vu).annonce, null, "ni quand elle rend ce qu'on avait déjà vu");
-    assert.equal(annonceXpS("Bea", 23, apres, r.vu).annonce, null, "un autre joueur sur ce téléphone : il repart de zéro");
-    const bola = annonceXpS("Ana", 33, [...apres, { ...L("bola:mvp:7:Ana", "bola", "MVP", 10, "mvp"), source: "bola" }], r.vu);
-    assert.deepEqual(bola.annonce?.sources, ["MVP"]);
+    assert.equal(annonceXpS("Ana", apres, r.vu, ICI).annonce, null, "une seule fois");
+    assert.equal(annonceXpS("Ana", avant, r.vu, ICI).annonce, null, "une feuille corrigée qui retire : rien");
+    assert.equal(annonceXpS("Ana", apres, annonceXpS("Ana", avant, r.vu, ICI).vu, ICI).annonce, null, "ni quand elle rend ce qu'on avait déjà vu");
+    assert.equal(annonceXpS("Bea", apres, r.vu, ICI).annonce, null, "un autre joueur sur ce téléphone : il repart de zéro");
+    // Une vieille ligne qui arrive en retard (les réponses aux missions chargées après coup) : pas d'annonce, mais vue.
+    const tard = annonceXpS("Ana", [...apres, L("mission:1:2:contrat:Ana", "mission", "Mission Verrou", 10, undefined, hiver("2026-10-19 00:00"))], r.vu, ICI);
+    assert.equal(tard.annonce, null, "une mission d'il y a trois semaines : rien");
+    assert.ok(tard.vu.cles.includes("mission:1:2:contrat:Ana"));
+    const bola = annonceXpS("Ana", [...apres, { ...L("bola:mvp:7:Ana", "bola", "MVP", 10, "mvp"), source: "bola" }], r.vu, ICI);
+    assert.deepEqual(bola.annonce, { plus: 10, sources: ["MVP"] });
+    // Chaque ligne du calcul porte l'instant où elle est tombée : la révélation de sa journée.
+    const pub = saisonR({ fin: hiver("2026-11-08 17:40").toISOString() });
+    const rev = xpsDe({ jugee: vueServeur(pub, hiver("2026-11-08 20:00")), maintenant: hiver("2026-11-08 20:00") }).get("Ana")!;
+    assert.equal(rev.find((l) => l.j === 5)!.le, hiver("2026-11-08 19:40").toISOString(), "la J5 : 19 h 40");
+    assert.equal(rev.find((l) => l.j === 4)!.le, hiver("2026-11-02 00:00").toISOString(), "la J4 : minuit");
+    assert.equal(
+      (rb.journalS.get("Kader") ?? []).find((l) => l.source === "flair-saison")!.le,
+      "2026-08-31T12:00:00.000Z",
+      "un Flair de saison : la clôture de sa saison"
+    );
 
     // La pastille : le symbole Bola et la lettre S, de la couleur du texte (aucune couleur à elle : ni or ni rang).
     const pastille = renderToStaticMarkup(createElement(PastilleS));
@@ -506,7 +523,8 @@ void (async () => {
     assert.match(tuile, /useSoldeXpS\(player\.name\)/, "Ma carte : les XP S qui restent");
     assert.match(tuile, /<MontantXpS n=\{soldeS\} \/>/, "« 1 630 XP · ▣S 59 »");
     assert.ok(!/à dépenser/.test(tuile.replace(/\/\/.*$|\{\/\*[\s\S]*?\*\/\}/gm, "")), "plus de « à dépenser » en XP normales");
-    assert.match(tuile, /annonceXpS\(nom, gagne, lignes, vu\)/, "l'annonce à la révélation");
+    assert.match(tuile, /annonceXpS\(nom, lignes, vu, new Date\(\)\)/, "l'annonce à la révélation");
+    assert.match(tuile, /const lignes = s\?\.complet \? s\.lignes : null;/, "seulement sur un calcul complet");
     assert.match(lire("components/sfl/mode-passe.tsx"), /xpS=\{vitrine \? null : soldeS\}/, "l'en-tête du Passe");
     assert.match(lire("components/sfl/mode-passe-missions.tsx"), /xpS\.get\(rattachementXp\(l\)/, "le journal porte la pastille à droite de l'XP");
   }

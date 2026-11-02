@@ -506,6 +506,8 @@ export interface XpSAffichees {
   gagne: number;
   /** Le détail, de la plus récente à la plus ancienne (xp-s.ts, bilanXpS). */
   lignes: LigneXpS[];
+  /** Le calcul de l'appareil a tout ce qu'il lui faut (session vérifiée, réponses chargées) : l'annonce l'attend. */
+  complet: boolean;
 }
 
 /**
@@ -526,8 +528,8 @@ export function useXpS(nom?: string): XpSAffichees | null {
     if (!lg || !qui) return null;
     const b = bilanXpS(lg.journalS, qui);
     // Le compte vitrine garde son calcul (un aperçu, sur son seul téléphone).
-    if (lg.vitrine === qui) return { gagne: b.gagne, lignes: b.lignes };
-    return { gagne: xpSAffiche(b.gagne, { complet, serveur }), lignes: b.lignes };
+    if (lg.vitrine === qui) return { gagne: b.gagne, lignes: b.lignes, complet: true };
+    return { gagne: xpSAffiche(b.gagne, { complet, serveur }), lignes: b.lignes, complet };
   }, [lg, qui, complet, serveur]);
 }
 

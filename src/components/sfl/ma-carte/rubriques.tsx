@@ -559,63 +559,70 @@ const CLE_XPS_VU = "sfl-xps-vu";
  *
  * Les XP S (lib/sfl/xp-s.ts, 02/11/2026) aussi, à la révélation : un toast
  * discret « +15 ▣S », d'où elles viennent (« MVP · Flair »), une haptique
- * légère. La première fois, rien : le stock d'avant se lit sur la tuile. Un
- * palier qui s'ouvre au même moment passe dans la même annonce, en
- * description, avec l'haptique du palier. Aucun nombre ne s'anime.
+ * légère ; seulement ce qui vient de tomber (annonceXpS), une fois le calcul
+ * de l'appareil complet et posé (quatre secondes sans bouger : les réponses
+ * aux missions arrivent un instant après l'ouverture). La première fois,
+ * rien : le stock d'avant se lit sur la tuile. Un palier qui s'ouvre au même
+ * moment passe dans la même annonce, en description, avec l'haptique du
+ * palier. Aucun nombre ne s'anime.
  */
+const POSE_MS = 4000;
+
 function useAnnonces(b: BilanXp | null, s: XpSAffichees | null, nom: string) {
   const sp = b?.saisonPasse;
   const palier = b ? Math.max(b.palier, b.passe.palier) : 0;
-  const gagne = s?.gagne ?? null;
-  const lignes = s?.lignes;
+  const lignes = s?.complet ? s.lignes : null;
   useEffect(() => {
-    let n: number | null = null;
-    if (sp && palier > 0) {
-      let vus: Record<string, number> = {};
-      try {
-        vus = JSON.parse(localStorage.getItem(CLE_VU) ?? "{}") as Record<string, number>;
-      } catch {}
-      n = palierAAnnoncer(palier, vus[sp.id] ?? null);
-      if (n !== null)
+    const id = window.setTimeout(() => {
+      let n: number | null = null;
+      if (sp && palier > 0) {
+        let vus: Record<string, number> = {};
         try {
-          localStorage.setItem(CLE_VU, JSON.stringify({ ...vus, [sp.id]: n }));
+          vus = JSON.parse(localStorage.getItem(CLE_VU) ?? "{}") as Record<string, number>;
         } catch {}
-    }
-    const p = n !== null ? sp?.paliers[n - 1] : undefined;
-    let annonce: { plus: number; sources: string[] } | null = null;
-    if (gagne !== null && lignes) {
-      let brut: string | null = null;
-      let vu: VuXpS | null = null;
-      try {
-        brut = localStorage.getItem(CLE_XPS_VU);
-        vu = JSON.parse(brut ?? "null") as VuXpS | null;
-      } catch {}
-      const r = annonceXpS(nom, gagne, lignes, vu);
-      annonce = r.annonce;
-      const garde = JSON.stringify(r.vu);
-      if (garde !== brut)
+        n = palierAAnnoncer(palier, vus[sp.id] ?? null);
+        if (n !== null)
+          try {
+            localStorage.setItem(CLE_VU, JSON.stringify({ ...vus, [sp.id]: n }));
+          } catch {}
+      }
+      const p = n !== null ? sp?.paliers[n - 1] : undefined;
+      let annonce: { plus: number; sources: string[] } | null = null;
+      if (lignes) {
+        let brut: string | null = null;
+        let vu: VuXpS | null = null;
         try {
-          localStorage.setItem(CLE_XPS_VU, garde);
+          brut = localStorage.getItem(CLE_XPS_VU);
+          vu = JSON.parse(brut ?? "null") as VuXpS | null;
         } catch {}
-    }
-    if (annonce) {
-      if (p) haptique.sceau();
-      else haptique.choix();
-      const description = [...annonce.sources, ...(p ? [`Palier ${n} · ${p.nom}`] : [])].join(" · ");
-      toast(
-        <span className="inline-flex items-center gap-1.5 tabular-nums">
-          <span className="sr-only">{`+${xpSFr(annonce.plus)}`}</span>
-          <span aria-hidden>+{annonce.plus}</span>
-          <PastilleS />
-        </span>,
-        description ? { description } : undefined
-      );
-      return;
-    }
-    if (!p || !sp) return;
-    haptique.sceau();
-    toast(`Palier ${n} · ${p.nom}`, { description: `Passe Bola · ${sp.nom}` });
-  }, [sp, palier, gagne, lignes, nom]);
+        const r = annonceXpS(nom, lignes, vu, new Date());
+        annonce = r.annonce;
+        const garde = JSON.stringify(r.vu);
+        if (garde !== brut)
+          try {
+            localStorage.setItem(CLE_XPS_VU, garde);
+          } catch {}
+      }
+      if (annonce) {
+        if (p) haptique.sceau();
+        else haptique.choix();
+        const description = [...annonce.sources, ...(p ? [`Palier ${n} · ${p.nom}`] : [])].join(" · ");
+        toast(
+          <span className="inline-flex items-center gap-1.5 tabular-nums">
+            <span className="sr-only">{`+${xpSFr(annonce.plus)}`}</span>
+            <span aria-hidden>+{annonce.plus}</span>
+            <PastilleS />
+          </span>,
+          description ? { description } : undefined
+        );
+        return;
+      }
+      if (!p || !sp) return;
+      haptique.sceau();
+      toast(`Palier ${n} · ${p.nom}`, { description: `Passe Bola · ${sp.nom}` });
+    }, POSE_MS);
+    return () => window.clearTimeout(id);
+  }, [sp, palier, lignes, nom]);
 }
 
 /* ----------------------------- La page enfant ----------------------------- */

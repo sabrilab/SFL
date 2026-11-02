@@ -35,14 +35,14 @@
 //
 // Pur : ni React ni réseau.
 
-import { estLeJour } from "./convocation-temps";
+import { estLeJour, minuitDuSoir } from "./convocation-temps";
 import type { MatchValide } from "./carte-bola";
 import { isHidden } from "./hidden";
 import type { LigneXp, TitreCouvert } from "./missions";
 import { instantParis, MISSIONS_PERSO, missionsPerso, rangPerso, semaineDe, type MissionFaite } from "./missions-perso";
 import { soldeXp } from "./pack-afrique";
 import { placeDe } from "./recrues";
-import { journeeComptee, nouveauRegime } from "./revelation";
+import { journeeComptee, nouveauRegime, revelation } from "./revelation";
 import { cleTitre } from "./saisie/evolution";
 import { journeeJouee } from "./saisie/engine";
 import type { MatchEntry, Saison } from "./saisie/types";
@@ -85,6 +85,12 @@ export interface LigneXpS {
   couvre?: TitreCouvert;
   /** Le match Bola de la ligne. */
   match?: number;
+  /**
+   * Quand elle est tombée (ISO) : la révélation de sa journée (minuit
+   * jusqu'à la J4), la clôture de sa saison pour un Flair de saison, le coup
+   * d'envoi d'un match Bola. L'annonce ne dit que ce qui vient de tomber.
+   */
+  le?: string;
   /**
    * La ligne du journal d'XP qu'elle accompagne (rattachementXp) : le journal
    * « Gagner de l'XP » porte ses XP S à droite de son XP, sans liste à part.
@@ -166,12 +172,15 @@ function sansTitresCouverts(lignes: readonly LigneXpS[], memeEvenement: (titre: 
   return lignes.filter((l) => !(l.titre && missions.some((m) => m.couvre === l.titre && memeEvenement(l, m))));
 }
 
-/** Les saisons dans l'ordre : les archives, puis celle en cours (comme le journal d'XP). */
-function saisonsDe(s: Saison): { numero: number; lue: Pick<Saison, "journees" | "entries" | "numero" | "titresFaibles">; close: boolean }[] {
+/** Les saisons dans l'ordre : les archives, puis celle en cours (comme le journal d'XP), et l'instant qui fixe l'année des dates. */
+function saisonsDe(
+  s: Saison,
+  maintenant: Date
+): { numero: number; lue: Pick<Saison, "journees" | "entries" | "numero" | "titresFaibles">; close: boolean; reference: Date }[] {
   const archives = [...(s.archives ?? [])].sort((a, b) => a.numero - b.numero);
   return [
-    ...archives.map((a) => ({ numero: a.numero, lue: { ...a, numero: a.numero }, close: true })),
-    { numero: s.numero ?? 0, lue: s, close: false },
+    ...archives.map((a) => ({ numero: a.numero, lue: { ...a, numero: a.numero }, close: true, reference: new Date(a.cloturee) })),
+    { numero: s.numero ?? 0, lue: s, close: false, reference: maintenant },
   ];
 }
 
@@ -227,6 +236,7 @@ export function lignesXpSBola(
       titre: "mvp",
       match: v.m.id,
       rattache: `bola-match:${v.libelle}`,
+      le: instantParis(v.m.jour, v.m.heure).toISOString(),
       t: instantParis(v.m.jour, v.m.heure).getTime(),
     });
   }
@@ -246,6 +256,7 @@ export function lignesXpSBola(
       ...(m?.couvre ? { couvre: m.couvre } : {}),
       match: f.matchId,
       rattache: `bola-mission:${f.libelle}:${quoi}`,
+      le: instantParis(f.jour, f.heure).toISOString(),
       t: instantParis(f.jour, f.heure).getTime(),
     });
   }
@@ -286,16 +297,20 @@ export function journalXpS(e: EntreesXpS, journal: ReadonlyMap<string, { lignes:
     (dans.get(k) ?? dans.set(k, []).get(k)!).push(l);
   };
 
-  // Les journées qui donnent leurs XP S, saison par saison.
-  const ouvertes = new Map<string, string>();
-  for (const sa of saisonsDe(e.jugee)) {
+  // Les journées qui donnent leurs XP S, saison par saison, et quand elles sont tombées.
+  const ouvertes = new Map<string, { date: string; le?: string }>();
+  const clotures = new Map<number, string>();
+  for (const sa of saisonsDe(e.jugee, t)) {
+    if (sa.close) clotures.set(sa.numero, sa.reference.toISOString());
     const faibles = new Set(sa.lue.titresFaibles ?? []);
     for (const m of sa.lue.journees) {
       if (!journeeDonneXpS(sa.lue, sa.numero, m.j, t, sa.close)) continue;
-      ouvertes.set(`${sa.numero}|${m.j}`, m.date);
+      const fin = revelation(m, sa.numero, sa.reference) ?? minuitDuSoir(m.date, sa.reference);
+      const le = fin ? fin.toISOString() : undefined;
+      ouvertes.set(`${sa.numero}|${m.j}`, { date: m.date, ...(le ? { le } : {}) });
       for (const x of sa.lue.entries) {
         if (x.j !== m.j || !joue(x) || isHidden(x.player)) continue;
-        const base = { saison: sa.numero, j: m.j, date: m.date, rattache: `dimanche:${sa.numero}:${m.j}` };
+        const base = { saison: sa.numero, j: m.j, date: m.date, rattache: `dimanche:${sa.numero}:${m.j}`, ...(le ? { le } : {}) };
         if (x.sflTime) poser(x.player, { ...base, quoi: "SFL Time", xps: XP_S.sflTime, source: "sfl-time", cle: `sfl-time:${sa.numero}:${m.j}:${x.player}` });
         if (x.mvp) poser(x.player, { ...base, quoi: "MVP", xps: XP_S.mvp, source: "titre", titre: "mvp", cle: `titre:mvp:${sa.numero}:${m.j}:${x.player}` });
         if (x.impact && !faibles.has(cleTitre(m.j, "impact", x.player)))
@@ -316,13 +331,24 @@ export function journalXpS(e: EntreesXpS, journal: ReadonlyMap<string, { lignes:
         if (l.flairSaison.tot)
           poser(
             joueur,
-            { saison: l.saison, j: l.j, date: l.date, quoi: l.quoi, xps: XP_S.flairSaison, source: "flair-saison", cle: `flair-saison:${l.saison}:${joueur}:${l.flairSaison.sujet}`, rattache },
+            {
+              saison: l.saison,
+              j: l.j,
+              date: l.date,
+              quoi: l.quoi,
+              xps: XP_S.flairSaison,
+              source: "flair-saison",
+              cle: `flair-saison:${l.saison}:${joueur}:${l.flairSaison.sujet}`,
+              rattache,
+              ...(clotures.has(l.saison) ? { le: clotures.get(l.saison) } : {}),
+            },
             horsPlafond
           );
         continue;
       }
-      if (l.bola || !ouvertes.has(`${l.saison}|${l.j}`)) continue;
-      const base = { saison: l.saison, j: l.j, date: ouvertes.get(`${l.saison}|${l.j}`) ?? l.date, rattache };
+      const ouverte = ouvertes.get(`${l.saison}|${l.j}`);
+      if (l.bola || !ouverte) continue;
+      const base = { saison: l.saison, j: l.j, date: ouverte.date, rattache, ...(ouverte.le ? { le: ouverte.le } : {}) };
       if (missionS(l))
         poser(joueur, { ...base, quoi: l.quoi, xps: XP_S.missionS, source: "mission", cle: `mission:${l.saison}:${l.j}:${l.mission!.creneau}:${joueur}`, ...(l.mission!.couvre ? { couvre: l.mission!.couvre } : {}) });
       else if (l.flairDurs)
@@ -373,12 +399,16 @@ export function bilanXpS(journalS: JournalXpS, nom: string, depense = 0): BilanX
 
 /* ------------------------------ L'annonce ------------------------------ */
 
-/** Ce que ce téléphone a déjà montré des XP S d'un joueur (sfl-xps-vu) : le plus haut total, les clés vues. */
+/** Ce que ce téléphone a déjà montré des XP S d'un joueur (sfl-xps-vu) : les clés vues. */
 export interface VuXpS {
   nom: string;
-  total: number;
   cles: string[];
 }
+
+/** Ce qui s'annonce encore : des XP S tombées il y a moins de deux jours. Plus vieilles, elles se lisent sur la tuile. */
+export const FENETRE_ANNONCE_MS = 48 * 3600_000;
+/** Les clés gardées sur le téléphone, au plus (les plus récentes). */
+const CLES_GARDEES = 600;
 
 /** Le nom court d'une source, pour l'annonce : « MVP », « Flair »… */
 export function sourceCourte(l: Pick<LigneXpS, "source" | "quoi" | "titre">): string {
@@ -402,25 +432,27 @@ const ORDRE_SOURCES = ["SFL Time", "MVP", "Impact", "Défensive", "Mission", "Fl
 
 /**
  * Les XP S à annoncer, une fois par téléphone (Ma carte, à la révélation) :
- * ce que le total gagné dépasse le plus haut déjà vu, et d'où viennent les
- * lignes neuves (« MVP · Flair »). Rien la première fois (le stock d'avant se
- * lit sur la tuile), ni pour un autre joueur, ni quand le total n'a pas
- * dépassé ce qu'on a déjà vu (une feuille corrigée qui retire puis rend).
- * Rend aussi ce qu'il faut garder.
+ * les lignes que ce téléphone n'a jamais vues et qui viennent de tomber
+ * (FENETRE_ANNONCE_MS), leur somme et d'où elles viennent (« MVP ·
+ * Flair »). Rien la première fois (le stock d'avant se lit sur la tuile), ni
+ * pour un autre joueur, ni pour une vieille ligne qui arrive en retard (des
+ * réponses aux missions chargées après coup), ni pour une ligne déjà vue
+ * qu'une feuille corrigée retire puis rend. Rend aussi ce qu'il faut garder.
  */
 export function annonceXpS(
   nom: string,
-  gagne: number,
   lignes: readonly LigneXpS[],
-  vu: VuXpS | null
+  vu: VuXpS | null,
+  maintenant: Date
 ): { annonce: { plus: number; sources: string[] } | null; vu: VuXpS } {
   const cles = lignes.map((l) => l.cle);
-  if (!vu || vu.nom !== nom) return { annonce: null, vu: { nom, total: gagne, cles } };
-  const garde = { nom, total: Math.max(vu.total, gagne), cles: [...new Set([...vu.cles, ...cles])] };
-  const plus = gagne - vu.total;
-  if (plus <= 0) return { annonce: null, vu: garde };
+  if (!vu || vu.nom !== nom) return { annonce: null, vu: { nom, cles: cles.slice(-CLES_GARDEES) } };
   const vues = new Set(vu.cles);
-  const sources = [...new Set(lignes.filter((l) => !vues.has(l.cle)).map(sourceCourte))].sort((a, b) => ORDRE_SOURCES.indexOf(a) - ORDRE_SOURCES.indexOf(b));
+  const t = maintenant.getTime();
+  const neuves = lignes.filter((l) => !vues.has(l.cle) && (!l.le || t - Date.parse(l.le) <= FENETRE_ANNONCE_MS));
+  const garde = { nom, cles: [...new Set([...vu.cles, ...cles])].slice(-CLES_GARDEES) };
+  const plus = totalXpS(neuves);
+  if (plus <= 0) return { annonce: null, vu: garde };
+  const sources = [...new Set(neuves.map(sourceCourte))].sort((a, b) => ORDRE_SOURCES.indexOf(a) - ORDRE_SOURCES.indexOf(b));
   return { annonce: { plus, sources }, vu: garde };
 }
-
