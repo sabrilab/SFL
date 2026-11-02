@@ -43,7 +43,9 @@
 // attente, contesté ou qui ne compte pas, même si le MVP y est déjà désigné ;
 // ex æquo, chacun sa puce. Les lignes sont celles de ligue_vierge()
 // (match_bola_json), jamais la feuille brute de la fiche : la ligue en écarte
-// les joueurs qui n'ont rien accepté, et le MVP peut en changer.
+// les joueurs qui n'ont rien accepté, et le MVP peut en changer ; une fois le
+// match validé, la fiche écrit donc sous le score le MVP de la ligue, celui
+// de la puce (mvpsDeLaFiche), et ses cartes y portent la puce aussi.
 
 import type { BoostType } from "./engine";
 import { jourMoisDuLibelle } from "./convocation-temps";
@@ -162,4 +164,21 @@ export function titresBola(m: Pick<MatchCompte, "valide" | "joueurs"> | null | u
 /** Les puces de tout un match Bola : id → ["mvp"]. Un match non validé n'en a aucune. */
 export function pucesBola(m: Pick<MatchCompte, "valide" | "joueurs"> | null | undefined): Map<string, readonly BoostType[]> {
   return new Map(m?.valide ? m.joueurs.filter((j) => j.mvp).map((j) => [j.id, MVP_SEUL] as const) : []);
+}
+
+/**
+ * Les MVP que la fiche d'un match Bola écrit sous le score (fiche-partie.tsx),
+ * et s'ils sont officiels. Une fois le match validé : ceux que la ligue compte
+ * (`compte`, ses lignes de ligue_vierge), les mêmes que la puce du terrain et
+ * la carte MVP Bola, et leurs cartes portent la puce. Avant : ceux de la
+ * feuille (`feuille`), désignés, sans puce. Sans ce choix, la puce dorée et
+ * le « MVP » écrit dessous pouvaient nommer deux joueurs : la ligue écarte de
+ * la feuille un joueur qui n'a jamais accepté ni confirmé, et le MVP change
+ * avec lui (contrôle du 02/11/2026).
+ */
+export function mvpsDeLaFiche(
+  compte: Pick<MatchCompte, "valide" | "mvps"> | null | undefined,
+  feuille: readonly string[],
+): { ids: readonly string[]; officiels: boolean } {
+  return compte?.valide ? { ids: compte.mvps, officiels: true } : { ids: feuille, officiels: false };
 }

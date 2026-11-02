@@ -4,13 +4,15 @@
 // le MVP désigné par l'app : jamais de rouge ni de bleu. La puce n'existe que
 // sur un match validé, au critère même de la carte MVP Bola (carte-bola.ts) :
 // à venir, en cours, en attente, contesté, sous le quorum, en exhibition,
-// rien ; ex æquo, chacun la sienne.
+// rien ; ex æquo, chacun la sienne. Et la fiche du match (mvpsDeLaFiche) :
+// validé, le « MVP » écrit sous le score est celui de la puce (la ligue), même
+// quand la feuille brute en désignait un autre.
 //   npx tsx tools/puces-bola-check.ts
 import assert from "node:assert/strict";
 import { cartesMvpBola, mesMatchsValides } from "../src/lib/sfl/carte-bola";
 import type { EtatResultat } from "../src/lib/sfl/confirmation-resultat";
-import { compterMatchs, QUORUM, type LigneBola, type MatchBola, type MatchCompte } from "../src/lib/sfl/ligue-vierge";
-import { pucesBola, titresBola } from "../src/lib/sfl/puces-titres";
+import { compterMatchs, mvpsDuMatch, QUORUM, type LigneBola, type MatchBola, type MatchCompte } from "../src/lib/sfl/ligue-vierge";
+import { mvpsDeLaFiche, pucesBola, titresBola } from "../src/lib/sfl/puces-titres";
 
 const ligne = (id: string, equipe: "clairs" | "fonces", buts = 0, passes = 0): LigneBola => ({ id, name: id, equipe, buts, passes });
 
@@ -141,6 +143,39 @@ assert.equal(pucesBola(null).size, 0);
     );
   }
   assert.equal(comptes.filter((m) => titresBola(m, "ana").length).length, 3, "Ana : trois matchs validés où elle est MVP");
+}
+
+/* -------- La fiche du match : sous le score, le même MVP que la puce (mvpsDeLaFiche) -------- */
+
+{
+  // La feuille brute de la fiche : Zoé, mise sur la feuille par l'organisateur
+  // sans avoir jamais accepté, fait le plus gros match et ne confirme pas. La
+  // ligue (match_bola_json) l'écarte : son MVP est Ana, celle de la carte MVP Bola.
+  const feuille = [...huit(), ligne("zoe", "fonces", 4, 2)];
+  const brut = mvpsDuMatch(feuille);
+  assert.deepEqual(brut, ["zoe"], "la feuille brute désigne Zoé");
+  const m = compte(match()); // les lignes de la ligue, sans Zoé
+  assert.deepEqual(m.mvps, ["ana"]);
+  const fiche = mvpsDeLaFiche(m, brut);
+  assert.deepEqual([...fiche.ids], ["ana"], "validé : le MVP écrit est celui de la ligue, pas celui de la feuille");
+  assert.equal(fiche.officiels, true, "validé : ses cartes portent la puce");
+  for (const id of fiche.ids) assert.deepEqual([...titresBola(m, id)], OR, "chaque MVP écrit porte la puce");
+  assert.deepEqual([...titresBola(m, "zoe")], [], "Zoé, écartée par la ligue : pas de puce");
+
+  // Pas validé (en attente, contesté, pas encore lu) : la feuille, désignée, sans puce.
+  for (const cas of [compte(match({ etat: "en_attente" })), compte(match({ etat: "conteste" })), compte(match({ genre: "exhibition" })), null, undefined]) {
+    const f = mvpsDeLaFiche(cas, brut);
+    assert.deepEqual([...f.ids], ["zoe"], "pas validé : le MVP de la feuille");
+    assert.equal(f.officiels, false, "pas validé : aucune puce sous le score");
+  }
+
+  // Ex æquo validé : les deux, chacun sa puce ; validé à 0 : personne.
+  const j = huit();
+  j[4] = ligne("eli", "fonces", 3, 1);
+  const ex = compte(match({ joueurs: j }));
+  assert.deepEqual([...mvpsDeLaFiche(ex, brut).ids].sort(), ["ana", "eli"]);
+  const zero = compte(match({ joueurs: huit().map((l) => ({ ...l, buts: 0, passes: 0 })) }));
+  assert.deepEqual(mvpsDeLaFiche(zero, brut), { ids: [], officiels: true }, "validé sans but ni passe : pas de MVP, même si la feuille en avait un");
 }
 
 console.log("puces-bola: ok");

@@ -30,7 +30,10 @@
 // Les cartes des MVP d'un match portent la puce dorée (Ilyes, 02/11/2026,
 // lib/sfl/puces-titres.ts, titresBola) une fois le match validé : le critère
 // de la carte MVP Bola ; un match amical, en attente ou contesté garde ses
-// cartes de MVP désignés, sans puce.
+// cartes de MVP désignés, sans puce. Sous le bilan (« Validé » ne dit que la
+// confirmation), un match décidé qui ne compte pas dit encore « Amical » ; et
+// la page se relit comme la carte Bola (premier plan, réseau, ma réponse) :
+// un match passe à « compte » sans que la table matchs bouge.
 //
 // Sur tablette et ordinateur (dès 768 px), la largeur des Actus
 // (.gabarit-ligue) et deux colonnes au nombre d'or : le classement dans la
@@ -84,7 +87,7 @@ import {
   type MatchCompte,
 } from "@/lib/sfl/ligue-vierge";
 import { DEMO_LIGUE_VIERGE, demoFeuille, demoMatchs } from "@/lib/sfl/ligue-vierge-demo";
-import { aujourdhuiIso, libelleJour, listerMesDerniers, lireLigueVierge, monId, type Partie } from "@/lib/sfl/matchs";
+import { aujourdhuiIso, libelleJour, listerMesDerniers, lireLigueVierge, MES_MATCHS_BOLA_EVENT, monId, type Partie } from "@/lib/sfl/matchs";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
 import { isHidden } from "@/lib/sfl/hidden";
@@ -232,7 +235,11 @@ function MatchJoue({ m, bilan = false }: { m: MatchCompte; bilan?: boolean }) {
         <span className="mono-label text-encre-3">
           {libelleJour(m.jour)} · {m.heure}
         </span>
-        {avecBilan ? null : m.etat && m.etat !== "compte" ? (
+        {avecBilan ? (
+          // « Validé » dessous ne dit que la confirmation : un match décidé qui ne compte pas
+          // (sous le quorum, exhibition) le dit ici, sinon ses MVP sans puce semblaient oubliés.
+          !m.valide && (!m.etat || m.etat === "compte") && <span className="mono-label text-encre-3">Amical</span>
+        ) : m.etat && m.etat !== "compte" ? (
           <span className="mono-label text-encre-3">{libelleEtat(m.etat)}</span>
         ) : (
           !m.valide && <span className="mono-label text-encre-3">Amical</span>
@@ -383,9 +390,22 @@ export default function LigueViergePage() {
         .on("postgres_changes", { event: "*", schema: "public", table: "matchs" }, charger)
         .subscribe();
     } catch {}
+    // Un match passe à « compte » sans que la table matchs bouge (une réponse,
+    // l'échéance des 24 h) : relu comme la carte Bola (use-bola-carte.ts), au
+    // retour au premier plan, du réseau et après ma propre réponse, pour que
+    // la puce de ses MVP suive le « Validé » du bilan (contrôle du 02/11).
+    const reprendre = () => {
+      if (document.visibilityState === "visible") charger();
+    };
+    document.addEventListener("visibilitychange", reprendre);
+    window.addEventListener("online", charger);
+    window.addEventListener(MES_MATCHS_BOLA_EVENT, charger);
     return () => {
       fini = true;
       if (canal) sb.removeChannel(canal);
+      document.removeEventListener("visibilitychange", reprendre);
+      window.removeEventListener("online", charger);
+      window.removeEventListener(MES_MATCHS_BOLA_EVENT, charger);
     };
   }, [actif, tick]);
 

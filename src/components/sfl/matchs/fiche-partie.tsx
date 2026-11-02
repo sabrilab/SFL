@@ -18,9 +18,12 @@
 // et tout le monde voit le score et le ou les MVP, puis où en est la
 // confirmation du résultat par les joueurs (28/10, bilan-resultat.tsx).
 // Une fois le match validé, son ou ses MVP portent la puce dorée sur le
-// terrain (Ilyes, 02/11/2026) : le MVP tel que la ligue le compte
-// (usePucesBola, lib/sfl/puces-titres.ts), lu seulement quand la base dit
-// « compte » ; rien avant, ni en attente, ni contesté.
+// terrain et sur leurs cartes sous le score (Ilyes, 02/11/2026) : le MVP tel
+// que la ligue le compte (usePucesBola, lib/sfl/puces-titres.ts), lu
+// seulement quand la base dit « compte » ; rien avant, ni en attente, ni
+// contesté. Validé, le « MVP » sous le score est aussi celui de la ligue
+// (mvpsDeLaFiche) : avant, celui de la feuille, qui pouvait nommer un autre
+// joueur que la puce.
 // Ceux du match (organisateur, inscrits, invités) ont en haut la porte de sa
 // discussion (22/10, matchs/discussion-match.tsx), avec ce qu'ils n'ont pas lu.
 
@@ -54,6 +57,7 @@ import { coupDEnvoiPasse, feuilleOuverte, mvpsDuMatch } from "@/lib/sfl/ligue-vi
 import { FeuilleBola } from "@/components/sfl/matchs/feuille-bola";
 import { BilanResultat, useBilan } from "@/components/sfl/matchs/bilan-resultat";
 import { usePucesBola } from "@/hooks/use-puces-bola";
+import { mvpsDeLaFiche } from "@/lib/sfl/puces-titres";
 import { cn } from "@/lib/utils";
 
 export function FichePartie({
@@ -85,10 +89,12 @@ export function FichePartie({
   const saisi = partie.saisiLe != null && partie.scoreClairs != null && partie.scoreFonces != null;
   const corrigeable = feuilleOuverte(partie.saisiLe);
   const presents = partie.joueurs.filter((j) => j.equipe === "clairs" || j.equipe === "fonces");
-  const mvps = saisi ? mvpsDuMatch(presents) : [];
   // L'état de la confirmation, lu une fois pour le bilan et pour les puces.
   const bilan = useBilan(saisi ? partie.id : 0, organise);
-  const titresDe = usePucesBola(partie.id, saisi && bilan?.etat === "compte", bilan ? `${bilan.version}·${bilan.etat}` : null);
+  const { titresDe, compte } = usePucesBola(partie.id, saisi && bilan?.etat === "compte", bilan ? `${bilan.version}·${bilan.etat}` : null);
+  // Sous le score, le même MVP que la puce : celui de la ligue une fois le match validé, celui de la feuille avant.
+  const { ids: mvps, officiels } = mvpsDeLaFiche(compte, saisi ? mvpsDuMatch(presents) : []);
+  const mvpsVus = [...presents, ...(compte?.joueurs ?? [])].filter((j, i, t) => mvps.includes(j.id) && t.findIndex((x) => x.id === j.id) === i);
 
   // L'organisateur invite depuis le terrain : la liste des joueurs, et ceux libres à cette heure-là.
   const [choisir, setChoisir] = useState(false);
@@ -230,10 +236,15 @@ export function FichePartie({
             </span>
             <span className="mono-label text-muted-foreground">Foncés</span>
           </div>
-          {mvps.length > 0 && (
+          {mvpsVus.length > 0 && (
             <div className="mt-4 flex flex-col items-center gap-2">
-              <span className="mono-label text-muted-foreground">{mvps.length > 1 ? "MVP ex æquo" : "MVP"}</span>
-              <QuiVient className="justify-center" noms={presents.filter((j) => mvps.includes(j.id)).map((j) => j.name)} />
+              <span className="mono-label text-muted-foreground">{mvpsVus.length > 1 ? "MVP ex æquo" : "MVP"}</span>
+              <QuiVient
+                className="justify-center"
+                noms={mvpsVus.map((j) => j.name)}
+                // Validé : leurs cartes portent la puce, comme sur le terrain.
+                titres={officiels ? (nom) => titresDe(mvpsVus.find((j) => j.name === nom)?.id ?? "") : undefined}
+              />
             </div>
           )}
           <BilanResultat matchId={partie.id} organise={organise} bilan={bilan} className="mt-5 border-t border-contraste/[0.06] pt-4" />
