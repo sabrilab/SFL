@@ -5,11 +5,13 @@
 // Sabri, 25/10 : « Est-ce que tu peux montrer dans l'espace admin les
 // résultats des votes ? » Côté joueurs, les voix restent cachées tant que le
 // vote est ouvert (vote-figures.tsx) ; ici l'admin voit tout, à tout moment :
-// journée par journée, match par match, les voix de chaque candidat, les élus
-// (ex æquo compris), qui a voté et qui ne l'a pas fait. Les bulletins qui ne
-// comptent nulle part (coéquipier, joueur changé de match après coup) sont
-// listés à part, avec leur raison, pour qu'un écart se comprenne d'un coup
-// d'œil. Calcul : bilanJournee (lib/sfl/votes.ts), le même décompte que
+// journée par journée, match par match et, dans chaque titre, équipe par
+// équipe (Ilyes, 02/11/2026 : un Impact et une Défensive pour chaque équipe),
+// les voix de chaque candidat, les élus (ex æquo compris), qui a voté et qui
+// ne l'a pas fait. Les bulletins qui ne comptent nulle part (coéquipier,
+// joueur changé de match après coup, extra time, place X) sont listés à
+// part, avec leur raison, pour qu'un écart se comprenne d'un coup d'œil.
+// Calcul : bilanJournee (lib/sfl/votes.ts), le même décompte que
 // appliquerVotes.
 
 import { useMemo, useState } from "react";
@@ -19,27 +21,30 @@ import { useVotes } from "@/hooks/use-votes";
 import { useSession } from "@/hooks/use-session";
 import { etatRevelation, libelleFinDuVote, libelleRevelation, voteOuvertA } from "@/lib/sfl/revelation";
 import { maintenant as heureDeLaLigue } from "@/lib/sfl/horloge";
-import { CATEGORIES_VOTE, LIBELLES_VOTE, bilanJournee, journeeAvecVote, type Decompte } from "@/lib/sfl/votes";
+import {
+  CATEGORIES_VOTE,
+  LIBELLES_VOTE,
+  bilanJournee,
+  journeeAvecVote,
+  type Decompte,
+  type DecompteEquipe,
+} from "@/lib/sfl/votes";
 import { Nom } from "@/components/sfl/nom";
 import { cn } from "@/lib/utils";
 
 const pct = (a: number, b: number) => (b ? Math.round((a / b) * 100) : 0);
 
-function Colonne({ titre, d }: { titre: string; d: Decompte }) {
-  const max = d.voix[0]?.[1] ?? 0;
+/** L'élection d'une équipe pour un titre : ses joueurs, leurs voix, son élu. */
+function Election({ e }: { e: DecompteEquipe }) {
+  const max = e.voix[0]?.[1] ?? 0;
   return (
-    <div className="flex min-w-0 flex-col gap-1.5">
-      <div className="flex items-baseline justify-between gap-2">
-        <span className="text-corps font-bold">{titre}</span>
-        <span className="text-legende text-muted-foreground tabular-nums">
-          {d.votants}/{d.inscrits} ont voté
-        </span>
-      </div>
-      {d.voix.length === 0 ? (
+    <div className="flex min-w-0 flex-col gap-1">
+      <span className="truncate text-petit font-semibold text-muted-foreground">{e.equipe}</span>
+      {e.voix.length === 0 ? (
         <p className="text-petit text-muted-foreground">Aucune voix.</p>
       ) : (
-        d.voix.map(([nom, n]) => {
-          const elu = d.elus.includes(nom);
+        e.voix.map(([nom, n]) => {
+          const elu = e.elus.includes(nom);
           return (
             <div key={nom} className="flex items-center gap-2">
               <span className={cn("flex min-w-0 flex-1 items-center gap-1 text-corps", elu ? "font-bold" : "text-encre-2")}>
@@ -57,9 +62,25 @@ function Colonne({ titre, d }: { titre: string; d: Decompte }) {
           );
         })
       )}
-      {d.elus.length > 1 && (
-        <span className="text-legende font-semibold text-muted-foreground">Ex æquo · {d.elus.length} élus</span>
+      {e.elus.length > 1 && (
+        <span className="text-legende font-semibold text-muted-foreground">Ex æquo · {e.elus.length} élus</span>
       )}
+    </div>
+  );
+}
+
+function Colonne({ titre, d }: { titre: string; d: Decompte }) {
+  return (
+    <div className="flex min-w-0 flex-col gap-2.5">
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="text-corps font-bold">{titre}</span>
+        <span className="text-legende text-muted-foreground tabular-nums">
+          {d.votants}/{d.inscrits} ont voté
+        </span>
+      </div>
+      {d.equipes.map((e, i) => (
+        <Election key={i} e={e} />
+      ))}
     </div>
   );
 }

@@ -29,16 +29,31 @@
 //     01/11). Avant, le vote s'affiche
 //     grisé ; chaque match s'ouvre avec sa propre feuille (Match 1 et
 //     Match 2 ne finissent pas à la même heure) ;
-//   · à la révélation (19 h ; minuit jusqu'à la J4), le plus voté de chaque
-//     match prend la carte ; à égalité, tous les ex æquo. Personne si
-//     personne n'a voté. Entre la fin du vote et la révélation, personne ne
-//     voit les élus (titresTombes).
+//   · à la révélation (19 h ; minuit jusqu'à la J4), CHAQUE ÉQUIPE de chaque
+//     match a son Joueur Impact et sa Défensive : le plus voté de ses
+//     joueurs, par l'équipe adverse ; à égalité, tous les ex æquo ; personne
+//     si aucune voix ne va à cette équipe. Un même joueur peut avoir
+//     l'Impact et la Défensive. Ilyes, 02/11/2026 : « Le principe c'est
+//     qu'il y en ait un par équipe : un joueur Impact pour chaque équipe et
+//     un joueur Défensive pour chaque équipe. Il n'y a que le MVP qui est
+//     unique, sauf en cas d'égalité. » Puis : « oui, un joueur peut avoir la
+//     Défensive et l'Impact le même jour », et la règle vaut pour les
+//     journées passées aussi. Avant, le décompte mêlait les deux équipes et
+//     n'élisait que le plus voté du match : à la J4, au Match 1, Noirs 1
+//     n'avait pas de Défensive, ni Blancs 1 d'Impact ;
+//   · ni un joueur venu en extra time ni une place « X1 », « X2 »… ne votent
+//     ni ne sont candidats dans le match qu'ils complètent ;
+//   · entre la fin du vote et la révélation, personne ne voit les élus
+//     (titresTombes).
 //
 // Les élus sont posés sur les lignes de la saison au moment de la dériver
 // (appliquerVotes, appelé par le SeasonProvider) : rien n'est réécrit dans
-// le document de saison, et l'admin n'a rien à saisir.
+// le document de saison, et l'admin n'a rien à saisir. La règle par équipe
+// vaut donc d'un coup pour toutes les journées votées de la saison en
+// cours ; une saison close garde les élus écrits dans son archive le jour de
+// sa clôture (cloturerSaison).
 
-import type { Journee, JourneeMatch } from "./engine";
+import type { Journee, JourneeMatch, MatchTeam } from "./engine";
 import type { Saison } from "./saisie/types";
 import { jourMoisDuLibelle } from "./convocation-temps";
 import { titresTombes } from "./revelation";
@@ -155,39 +170,75 @@ export async function voter(v: VoteFigure): Promise<void> {
 }
 
 /* ------------------------------ Le décompte ----------------------------- */
+// Une élection par équipe et par titre : les joueurs d'une équipe sont les
+// candidats, ceux de l'équipe adverse votent (on vote pour un adversaire).
 
-export interface Decompte {
-  /** Voix par candidat, du plus voté au moins voté (les candidats à 0 exclus). */
+/** L'élection d'une équipe pour un titre. */
+export interface DecompteEquipe {
+  /** L'équipe dont les joueurs sont candidats (MatchTeam.name, « Noirs 1 »). */
+  equipe: string;
+  /** Voix par candidat de l'équipe, du plus voté au moins voté (les candidats à 0 exclus). */
   voix: [nom: string, n: number][];
+  /** Les joueurs de l'équipe adverse qui ont voté pour ce titre, et ceux qui le pouvaient. */
   votants: number;
   inscrits: number;
-  /** Les plus votés (ex æquo compris) ; vide si personne n'a voté. */
+  /** Ses plus votés (ex æquo compris) ; vide si aucune voix ne lui va. */
   elus: string[];
 }
 
-/** Le décompte d'un match pour un titre : seules comptent les voix d'un joueur du match pour un adversaire. */
+export interface Decompte {
+  /** teamA puis teamB : chaque équipe a son élection. */
+  equipes: [DecompteEquipe, DecompteEquipe];
+  /** Les joueurs du match qui ont voté pour ce titre, et ceux qui le pouvaient. */
+  votants: number;
+  inscrits: number;
+  /** Les élus des deux équipes. */
+  elus: string[];
+}
+
+/** Ceux qui votent et sont candidats pour une équipe : ni l'extra time, ni une place X. */
+function electeursDe(t: MatchTeam): string[] {
+  return t.players.filter((p) => !p.extraTime && !isPlaceExtraTime(p.name)).map((p) => p.name);
+}
+
+/**
+ * Le décompte d'un match pour un titre, équipe par équipe : seules comptent
+ * les voix d'un joueur du match pour un adversaire, et chaque équipe élit le
+ * plus voté de ses joueurs.
+ */
 export function decompterMatch(votes: VoteFigure[], saison: number, j: number, match: JourneeMatch, cat: CategorieVote): Decompte {
-  const equipeDe = new Map<string, "A" | "B">();
-  // Un joueur venu en extra time ne vote pas dans ce match et n'y est pas candidat.
-  match.teamA.players.forEach((p) => !p.extraTime && equipeDe.set(p.name, "A"));
-  match.teamB.players.forEach((p) => !p.extraTime && equipeDe.set(p.name, "B"));
-  const compte = new Map<string, number>();
-  let votants = 0;
+  const joueurs = [electeursDe(match.teamA), electeursDe(match.teamB)] as const;
+  const cote = new Map<string, 0 | 1>();
+  joueurs[0].forEach((n) => cote.set(n, 0));
+  joueurs[1].forEach((n) => cote.set(n, 1));
+  const compte = [new Map<string, number>(), new Map<string, number>()] as const;
+  const votants = [0, 0];
   for (const v of votes) {
     if (v.saison !== saison || v.j !== j || v.categorie !== cat) continue;
-    const a = equipeDe.get(v.votant);
-    const b = equipeDe.get(v.candidat);
-    if (!a || !b || a === b) continue;
-    votants++;
-    compte.set(v.candidat, (compte.get(v.candidat) ?? 0) + 1);
+    const de = cote.get(v.votant);
+    const pour = cote.get(v.candidat);
+    if (de == null || pour == null || de === pour) continue;
+    votants[pour]++;
+    compte[pour].set(v.candidat, (compte[pour].get(v.candidat) ?? 0) + 1);
   }
-  const voix = [...compte.entries()].sort((x, y) => y[1] - x[1]);
-  const max = voix[0]?.[1] ?? 0;
+  const election = (i: 0 | 1, equipe: string): DecompteEquipe => {
+    const voix = [...compte[i].entries()].sort((x, y) => y[1] - x[1] || x[0].localeCompare(y[0], "fr"));
+    const max = voix[0]?.[1] ?? 0;
+    return {
+      equipe,
+      voix,
+      votants: votants[i],
+      // Les électeurs d'une équipe sont les joueurs de l'autre.
+      inscrits: joueurs[1 - i].length,
+      elus: max > 0 ? voix.filter(([, n]) => n === max).map(([nom]) => nom) : [],
+    };
+  };
+  const equipes: [DecompteEquipe, DecompteEquipe] = [election(0, match.teamA.name), election(1, match.teamB.name)];
   return {
-    voix,
-    votants,
-    inscrits: equipeDe.size,
-    elus: max > 0 ? voix.filter(([, n]) => n === max).map(([nom]) => nom) : [],
+    equipes,
+    votants: votants[0] + votants[1],
+    inscrits: joueurs[0].length + joueurs[1].length,
+    elus: [...equipes[0].elus, ...equipes[1].elus],
   };
 }
 
@@ -215,9 +266,10 @@ export function feuilleRemplie(saison: Pick<Saison, "entries">, j: number, match
 
 /**
  * Pose les élus des votes tombés (titresTombes) sur les lignes de la saison (Impact,
- * Défensive), journée par journée, match par match — comme appliquerMvpAuto
- * pour le MVP. Une journée sans aucune voix valable pour un titre garde ce que
- * l'admin a saisi. Même référence renvoyée si rien ne change.
+ * Défensive), journée par journée, match par match et équipe par équipe —
+ * comme appliquerMvpAuto pour le MVP. Une journée sans aucune voix valable
+ * pour un titre garde ce que l'admin a saisi. Même référence renvoyée si
+ * rien ne change.
  */
 export function appliquerVotes(saison: Saison, journees: Journee[], votes: VoteFigure[], maintenant: Date): Saison {
   if (!votes.length) return saison;
@@ -258,16 +310,20 @@ export function appliquerVotes(saison: Saison, journees: Journee[], votes: VoteF
  * carte du jour, les points Pépite), mais ne font pas monter la note
  * (saisie/evolution.ts). Sabri a validé le seuil le 26/10 avec la
  * proposition : à la J3, 13 votants sur 36, tous les élus l'étaient à une voix.
+ * Jugés équipe par équipe : l'élu d'une équipe à une voix est faible, même
+ * si l'autre équipe du match a le sien à trois.
  */
 export function titresFaibles(saison: Saison, journees: Journee[], votes: VoteFigure[], maintenant: Date): Set<string> {
   const faibles = new Set<string>();
   const numero = saison.numero ?? 0;
   for (const jn of journees) {
     if (!journeeAvecVote(jn) || !titresTombes(saison, jn.j, maintenant)) continue;
+    const valables = votesDuJour(votes, jn.date, jn.j);
     for (const cat of CATEGORIES_VOTE) {
       for (const m of jn.matches ?? []) {
-        const d = decompterMatch(votesDuJour(votes, jn.date, jn.j), numero, jn.j, m, cat);
-        if ((d.voix[0]?.[1] ?? 0) < VOIX_MIN) d.elus.forEach((n) => faibles.add(cleTitre(jn.j, cat, n)));
+        for (const eq of decompterMatch(valables, numero, jn.j, m, cat).equipes) {
+          if ((eq.voix[0]?.[1] ?? 0) < VOIX_MIN) eq.elus.forEach((n) => faibles.add(cleTitre(jn.j, cat, n)));
+        }
       }
     }
   }
@@ -276,11 +332,12 @@ export function titresFaibles(saison: Saison, journees: Journee[], votes: VoteFi
 
 /* ------------------------------ Le bilan admin -------------------------- */
 // Ce que l'admin voit des votes (Admin → Feuille → Votes), ouverts ou fermés :
-// voix, élus, et qui a voté, match par match. Sabri, 25/10 : « montrer dans
-// l'espace admin les résultats des votes ».
+// voix, élus, et qui a voté, match par match et équipe par équipe. Sabri,
+// 25/10 : « montrer dans l'espace admin les résultats des votes ».
 
 export interface BilanMatch {
   match: JourneeMatch;
+  /** Par titre, l'élection de chaque équipe (Decompte.equipes). */
   parCategorie: Record<CategorieVote, Decompte>;
   /** Les joueurs du match (hors extra time) qui ont voté au moins une fois, ou pas. */
   ontVote: string[];
@@ -309,20 +366,25 @@ export function bilanJournee(votes: VoteFigure[], saison: number, jn: Journee): 
   // celui du match ne compte pas, et l'admin le voit écarté.
   const valables = votesDuJour(duJour, jn.date, jn.j);
   const horsJour = new Set(duJour.filter((v) => !valables.includes(v)));
+  // Les places « X1 », « X2 »… complètent une équipe sans être des joueurs, et
+  // un joueur venu en extra time compte dans son propre match : ni les unes ni
+  // l'autre ne votent ou ne sont candidats là (decompterMatch).
   const equipeDe = new Map<string, { m: string; t: "A" | "B" }>();
+  const enExtraTime = new Set<string>();
   for (const m of jn.matches ?? []) {
-    m.teamA.players.forEach((p) => !p.extraTime && equipeDe.set(p.name, { m: m.id, t: "A" }));
-    m.teamB.players.forEach((p) => !p.extraTime && equipeDe.set(p.name, { m: m.id, t: "B" }));
+    for (const [t, equipe] of [["A", m.teamA], ["B", m.teamB]] as const) {
+      for (const p of equipe.players) {
+        if (p.extraTime) enExtraTime.add(p.name);
+        else if (!isPlaceExtraTime(p.name)) equipeDe.set(p.name, { m: m.id, t });
+      }
+    }
   }
   const aVote = new Set(valables.map((v) => v.votant));
-  // Les places « X1 », « X2 »… complètent une équipe sans être des joueurs :
-  // elles ne votent pas et ne comptent pas parmi les inscrits.
-  const vrai = (n: string) => !isPlaceExtraTime(n);
   const matchs = (jn.matches ?? []).map((match) => {
     const joueurs = [...match.teamA.players, ...match.teamB.players]
-      .filter((p) => !p.extraTime && vrai(p.name))
+      .filter((p) => !p.extraTime && !isPlaceExtraTime(p.name))
       .map((p) => p.name);
-    const compter = (cat: CategorieVote) => ({ ...decompterMatch(valables, saison, jn.j, match, cat), inscrits: joueurs.length });
+    const compter = (cat: CategorieVote) => decompterMatch(valables, saison, jn.j, match, cat);
     return {
       match,
       parCategorie: { impact: compter("impact"), def: compter("def") },
@@ -330,6 +392,12 @@ export function bilanJournee(votes: VoteFigure[], saison: number, jn: Journee): 
       nontPasVote: joueurs.filter((n) => !aVote.has(n)),
     };
   });
+  const horsFeuille = (nom: string, qui: "votant" | "candidat") =>
+    isPlaceExtraTime(nom)
+      ? `${qui} : une place X`
+      : enExtraTime.has(nom)
+        ? `${qui} venu en extra time`
+        : `${qui} hors des feuilles du jour`;
   const ecartees: VoixEcartee[] = [];
   for (const v of duJour) {
     const a = equipeDe.get(v.votant);
@@ -337,9 +405,9 @@ export function bilanJournee(votes: VoteFigure[], saison: number, jn: Journee): 
     const raison = horsJour.has(v)
       ? "envoyé après le jour du match"
       : !a
-      ? "votant hors des feuilles du jour"
+      ? horsFeuille(v.votant, "votant")
       : !b
-        ? "candidat hors des feuilles du jour"
+        ? horsFeuille(v.candidat, "candidat")
         : a.m !== b.m
           ? "candidat d'un autre match"
           : a.t === b.t
@@ -349,8 +417,8 @@ export function bilanJournee(votes: VoteFigure[], saison: number, jn: Journee): 
   }
   return {
     matchs,
-    inscrits: [...equipeDe.keys()].filter(vrai).length,
-    votants: [...equipeDe.keys()].filter((n) => vrai(n) && aVote.has(n)).length,
+    inscrits: equipeDe.size,
+    votants: [...equipeDe.keys()].filter((n) => aVote.has(n)).length,
     ecartees,
   };
 }
