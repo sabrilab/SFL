@@ -106,6 +106,7 @@
    calmer l'interface. On neutralise les animations et transitions plutôt
    que de les supprimer, pour que les états finaux restent atteints. */
 @media (prefers-reduced-motion: reduce) {
+  .tuile-match, .tuile-match:active { transition: none; transform: none; }
   *,
   *::before,
   *::after {
@@ -1937,6 +1938,11 @@
   to { transform: none; opacity: 1; }
 }
 .tiroir-map { animation: tiroir-monte 0.6s cubic-bezier(0.2, 0.85, 0.25, 1) 0.15s both; }
+/* Le toucher qui rebondit (02/11, la mignonitude) : la tuile s'enfonce un peu
+   et revient en dépassant à peine, comme un objet souple ; le contour de la
+   choisie glisse en même temps. */
+.tuile-match { transition: transform 0.42s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.3s ease; }
+.tuile-match:active { transform: scale(0.955); transition-duration: 0.12s; }
 .barre-map-titre { animation: barre-titre-entre 0.35s ease-out both; }
 @media (prefers-reduced-motion: reduce) {
   .tiroir-map, .barre-map-titre { animation: none; }

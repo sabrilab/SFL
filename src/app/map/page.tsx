@@ -1682,7 +1682,11 @@ export default function MapPage() {
                       dans={m.joue ? null : ecartJours(m.dateLabel, aujourdhui)}
                       nonLus={m.partie ? (apercus.get(m.partie.id)?.nonLus ?? 0) : 0}
                       affiche={afficheDu(m)}
-                      onToucher={() => (m.cle !== choisi?.cle || surCarte ? setChoix(m.cle) : ouvrirFiche())}
+                      onToucher={() => {
+                        navigator.vibrate?.(8);
+                        if (m.cle !== choisi?.cle || surCarte) setChoix(m.cle);
+                        else ouvrirFiche();
+                      }}
                     />
                   </div>
                 ))}
@@ -2446,7 +2450,7 @@ function TuileMatch({
         aria-pressed={choisi}
         aria-label={`${m.quand.titre} ${m.heure}, ${lieu}, ${joue ? "joué" : m.etatTexte}${nonLus ? `, ${nonLus} message${nonLus > 1 ? "s" : ""} pas lu${nonLus > 1 ? "s" : ""}` : ""}`}
         className={cn(
-          "tuile-match relative block h-[184px] w-[264px] overflow-hidden rounded-[24px] text-left text-white transition-[transform,box-shadow] duration-300 active:scale-[0.98]",
+          "tuile-match relative block h-[163px] w-[264px] overflow-hidden rounded-[24px] text-left text-white",
           choisi ? "shadow-[0_0_0_2.5px_var(--background),0_0_0_5px_var(--foreground)]" : "shadow-[0_6px_18px_rgba(0,0,0,0.22)]"
         )}
         style={{ background: ENCRE }}
@@ -2466,16 +2470,24 @@ function TuileMatch({
           />
         )}
         <span aria-hidden className="absolute inset-0 bg-gradient-to-b from-[rgba(4,5,7,0.35)] via-[rgba(4,5,7,0.05)] to-[rgba(4,5,7,0.92)]" />
-        <span className="absolute inset-x-0 top-0 flex items-center justify-between gap-2 p-2.5">
-          <span className="truncate rounded-full bg-[rgba(10,11,13,0.55)] px-2.5 py-[5px] text-[11px] leading-none font-bold tracking-[0.6px] uppercase backdrop-blur-md">
-            {joue ? "Joué" : jour}
-          </span>
+        <span className="absolute inset-x-0 top-0 flex items-center justify-between gap-2 p-[8px]">
+          {m.dedans ? (
+            // Le regard réflexif (02/11) : je me vois dans le match avant tout le reste.
+            <span className="flex min-w-0 items-center gap-1 rounded-full bg-white px-2.5 py-[5px] text-[11px] leading-none font-bold tracking-[0.6px] uppercase" style={{ color: ENCRE }}>
+              <Check aria-hidden className="size-3 shrink-0" strokeWidth={3.4} />
+              <span className="truncate">{joue ? "Tu y étais" : `Tu y es · ${m.quand.titre}`}</span>
+            </span>
+          ) : (
+            <span className="truncate rounded-full bg-[rgba(10,11,13,0.55)] px-2.5 py-[5px] text-[11px] leading-none font-bold tracking-[0.6px] uppercase backdrop-blur-md">
+              {joue ? "Joué" : jour}
+            </span>
+          )}
           <span className="flex shrink-0 items-center gap-1.5 rounded-full bg-[rgba(10,11,13,0.55)] px-2.5 py-[5px] text-[11.5px] leading-none font-semibold tabular-nums backdrop-blur-md">
             {loin}
             <SigleLigue ligue={m.ligue} hauteur={9} className="text-white" />
           </span>
         </span>
-        <span className="absolute inset-x-0 bottom-0 flex flex-col px-3.5 pb-3">
+        <span className="absolute inset-x-0 bottom-0 flex flex-col px-[13px] pb-[13px]">
           <span className="flex items-end justify-between gap-2">
             <span className="min-w-0">
               <span className="block font-display text-[34px] leading-[0.95] tracking-[0.3px] uppercase">{heureCourte(m.heure)}</span>
@@ -2488,15 +2500,18 @@ function TuileMatch({
               className={cn("truncate text-[12.5px] font-semibold", !(manque && !joue) && "text-white/70")}
               style={manque && !joue ? { color: BRAISE } : undefined}
             >
-              {joue ? "Le récap" : m.etat.genre === "inscrits" && m.presents.length > 3 ? `${m.etatTexte} · +${m.presents.length - 3}` : m.etatTexte}
+              {joue ? "Le récap" : m.dedans ? `${m.presents.length} joueur${m.presents.length > 1 ? "s" : ""}` : m.etat.genre === "inscrits" && m.presents.length > 3 ? `${m.etatTexte} · +${m.presents.length - 3}` : m.etatTexte}
             </span>
             {places > 0 && (
-              <span aria-hidden className="ml-auto flex w-[92px] shrink-0 gap-[3px]">
+              // Les places en sièges ronds (02/11, la mignonitude) : un rond
+              // plein par joueur venu, un rond vide en braise par place libre,
+              // celle qui t'attend.
+              <span aria-hidden className="ml-auto flex shrink-0 flex-wrap justify-end gap-[3px]" style={{ width: (places > 7 ? Math.ceil(places / 2) : places) * 11 - 3 }}>
                 {Array.from({ length: places }, (_, i) => (
                   <span
                     key={i}
-                    className="h-[4px] flex-1 rounded-full"
-                    style={i < venus ? { background: "rgba(255,255,255,0.92)" } : { background: complet ? "rgba(255,255,255,0.2)" : `color-mix(in srgb, ${BRAISE} 35%, transparent)` }}
+                    className="size-[8px] rounded-full"
+                    style={i < venus ? { background: "rgba(255,255,255,0.95)" } : complet ? { background: "rgba(255,255,255,0.2)" } : { boxShadow: `inset 0 0 0 1.5px ${BRAISE}` }}
                   />
                 ))}
               </span>
@@ -2548,7 +2563,7 @@ function TuilePropose({
       aria-pressed={choisie}
       aria-label={`Ouvrir un match${moment ? ` ${titre.toLowerCase()} ${moment.heure.replace(":", "h")}` : ""}, ${ou}${noms.length ? `, ${noms.length} joueurs libres` : ""}`}
       className={cn(
-        "flex h-[184px] w-[264px] flex-col rounded-[24px] p-4 text-left transition-[box-shadow,transform] duration-300 active:scale-[0.98]",
+        "tuile-match flex h-[163px] w-[264px] flex-col rounded-[24px] p-[13px] text-left",
         choisie ? "shadow-[0_0_0_2.5px_var(--background),0_0_0_5px_var(--foreground)]" : "shadow-[0_6px_18px_rgba(0,0,0,0.22)]"
       )}
       style={{ background: MAUVE, color: ENCRE }}
@@ -2561,7 +2576,7 @@ function TuilePropose({
         <span aria-hidden className="grid size-[30px] shrink-0 place-items-center rounded-full" style={{ background: ENCRE, color: MAUVE }}>
           <Plus className="size-4" strokeWidth={3} />
         </span>
-        <span className="font-display text-[34px] leading-[0.95] tracking-[0.3px] uppercase">{moment ? heureCourte(moment.heure.replace(":", "h")) : "Quand tu veux"}</span>
+        <span className={cn("font-display leading-[0.95] tracking-[0.3px] whitespace-nowrap uppercase", moment ? "text-[34px]" : "text-[27px]")}>{moment ? heureCourte(moment.heure.replace(":", "h")) : "Quand tu veux"}</span>
       </span>
       <span className="mt-1 truncate text-[14.5px] leading-tight font-semibold tracking-[-0.2px]">{ou}</span>
       <span className="mt-auto flex items-center gap-2 pt-1.5">
