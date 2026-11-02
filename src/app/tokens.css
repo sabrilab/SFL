@@ -22,11 +22,18 @@
       un par un.
    4. Les arrondis, cinq : rounded-petit 10, rounded-champ 16,
       rounded-tuile 22, rounded-feuille 28, rounded-full.
+   5. Les couleurs des titres, trois : --titre-mvp (or), --titre-impact
+      (rouge), --titre-def (bleu), le « vive » des cartes à titre
+      (components/sfl/finitions-carte.ts). Elles ne peignent que les puces
+      des titres d'un match, posées sur les cartes des terrains
+      (components/sfl/puces-titres.tsx, Ilyes, 02/11/2026) ; les mêmes dans
+      les deux modes, comme les cartes.
 
    Ce qui n'en dépend pas, exprès : les cartes de joueur, les écussons, les
    trophées, la Map et ses stickers. Ce sont des objets dessinés, ils gardent
    leurs couleurs dans les deux modes. L'or, le bleu et le rouge des cartes
-   MVP, Défensive et Impact leur sont réservés : jamais dans l'interface.
+   MVP, Défensive et Impact leur sont réservés : jamais dans l'interface,
+   sauf les puces posées sur ces mêmes cartes (5. ci-dessous).
 
    Les familles de scènes (--gazon-*, --nuit-*, --studio-*) restent dans
    globals.css, à côté de ce qu'elles peignent. Les tons des boutons
@@ -51,6 +58,9 @@
   --color-braise: var(--braise);
   --color-mauve: var(--mauve);
   --color-contraste: var(--contraste);
+  --color-titre-mvp: var(--titre-mvp);
+  --color-titre-impact: var(--titre-impact);
+  --color-titre-def: var(--titre-def);
   --color-ring: var(--ring);
   --color-input: var(--input);
   --color-border: var(--border);
@@ -112,6 +122,10 @@
      traits des scènes qui étaient blancs : text-contraste/45 garde au sombre
      exactement son blanc à 45 %. */
   --contraste: #08090b;
+  /* Les titres d'un match, sur les cartes : les mêmes en sombre. */
+  --titre-mvp: #d4a73a;
+  --titre-impact: #e0262e;
+  --titre-def: #2a6ae6;
 }
 
 /* Thème sombre — l'app BOLA (DA/Theme.swift) : noir profond, neutres purs,

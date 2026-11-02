@@ -10,12 +10,17 @@
 // Rien ne se chevauche (Sabri, 23/10) : trois joueurs au plus par rangée, et
 // d'une rangée à la suivante, de quoi poser une carte, son nom et sa pastille
 // sans que la carte de devant ne cache la pastille de derrière.
+// Dans chaque mode, une carte à titre porte ses puces sur son coin, or MVP,
+// rouge Impact, bleu Défensive (Ilyes, 02/11/2026, puces-titres.tsx) : les
+// titres de la ligne, lus par le récap dans la saison des votes posés.
 
 import { useState } from "react";
 import { ovr, type Player } from "@/lib/sfl/engine";
 import { cn } from "@/lib/utils";
 import { CarteDe } from "@/components/sfl/mini-carte";
 import { Nom } from "@/components/sfl/nom";
+import { PucesTitres } from "@/components/sfl/puces-titres";
+import { titresDeLigne } from "@/lib/sfl/puces-titres";
 
 export interface PitchLine {
   name: string;
@@ -107,6 +112,12 @@ export function PitchSynthese({
     }
   })();
 
+  // Les puces de chaque carte : ses titres du jour, quel que soit le mode.
+  const titresDe = (name: string) => {
+    const l = lines.find((x) => x.name === name);
+    return l ? titresDeLigne(l) : [];
+  };
+
   // Placement par poste (l'attaque près du rond central, le gardien devant
   // sa surface), puis répartition horizontale : une rangée de plus de trois
   // se dédouble, une rangée vide disparaît.
@@ -167,7 +178,10 @@ export function PitchSynthese({
                 left: `${LARGEURS[rowPlayers.length][i]}%`,
               }}
             >
-              <Avatar name={pl.name} size={pl.hot ? 38 : 34} />
+              <div className="relative flex">
+                <Avatar name={pl.name} size={pl.hot ? 38 : 34} />
+                <PucesTitres titres={titresDe(pl.name)} />
+              </div>
               <span className="max-w-[74px] truncate text-[11px] font-bold"><Nom n={pl.name} /></span>
               <span
                 className={cn(

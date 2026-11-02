@@ -18,6 +18,9 @@
 // Un invité qui n'a pas encore répondu attend sur sa place, en pointillé, sa
 // carte voilée ; le mode Team ajoute à son prénom le temps qui reste avant
 // que l'invitation tombe (« Adil · 71 h »).
+// Une carte à titre (le terrain de l'admin, une journée de ligue) porte ses
+// puces sur son coin, or MVP, rouge Impact, bleu Défensive (puces-titres.tsx) ;
+// les matchs Bola n'en donnent pas.
 
 import { useMemo } from "react";
 import { Plus, X } from "lucide-react";
@@ -27,6 +30,8 @@ import { SolTerrain } from "@/components/sfl/matchs/sol-terrain";
 import { placerTerrain, VUE_PLACES } from "@/lib/sfl/places-terrain";
 import { projeter, TERRAIN, vue as vueDe, type Vue } from "@/lib/sfl/terrain-vu";
 import { cn } from "@/lib/utils";
+import type { BoostType } from "@/lib/sfl/engine";
+import { PucesTitres } from "@/components/sfl/puces-titres";
 
 export interface Occupant {
   cle: string;
@@ -35,6 +40,8 @@ export interface Occupant {
   enAttente?: boolean;
   /** Le temps qui lui reste pour répondre (« 71 h »), à côté de son prénom. */
   reste?: string;
+  /** Ses titres du match, une fois attribués (SFL seulement) : ses puces. */
+  titres?: BoostType[];
 }
 
 const BLANC = { fond: "#f4f3ef", encre: "#0a0b0d" };
@@ -166,6 +173,7 @@ export function TerrainPlaces({
                           <X className="size-[10px]" strokeWidth={3.2} />
                         </span>
                       )}
+                      <PucesTitres titres={occupant.titres ?? []} echelle={k} />
                     </button>
                     <span
                       className={cn(
