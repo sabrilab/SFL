@@ -82,6 +82,7 @@ import { MATIERES_OFFERTES, type FinitionOfferte, type MotifOffert } from "@/com
 import { MATIERE_ARBITRE, MATIERES_ARBITRE, type FinitionArbitre, type MotifArbitre } from "@/components/sfl/skins-arbitre";
 import { MATIERES_RECRUES, numeroFondateur, type FinitionRecrue, type MotifRecrue } from "@/components/sfl/skins-recrues";
 import { MATIERES_AFRIQUE } from "@/components/sfl/afrique/registre";
+import { NATIONS, numeroSerieNation } from "@/lib/sfl/pack-afrique";
 import type { FinitionAfrique, MotifAfrique } from "@/components/sfl/afrique/types";
 
 /** L'édition d'une carte : la carte de saison, ou une carte à titre. */
@@ -129,6 +130,8 @@ export interface HabillageCarte {
   rang?: RangCarte;
   /** La carte Fondateur : son numéro sur 500, posé une fois pour toutes (skins-recrues.ts). */
   fondateur?: number;
+  /** Un skin du PACK AFRIQUE 2027 : son numéro de série dans l'édition de la nation (n° 0042, au dos). */
+  serieNation?: number;
 }
 
 /** Les éditions d'époque : les cartes de la saison 0, dans ses visuels. */
@@ -726,6 +729,39 @@ export const MATIERES: Record<NomMatiere, Matiere> = {
 };
 
 /**
+ * Toutes les finitions qu'une carte de joueur peut porter, dérivées des
+ * matières : la liste que relit habillages-choisis.ts (profiles.habillage). Ne
+ * s'écrit plus à la main (01/11/2026 : les 9 skins de la Saison Givre y
+ * manquaient, et porter l'un d'eux était relu « auto » et refusé par la
+ * base) ; tools/givre-check.ts vérifie chacune contre la contrainte
+ * profiles_habillage_check de supabase/schema.sql.
+ */
+export const FINITIONS: readonly Finition[] = [
+  "nuit",
+  "chrome",
+  "animee",
+  "onyx",
+  "verre",
+  ...(Object.keys(MATIERES_PASSE) as Finition[]),
+  "couleurs",
+  ...(Object.keys(MATIERES_OFFERTES) as Finition[]),
+  ...(Object.keys(MATIERES_RECRUES) as Finition[]),
+  ...(Object.keys(MATIERES_AFRIQUE) as Finition[]),
+];
+
+/** Les signes qu'une carte de joueur peut porter (le sifflet et les cartons ne sont qu'aux arbitres). */
+export const SIGNES_JOUEUR = [
+  "lisere-argent",
+  "lisere-platine",
+  "sceau",
+  "puce-noire",
+  "nom-grave",
+  "lisere-fer",
+  "runes",
+  "nom-runes",
+] as const satisfies readonly Signe[];
+
+/**
  * Les saisons closes qui ont leur édition d'époque : la matière de chacune
  * de leurs éditions (Sabri, 24/10). La saison 0 seulement, pour l'instant.
  */
@@ -772,6 +808,13 @@ export function serieDe(nom: string, habillage?: HabillageCarte): { serie: strin
   const seed = graine(nom);
   const serie = `bola-fr-${String(seed % 1000000).padStart(6, "0")}`;
   if (habillage?.finition === "fondateur" && habillage.fondateur) return { serie, numero: numeroFondateur(habillage.fondateur) };
+  // Un skin de nation (PACK AFRIQUE 2027) : son édition et son numéro, « afrique-sn · n° 0042 ».
+  if (habillage?.finition?.startsWith("afrique-")) {
+    const code = habillage.finition.slice(8);
+    const hote = (NATIONS as readonly { id: string; hote?: true }[]).find((n) => n.id === code)?.hote;
+    const numero = habillage.serieNation ? numeroSerieNation(habillage.serieNation) : "aperçu";
+    return { serie: habillage.finition, numero: hote ? `${numero} · pays hôte` : numero };
+  }
   return { serie, numero: `n° ${(seed % 900) + 100} / ∞` };
 }
 

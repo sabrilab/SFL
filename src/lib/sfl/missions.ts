@@ -46,7 +46,7 @@ import { matchsDeJournee, premierCoupDEnvoi } from "./matchs-du-jour";
 import { ovr, type Player } from "./engine";
 import type { MatchEntry, Saison, SaisonArchivee } from "./saisie/types";
 import { passeDe, type BilanPasse, type Epreuve, type PaliersAtteints } from "./passe";
-import { saisonPasseA, saisonPasseDeLigne, SAISONS_PASSE, type SaisonPasse } from "./saisons-passe";
+import { derniersJours, saisonPasseA, saisonPasseDeLigne, SAISONS_PASSE, type SaisonPasse } from "./saisons-passe";
 import type { CreneauArbitre } from "./missions-arbitre";
 
 /* ------------------------------- Le barème ------------------------------- */
@@ -632,6 +632,8 @@ export interface LigneXp {
   saison: number;
   j: number;
   date: string;
+  /** Le jour ISO (AAAA-MM-JJ), quand on le connaît : il l'emporte sur `date` (saisons-passe.ts, jourDeLigne). */
+  jour?: string;
   quoi: string;
   xp: number;
   /**
@@ -835,7 +837,8 @@ export function bilanDe(
 ): BilanXp {
   const x = journal.get(joueur) ?? { lignes: [], reussies: 0 };
   const saisonPasse = saisonVoulue ?? saisonPasseA(maintenant);
-  const lignesSaison = x.lignes.filter((l) => saisonPasseDeLigne(l, maintenant) === saisonPasse);
+  const repli = derniersJours(x.lignes, maintenant);
+  const lignesSaison = x.lignes.filter((l) => saisonPasseDeLigne(l, maintenant, repli) === saisonPasse);
   // Les risques font baisser l'XP ; jamais sous zéro.
   const total = Math.max(0, x.lignes.reduce((a, l) => a + l.xp, 0));
   const saison = Math.max(0, lignesSaison.reduce((a, l) => a + l.xp, 0));

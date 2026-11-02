@@ -76,6 +76,32 @@ export function soldeXp(gagnee: number, depensee: number): number {
   return Math.max(0, Math.round(gagnee) - Math.round(depensee));
 }
 
+/** Le numéro de série d'une carte de nation, au dos : « n° 0042 ». */
+export const numeroSerieNation = (n: number) => `n° ${String(Math.max(1, Math.round(n))).padStart(4, "0")}`;
+
+/** Les nations que l'écran montre : toutes celles dont le skin est dessiné (le gabarit ne se montre jamais). */
+export function nationsMontrees(): CodeNation[] {
+  return NATIONS.filter((n) => (n.etat as EtatNation) !== "a-dessiner").map((n) => n.id);
+}
+
+/** Le pack est-il ouvert ? Seulement quand une nation au moins est validée : on ne vend jamais un skin vide. */
+export const packOuvert = () => nationsEnJeu().length > 0;
+
+export type EtatOuverture =
+  | { t: "ouvrir"; prix: number }
+  | { t: "manque"; solde: number; prix: number }
+  | { t: "complet"; sur: number }
+  | { t: "ferme" };
+
+/** Ce que dit le bouton du pack : ouvrir, l'XP qui manque, complet, ou fermé. */
+export function etatOuverture(solde: number, obtenus: readonly string[], prix = PACK_AFRIQUE.prix): EtatOuverture {
+  const enJeu = nationsEnJeu();
+  if (!enJeu.length) return { t: "ferme" };
+  if (enJeu.every((n) => obtenus.includes(n))) return { t: "complet", sur: nationsMontrees().length };
+  if (solde < prix) return { t: "manque", solde, prix };
+  return { t: "ouvrir", prix };
+}
+
 /** Ce qui ne s'écrit nulle part (noms, phrases, sources affichées) : marques de la CAF et clichés. */
 export const MOTS_INTERDITS: readonly RegExp[] = [
   /\bCAN\b/,

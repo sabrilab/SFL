@@ -28,7 +28,6 @@ import {
   CRANS,
   dimancheEnCours,
   engagementsDe,
-  journalXp,
   juger,
   paliersDe,
   rangsDesJoueurs,
@@ -54,16 +53,18 @@ import {
   chargerReponses,
   MISSIONS_EVENT,
   repondreMission,
+  reponsesChargees,
   reponsesDemo,
   reponsesEnMemoire,
 } from "@/lib/sfl/missions-reponses";
-import { ajouterPronos } from "@/lib/sfl/pronos";
-import { ajouterDefis } from "@/lib/sfl/defis";
-import { ajouterRecrues, type RecruesJoueur } from "@/lib/sfl/recrues";
+import { publicationEnAttente } from "@/lib/sfl/saisie/sync";
+import { bilanAffiche } from "@/lib/sfl/xp-acquis";
+import { useBilanServeur, usePaliersGardes } from "@/hooks/use-bilan-serveur";
+import type { RecruesJoueur } from "@/lib/sfl/recrues";
+import { journalComplet } from "@/lib/sfl/xp-calcul";
 import { appliquerVotes } from "@/lib/sfl/votes";
 import { supabase } from "@/lib/supabase";
 import type { Saison } from "@/lib/sfl/saisie/types";
-import { ajouterBola, lignesXpBola, missionsPerso } from "@/lib/sfl/missions-perso";
 import { EPREUVES_BOLA, type Epreuve } from "@/lib/sfl/passe";
 import { saisonsPasseOuvertes } from "@/lib/sfl/saisons-passe";
 
@@ -420,6 +421,8 @@ export interface XpLigue {
   recrues: ReadonlyMap<string, RecruesJoueur>;
   /** Mon nom si je joue en Bola, hors de la SFL : mon passe suit les épreuves Bola (EPREUVES_BOLA). */
   bola: string | null;
+  /** Le compte vitrine, s'il est allumé sur ce téléphone (compte-vitrine.ts) : un aperçu, jamais écrit. */
+  vitrine?: string | null;
 }
 
 export const XpLigueContext = createContext<XpLigue | null>(null);
@@ -443,22 +446,21 @@ export function useXpLigueCalcule(): XpLigue | null {
   const { ligue, miennes } = useRecrues();
   return useMemo(() => {
     if (!isClient) return null;
-    const journal = journalXp(jugee, reponses, votes, maintenant, felicitations);
-    ajouterPronos(journal, jugee, pronos, maintenant);
-    // Les badges de palier franchis depuis S1 J4 : la prime de leur défi (lib/sfl/defis.ts).
-    ajouterDefis(journal, jugee);
-    // +100 par recrue active, hors du rang (lib/sfl/recrues.ts).
-    ajouterRecrues(journal, jugee, ligue, me ? { nom: me, recrues: miennes } : null, maintenant);
-    // Mes matchs Bola validés et mes missions perso (lib/sfl/missions-perso.ts), hors du rang ;
-    // sur mon seul téléphone. Gardés si je suis entré en SFL depuis.
-    if (bolaCarte) {
-      const { faites } = missionsPerso(bolaCarte.valides, maintenant);
-      ajouterBola(journal, bolaCarte.nom, lignesXpBola(bolaCarte.valides, faites, jugee, maintenant));
-    }
+    const journal = journalComplet({
+      jugee,
+      reponses,
+      votes,
+      felicitations,
+      pronos,
+      ligueRecrues: ligue,
+      moi: me ? { nom: me, recrues: miennes } : null,
+      bolaCarte,
+      maintenant,
+    });
     const recrues = new Map(ligue.map((r) => [r.nom, r]));
     const rangs = rangsDesJoueurs(classementNiveau(journal, allPlayers, { pourLeRang: true }));
     const surLesCartes = cartesDe(journal, rangs, recrues, bola, maintenant);
-    const lg = { journal, saison: saison.numero ?? 0, maintenant, rangs, surLesCartes, recrues, bola };
+    const lg = { journal, saison: saison.numero ?? 0, maintenant, rangs, surLesCartes, recrues, bola, vitrine: vitrine?.nom ?? null };
     return vitrine ? avecVitrineXp(lg, saison, vitrine.nom) : lg;
   }, [isClient, jugee, reponses, votes, maintenant, felicitations, pronos, saison, allPlayers, vitrine, ligue, miennes, me, bola, bolaCarte]);
 }
@@ -475,8 +477,21 @@ export function useXpLigue(): XpLigue | null {
 export function useXp(nom?: string): BilanXp | null {
   const { me } = useMyPlayer();
   const lg = useXpLigue();
+  const session = useSession();
   const qui = nom ?? me;
-  return useMemo(() => (lg && qui ? bilanDe(lg.journal, qui, lg.maintenant, epreuvesDe(qui, lg.bola)) : null), [lg, qui]);
+  const serveur = useBilanServeur(qui === me ? qui : null);
+  const garde = usePaliersGardes()[qui ?? ""];
+  // Mes réponses aux missions arrivent un instant après l'ouverture : useReponses suit leur chargement.
+  useReponses();
+  const complet = !!session?.server && reponsesChargees() && !publicationEnAttente();
+  return useMemo(() => {
+    if (!lg || !qui) return null;
+    const b = bilanDe(lg.journal, qui, lg.maintenant, epreuvesDe(qui, lg.bola));
+    // Le compte vitrine garde son calcul (un aperçu voulu, sur son seul téléphone).
+    if (lg.vitrine === qui) return b;
+    // Le palier gardé par le serveur ; un calcul incomplet, au plus haut avec son dernier bilan (xp-acquis.ts).
+    return bilanAffiche(b, { complet, serveur, garde });
+  }, [lg, qui, complet, serveur, garde]);
 }
 
 /** Le rang d'un joueur (B, A, S) ; null pour un joueur masqué ou inconnu. */
