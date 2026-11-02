@@ -1422,6 +1422,62 @@
   transition: transform 0.5s cubic-bezier(0.32, 1.35, 0.42, 1);
   pointer-events: none;
 }
+/* La goutte de verre sous le doigt (layout/lentille-liquide.ts, 02/11/2026) :
+   la pilule pleine devient du verre clair qui déborde de la barre, au-dessus
+   des onglets (ils passent sous elle, grossis comme sous une loupe). Le bord
+   est peint : liseré de lumière en haut à gauche, franges froide à gauche et
+   chaude à droite, comme le bord du verre d'iOS en sombre. La pilule revient
+   en fondu une fois la goutte posée. */
+.liquid-tabbar {
+  touch-action: none;
+}
+.liquid-tabbar__lentille {
+  transform-origin: 50% 50%;
+  will-change: transform;
+}
+.liquid-tabbar__lentille[data-verre] {
+  z-index: 2;
+  /* Pas de backdrop-filter ici : imbriqué dans celui de la barre, il
+     éteint le flou de la barre (Chromium). Le verre est peint. */
+  background: rgba(255, 255, 255, 0.12);
+  box-shadow:
+    inset 0 0 0 0.75px rgba(255, 255, 255, 0.5),
+    inset 1.5px 2px 1px -1px rgba(255, 255, 255, 0.95),
+    inset -1.5px -2px 1.5px -1px rgba(255, 255, 255, 0.4),
+    inset 5px 0 7px -5px rgba(150, 205, 255, 0.55),
+    inset -5px 0 7px -5px rgba(255, 196, 150, 0.5),
+    inset 0 -6px 10px -8px rgba(255, 255, 255, 0.45),
+    0 6px 18px rgba(0, 0, 0, 0.22);
+  transition: background-color 0.12s ease;
+}
+.liquid-tabbar[data-clair] .liquid-tabbar__lentille[data-verre] {
+  background: rgba(236, 236, 240, 0.55);
+  box-shadow:
+    inset 0 0 0 0.75px rgba(0, 0, 0, 0.08),
+    inset 1.5px 2px 1px -1px #ffffff,
+    inset -1.5px -2px 1.5px -1px rgba(0, 0, 0, 0.1),
+    0 2px 5px rgba(0, 0, 0, 0.1),
+    inset 5px 0 7px -5px rgba(150, 205, 255, 0.45),
+    inset -5px 0 7px -5px rgba(255, 196, 150, 0.4),
+    0 7px 18px rgba(0, 0, 0, 0.16);
+}
+/* La pilule pleine réapparaît en retard, comme sur iOS. */
+.liquid-tabbar__lentille:not([data-verre]) {
+  transition: background-color 0.24s ease 0.04s, box-shadow 0.24s ease;
+}
+/* La barre s'éclaire et s'élargit un peu autour de la goutte. */
+.liquid-tabbar[data-tenu] {
+  --tabbar-verre: rgba(52, 53, 58, 0.66);
+}
+.liquid-tabbar[data-clair][data-tenu] {
+  --tabbar-verre: rgba(255, 255, 255, 0.78);
+}
+.liquid-tabbar {
+  transition: background-color 0.25s ease;
+}
+.liquid-tabbar[data-tenu] .liquid-tabbar__onglet {
+  transition: none;
+}
 .liquid-tabbar__onglet {
   position: relative;
   z-index: 1;

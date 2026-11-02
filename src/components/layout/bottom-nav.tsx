@@ -35,7 +35,8 @@
 
 import { useEffect } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { useLentilleLiquide } from "./lentille-liquide";
 import { ActusIcon, CarteIcon, MapIcon, VestiaireIcon } from "./nav-icons";
 import { ongletActif } from "@/lib/nav";
 import { remonter, retrouverOnglet } from "./memoire-navigation";
@@ -84,6 +85,16 @@ export function BottomNav() {
   // L'icône de l'app : tous les messages pas lus, comme les notifications.
   useEffect(() => pastilleIcone(nonLus + discussions + equipe), [nonLus, discussions, equipe]);
 
+  // La goutte de verre sous le doigt (lentille-liquide.ts) : un glissé
+  // navigue lui-même vers l'onglet où on lâche.
+  const router = useRouter();
+  const lien = (racine: string) => (horsSfl && racine === "/ligue" ? "/ligue-vierge" : racine);
+  const { nav, lentille, verre, gestes } = useLentilleLiquide(TABS.length, actif, (i) => {
+    const href = lien(TABS[i].href);
+    retrouverOnglet(href);
+    router.push(href);
+  });
+
   // L'admin est un outil (30/10/2026) : son geste du moment occupe le bas de
   // l'écran, sous le pouce ; le retour en haut à gauche ramène à l'app.
   if (pathname.startsWith("/admin")) return null;
@@ -98,18 +109,21 @@ export function BottomNav() {
     >
       <nav
         aria-label="Onglets"
+        ref={nav}
+        {...gestes}
         className="liquid-tabbar relative flex min-w-0 flex-1"
         data-clair={clair ? "" : undefined}
+        data-tenu={verre ? "" : undefined}
         // La place de la lentille : un tiers, décalé de l'onglet choisi.
         style={{ ["--onglet" as string]: Math.max(0, actif) }}
       >
         {/* La lentille de l'onglet choisi */}
-        {actif >= 0 && <span aria-hidden className="liquid-tabbar__lentille" />}
+        {actif >= 0 && <span ref={lentille} aria-hidden className="liquid-tabbar__lentille" data-verre={verre ? "" : undefined} />}
 
         {TABS.map(({ href: racine, Icon, label }, i) => {
           const choisi = i === actif;
           // Les Actus d'un joueur Bola sont celles de Bola (porte-sfl.tsx).
-          const href = horsSfl && racine === "/ligue" ? "/ligue-vierge" : racine;
+          const href = lien(racine);
           return (
             <Link
               key={racine}
@@ -123,7 +137,9 @@ export function BottomNav() {
               }}
               className="liquid-tabbar__onglet"
               // L'onglet choisi est plein, à l'encre inverse (relifting du 02/11).
-              style={{ color: choisi ? (clair ? "#ffffff" : "#0a0b0d") : encre }}
+              // Sous la goutte de verre, plus de pilule : tous à l'encre de la barre.
+              style={{ color: choisi && !verre ? (clair ? "#ffffff" : "#0a0b0d") : encre }}
+              draggable={false}
             >
               <span className="relative flex">
                 <Icon plein={choisi} />
