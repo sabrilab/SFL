@@ -1024,15 +1024,17 @@ export default function BolaTeamPage() {
                           Annuler
                         </Pilule>
                       ) : (
-                        <span className="mono-label text-foreground">{inscrit ? "Sur la feuille" : "À jouer"}</span>
+                        <span className="mono-label text-foreground">À jouer</span>
                       )}
                     </div>
-                    {(deposer || lire) && (
+                    {deposer || lire ? (
                       <div className="pl-12">
                         <Pilule plein={!feuille} ton={feuille ? undefined : "bouton--vert"} onClick={() => setAvantMatch(d.id)}>
                           {feuille && auteur ? `Feuille · ${prenom(auteur.name)}` : "Feuille"}
                         </Pilule>
                       </div>
+                    ) : (
+                      inscrit && <span className="mono-label pl-12 text-foreground">Sur la feuille</span>
                     )}
                   </div>
                 );

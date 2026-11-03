@@ -15,7 +15,9 @@
 // Depuis le 03/11/2026, Sunday Five a un entraîneur, Lucien (un nom de
 // démonstration, hors de la ligue) : le 7 + 1 se voit sans base, sa carte
 // d'entraîneur sur le banc ; et un match programmé contre le Racing, dans
-// deux jours, dont Lucien a déposé la feuille d'avant-match.
+// deux jours, dont Lucien a déposé la feuille d'avant-match. Le 5 contre 4
+// aussi : le Racing n'était que quatre sur la feuille à confirmer, et mon
+// dernier résultat s'est joué contre une équipe à 4.
 //
 // Le monde de démonstration se demande une fois par appareil (?apercu=1 sur
 // la page Team, ?apercu=0 pour revenir à la base) : la page Team, la page de
@@ -343,8 +345,8 @@ export function demoChampionnat(
     return [...lignes.values()];
   }
 
-  // Un 5 contre 4 parmi mes derniers résultats : l'adversaire était à 4, les deux feuilles le disent.
-  const quatre = matchs.find((x) => x.statut === "accepte" && x.saisies.length === 2 && (x.de === 1 || x.a === 1));
+  // Un 5 contre 4 dans mon dernier résultat : l'adversaire était à 4, les deux feuilles le disent.
+  const quatre = [...matchs].reverse().find((x) => x.statut === "accepte" && x.saisies.length === 2 && (x.de === 1 || x.a === 1));
   if (quatre) {
     const adverse = quatre.de === 1 ? quatre.a : quatre.de;
     quatre.saisies = quatre.saisies.map((x) => (x.equipe === adverse ? { ...x, presents: 4, presentsAdverses: 5 } : { ...x, presents: 5, presentsAdverses: 4 }));
