@@ -22,6 +22,13 @@
 // Une trace impossible à poser (base pas encore migrée, aperçus) n'empêche
 // jamais l'envoi : la notification part simplement sans identifiant.
 //
+// Personne n'est prévenu tant qu'il doit changer son mot de passe (une ligne
+// dans mot_de_passe_a_changer : d'origine, devenu public, ou provisoire ;
+// audit de sécurité du 03/11/2026) : une notification porte le texte d'un
+// message, et un téléphone a pu être abonné avec ce mot de passe avant que
+// la base ne le refuse. Seule une base sans la table (aperçu pas encore
+// migré) laisse passer ; toute autre erreur de lecture n'envoie rien.
+//
 // SERVEUR UNIQUEMENT.
 
 import { randomUUID } from "node:crypto";
@@ -44,6 +51,21 @@ export interface Options {
   traces?: SupabaseClient | null;
   /** Le joueur dont viennent ces notifications (son message, son invitation, son suivi…) ; rien quand c'est l'app. */
   de?: string | null;
+}
+
+/**
+ * Ceux des joueurs qui doivent encore changer leur mot de passe ; null si la
+ * table n'a pas pu être lue (on ne prévient alors personne).
+ */
+export async function motDePasseAChanger(sb: SupabaseClient, ids: string[]): Promise<Set<string> | null> {
+  if (ids.length === 0) return new Set();
+  const { data, error } = await sb.from("mot_de_passe_a_changer").select("user_id").in("user_id", ids);
+  if (error) {
+    if (error.code === "42P01" || error.code === "PGRST205") return new Set();
+    console.error("[push] mot_de_passe_a_changer", error.code);
+    return null;
+  }
+  return new Set(((data ?? []) as { user_id: string }[]).map((x) => x.user_id));
 }
 
 export interface Bilan {
@@ -71,10 +93,15 @@ export async function prevenir(
   const rien: Bilan = { recus, telephones: 0, echecs: 0, morts: 0 };
   if (envois.size === 0) return rien;
 
+  const aChanger = await motDePasseAChanger(sb, [...envois.keys()]);
+  if (!aChanger) return rien;
+  const destinataires = [...envois.keys()].filter((uid) => !aChanger.has(uid));
+  if (destinataires.length === 0) return rien;
+
   const { data } = await sb
     .from("push_abonnements")
     .select("endpoint, p256dh, auth, user_id")
-    .in("user_id", [...envois.keys()]);
+    .in("user_id", destinataires);
   const parJoueur = new Map<string, Abonnement[]>();
   for (const ab of (data ?? []) as (Abonnement & { user_id: string })[]) {
     const liste = parJoueur.get(ab.user_id);

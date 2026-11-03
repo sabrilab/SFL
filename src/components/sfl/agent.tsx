@@ -29,7 +29,9 @@
 // { pret: false }), la fiche reste et la barre d'écriture cède la place à une
 // ligne : « Bola Agent arrive bientôt. »
 //
-// Données : la table agent_messages (la conversation, privée). Hors
+// Données : la table agent_messages (la conversation, privée). La route la
+// relit elle-même en base pour le modèle (audit du 03/11/2026) : l'écran
+// n'envoie plus que la question, le dossier et l'ouverture. Hors
 // production (développement et aperçus Vercel), ?demo=agent montre une
 // conversation d'essai, sans base ni modèle, pour juger le rendu.
 
@@ -47,7 +49,6 @@ import { useFilAuBas } from "@/hooks/use-fil-au-bas";
 import { BoutonRecherche } from "@/components/layout/bouton-recherche";
 import { useSession } from "@/hooks/use-session";
 import {
-  HISTORIQUE_MAX,
   LIBELLE_CARTE,
   NOMS_STATS,
   QUESTION_MAX,
@@ -366,12 +367,6 @@ export function Agent() {
             dossier,
             ouverture: ouv ?? undefined,
             raccourci,
-            historique: avant.slice(-HISTORIQUE_MAX).map(({ role, texte, cartes, image, schema }) => ({
-              role,
-              texte,
-              cartes,
-              image: image?.legende || (schema ? `schéma ${schema.type}${schema.legende ? ` : ${schema.legende}` : ""}` : undefined),
-            })),
           }),
         });
         const d = (await r.json().catch(() => ({}))) as { texte?: string; cartes?: unknown; image?: unknown; schema?: unknown; error?: string };
