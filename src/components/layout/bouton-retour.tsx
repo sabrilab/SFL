@@ -64,7 +64,7 @@ export function BoutonRetour({
       aria-label={revenirA(nom)}
       className={cn(givre ? "bouton-givre size-10" : "bouton-secondaire size-11", "flex shrink-0 items-center justify-center", className)}
     >
-      <ChevronLeft className="size-5" />
+      <ChevronLeft className="size-5 rtl:-scale-x-100" />
     </button>
   );
 }

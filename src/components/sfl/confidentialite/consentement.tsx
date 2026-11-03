@@ -35,6 +35,7 @@ import { AGE_ACCORD_PARENT, DATE_POLITIQUE } from "@/lib/sfl/confidentialite";
 import { donnerAccord, monAge, rafraichirAccord } from "@/lib/sfl/consentement";
 import { TextePolitique } from "./politique";
 import { cn } from "@/lib/utils";
+import { useT } from "@/lib/i18n/langue";
 
 /** Les pages sans voile : elles ont leur propre case, ou pas de compte. */
 const SANS_VOILE = ["/confidentialite", "/inscription", "/bienvenue"];
@@ -113,7 +114,7 @@ export function CaseAccord({
       </span>
       <span className="min-w-0 text-ligne leading-snug font-medium text-encre-2">
         {children}
-        {note && <span className="ml-[6px] text-encre-3">{note}</span>}
+        {note && <span className="ms-[6px] text-encre-3">{note}</span>}
       </span>
     </label>
   );
@@ -121,9 +122,10 @@ export function CaseAccord({
 
 /** La phrase de la case obligatoire : « politique de confidentialité » ouvre le texte entier. */
 export function PhraseAccord({ onLire }: { onLire: () => void }) {
+  const t = useT();
   return (
     <>
-      J&apos;accepte la{" "}
+      {t("J'accepte la")}{" "}
       <button
         type="button"
         onClick={(e) => {
@@ -133,9 +135,9 @@ export function PhraseAccord({ onLire }: { onLire: () => void }) {
         }}
         className="font-semibold text-foreground underline underline-offset-2"
       >
-        politique de confidentialité
+        {t("politique de confidentialité")}
       </button>{" "}
-      et l&apos;usage de ma photo sur ma carte, dans l&apos;app.
+      {t("et l'usage de ma photo sur ma carte, dans l'app.")}
     </>
   );
 }
