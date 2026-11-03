@@ -128,8 +128,34 @@ create trigger on_auth_user_created
 -- Personne n'appelle cette fonction directement : seul le trigger s'en sert.
 revoke execute on function public.handle_new_user() from public, anon, authenticated;
 
+-- Les comptes qui doivent encore choisir leur mot de passe (22/10/2026) : la
+-- table, son explication, ses règles et son trigger sont plus bas (« Mots de
+-- passe à changer »). Elle naît ICI depuis le 03/11/2026, avant
+-- is_league_admin() et est_membre() qui la lisent : une fonction SQL vérifie
+-- ses tables à sa création, une base neuve buterait sinon.
+create table if not exists public.mot_de_passe_a_changer (
+  user_id  uuid primary key references auth.users(id) on delete cascade,
+  motif    text not null default 'origine' check (motif in ('origine', 'provisoire')),
+  depuis   timestamptz not null default now()
+);
+
+alter table public.mot_de_passe_a_changer enable row level security;
+
+-- Lecture seule pour l'app : la ligne naît par les routes admin (clé
+-- secrète) et meurt par le trigger.
+revoke all on public.mot_de_passe_a_changer from anon, authenticated;
+grant select on public.mot_de_passe_a_changer to authenticated;
+
 -- Helper : « l'appelant est-il admin ? » — SECURITY DEFINER pour lire profiles
 -- sans récursion de RLS, avec le contrôle d'identité DANS la fonction.
+--
+-- Un admin qui doit encore changer son mot de passe (une ligne dans
+-- mot_de_passe_a_changer) n'est pas admin pour la base (audit de sécurité du
+-- 03/11/2026) : son mot de passe d'origine a été public, une session ouverte
+-- avec lui ne doit rien ouvrir. L'écran « Nouveau mot de passe » ne passe
+-- pas par ici (sa ligne se lit par user_id, le changement par Supabase Auth)
+-- et le trigger efface la ligne dès le mot de passe changé. La recherche se
+-- fait par la clé primaire : le coût est négligeable.
 create or replace function public.is_league_admin()
 returns boolean
 language sql
@@ -140,6 +166,10 @@ as $$
   select exists (
     select 1 from public.profiles p
     where p.id = (select auth.uid()) and p.is_admin
+  )
+  and not exists (
+    select 1 from public.mot_de_passe_a_changer m
+    where m.user_id = (select auth.uid())
   );
 $$;
 
@@ -150,6 +180,11 @@ grant execute on function public.is_league_admin() to authenticated;
 -- attente se connecte, voit sa propre fiche, et rien d'autre : ni la saison,
 -- ni les joueurs, ni le salon. C'est ce qui rend l'inscription libre sans
 -- risque pour la ligue.
+--
+-- Comme pour l'admin (plus haut), un compte qui doit encore changer son mot
+-- de passe n'est pas membre pour la base (03/11/2026) : avec son mot de
+-- passe d'origine, devenu public, on ne lit rien de la ligue. Il garde sa
+-- fiche, ses propres lignes et l'écran « Nouveau mot de passe ».
 create or replace function public.est_membre()
 returns boolean
 language sql
@@ -160,6 +195,10 @@ as $$
   select exists (
     select 1 from public.profiles p
     where p.id = (select auth.uid()) and p.valide
+  )
+  and not exists (
+    select 1 from public.mot_de_passe_a_changer m
+    where m.user_id = (select auth.uid())
   );
 $$;
 
@@ -1198,6 +1237,12 @@ $$;
 --   · {"type":"actu","video":"j3-le-recap","titre":"J3! Le Recap","montre":"carrousel"}
 --     (26/10 : une vidéo des Actus, son carrousel ou une de ses images, 0…)
 alter table public.messages add column if not exists piece jsonb;
+-- Le message qui porte un fichier (vocal, photo, vidéo), retrouvé par son
+-- chemin : c'est ainsi que les règles de lecture des buckets « vocaux » et
+-- « images » (plus bas) savent qui peut l'ouvrir (03/11/2026).
+create index if not exists messages_piece_chemin_idx
+  on public.messages ((piece ->> 'chemin'))
+  where piece ->> 'chemin' is not null;
 -- Répondre à un message précis (19/10) : la réponse cite l'original. Si
 -- l'original est retiré, la réponse reste, sans citation.
 alter table public.messages add column if not exists reponse_a bigint references public.messages(id) on delete set null;
@@ -1345,8 +1390,9 @@ grant insert (user_id, lu_jusqua, notifs, devant_le) on public.vestiaire_suivi t
 grant update (user_id, lu_jusqua, notifs, devant_le) on public.vestiaire_suivi to authenticated;
 
 -- Les vocaux du Vestiaire (19/10) : bucket PRIVÉ « vocaux »,
--- <uuid de l'auteur>/<horodatage>.<ext>. Toute la ligue les écoute (liens
--- signés), chacun ne pose et ne retire que les siens. Une minute au plus,
+-- <uuid de l'auteur>/<horodatage>.<ext>. Les écoutent (liens signés) leur
+-- auteur et ceux qui lisent le message qui les porte (03/11, plus bas) ;
+-- chacun ne pose et ne retire que les siens. Une minute au plus,
 -- donc 3 Mo suffisent ; mp4/aac pour l'iPhone, webm/ogg pour le reste.
 do $$
 begin
@@ -1362,14 +1408,47 @@ exception
 end;
 $$;
 
+-- Qui écoute un vocal (audit de sécurité du 03/11/2026) : son auteur (le
+-- premier dossier du chemin est le sien), et qui peut lire le message qui le
+-- porte. La sous-requête passe par les règles de messages : les deux joueurs
+-- d'un privé, ceux du match ou de l'équipe, l'effectif de la SFL pour le
+-- Vestiaire. Le message doit être de l'auteur du fichier : sans cela, un
+-- joueur pourrait écrire un message qui pointe le vocal d'un autre et
+-- l'ouvrir. Un vocal dont le message est retiré ne s'ouvre plus que pour son
+-- auteur. Avant, tout membre de la ligue écoutait tout (« vocaux: la ligue
+-- écoute »), privés compris.
+--
+-- Aucune erreur n'est avalée ici, au contraire des blocs voisins : si la
+-- règle ne se pose pas, la migration échoue (et rien n'est appliqué) plutôt
+-- que de garder l'ancienne, ouverte à toute la ligue. Seule une base sans
+-- stockage (Postgres nu) passe, avec un avertissement.
 do $$
 begin
+  if to_regclass('storage.objects') is null then
+    raise warning 'vocaux : pas de stockage, règle de lecture non posée';
+    return;
+  end if;
   drop policy if exists "vocaux: la ligue écoute" on storage.objects;
-  create policy "vocaux: la ligue écoute"
+  drop policy if exists "vocaux: l'auteur et qui lit le message" on storage.objects;
+  create policy "vocaux: l'auteur et qui lit le message"
     on storage.objects for select
     to authenticated
-    using (bucket_id = 'vocaux' and (select public.est_membre()));
+    using (
+      bucket_id = 'vocaux'
+      and (
+        (storage.foldername(name))[1] = (select auth.uid())::text
+        or exists (
+          select 1 from public.messages m
+          where m.piece ->> 'chemin' = objects.name
+            and m.auteur::text = (storage.foldername(objects.name))[1]
+        )
+      )
+    );
+end;
+$$;
 
+do $$
+begin
   drop policy if exists "vocaux: je pose les miens" on storage.objects;
   create policy "vocaux: je pose les miens"
     on storage.objects for insert
@@ -1412,14 +1491,35 @@ exception
 end;
 $$;
 
+-- Qui voit une photo ou une vidéo : comme pour les vocaux (plus haut), son
+-- auteur et qui lit le message, de son auteur, qui la porte (03/11/2026).
 do $$
 begin
+  if to_regclass('storage.objects') is null then
+    raise warning 'images : pas de stockage, règle de lecture non posée';
+    return;
+  end if;
   drop policy if exists "images: la ligue regarde" on storage.objects;
-  create policy "images: la ligue regarde"
+  drop policy if exists "images: l'auteur et qui lit le message" on storage.objects;
+  create policy "images: l'auteur et qui lit le message"
     on storage.objects for select
     to authenticated
-    using (bucket_id = 'images' and (select public.est_membre()));
+    using (
+      bucket_id = 'images'
+      and (
+        (storage.foldername(name))[1] = (select auth.uid())::text
+        or exists (
+          select 1 from public.messages m
+          where m.piece ->> 'chemin' = objects.name
+            and m.auteur::text = (storage.foldername(objects.name))[1]
+        )
+      )
+    );
+end;
+$$;
 
+do $$
+begin
   drop policy if exists "images: je pose les miennes" on storage.objects;
   create policy "images: je pose les miennes"
     on storage.objects for insert
@@ -5448,13 +5548,11 @@ update public.profiles set contact_email = null where contact_email is not null;
 -- (trigger sur auth.users) : personne ne peut l'effacer autrement. Les routes
 -- admin en posent une à chaque mot de passe provisoire (compte créé, mot de
 -- passe réinitialisé) : le provisoire ne sert qu'à entrer une fois.
-create table if not exists public.mot_de_passe_a_changer (
-  user_id  uuid primary key references auth.users(id) on delete cascade,
-  motif    text not null default 'origine' check (motif in ('origine', 'provisoire')),
-  depuis   timestamptz not null default now()
-);
-
-alter table public.mot_de_passe_a_changer enable row level security;
+--
+-- Depuis le 03/11/2026, la base aussi retient le compte : tant que sa ligne
+-- existe, est_membre() et is_league_admin() lui répondent non (en tête du
+-- fichier, où la table est créée). Avec un mot de passe d'origine, une
+-- session ne lit plus rien de la ligue, même par l'API.
 
 drop policy if exists "mot_de_passe_a_changer: je lis le mien" on public.mot_de_passe_a_changer;
 create policy "mot_de_passe_a_changer: je lis le mien"
@@ -5465,11 +5563,6 @@ drop policy if exists "mot_de_passe_a_changer: l'admin lit tout" on public.mot_d
 create policy "mot_de_passe_a_changer: l'admin lit tout"
   on public.mot_de_passe_a_changer for select to authenticated
   using ((select public.is_league_admin()));
-
--- Lecture seule pour l'app : la ligne naît par les routes admin (clé
--- secrète) et meurt par le trigger.
-revoke all on public.mot_de_passe_a_changer from anon, authenticated;
-grant select on public.mot_de_passe_a_changer to authenticated;
 
 create or replace function public.mot_de_passe_change()
 returns trigger
@@ -8847,3 +8940,15 @@ end;
 $$;
 revoke execute on function public.ouvrir_pack_xp(uuid, text, text, int, int, text[], uuid) from public, anon, authenticated;
 grant execute on function public.ouvrir_pack_xp(uuid, text, text, int, int, text[], uuid) to service_role;
+
+-- ─────────────── Droits de table : pas plus que ce que l'API sert (03/11/2026) ───────────────
+-- Supabase donne d'office tous les droits de table à anon et authenticated, et
+-- la RLS filtre ensuite. Trois d'entre eux ne servent à rien ici : TRUNCATE,
+-- TRIGGER et REFERENCES. L'API (PostgREST) ne les expose pas, l'app ne s'en
+-- sert pas, et les fonctions et les triggers de ce fichier tournent avec les
+-- droits de leur propriétaire (une clé étrangère se vérifie sans REFERENCES,
+-- un trigger se déclenche sans TRIGGER). TRUNCATE, lui, passe outre la RLS :
+-- qui l'a vide une table entière en SQL direct (audit de sécurité, T17).
+-- Retirés en fin de fichier, à chaque migration : les tables créées plus haut
+-- au même passage y passent aussi. Les autres droits ne changent pas ici.
+revoke truncate, trigger, references on all tables in schema public from anon, authenticated;

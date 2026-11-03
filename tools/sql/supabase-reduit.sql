@@ -15,8 +15,11 @@ create table auth.users (
   raw_app_meta_data jsonb default '{}'::jsonb,
   created_at timestamptz default now()
 );
+-- Comme Supabase : l'ancien réglage request.jwt.claim.sub, sinon le jeton
+-- entier que pose PostgREST (request.jwt.claims).
 create function auth.uid() returns uuid language sql stable as $$
-  select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
+  select coalesce(nullif(current_setting('request.jwt.claim.sub', true), ''),
+                  (nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'sub'))::uuid $$;
 create function auth.role() returns text language sql stable as $$
   select coalesce(nullif(current_setting('request.jwt.claim.role', true), ''), 'authenticated') $$;
 create function auth.jwt() returns jsonb language sql stable as $$ select '{}'::jsonb $$;
