@@ -317,15 +317,7 @@ export default function PageEquipe() {
                       <span className="truncate text-lecture font-semibold">{autre?.nom ?? "Adversaire"}</span>
                       <span className="mono-label text-encre-3">
                         {libelleJour(m.jour)}
-                        {em.forfaitDe != null
-                          ? " · forfait"
-                          : !compte
-                            ? " · amical"
-                            : em.aQuatre === montree.id
-                              ? " · à 4"
-                              : em.aQuatre != null
-                                ? " · 5 contre 4"
-                                : ""}
+                        {em.forfaitDe != null ? " · forfait" : !compte ? " · amical" : em.aQuatre != null ? " · 5 contre 4" : ""}
                       </span>
                     </span>
                     <span className="shrink-0 text-titre-m leading-none tabular-nums" style={{ fontFamily: ANTON }}>

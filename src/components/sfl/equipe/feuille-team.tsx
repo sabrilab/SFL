@@ -18,7 +18,10 @@
 // Règlement Team art. 7.2 et 7.3), qui doivent coller eux aussi. À 4 face à
 // 5 ou plus, le score final se lit sous la carte ; à 3 ou moins, c'est un
 // forfait : plus de score du terrain ni de buteurs, le 0 – 3. Le score validé
-// est le score final, « à 4 » sous l'équipe qui l'était.
+// est le score final, « à 4 » sous l'équipe qui l'était. Après la fermeture
+// (3 jours après le coup d'envoi), seule l'équipe qui répond à une saisie
+// faite seule juste avant garde ses 24 h pour répondre (art. 8.7) ; pour
+// l'autre, la feuille se lit sans bouton.
 
 import { useMemo, useState } from "react";
 import { Minus, Plus } from "lucide-react";
@@ -27,7 +30,7 @@ import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { CarteDe, FORMAT_CARTE } from "@/components/sfl/mini-carte";
 import { Ecusson } from "@/components/sfl/equipe/ecusson";
-import { collent, coupDEnvoiTeam, etatMatch, scoreFinal, type MatchTeam, type Presents } from "@/lib/sfl/championnat-team";
+import { collent, coupDEnvoiTeam, etatMatch, fermeturePour, scoreFinal, type MatchTeam, type Presents } from "@/lib/sfl/championnat-team";
 import { direErreurEquipe, saisirResultat, signataires, type Equipe, type EquipeTeam } from "@/lib/sfl/equipes";
 import { quandTombe } from "@/lib/sfl/equipes-temps";
 import { libelleJour } from "@/lib/sfl/matchs";
@@ -149,7 +152,10 @@ function Contenu({
   const ma = match.saisies.find((s) => s.equipe === mienne.id) ?? null;
   const leur = match.saisies.find((s) => s.equipe !== mienne.id) ?? null;
   const etat = etatMatch(match, maintenant);
-  const ferme = etat.etat === "valide" || etat.etat === "non-classe";
+  // Fermée pour moi : validée, non classée, ou passée sa fermeture (seule l'équipe qui répond à une saisie
+  // faite seule juste avant la fermeture a encore ses 24 h : fermeturePour, la même règle que la base).
+  const fermeePourMoi = etat.etat !== "a-venir" && (maintenant ?? new Date()).getTime() > fermeturePour(match, mienne.id).getTime();
+  const ferme = etat.etat === "valide" || etat.etat === "non-classe" || fermeePourMoi;
   // Les buteurs et passeurs : les joueurs de la feuille d'avant-match, si elle a été déposée ; sinon ceux de l'équipe.
   const inscrits = match.feuilles?.find((f) => f.equipe === mienne.id)?.joueurs;
   const joueurs = signataires(mienne).filter((j) => !inscrits || inscrits.includes(j.id));
@@ -334,9 +340,11 @@ function Contenu({
         )}
 
         {ferme ? (
-          <p className="mono-label text-center text-muted-foreground">
-            {etat.etat === "valide" ? "Validé" : "Non classé"} · {libelleJour(match.jour)}
-          </p>
+          etat.etat === "a-confirmer" ? null : (
+            <p className="mono-label text-center text-muted-foreground">
+              {etat.etat === "valide" ? "Validé" : etat.etat === "litige" ? "Litige" : "Non classé"} · {libelleJour(match.jour)}
+            </p>
+          )
         ) : (
           <Button
             variant="vert"

@@ -176,6 +176,8 @@ export function demoEquipes(noms: string[], moi: string): { equipes: Equipe[]; d
             le: new Date(Date.now() - 3 * 3600_000).toISOString(),
           },
         ],
+        // Le Racing a déposé la sienne : on sait seulement qu'elle l'est.
+        deposees: [1, 3],
       },
     ],
   };
@@ -351,6 +353,14 @@ export function demoChampionnat(
     const adverse = quatre.de === 1 ? quatre.a : quatre.de;
     quatre.saisies = quatre.saisies.map((x) => (x.equipe === adverse ? { ...x, presents: 4, presentsAdverses: 5 } : { ...x, presents: 5, presentsAdverses: 4 }));
   }
+  // Les feuilles d'avant-match des matchs de la dernière journée : toute la ligue les lit, le coup d'envoi passé.
+  const derniere = JOURNEES[JOURNEES.length - 1];
+  for (const x of matchs)
+    if (x.jour === derniere && x.statut === "accepte")
+      x.feuilles = [x.de, x.a].map((e) => {
+        const n = (effectifs.get(e) ?? []).slice(0, 7);
+        return { equipe: e, joueurs: n.map((nom) => `demo-${nom}`), noms: n, par: null, le: `${derniere}T16:00:00Z` };
+      });
 
   // Mes deux feuilles en cours : celle d'hier soir, à remplir (Lucien avait déposé la feuille d'avant-match),
   // et celle de samedi, que le Racing a déjà remplie.

@@ -156,12 +156,9 @@ export function SignerReglement({
               <Ecusson initiales={equipe.initiales} fond={equipe.fond} blason={equipe.blason} taille={44} />
               <span className="flex min-w-0 flex-col gap-0.5 pr-10">
                 <SheetTitle className="truncate text-titre-g font-bold tracking-tight">{equipe.nom}</SheetTitle>
-                {invitation && (
-                  <span className="truncate text-ligne text-muted-foreground">
-                    {[tInvite(equipe, invitation), invitation.depuis && `jusqu'à ${quandTombe(finInvitation(invitation.depuis))}`]
-                      .filter(Boolean)
-                      .join(" · ")}
-                  </span>
+                {invitation && <span className="truncate text-ligne text-muted-foreground">{tInvite(equipe, invitation)}</span>}
+                {invitation?.depuis && (
+                  <span className="truncate text-ligne text-muted-foreground">jusqu&apos;à {quandTombe(finInvitation(invitation.depuis))}</span>
                 )}
               </span>
             </SheetHeader>

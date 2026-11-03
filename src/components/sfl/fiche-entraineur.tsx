@@ -10,9 +10,11 @@
 //     ce qu'une mise à jour lui donnerait aujourd'hui (« +1 ») et sa jauge,
 //     la même que celle des cartes de joueur (ma-note.tsx) ;
 //   · le journal, du plus récent au plus ancien, en mots : ses rencontres
-//     (« victoire contre plus fort », « 5 contre 4 », « forfait »), les
-//     départs (« Samir est parti »), les mises à jour qui ont fait monter sa
-//     carte. Jamais l'attendu en chiffres.
+//     (« victoire contre plus fort », « 5 contre 4 », « forfait » ; celles
+//     qui ne comptent pas en rés, leur issue en gris, sans pastille ; un
+//     litige le dit près du nom), les départs (« Samir est parti »), les mises
+//     à jour qui ont fait monter sa carte. Jamais l'attendu en chiffres. La
+//     date toujours à droite.
 // Tout vient de la carte gardée par le serveur (use-carte-entraineur.ts) ;
 // un entraîneur qui vient d'arriver lit sa carte de départ, 75 partout.
 // Noir et blanc, comme Ma note : les chiffres en Anton, les étiquettes en
@@ -74,11 +76,17 @@ function Stat({ k, valeur, attente, jauge }: { k: CleEntraineur; valeur: number;
 }
 
 type Ligne =
-  | { quoi: "rencontre"; le: string; cle: string; contre?: string; faits: FaitEntraineur[] }
+  | { quoi: "rencontre"; le: string; cle: string; contre?: string; faits: FaitEntraineur[]; issue?: string; litige: boolean }
   | { quoi: "coh"; le: string; cle: string; fait: FaitEntraineur }
   | { quoi: "maj"; le: string; cle: string; note: number; gains: string };
 
-/** Le journal : ses rencontres (une ligne chacune), les départs, les mises à jour qui ont fait monter sa carte. */
+/**
+ * Le journal : ses rencontres (une ligne chacune), les départs, les mises à
+ * jour qui ont fait monter sa carte. Une rencontre jouée qui ne compte pas en
+ * rés (déjà rencontrée cette saison, une feuille ou une carte qui manque, sa
+ * saisie seule) dit son issue en mots, en gris, sans pastille ; un litige
+ * jamais tranché (lu avec la version de l'adversaire) le dit près du nom.
+ */
 function lignesDuJournal(d: DetailEntraineur): Ligne[] {
   const out: Ligne[] = [];
   const parRencontre = new Map<string, Extract<Ligne, { quoi: "rencontre" }>>();
@@ -89,12 +97,14 @@ function lignesDuJournal(d: DetailEntraineur): Ligne[] {
     }
     let l = parRencontre.get(f.source);
     if (!l) {
-      l = { quoi: "rencontre", le: f.le, cle: `r-${f.source}`, contre: f.adversaireNom, faits: [] };
+      l = { quoi: "rencontre", le: f.le, cle: `r-${f.source}`, contre: f.adversaireNom, faits: [], litige: false };
       parRencontre.set(f.source, l);
       out.push(l);
     }
+    if (f.litige) l.litige = true;
+    if (f.compte === false) l.issue = f.texte;
     // « venue » est le cas ordinaire : rien à en dire.
-    if (!(f.cle === "PRES" && f.texte === "venue")) l.faits.push(f);
+    else if (!(f.cle === "PRES" && f.texte === "venue")) l.faits.push(f);
   });
   for (const m of d.majs) {
     const g = gains(m.gains);
@@ -124,20 +134,23 @@ function Journal({ d }: { d: DetailEntraineur }) {
             </li>
           ) : l.quoi === "coh" ? (
             <li key={l.cle} className="flex items-baseline justify-between gap-3 border-b border-foreground/10 py-3 last:border-0">
-              <span className="font-mono text-[11px] text-foreground/45">{jourCourt(l.le)}</span>
-              <span className="flex min-w-0 items-baseline gap-2 text-right">
+              <span className="flex min-w-0 items-baseline gap-2">
                 <span className="font-mono text-[11px] text-foreground/45">{LIBELLES_ENTRAINEUR.COH}</span>
                 <span className="text-[14px] font-semibold">{l.fait.texte}</span>
               </span>
+              <span className="shrink-0 font-mono text-[11px] text-foreground/45">{jourCourt(l.le)}</span>
             </li>
           ) : (
             <li key={l.cle} className="flex flex-col gap-1.5 border-b border-foreground/10 py-3 last:border-0">
               <span className="flex items-baseline justify-between gap-3">
-                <span className="truncate text-[14px] font-semibold">{l.contre ?? "Rencontre"}</span>
+                <span className="flex min-w-0 items-baseline gap-2">
+                  <span className="truncate text-[14px] font-semibold">{l.contre ?? "Rencontre"}</span>
+                  {l.litige && <span className="mono-label shrink-0 text-[10px] text-foreground/45">Litige</span>}
+                </span>
                 <span className="shrink-0 font-mono text-[11px] text-foreground/45">{jourCourt(l.le)}</span>
               </span>
-              {l.faits.length > 0 && (
-                <span className="flex flex-wrap gap-1.5">
+              {(l.faits.length > 0 || l.issue) && (
+                <span className="flex flex-wrap items-center gap-1.5">
                   {l.faits.map((f) => (
                     <span
                       key={f.cle}
@@ -150,6 +163,7 @@ function Journal({ d }: { d: DetailEntraineur }) {
                       {f.texte}
                     </span>
                   ))}
+                  {l.issue && <span className="text-[12px] font-semibold text-foreground/45">{l.issue}</span>}
                 </span>
               )}
             </li>

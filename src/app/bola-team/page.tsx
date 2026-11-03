@@ -84,7 +84,10 @@
 // d'avant-match (equipe/feuille-avant-match.tsx) : « Feuille » à qui peut la
 // déposer (l'entraîneur ; sans lui, ou dès H-2, le capitaine et le vice),
 // « Feuille · Lucien » une fois déposée ; un joueur inscrit lit « Sur la
-// feuille ». Elle se fige au coup d'envoi.
+// feuille ». Elle se fige au coup d'envoi. Celle de l'adversaire ne se lit
+// pas avant : on sait seulement qu'elle est déposée (« Feuille adverse
+// déposée », equipe_feuilles_deposees). Une invitation reçue d'une équipe à
+// 7 joueurs (un entraîneur) montre cinq cartes et « +2 », sans rien couper.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
@@ -114,7 +117,7 @@ import { useSession } from "@/hooks/use-session";
 import { useAccesTeam, useEssaiTeam } from "@/hooks/use-acces-team";
 import { useApercuTeam } from "@/hooks/use-equipes";
 import { signalerEquipe, useMonEquipe } from "@/hooks/use-mon-equipe";
-import { championnat, coupDEnvoiTeam, etatMatch, saisonEnCours, type EtatMatch, type MatchTeam } from "@/lib/sfl/championnat-team";
+import { championnat, coupDEnvoiTeam, etatMatch, fermeture, saisonEnCours, type EtatMatch, type MatchTeam } from "@/lib/sfl/championnat-team";
 import {
   MAX_EQUIPE,
   MIN_EQUIPE,
@@ -240,9 +243,21 @@ function CarteFeuille({
   adverse: Pick<Equipe, "nom" | "initiales" | "fond" | "blason">;
   onOuvrir: () => void;
 }) {
-  // Ma feuille envoyée attend l'autre capitaine : on peut encore la corriger, elle ne presse plus.
+  // Ma feuille envoyée attend l'autre capitaine : on peut encore la corriger, elle ne presse plus. Un litige né
+  // d'une réponse après la fermeture ne se corrige plus de mon côté (seule l'équipe qui répond a ses 24 h).
   const envoyee = etat.etat === "a-confirmer" && etat.par === mienne;
-  const action = etat.etat === "a-saisir" ? "Feuille de match" : etat.etat === "litige" ? "À corriger" : envoyee ? "Envoyée" : "À confirmer";
+  const autre = m.saisies.find((s) => s.equipe !== mienne);
+  const reponseTardive = !!autre && Date.parse(autre.le) > fermeture(m).getTime();
+  const action =
+    etat.etat === "a-saisir"
+      ? "Feuille de match"
+      : etat.etat === "litige"
+        ? reponseTardive
+          ? "Litige"
+          : "À corriger"
+        : envoyee
+          ? "Envoyée"
+          : "À confirmer";
   return (
     <button
       type="button"
@@ -264,29 +279,32 @@ function CarteFeuille({
   );
 }
 
-/** Une équipe qui m'invite : qui, jusqu'à quand, ceux qui ont signé, et la réponse. */
+/** Les cartes d'une invitation tiennent sur une rangée : au-delà, « +2 » (une équipe à 7 invite un entraîneur). */
+const CARTES_INVITATION = 5;
+
+/** Une équipe qui m'invite : qui, jusqu'à quand (deux lignes : rien n'est coupé), ceux qui ont signé, et la réponse. */
 function InvitationRecue({ e, moi, onRefuser, onRejoindre }: { e: Equipe; moi: string | null; onRefuser: () => void; onRejoindre: () => void }) {
   const m = e.membres.find((x) => x.id === moi && x.statut === "invite");
   const deja = signataires(e);
+  const vues = deja.length > CARTES_INVITATION + 1 ? deja.slice(0, CARTES_INVITATION) : deja;
   return (
     <div className="flex flex-col gap-3 rounded-[24px] bg-card p-3.5">
       <div className="flex items-center gap-3">
         <Ecusson initiales={e.initiales} fond={e.fond} blason={e.blason} taille={50} />
         <span className="flex min-w-0 flex-1 flex-col gap-0.5">
           <span className="truncate text-titre-fort leading-tight font-bold tracking-tight">{e.nom}</span>
-          {m && (
-            <span className="truncate text-corps text-muted-foreground">
-              {tInvite(e, m)}
-              {m.depuis && <> · jusqu&apos;à {quandTombe(finInvitation(m.depuis))}</>}
-            </span>
-          )}
+          {m && <span className="truncate text-corps text-muted-foreground">{tInvite(e, m)}</span>}
+          {m?.depuis && <span className="truncate text-corps text-muted-foreground">jusqu&apos;à {quandTombe(finInvitation(m.depuis))}</span>}
         </span>
       </div>
       <div className="flex items-center gap-1.5">
-        {deja.map((x) => (
+        {vues.map((x) => (
           <CarteDe key={x.id} name={x.name} size={FORMAT_CARTE.petite} />
         ))}
-        <span className="mono-label ml-auto pl-2 text-muted-foreground">
+        {vues.length < deja.length && (
+          <span className="mono-label shrink-0 pl-0.5 text-muted-foreground tabular-nums">+{deja.length - vues.length}</span>
+        )}
+        <span className="mono-label ml-auto shrink-0 pl-2 text-muted-foreground tabular-nums">
           {deja.length} / {active(e) ? MAX_EQUIPE : MIN_EQUIPE}
         </span>
       </div>
@@ -1006,6 +1024,8 @@ export default function BolaTeamPage() {
                 const lire = !!feuille && puis("feuille");
                 const inscrit = !!feuille && !!moi && feuille.joueurs.includes(moi);
                 const auteur = feuille ? mienne.membres.find((m) => m.id === feuille.par) : undefined;
+                // La feuille de l'adversaire : seulement qu'elle est déposée (ses noms, au coup d'envoi).
+                const adverseDeposee = d.statut === "accepte" && !!d.deposees?.includes(d.de === mienne.id ? d.a : d.de);
                 return (
                   <div key={d.id} className="flex flex-col gap-2 rounded-[20px] bg-card px-3 py-2.5">
                     <div className="flex items-center gap-3">
@@ -1028,14 +1048,19 @@ export default function BolaTeamPage() {
                         <span className="mono-label text-foreground">À jouer</span>
                       )}
                     </div>
-                    {deposer || lire ? (
-                      <div className="pl-12">
-                        <Pilule plein={!feuille} ton={feuille ? undefined : "bouton--vert"} onClick={() => setAvantMatch(d.id)}>
-                          {feuille && auteur ? `Feuille · ${prenom(auteur.name)}` : "Feuille"}
-                        </Pilule>
+                    {(deposer || lire || inscrit || adverseDeposee) && (
+                      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 pl-12">
+                        {deposer || lire ? (
+                          <Pilule plein={!feuille} ton={feuille ? undefined : "bouton--vert"} onClick={() => setAvantMatch(d.id)}>
+                            {feuille && auteur ? `Feuille · ${prenom(auteur.name)}` : "Feuille"}
+                          </Pilule>
+                        ) : inscrit ? (
+                          <span className="mono-label text-foreground">Sur la feuille</span>
+                        ) : (
+                          <span />
+                        )}
+                        {adverseDeposee && <span className="mono-label text-muted-foreground">Feuille adverse déposée</span>}
                       </div>
-                    ) : (
-                      inscrit && <span className="mono-label pl-12 text-foreground">Sur la feuille</span>
                     )}
                   </div>
                 );

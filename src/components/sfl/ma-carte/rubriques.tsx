@@ -478,29 +478,7 @@ export function RubriquesMaCarte() {
 
   // 5 bis. Entraîneur (lot B2, 03/11/2026) : ma carte d'entraîneur, si j'entraîne ou si j'ai entraîné ;
   // sa note et ses trois, le dos de la carte pour objet (pas d'image). Ma carte de joueur reste en tête.
-  if (carteEntraineur || entraine) {
-    const st = statsDe(carteEntraineur);
-    const note = noteEntraineur(st);
-    tuiles.push(
-      <Tuile
-        key="entraineur"
-        href="/profil/entraineur"
-        ton="entraineur"
-        nom="Entraîneur"
-        label={`Entraîneur : note ${note}, rés ${st.RES}, pré ${st.PRES}, coh ${st.COH}`}
-        objet={<CarteDeTuile nom={player.name} />}
-      >
-        <span className="mt-auto flex flex-col gap-1">
-          <span style={{ ...NOMBRE, fontSize: 34 }} className="tabular-nums">
-            {note}
-          </span>
-          <span className="font-mono text-[11px] leading-tight text-foreground/55 tabular-nums">
-            rés {st.RES} · pré {st.PRES} · coh {st.COH}
-          </span>
-        </span>
-      </Tuile>
-    );
-  }
+  if (carteEntraineur || entraine) tuiles.push(<TuileEntraineur key="entraineur" nom={player.name} />);
 
   // 6. Le Flair (Sabri, 30/10) : ma dernière journée jugée, mes choix, l'XP ;
   // sinon la journée ouverte, pour aller choisir sur sa feuille de match.
@@ -678,6 +656,40 @@ function useAnnonces(b: BilanXp | null, s: XpSAffichees | null, nom: string) {
     }, POSE_MS);
     return () => window.clearTimeout(id);
   }, [sp, palier, lignes, nom, ceremonie]);
+}
+
+/**
+ * La tuile Entraîneur : la note de ma carte d'entraîneur et ses trois, le dos
+ * de la carte pour objet ; elle ouvre /profil/entraineur. Dans les rubriques
+ * de Ma carte, et sur la page d'un arbitre qui entraîne (profil-arbitre.tsx).
+ * Rien si je n'entraîne pas et n'ai jamais entraîné.
+ */
+export function TuileEntraineur({ nom, seule }: { nom: string; seule?: boolean }) {
+  const carteEntraineur = useCarteEntraineur({ nom });
+  const entraine = useEquipeDe(nom)?.membre.role === "entraineur";
+  if (!carteEntraineur && !entraine) return null;
+  const st = statsDe(carteEntraineur);
+  const note = noteEntraineur(st);
+  const tuile = (
+    <Tuile
+      href="/profil/entraineur"
+      ton="entraineur"
+      nom="Entraîneur"
+      label={`Entraîneur : note ${note}, rés ${st.RES}, pré ${st.PRES}, coh ${st.COH}`}
+      objet={<CarteDeTuile nom={nom} />}
+    >
+      <span className="mt-auto flex flex-col gap-1">
+        <span style={{ ...NOMBRE, fontSize: 34 }} className="tabular-nums">
+          {note}
+        </span>
+        <span className="font-mono text-[11px] leading-tight text-foreground/55 tabular-nums">
+          rés {st.RES} · pré {st.PRES} · coh {st.COH}
+        </span>
+      </span>
+    </Tuile>
+  );
+  // Seule (la page d'un arbitre) : dans une grille de deux, comme dans les rubriques.
+  return seule ? <div className="grid grid-cols-2 gap-[var(--fib-13)]">{tuile}</div> : tuile;
 }
 
 /** L'objet de la tuile Entraîneur : le dos de sa carte (le Tableau, la lune et BOLA à la craie), penché dans le coin. */

@@ -17,7 +17,10 @@
 //   · les buteurs et les passeurs du championnat ;
 //   · les récompenses de la saison : le champion, le meilleur buteur, le
 //     meilleur passeur (« en tête » tant que la saison court) ;
-//   · les derniers résultats, un amical marqué comme tel.
+//   · les derniers résultats, un amical marqué comme tel ; « à 4 » sous
+//     l'équipe arrêtée à 4 (le 5 contre 4). Un résultat qui a ses feuilles
+//     d'avant-match s'ouvre d'un toucher sur les deux, côte à côte (après le
+//     coup d'envoi, toute la ligue les lit).
 // Sur tablette et ordinateur, deux colonnes au nombre d'or : le tableau à
 // gauche, le reste à droite. Toucher une équipe du tableau ouvre sa page
 // (/bola-team/[id], depuis le 24/10 au soir).
@@ -222,6 +225,8 @@ export function ChampionnatTeam({
   const maDivision = (mienne != null ? c.divisionDe.get(mienne) : null) ?? 1;
   const [division, setDivision] = useState<number | null>(null);
   const [vue, setVue] = useState<"buts" | "passes">("buts");
+  // Le résultat dont on lit les deux feuilles d'avant-match (un seul à la fois).
+  const [ouvert, setOuvert] = useState<number | null>(null);
   const d = c.divisions.find((x) => x.n === (division ?? maDivision)) ?? c.divisions[0];
   const engagees = c.divisions.reduce((n, x) => n + x.lignes.length, 0);
   const valides = c.matchs.filter((x) => x.etat.etat === "valide");
@@ -330,6 +335,10 @@ export function ChampionnatTeam({
               const a = parId.get(m.de);
               const b = parId.get(m.a);
               if (!a || !b) return null;
+              const fa = m.feuilles?.find((f) => f.equipe === m.de);
+              const fb = m.feuilles?.find((f) => f.equipe === m.a);
+              const avecFeuilles = !!(fa || fb);
+              const deplie = ouvert === m.id;
               return (
                 <div key={m.id} className="flex flex-col gap-1.5 rounded-[20px] bg-card px-3 py-2.5">
                   <span className="mono-label flex justify-between text-encre-3">
@@ -355,6 +364,36 @@ export function ChampionnatTeam({
                       </span>
                     </span>
                   </div>
+                  {avecFeuilles && (
+                    <button
+                      type="button"
+                      aria-expanded={deplie}
+                      onClick={() => setOuvert(deplie ? null : m.id)}
+                      className="mono-label -mx-1 self-center rounded-full px-3 py-1 text-encre-3 transition-colors active:bg-foreground/[0.06]"
+                    >
+                      Feuilles
+                    </button>
+                  )}
+                  {deplie && (
+                    <div className="grid grid-cols-2 gap-3 border-t border-foreground/10 pt-2">
+                      {[
+                        { f: fa, aligne: "items-end text-right" },
+                        { f: fb, aligne: "items-start text-left" },
+                      ].map(({ f, aligne }, i) => (
+                        <span key={i} className={cn("flex min-w-0 flex-col gap-0.5", aligne)}>
+                          {f ? (
+                            (f.noms ?? f.joueurs).map((n, k) => (
+                              <span key={`${f.joueurs[k]}`} className="w-full truncate text-corps">
+                                {n.split(" ")[0]}
+                              </span>
+                            ))
+                          ) : (
+                            <span className="text-corps text-muted-foreground">–</span>
+                          )}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
               );
             })}

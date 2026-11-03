@@ -96,6 +96,8 @@ export interface Defi {
   le?: string;
   /** Un match programmé : les feuilles d'avant-match qu'on peut lire (celle de mon équipe, avant le coup d'envoi). */
   feuilles?: FeuilleTeam[];
+  /** Les équipes qui ont déposé leur feuille, sans les noms (l'adversaire sait seulement qu'elle est déposée). */
+  deposees?: number[];
 }
 
 /** Le coup d'envoi d'un défi (heure de Paris, à la minute près l'hiver comme l'été). */
@@ -316,8 +318,23 @@ export async function listerDefis(): Promise<Defi[]> {
       const coup = coupDEnvoi(d).getTime();
       return new Date(d.le).getTime() > maintenant - 48 * 3600_000 && coup > maintenant + 36 * 3600_000;
     });
-  const feuilles = await lireFeuilles(defis.filter((d) => d.statut === "accepte").map((d) => d.id));
-  return defis.map((d) => (feuilles.has(d.id) ? { ...d, feuilles: feuilles.get(d.id) } : d));
+  const programmes = defis.filter((d) => d.statut === "accepte").map((d) => d.id);
+  const [feuilles, deposees] = await Promise.all([lireFeuilles(programmes), feuillesDeposees(programmes)]);
+  return defis.map((d) => ({
+    ...d,
+    ...(feuilles.has(d.id) ? { feuilles: feuilles.get(d.id) } : {}),
+    ...(deposees.has(d.id) ? { deposees: deposees.get(d.id) } : {}),
+  }));
+}
+
+/** Qui a déposé sa feuille, par match, sans les noms (equipe_feuilles_deposees) ; sans la migration, personne. */
+export async function feuillesDeposees(defis: number[]): Promise<Map<number, number[]>> {
+  const par = new Map<number, number[]>();
+  if (defis.length === 0) return par;
+  const { data, error } = await supabase().rpc("equipe_feuilles_deposees", { d: defis });
+  if (error) return par;
+  for (const r of (data ?? []) as { defi_id: number; equipe_id: number }[]) par.set(r.defi_id, [...(par.get(r.defi_id) ?? []), r.equipe_id]);
+  return par;
 }
 
 interface LigneFeuille {
@@ -325,7 +342,7 @@ interface LigneFeuille {
   equipe_id: number;
   deposee_par: string | null;
   deposee_le: string;
-  equipe_feuille_joueurs: { joueur: string }[] | null;
+  equipe_feuille_joueurs: { joueur: string; p: Un<{ name: string }> }[] | null;
 }
 
 /**
@@ -336,11 +353,20 @@ interface LigneFeuille {
 export async function lireFeuilles(defis?: number[]): Promise<Map<number, FeuilleTeam[]>> {
   const par = new Map<number, FeuilleTeam[]>();
   if (defis && defis.length === 0) return par;
-  const lire = supabase().from("equipe_feuilles").select("defi_id, equipe_id, deposee_par, deposee_le, equipe_feuille_joueurs(joueur)");
+  const lire = supabase()
+    .from("equipe_feuilles")
+    .select("defi_id, equipe_id, deposee_par, deposee_le, equipe_feuille_joueurs(joueur, p:profiles!equipe_feuille_joueurs_joueur_fkey(name))");
   const { data, error } = await (defis ? lire.in("defi_id", defis) : lire);
   if (error) return par;
   for (const r of (data ?? []) as unknown as LigneFeuille[]) {
-    const f: FeuilleTeam = { equipe: r.equipe_id, joueurs: (r.equipe_feuille_joueurs ?? []).map((j) => j.joueur), par: r.deposee_par, le: r.deposee_le };
+    const lignes = r.equipe_feuille_joueurs ?? [];
+    const f: FeuilleTeam = {
+      equipe: r.equipe_id,
+      joueurs: lignes.map((j) => j.joueur),
+      noms: lignes.map((j) => un(j.p)?.name ?? "?"),
+      par: r.deposee_par,
+      le: r.deposee_le,
+    };
     par.set(r.defi_id, [...(par.get(r.defi_id) ?? []), f]);
   }
   return par;
@@ -689,14 +715,16 @@ export function urlDuLien(j: string): string {
  * carte (Sabri, 24/10 : « une couverture faite justement en IA, avec les
  * joueurs présents de cette équipe ») : signer, c'est l'accepter. Version 3
  * (03/11/2026, Ilyes : 7 joueurs + 1 entraîneur) : les points 1, 2 et 8 ne
- * parlent plus de « membres » mais de joueurs, et de l'entraîneur.
+ * parlent plus de « membres » mais de joueurs, et de l'entraîneur ; le
+ * point 5 dit le 5 contre 4 tel que la feuille l'applique (championnat-team.ts,
+ * scoreFinal), sans le check-in ni les Points Perso, qui n'existent pas encore.
  */
 export const REGLEMENT = [
   "Vous ne jouez qu'avec les joueurs de votre équipe. Aucun joueur extérieur, même en match amical.",
   "Une équipe compte 5 à 7 joueurs, et un entraîneur si elle le veut, tous signataires de ce règlement. À 7 joueurs, plus aucun joueur ne peut entrer. L'entraîneur ne joue jamais pour l'équipe.",
   "Une victoire rapporte 2 points à l'équipe, un nul 1, une défaite 0. Ces points vont à l'équipe, pas au joueur. Le championnat dure 4 mois ; à la fin, les 3 premiers de chaque division montent, les 3 derniers descendent.",
   "Vous gagnez des Points Perso par votre présence, vos buts, vos passes décisives et les distinctions votées après le match : Meilleur Joueur +1, Meilleur Défenseur +1, MVP +2.",
-  "Faites votre check-in à chaque match. À 5 présents ou plus : aucune pénalité. À 4 face à une équipe de 5 ou plus : votre équipe perd 1 but au score final et chaque absent perd 2 Points Perso. Si les deux équipes sont à 4 : le match est compté comme un amical.",
+  "Avec le score, chaque capitaine déclare les présents des deux équipes. À 4 face à 5 ou plus : votre équipe perd 1 but au score final, ou l'adversaire en gagne 1 si elle n'a pas marqué. Deux équipes à 4 : le match est un amical. À 3 ou moins : forfait, 0 – 3.",
   "Si 6 joueurs ou plus signalent un match, il est annulé avec ses statistiques.",
   "Au-delà de 2 rencontres contre la même équipe dans la saison, le match est amical : ni points ni stats comptabilisés.",
   "Si vous quittez l'équipe, joueur ou entraîneur, vous ne pourrez plus jamais y revenir.",
@@ -707,14 +735,16 @@ export const REGLEMENT = [
  * La Charte de déontologie de Bola Team (Sabri, 24/10 : « faire un règlement
  * déontologique aussi, qu'ils doivent signer »), d'après les articles 14 et
  * 15 du Règlement Team : ce qu'on promet sur le terrain et autour. Elle se
- * signe avec le Règlement, par la même case (version 2).
+ * signe avec le Règlement, par la même case (version 2). Version 3 : le point
+ * 5 tient pour tous, l'entraîneur compris, qui ne saisit rien (« les scores
+ * saisis pour mon équipe sont les vrais »).
  */
 export const CHARTE = [
   "Je respecte mes coéquipiers, mes adversaires, le terrain et le personnel du complexe.",
   "Aucune insulte, aucune menace, aucun propos sur l'origine, la religion, le genre, l'orientation ou le handicap de quelqu'un.",
   "Aucune violence. Pas de tacle glissé. Un geste violent, c'est la suspension, et l'exclusion s'il se répète.",
   "Pas d'arbitre : les capitaines tranchent sur le terrain, de bonne foi. Je reconnais mes fautes.",
-  "Je saisis le vrai score, les vrais buteurs, les vrais passeurs. Aucune entente sur un résultat, aucun match arrangé.",
+  "Les scores, les buteurs et les passeurs saisis pour mon équipe sont les vrais. Aucune entente sur un résultat, aucun match arrangé.",
   "J'arrive à l'heure. Si je ne peux pas venir, je préviens mon équipe le plus tôt possible.",
   "Dans la discussion, sur le nom et sur l'écusson de l'équipe : rien d'injurieux ni de déplacé.",
   "Un manquement peut valoir un avertissement, le gel des points du match, une suspension ou l'exclusion de Bola Team.",

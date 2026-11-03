@@ -7,8 +7,10 @@
 //   · l'entraîneur en place : sa carte d'entraîneur (carte-entraineur-de.tsx,
 //     le Tableau, telle que le serveur la garde) au format moyen, 78 px, le
 //     palier réduit (la note centrée et l'écusson de l'équipe), son prénom
-//     dessous ; la toucher ouvre sa fiche ;
-//   · invité : sa carte voilée et le temps qui lui reste (« Adil · 71 h ») ;
+//     dessous, puis « Entraîneur » (à 78 px, la carte ne porte pas le mot) ;
+//     la toucher ouvre sa fiche ;
+//   · invité : sa carte voilée et le temps qui lui reste (« Adil · 71 h »),
+//     puis « Entraîneur » ;
 //   · personne : au capitaine, un + comme une place libre du terrain, qui
 //     ouvre la liste des joueurs ; aux autres, rien.
 // Jamais de tirets autour : dans l'app, un bord en tirets veut dire
@@ -73,11 +75,14 @@ export function BancEntraineur({
           <CarteEntraineurDe nom={entraineur.name} id={entraineur.id} equipe={equipe} inerte />
         </span>
       </button>
-      <span className={cn("text-ligne", toi ? "font-extrabold" : "font-semibold")}>
-        {toi ? "Toi" : prenom(entraineur.name)}
-        {invite && entraineur.depuis && (
-          <span className="font-medium text-muted-foreground tabular-nums"> · {resteAvant(finInvitation(entraineur.depuis))}</span>
-        )}
+      <span className="flex flex-col items-center gap-0.5">
+        <span className={cn("text-ligne", toi ? "font-extrabold" : "font-semibold")}>
+          {toi ? "Toi" : prenom(entraineur.name)}
+          {invite && entraineur.depuis && (
+            <span className="font-medium text-muted-foreground tabular-nums"> · {resteAvant(finInvitation(entraineur.depuis))}</span>
+          )}
+        </span>
+        <span className="mono-label text-muted-foreground">Entraîneur</span>
       </span>
     </div>
   );

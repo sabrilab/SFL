@@ -9,7 +9,8 @@
 //   3. sa photo (le studio, comme tout le monde : ProfilePhoto) ;
 //   4. ses missions d'arbitre de la journée (arbitre-missions.tsx), et la
 //      ligne de son passe d'arbitre (arbitre-passe.tsx) : ses skins de
-//      tenue, ses signes et ses grades ;
+//      tenue, ses signes et ses grades ; s'il entraîne une équipe de Bola
+//      Team, la tuile de sa carte d'entraîneur (comme dans Ma carte) ;
 //   5. ses matchs, du plus récent au plus ancien, chacun avec sa
 //      satisfaction (ou « à venir », ou « pas encore noté ») ;
 //   6. « Se déconnecter ».
@@ -21,6 +22,7 @@ import { Card3DEnGrand } from "@/components/sfl/carte-en-grand";
 import { CarteArbitre } from "@/components/sfl/carte-arbitre";
 import { MissionsArbitre } from "@/components/sfl/arbitre-missions";
 import { PasseArbitre } from "@/components/sfl/arbitre-passe";
+import { TuileEntraineur } from "@/components/sfl/ma-carte/rubriques";
 import { Chiffre } from "@/components/sfl/profil-joueur";
 import { ProfilePhoto } from "@/components/sfl/profile-photo";
 import { useSeason } from "@/components/sfl/season-provider";
@@ -96,6 +98,8 @@ export function ProfilArbitre({ nom }: { nom: string }) {
         <div className="flex min-w-0 flex-col gap-[var(--fib-21)]">
           <MissionsArbitre nom={nom} />
           <PasseArbitre nom={nom} saison={numero} />
+          {/* Un arbitre peut entraîner une équipe de Bola Team : sa carte d'entraîneur a sa tuile, comme dans Ma carte. */}
+          <TuileEntraineur nom={nom} seule />
           <section>
             <h2 className="mb-3 px-1 text-lg font-semibold tracking-tight">Mes matchs</h2>
             {s.liste.length === 0 ? (
