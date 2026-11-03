@@ -12,10 +12,14 @@
 //   · rés, résultats : son équipe prend plus de points que ses joueurs n'en
 //     promettaient. À chaque rencontre jouée, le résultat du terrain (1, ½,
 //     0) moins l'attendu E, tiré de la force des deux feuilles : la moyenne
-//     des notes de carte des cinq meilleurs inscrits de chaque côté. Les
-//     cartes ne bougent pas avec les matchs Team : l'attendu ne dépend jamais
-//     de ses propres résultats (un Indice qui apprend les absorbait). Le
-//     conseil de Football Manager : juger contre la force de l'effectif ;
+//     des notes de carte des cinq meilleurs inscrits de chaque côté, et de
+//     son côté jamais moins que ses cinq meilleurs joueurs du jour (inscrire
+//     les faibles ne baisse pas ce qu'on attend). Une carte inconnue sur
+//     l'une des deux feuilles (un compte sans carte SFL ni Bola) : la force
+//     est inconnue, rés saute la rencontre. Les cartes ne bougent pas avec
+//     les matchs Team : l'attendu ne dépend jamais de ses propres résultats
+//     (un Indice qui apprend les absorbait). Le conseil de Football Manager :
+//     juger contre la force de l'effectif ;
 //   · pré, présence : son équipe vient. Par rencontre : un forfait (une
 //     annulation à moins de 48 h, ou 3 présents ou moins) −3 ; le 5 contre 4
 //     (4 présents) −1 ; sinon 0. Rien que des faits que l'adversaire a
@@ -26,18 +30,23 @@
 //     exclusion vaut un départ) contre ceux qu'on attendait. Seuls comptent
 //     les joueurs actifs : pendant leurs 60 premiers jours dans l'équipe,
 //     puis dans les 60 jours qui suivent chaque feuille où ils sont
-//     inscrits. Un membre fantôme ne gonfle rien, une équipe qui ne joue pas
-//     n'avance plus au bout de 60 jours, et le départ de quelqu'un qui ne
-//     venait plus ne coûte rien. Le vestiaire de FM : le temps de jeu refusé, la confiance
-//     perdue, finissent en départ.
+//     inscrits. Un membre jamais inscrit ne gonfle rien, une équipe qui ne
+//     joue pas n'avance plus au bout de 60 jours, et le départ de quelqu'un
+//     qui ne venait plus ne coûte rien. Limite connue : un compte inscrit sur
+//     chaque feuille sans jamais venir compte actif ; le check-in par QR
+//     croisé la fermera. Le vestiaire de FM : le temps de jeu refusé, la
+//     confiance perdue, finissent en départ.
 // Différentes de celles d'un joueur (vit, tir, pas, dri, def, phy), d'un
 // gardien (plo, réf, dég, jma, pla) et d'un arbitre (mat, avis, top, der).
 // Jamais ce qu'il dit de lui, jamais l'avis de ses propres joueurs.
 //
 // À quoi on compare (pré et coh) : à son équipe avant lui, rapprochée de la
 // moyenne de la ligue (16 rencontres, 840 jours-joueurs de poids pour la
-// ligue). Rejoindre une équipe fiable ne rapporte rien ; la rendre fiable,
-// si. Une équipe neuve prend la moyenne de la ligue. Les normes de la ligue
+// ligue), et jamais plus doux que la ligue (contrôle du 03/11/2026 : des
+// forfaits ou des départs provoqués juste avant de le nommer lui faisaient
+// tout gagner). Rejoindre une équipe fiable ne rapporte rien ; la rendre
+// fiable rapporte ce qui dépasse la moyenne de la ligue. Une équipe neuve
+// prend la moyenne de la ligue. Les normes de la ligue
 // sont celles de la saison de chaque rencontre, figées à la fin de la saison
 // (en attendant, celles de la saison d'avant) : un rejeu ne fait jamais
 // redescendre la carte, et la carte officielle gardée en base sert de
@@ -57,14 +66,21 @@
 // (lib/sfl/engine.ts). Elle part de 75.
 //
 // Ce qui compte pour lui : les rencontres classées de son équipe
-// (MatchCompteTeam.compte du championnat) pendant qu'il tient la place,
-// qu'il soit venu ou non, et ses forfaits. Le score est lu 24 h après la
-// fermeture de la feuille, quand plus rien ne peut changer ; un litige
-// attend la revue. En rés, une seule rencontre par adversaire et par saison
-// (contre les matchs arrangés). Une saisie restée seule de son propre camp
-// ne compte que contre lui, en rés comme en pré : pré ne lit que ce que
-// l'adversaire a vérifié. Le 5 contre 4 n'est compté qu'une fois : en pré ;
-// rés lit le score du terrain, avant le but retiré.
+// (MatchCompteTeam.compte du championnat) pendant qu'il tient la place, à
+// partir de 7 jours après sa signature (la qualification), qu'il soit venu
+// ou non, et ses forfaits. Le score est lu 24 h après la fermeture de la
+// feuille, quand plus rien ne peut changer. Un litige jamais tranché se lit
+// avec la version de l'adversaire, contre lui seulement, en attendant la
+// revue des litiges : contester une défaite ne l'efface plus. En rés, une
+// seule rencontre qui compte par adversaire et par saison, et un même
+// adversaire n'apporte pas plus de ±1,5 en tout (contre les matchs
+// arrangés ; le serveur signale à l'admin ceux qui se répètent). Une saisie
+// restée seule de son propre camp ne compte que contre lui, en rés comme en
+// pré, et ne prend pas la place de l'adversaire dans la saison : pré ne lit
+// que ce que l'adversaire a vérifié. Le 5 contre 4 n'est compté qu'une fois :
+// en pré ; rés lit le score du terrain, avant le but retiré. Une rencontre
+// jouée qui ne compte pas en rés garde son issue en mots dans le journal,
+// sans pastille.
 //
 // Ses places s'enchaînent (evoluerCarrieres) : ses compteurs le suivent d'une
 // équipe à l'autre, la carte aussi. Avant la mise en ligne des feuilles
@@ -74,7 +90,7 @@
 
 import type { FinitionEntraineur } from "@/components/sfl/skins-entraineur";
 import type { Blason } from "@/lib/sfl/blason";
-import { etatMatch, fermeture, type MatchCompteTeam } from "@/lib/sfl/championnat-team";
+import { collent, etatMatch, fermeture, versionDe, type EtatMatch, type MatchCompteTeam } from "@/lib/sfl/championnat-team";
 import type { Fond } from "@/lib/sfl/equipes";
 
 export const CLES_ENTRAINEUR = ["RES", "PRES", "COH"] as const;
@@ -149,33 +165,57 @@ export function faceEntraineur(s: StatsEntraineur, o: { finition?: FinitionEntra
 const H = 3_600_000;
 const JOUR = 86_400_000;
 
+/** Une rencontre lue pour la carte : le score du terrain, son forfait, le 5 contre 4, et d'où vient la lecture. */
+export interface LectureRencontre {
+  pour: number;
+  contre: number;
+  forfait: boolean;
+  /** Le 5 contre 4 : son équipe à 4 (« nous »), ou l'adversaire (« eux »). */
+  aQuatre: "nous" | "eux" | null;
+  /** Le score ne tient que par la saisie de son propre camp. */
+  saisieSeule: boolean;
+  /** Un litige jamais tranché, lu avec la version de l'adversaire. */
+  litige: boolean;
+}
+
 /**
  * Une rencontre de son équipe compte-t-elle pour lui, et avec quel score ?
  * Seulement si le championnat la classe (MatchCompteTeam.compte : validée,
  * entre divisions voisines, deux fois au plus contre la même équipe), lue
  * 24 h après la fermeture de la feuille : une saisie faite seule juste avant
- * la fermeture a eu ses 24 h, plus rien ne bouge. Avant, null (en attente).
- * Le silence vaut accord, comme au championnat ; mais `saisieSeule` dit
- * quand le score ne tient que par la saisie de son propre camp (la carte ne
- * la compte alors que contre lui). Le forfait de l'adversaire ne dit rien de
- * lui ; le sien compte.
+ * la fermeture a eu ses 24 h, l'autre équipe aussi pour y répondre ; plus
+ * rien ne bouge. Avant, null (en attente). Le silence vaut accord, comme au
+ * championnat ; mais `saisieSeule` dit quand le score ne tient que par la
+ * saisie de son propre camp (la carte ne la compte alors que contre lui).
+ * Le forfait de l'adversaire ne dit rien de lui ; le sien compte.
+ *
+ * Un litige jamais tranché (deux saisies qui ne collent pas, la feuille
+ * fermée) n'est pas classé, mais la carte ne l'oublie pas : en attendant la
+ * revue des litiges, elle le lit avec la version de l'adversaire (son score,
+ * ses présents), contre lui seulement, s'il aurait été classé (`litige`).
+ * Contester une défaite ne l'efface donc plus (contrôle du 03/11/2026).
  */
-export function rencontreComptee(
-  mc: MatchCompteTeam,
-  equipe: number,
-  maintenant = new Date()
-): { pour: number; contre: number; forfait: boolean; saisieSeule: boolean } | null {
+export function rencontreComptee(mc: MatchCompteTeam, equipe: number, maintenant = new Date()): LectureRencontre | null {
   const { m } = mc;
   const lecture = new Date(fermeture(m).getTime() + 24 * H);
   if (maintenant.getTime() < lecture.getTime() && m.statut !== "forfait") return null;
-  if (!mc.compte) return null;
   const e = etatMatch(m, lecture);
-  if (e.etat !== "valide") return null;
-  if (e.forfaitDe != null && e.forfaitDe !== equipe) return null;
-  const [de, a] = e.buts;
-  const nous = m.de === equipe;
-  const saisieSeule = e.forfaitDe == null && m.saisies.length === 1 && m.saisies[0].equipe === equipe;
-  return { pour: nous ? de : a, contre: nous ? a : de, forfait: e.forfaitDe === equipe, saisieSeule };
+  const lire = (v: EtatMatch, litige: boolean): LectureRencontre | null => {
+    if (v.etat !== "valide" || v.amical) return null;
+    if (v.forfaitDe != null && v.forfaitDe !== equipe) return null;
+    const [de, a] = v.buts;
+    const nous = m.de === equipe;
+    const saisieSeule = !litige && v.forfaitDe == null && m.saisies.length === 1 && m.saisies[0].equipe === equipe;
+    const aQuatre = v.aQuatre == null ? null : v.aQuatre === equipe ? "nous" : "eux";
+    return { pour: nous ? de : a, contre: nous ? a : de, forfait: v.forfaitDe === equipe, aQuatre, saisieSeule, litige };
+  };
+  if (e.etat === "non-classe" && mc.classable) {
+    const nous = m.saisies.find((s) => s.equipe === equipe);
+    const eux = m.saisies.find((s) => s.equipe !== equipe);
+    return nous && eux && !collent(nous, eux) ? lire(versionDe(m, eux), true) : null;
+  }
+  if (!mc.compte) return null;
+  return lire(e, false);
 }
 
 /** Un inscrit de la feuille d'avant-match (H-2) : le joueur, et sa note de carte au dépôt. */
@@ -204,10 +244,25 @@ export interface RencontreEntraineur {
   cinqContreQuatre: "nous" | "eux" | null;
   /** Sa feuille, déposée à H-2 (5 à 7 joueurs ; l'entraîneur n'y est jamais). */
   feuille: Inscrit[];
+  /**
+   * Les notes de carte de tous ses joueurs au coup d'envoi, inscrits ou non
+   * (ceux qui ont une vraie carte) : la force de son équipe ne passe jamais
+   * sous celle de ses cinq meilleurs (inscrire les faibles et faire jouer les
+   * forts hors feuille ne paie pas). Absent : la feuille seule.
+   */
+  effectif?: number[];
   /** Les notes de carte des inscrits de la feuille adverse. */
   adverses: number[];
   /** Le score ne tient que par la saisie de son propre capitaine (rencontreComptee). */
   saisieSeule?: boolean;
+  /**
+   * Un litige jamais tranché (deux saisies qui ne collent pas, feuille
+   * fermée) : le score et les présents sont ceux de l'adversaire, et ne
+   * comptent que contre lui, en attendant la revue des litiges.
+   */
+  litige?: boolean;
+  /** Un inscrit de l'une des deux feuilles n'a pas de vraie carte (ni SFL, ni Bola) : la force est inconnue, rés saute la rencontre. */
+  cartesInconnues?: boolean;
 }
 
 /** Seuls le départ et l'exclusion comptent contre la cohésion ; la dissolution et un changement de place, non. */
@@ -294,6 +349,16 @@ export const BAREME_ENTRAINEUR = {
   maj: { rencontres: 4 },
   /** Le titre « Exploit » : une victoire quand l'attendu était de 0,30 ou moins. */
   exploit: 0.3,
+  /**
+   * rés : ce qu'un même adversaire peut lui apporter (ou lui coûter) en tout,
+   * toutes saisons comprises (contrôle du 03/11/2026). Des équipes amies qui
+   * perdent exprès chaque saison n'apportent pas plus d'un point et demi
+   * d'avance chacune ; un bon entraîneur n'y perd presque rien (rés 78,5
+   * au lieu de 79,0 après 100 rencontres dans une ligue stable).
+   */
+  parAdversaire: 1.5,
+  /** Ses rencontres comptent 7 jours après sa signature (la qualification des règles, 04 §5). */
+  qualificationJours: 7,
 } as const;
 
 /** Les crans à verser pour +1 selon le niveau : la même jauge que les cartes de joueur. */
@@ -323,6 +388,17 @@ export function forceFeuille(notes: number[]): number | null {
   return cinq.reduce((t, n) => t + n, 0) / cinq.length;
 }
 
+/**
+ * La force de son équipe à une rencontre : celle de sa feuille, et jamais moins
+ * que celle de ses cinq meilleurs joueurs au coup d'envoi (l'effectif, quand le
+ * serveur le connaît). null sans feuille.
+ */
+export function forceDe(r: Pick<RencontreEntraineur, "feuille" | "effectif">): number | null {
+  const f = forceFeuille(r.feuille.map((i) => i.note));
+  const t = r.effectif?.length ? forceFeuille(r.effectif) : null;
+  return f == null ? null : t == null ? f : Math.max(f, t);
+}
+
 /** L'attendu de son équipe, d'après la force des deux feuilles. */
 export function attenduDe(force: number, forceAdverse: number): number {
   return 1 / (1 + 10 ** ((forceAdverse - force) / BAREME_ENTRAINEUR.echelle));
@@ -342,6 +418,10 @@ export interface FaitEntraineur {
   texte: string;
   /** Une rencontre : l'équipe adverse. */
   adversaireNom?: string;
+  /** Une rencontre jouée qui ne compte pas en rés (déjà rencontré cette saison, feuille ou carte qui manque, sa saisie seule) : son issue en mots, sans pastille. */
+  compte?: false;
+  /** Un litige jamais tranché, lu avec la version de l'adversaire (contre lui seulement). */
+  litige?: true;
 }
 
 export interface MiseAJourEntraineur {
@@ -359,6 +439,8 @@ export interface RepriseEntraineur {
   fenetre: number;
   /** Le jour de la dernière mise à jour, AAAA-MM-JJ (jamais deux le même mois). */
   derniereMaj: string | null;
+  /** rés, par adversaire : ce qu'il a déjà apporté, borné à ±parAdversaire (ses places se suivent). */
+  parAdversaire?: Record<string, number>;
 }
 
 export interface EvolutionEntraineur {
@@ -375,7 +457,7 @@ export interface EvolutionEntraineur {
   majs: MiseAJourEntraineur[];
   /** Les rencontres dirigées : la fiche, pas la face. */
   rencontres: number;
-  /** Les victoires « Exploit » (l'attendu de 0,30 ou moins) : leurs rencontres. */
+  /** Les victoires « Exploit » (l'attendu de 0,30 ou moins) : leurs rencontres (le serveur y cherche les matchs arrangés). */
   exploits: string[];
   compteurs: CompteursEntraineur;
   reprise: RepriseEntraineur;
@@ -499,23 +581,34 @@ export function evoluerEntraineur(carriere: CarriereEntraineur, options: Options
   const majs: MiseAJourEntraineur[] = [];
   const exploits: string[] = [];
   const rencontres = [...carriere.rencontres].sort((a, b) => a.le.localeCompare(b.le) || a.id.localeCompare(b.id));
-  const note = (le: string, source: string, cle: CleEntraineur, x: number, texte: string, adversaireNom?: string) =>
-    journal.push({ le, source, cle, sens: x > 1e-9 ? 1 : x < -1e-9 ? -1 : 0, texte, ...(adversaireNom ? { adversaireNom } : {}) });
+  const note = (le: string, source: string, cle: CleEntraineur, x: number, texte: string, adversaireNom?: string, o: { compte?: false; litige?: boolean } = {}) =>
+    journal.push({
+      le,
+      source,
+      cle,
+      sens: x > 1e-9 ? 1 : x < -1e-9 ? -1 : 0,
+      texte,
+      ...(adversaireNom ? { adversaireNom } : {}),
+      ...(o.compte === false ? { compte: false as const } : {}),
+      ...(o.litige ? { litige: true as const } : {}),
+    });
   const essai = (k: CleEntraineur, x: number, poids = 1) => {
     c[k].avance += x;
     c[k].poids += poids;
   };
 
-  // Son équipe avant lui, rapprochée de la moyenne de la ligue de la saison.
+  // Son équipe avant lui, rapprochée de la moyenne de la ligue de la saison, et jamais plus douce que
+  // la ligue : une équipe sabotée avant son arrivée (des forfaits, des départs) ne lui fait rien gagner
+  // (contrôle du 03/11/2026). La redresser rapporte ce qui dépasse la moyenne de la ligue.
   const av = carriere.equipeAvant;
   const P = B.poidsLigue;
   const refPresence = (saison: number) => {
     const L = normesDe(options.normes, saison).presence;
-    return av ? (av.rencontres * av.presence + P.rencontres * L) / (av.rencontres + P.rencontres) : L;
+    return av ? Math.max(L, (av.rencontres * av.presence + P.rencontres * L) / (av.rencontres + P.rencontres)) : L;
   };
   const refDeparts = (saison: number) => {
     const L = normesDe(options.normes, saison).departsParJour;
-    return av ? (av.departs + P.joursActifs * L) / (av.joursActifs + P.joursActifs) : L;
+    return av ? Math.min(L, (av.departs + P.joursActifs * L) / (av.joursActifs + P.joursActifs)) : L;
   };
 
   // coh : les jours de ses feuilles (sa dernière d'avant l'arrivée de l'entraîneur comprise).
@@ -531,6 +624,7 @@ export function evoluerEntraineur(carriere: CarriereEntraineur, options: Options
 
   let fenetre = options.reprise?.fenetre ?? 0;
   let derniereMaj = options.reprise?.derniereMaj ?? null;
+  const parAdversaire: Record<string, number> = { ...options.reprise?.parAdversaire };
   let debut = jourDe(carriere.arrivee);
   let saisonCourante = rencontres[0]?.saison ?? 1;
   const deja = new Set<string>();
@@ -567,29 +661,41 @@ export function evoluerEntraineur(carriere: CarriereEntraineur, options: Options
 
   for (const r of rencontres) {
     saisonCourante = r.saison;
-    // rés : les rencontres jouées, les deux feuilles connues, la première contre cet adversaire dans la saison.
-    const force = forceFeuille(r.feuille.map((i) => i.note));
-    const forceAdverse = forceFeuille(r.adverses);
-    const paire = `${r.saison}:${r.adversaire}`;
-    if (!r.forfait && force != null && forceAdverse != null && !deja.has(paire)) {
-      deja.add(paire);
+    // Sa saisie restée seule, ou un litige jamais tranché (la version de l'adversaire) : contre lui seulement.
+    const contreLui = !!(r.saisieSeule || r.litige);
+    const litige = !!r.litige;
+    // rés : les rencontres jouées, les deux feuilles connues (chaque inscrit avec sa vraie carte), la première
+    // qui compte contre cet adversaire dans la saison ; et un même adversaire n'apporte en tout que ±parAdversaire.
+    if (!r.forfait) {
       const s = r.pour > r.contre ? 1 : r.pour === r.contre ? 0.5 : 0;
-      const e = attenduDe(force, forceAdverse);
-      // Sa saisie restée seule ne compte que contre lui.
-      if (!r.saisieSeule || s <= e) {
-        essai("RES", s - e);
+      const force = forceDe(r);
+      const forceAdverse = forceFeuille(r.adverses);
+      const paire = `${r.saison}:${r.adversaire}`;
+      const e = force != null && forceAdverse != null && !r.cartesInconnues ? attenduDe(force, forceAdverse) : null;
+      // La place de l'adversaire dans la saison ne se prend que si la rencontre compte (une victoire saisie seule
+      // par son camp, qui ne compte pas, n'efface pas la défaite qui suit contre la même équipe).
+      if (e != null && !deja.has(paire) && (!contreLui || s <= e)) {
+        deja.add(paire);
+        const cle = String(r.adversaire);
+        const apport = parAdversaire[cle] ?? 0;
+        const x = Math.max(-B.parAdversaire, Math.min(B.parAdversaire, apport + (s - e))) - apport;
+        parAdversaire[cle] = apport + x;
+        essai("RES", x);
         const mots = resultatEnMots(s, e);
-        note(r.le, r.id, "RES", mots === "nul" ? 0 : s - e, mots, r.adversaireNom);
+        note(r.le, r.id, "RES", mots === "nul" ? 0 : s - e, mots, r.adversaireNom, { litige });
         if (s === 1 && e <= B.exploit) exploits.push(r.id);
+      } else {
+        // Jouée, mais sans effet en rés : son issue en mots, sans pastille.
+        note(r.le, r.id, "RES", 0, s === 1 ? "victoire" : s ? "nul" : "défaite", r.adversaireNom, { compte: false, litige });
       }
     }
-    // pré : toutes, forfaits compris, contre son équipe d'avant ; sa saisie restée seule ne compte que contre lui
-    // (un forfait ou un 5 contre 4 qu'il déclare de lui-même compte ; « venue », que l'adversaire n'a pas vérifiée, non).
+    // pré : toutes, forfaits compris, contre son équipe d'avant ; sa saisie restée seule (ou un litige) ne compte que
+    // contre lui (un forfait ou un 5 contre 4 déclaré compte ; « venue », que l'adversaire n'a pas vérifiée, non).
     const p = valeurPresence(r);
-    if (!r.saisieSeule || p.valeur < 0) {
+    if (!contreLui || p.valeur < 0) {
       const x = p.valeur - refPresence(r.saison);
       essai("PRES", x);
-      note(r.le, r.id, "PRES", x, p.texte, r.adversaireNom);
+      note(r.le, r.id, "PRES", x, p.texte, r.adversaireNom, { litige });
     }
     fenetre += 1;
     if (fenetre >= B.maj.rencontres && derniereMaj?.slice(0, 7) !== r.le.slice(0, 7)) mettreAJour(r.le);
@@ -618,7 +724,7 @@ export function evoluerEntraineur(carriere: CarriereEntraineur, options: Options
     rencontres: rencontres.length,
     exploits,
     compteurs: c,
-    reprise: { fenetre, derniereMaj },
+    reprise: { fenetre, derniereMaj, parAdversaire },
   };
 }
 
@@ -629,7 +735,14 @@ export function evoluerEntraineur(carriere: CarriereEntraineur, options: Options
  * place, la carte de départ.
  */
 export function evoluerCarrieres(carrieres: readonly CarriereEntraineur[], options: Omit<OptionsEntraineur, "avant" | "reprise"> = {}): EvolutionEntraineur {
-  const places = [...carrieres].sort((a, b) => a.arrivee.localeCompare(b.arrivee));
+  // Une place à la fois : une place qui commence avant la fin de la précédente (deux places ouvertes ensemble, des
+  // données abîmées) est ignorée, sinon ses rencontres compteraient deux mises à jour le même mois.
+  const places: CarriereEntraineur[] = [];
+  for (const p of [...carrieres].sort((a, b) => a.arrivee.localeCompare(b.arrivee))) {
+    const avant = places[places.length - 1];
+    if (avant && (!avant.fin || p.arrivee < avant.fin)) continue;
+    places.push(p);
+  }
   if (places.length === 0) return evoluerEntraineur({ arrivee: "1970-01-01", rencontres: [], membres: [] }, options);
   const journal: FaitEntraineur[] = [];
   const majs: MiseAJourEntraineur[] = [];

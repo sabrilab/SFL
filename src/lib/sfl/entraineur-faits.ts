@@ -5,18 +5,25 @@
 //   · le championnat, comme l'app le lit (lireChampionnat, equipes.ts) :
 //     chaque rencontre, son état et si elle compte (MatchCompteTeam.compte),
 //     saison par saison ; puis rencontreComptee la lit 24 h après la
-//     fermeture de sa feuille ;
-//   · les places de chaque entraîneur (equipe_entraineurs), dans l'ordre :
-//     une rencontre compte pour lui si son coup d'envoi tombe pendant sa
-//     place ; sa feuille et celle de l'adversaire (equipe_feuilles), avec la
-//     note de carte de chaque inscrit au coup d'envoi (noteAu) ; le 5 contre
-//     4 et le forfait (les présents, equipe_resultats ; l'annulation à moins
-//     de 48 h, equipe_defis.forfait_de) ; sa saisie restée seule ;
+//     fermeture de sa feuille, un litige jamais tranché avec la version de
+//     l'adversaire ;
+//   · les places de chaque entraîneur (equipe_entraineurs), dans l'ordre,
+//     telles qu'elles sont vraiment (placesReelles : une place ouverte sans
+//     sa ligne de membre n'en est pas une ; un préavis d'exclusion échu la
+//     ferme à son heure) : une rencontre compte pour lui si son coup d'envoi
+//     tombe pendant sa place, 7 jours après sa signature au moins ; sa
+//     feuille et celle de l'adversaire (equipe_feuilles), avec la vraie
+//     carte de chaque inscrit au coup d'envoi (carteAu ; une carte qui manque
+//     rend la force inconnue), et ses joueurs du jour (l'effectif) ; le 5
+//     contre 4 et le forfait (les présents, equipe_resultats ; l'annulation
+//     à moins de 48 h, equipe_defis.forfait_de) ; sa saisie restée seule ;
 //   · les joueurs de son équipe (jamais un entraîneur) : leur arrivée, la
 //     première signature (equipe_signatures) ; leur départ et son motif
 //     (equipe_departs ; une ligne d'avant le 03/11 sans motif se lit comme un
 //     départ, ou comme la dissolution quand elle tombe à l'instant même où
-//     l'équipe est dissoute) ; leur dernière feuille d'avant lui ;
+//     l'équipe est dissoute ; un préavis d'exclusion échu que le ménage n'a
+//     pas relevé, comme une exclusion à son heure) ; leur dernière feuille
+//     d'avant lui ;
 //   · son équipe avant lui (EquipeAvant) : ses 16 dernières rencontres
 //     classées, et ses 120 derniers jours de joueurs actifs et de départs ;
 //   · les normes de la ligue d'une saison finie (normesDeLaSaison), à figer
@@ -26,9 +33,14 @@
 // La note de carte au coup d'envoi (cartesDeLaLigue) : celle de la saison
 // SFL de cet instant (la carte officielle d'après la dernière journée jouée
 // avant ce jour-là, lib/sfl/saisie/evolution.ts) ; sinon sa carte de joueur
-// Bola d'après ses matchs validés d'avant (carte-bola.ts) ; sinon 75. Les
-// cartes ne bougent jamais avec les matchs Team : l'attendu ne dépend pas
-// des résultats de l'entraîneur.
+// Bola d'après ses matchs validés d'avant (carte-bola.ts) ; sinon pas de
+// vraie carte (75 pour l'affichage, mais rés ne juge pas une feuille où il
+// y en a une). Les cartes ne bougent jamais avec les matchs Team :
+// l'attendu ne dépend pas des résultats de l'entraîneur.
+//
+// Les matchs arrangés se répètent : aRevoirDe signale à l'admin les
+// victoires « contre bien plus fort » contre la même équipe, ou contre les
+// mêmes joueurs sous un autre nom.
 //
 // Avant la mise en ligne des feuilles d'avant-match (la première déposée dans
 // la ligue), on ne sait pas qui jouait : tout joueur compte actif. Module
@@ -73,7 +85,8 @@ type Motif = "depart" | "exclusion" | "dissolution";
 /** Les lignes de la base que lit le calcul (les colonnes de supabase/schema.sql). */
 export interface LignesEntraineur {
   equipes: { id: number; nom: string; created_at: string; dissoute_le: string | null }[];
-  membres: { equipe_id: number; joueur: string; statut: "invite" | "membre"; role: Role; signe_le: string | null; created_at: string }[];
+  /** `depart_le` : la fin d'un préavis d'exclusion (48 h) ; passée, il est parti, même si le ménage ne l'a pas encore relevé. */
+  membres: { equipe_id: number; joueur: string; statut: "invite" | "membre"; role: Role; signe_le: string | null; created_at: string; depart_le?: string | null }[];
   signatures: { equipe_id: number; joueur: string; le: string }[];
   departs: { equipe_id: number; joueur: string; parti_le: string; motif: Motif | null; role: Role | null }[];
   entraineurs: { equipe_id: number; joueur: string; debut: string; fin: string | null; motif: Motif | null }[];
@@ -92,7 +105,10 @@ export interface JoueurCarte {
 
 /** La note de carte d'un joueur à un instant. */
 export interface CartesDeLaLigue {
+  /** Sa note ; 75 sans vraie carte. */
   noteAu(joueur: JoueurCarte, instant: Date): number;
+  /** Sa vraie carte (SFL, sinon Bola) ; null sans : sa force est inconnue. */
+  carteAu(joueur: JoueurCarte, instant: Date): number | null;
 }
 
 /* -------------------------- Les cartes de joueur -------------------------- */
@@ -179,12 +195,11 @@ export function cartesDeLaLigue(o: { saison: Saison | null; maintenant: Date; ma
     memo.set(cle, n);
     return n;
   };
-  return {
-    noteAu: (j, instant) => {
-      const t = instant.getTime();
-      return noteSfl(j, t) ?? noteBola(j, t) ?? DEPART_ENTRAINEUR;
-    },
+  const carteAu = (j: JoueurCarte, instant: Date) => {
+    const t = instant.getTime();
+    return noteSfl(j, t) ?? noteBola(j, t);
   };
+  return { carteAu, noteAu: (j, instant) => carteAu(j, instant) ?? DEPART_ENTRAINEUR };
 }
 
 /* ---------------------------- Le championnat ---------------------------- */
@@ -248,6 +263,8 @@ interface RencontreLue {
   contre: number;
   cinqContreQuatre: "nous" | "eux" | null;
   saisieSeule: boolean;
+  /** Un litige jamais tranché, lu avec la version de l'adversaire. */
+  litige: boolean;
 }
 
 /** Ce que le calcul tire une fois des lignes : de quoi construire chaque place. */
@@ -270,6 +287,13 @@ export interface FaitsDeLaLigue {
 const cleFeuille = (defi: number, equipe: number) => `${defi}:${equipe}`;
 const jourDe = (iso: string) => jourParis(new Date(iso));
 
+/** Les membres dont le préavis d'exclusion est échu (depart_le passé), que le ménage les ait relevés ou non. */
+function exclusionsEchues(l: Pick<LignesEntraineur, "membres">, maintenant: Date) {
+  return l.membres.flatMap((m) =>
+    m.statut === "membre" && m.depart_le && Date.parse(m.depart_le) <= maintenant.getTime() ? [{ ...m, depart_le: m.depart_le }] : []
+  );
+}
+
 /** Le motif d'un départ ; une ligne d'avant le 03/11 n'en a pas : la dissolution si elle tombe avec elle, sinon un départ. */
 function motifDe(d: LignesEntraineur["departs"][number], dissouteLe: string | null): MotifDepart {
   if (d.motif) return d.motif;
@@ -286,21 +310,21 @@ export function faitsDeLaLigue(l: LignesEntraineur, maintenant: Date): FaitsDeLa
   const rencontres = new Map<number, RencontreLue[]>();
   for (const mc of comptes.values()) {
     for (const e of [mc.m.de, mc.m.a]) {
+      // Validée et classée ; ou un litige jamais tranché, lu avec la version de l'adversaire (rencontreComptee).
       const r = rencontreComptee(mc, e, maintenant);
-      if (!r || mc.etat.etat !== "valide") continue;
-      const autre = e === mc.m.de ? mc.m.a : mc.m.de;
-      const aQuatre = mc.etat.aQuatre;
+      if (!r) continue;
       const lue: RencontreLue = {
         defi: mc.m.id,
         coup: coupDEnvoiTeam(mc.m).getTime(),
         jour: mc.m.jour,
         saison: mc.saison,
-        adversaire: autre,
+        adversaire: e === mc.m.de ? mc.m.a : mc.m.de,
         forfait: r.forfait,
         pour: r.pour,
         contre: r.contre,
-        cinqContreQuatre: aQuatre == null ? null : aQuatre === e ? "nous" : "eux",
+        cinqContreQuatre: r.aQuatre,
         saisieSeule: r.saisieSeule,
+        litige: r.litige,
       };
       rencontres.set(e, [...(rencontres.get(e) ?? []), lue]);
     }
@@ -337,6 +361,12 @@ export function faitsDeLaLigue(l: LignesEntraineur, maintenant: Date): FaitsDeLa
     if (m.statut === "membre" && !arrivees.has(k)) arrivees.set(k, m.signe_le ?? m.created_at);
   }
   const departs = new Map(l.departs.map((d) => [`${d.equipe_id}:${d.joueur}`, d]));
+  // Un préavis d'exclusion échu que le ménage n'a pas encore relevé : il est parti à son heure (equipe_menage le
+  // datera de même), exclu.
+  for (const m of exclusionsEchues(l, maintenant)) {
+    const k = `${m.equipe_id}:${m.joueur}`;
+    if (!departs.has(k)) departs.set(k, { equipe_id: m.equipe_id, joueur: m.joueur, parti_le: m.depart_le, motif: "exclusion", role: m.role });
+  }
   const joueurs = new Map<number, MembreEntraineur[]>();
   for (const [k, arrivee] of arrivees) {
     if (entraineurs.has(k)) continue;
@@ -414,23 +444,45 @@ export function normesFigeables(saison: number, maintenant: Date): boolean {
   return jourParis(maintenant) >= new Date(Date.parse(finExclue) + (NORMES_APRES_JOURS - 1) * JOUR_MS).toISOString().slice(0, 10);
 }
 
-/** Une place d'entraîneur (equipe_entraineurs), telle que la carte la rejoue. */
+/**
+ * Une place d'entraîneur (equipe_entraineurs), telle que la carte la rejoue :
+ * ses rencontres à partir de 7 jours après sa signature (la qualification),
+ * jusqu'à la fin de sa place. La force de chaque côté vient des feuilles, et
+ * de son côté jamais moins que celle de ses cinq meilleurs joueurs au coup
+ * d'envoi (l'effectif) ; dès qu'un inscrit de l'une des deux feuilles n'a
+ * pas de vraie carte, sa force est inconnue et rés saute la rencontre (des
+ * comptes neufs à 75 ne font plus passer une équipe forte pour moyenne).
+ */
 export function carriereDe(f: FaitsDeLaLigue, place: LignesEntraineur["entraineurs"][number], cartes: CartesDeLaLigue): CarriereEntraineur {
   const e = place.equipe_id;
   const debut = Date.parse(place.debut);
+  const qualifie = debut + BAREME_ENTRAINEUR.qualificationJours * JOUR_MS;
   const fin = place.fin ? Date.parse(place.fin) : Infinity;
   const arrivee = jourDe(place.debut);
   const D = numeroDuJour(arrivee);
-  const inscrits = (defi: number, equipe: number, coup: number): Inscrit[] | null => {
+  const carteDe = (id: string, coup: number) => cartes.carteAu({ id, nom: f.profils.get(id) ?? "" }, new Date(coup));
+  const inscrits = (defi: number, equipe: number, coup: number): { inscrits: Inscrit[]; inconnus: number } | null => {
     const ids = f.feuilles.get(cleFeuille(defi, equipe));
     if (!ids) return null;
-    return ids.map((id) => ({ id, note: cartes.noteAu({ id, nom: f.profils.get(id) ?? "" }, new Date(coup)) }));
+    const notes = ids.map((id) => ({ id, carte: carteDe(id, coup) }));
+    return { inscrits: notes.map((x) => ({ id: x.id, note: x.carte ?? DEPART_ENTRAINEUR })), inconnus: notes.filter((x) => x.carte == null).length };
+  };
+  // Ses joueurs au coup d'envoi (jamais un entraîneur), avec leur vraie carte.
+  const effectifAu = (coup: number) => {
+    const j = numeroDuJour(jourParis(new Date(coup)));
+    return (f.joueurs.get(e) ?? [])
+      .filter((m) => numeroDuJour(m.arrivee) <= j && (!m.depart || numeroDuJour(m.depart.le) > j))
+      .flatMap((m) => {
+        const n = carteDe(m.id, coup);
+        return n == null ? [] : [n];
+      });
   };
   const rencontres: RencontreEntraineur[] = (f.rencontres.get(e) ?? [])
-    .filter((r) => r.coup >= debut && r.coup < fin)
+    .filter((r) => r.coup >= qualifie && r.coup < fin)
     .map((r) => {
       const feuille = inscrits(r.defi, e, r.coup);
       const adverses = inscrits(r.defi, r.adversaire, r.coup);
+      const effectif = feuille ? effectifAu(r.coup) : [];
       return {
         id: String(r.defi),
         le: r.jour,
@@ -442,9 +494,12 @@ export function carriereDe(f: FaitsDeLaLigue, place: LignesEntraineur["entraineu
         contre: r.contre,
         cinqContreQuatre: r.cinqContreQuatre,
         // Sans les deux feuilles, la force d'un côté manque : rés saute la rencontre (pré et coh la comptent).
-        feuille: feuille ?? [],
-        adverses: feuille && adverses ? adverses.map((i) => i.note) : [],
+        feuille: feuille?.inscrits ?? [],
+        adverses: feuille && adverses ? adverses.inscrits.map((i) => i.note) : [],
+        ...(effectif.length ? { effectif } : {}),
+        ...((feuille?.inconnus ?? 0) + (adverses?.inconnus ?? 0) > 0 ? { cartesInconnues: true } : {}),
         ...(r.saisieSeule ? { saisieSeule: true } : {}),
+        ...(r.litige ? { litige: true } : {}),
       };
     });
   const finJour = place.fin ? numeroDuJour(jourDe(place.fin)) : numeroDuJour(jourParis(f.maintenant)) + 1;
@@ -473,10 +528,69 @@ export interface CarteCalculee {
   equipe: number;
   stats: StatsEntraineur;
   ev: EvolutionEntraineur;
+  /** À revoir par la modération (aRevoirDe). */
+  aRevoir: ARevoir[];
+}
+
+/** Des victoires « contre bien plus fort » qui se répètent : la modération les revoit (des matchs arrangés). */
+export interface ARevoir {
+  entraineur: string;
+  /** Les rencontres en cause (les ids des défis). */
+  rencontres: number[];
+  /** « equipe » : deux fois ou plus contre la même équipe ; « joueurs » : contre trois mêmes joueurs ou plus, sous deux noms d'équipe (une équipe refaite). */
+  motif: "equipe" | "joueurs";
+}
+
+/**
+ * Les matchs arrangés se répètent (contrôle du 03/11/2026) : ses victoires
+ * « contre bien plus fort » (l'attendu de 0,30 ou moins), deux fois ou plus
+ * contre la même équipe, ou contre trois mêmes joueurs sous deux noms
+ * d'équipe. Rien ne change sur sa carte : c'est pour l'admin, qui les lit
+ * dans le bilan du calcul (/api/entraineurs/calcul).
+ */
+export function aRevoirDe(f: FaitsDeLaLigue, entraineur: string, equipes: readonly number[], exploits: readonly string[]): ARevoir[] {
+  const lus = exploits.flatMap((id) => {
+    const defi = Number(id);
+    for (const e of equipes) {
+      const r = f.rencontres.get(e)?.find((x) => x.defi === defi);
+      if (r) return [{ defi, adversaire: r.adversaire, joueurs: new Set(f.feuilles.get(cleFeuille(defi, r.adversaire)) ?? []) }];
+    }
+    return [];
+  });
+  const out: ARevoir[] = [];
+  const parEquipe = new Map<number, number[]>();
+  for (const x of lus) parEquipe.set(x.adversaire, [...(parEquipe.get(x.adversaire) ?? []), x.defi]);
+  for (const d of parEquipe.values()) if (d.length >= 2) out.push({ entraineur, rencontres: d, motif: "equipe" });
+  for (let i = 0; i < lus.length; i++)
+    for (let j = i + 1; j < lus.length; j++) {
+      if (lus[i].adversaire === lus[j].adversaire) continue;
+      let communs = 0;
+      for (const p of lus[i].joueurs) if (lus[j].joueurs.has(p)) communs++;
+      if (communs >= 3) out.push({ entraineur, rencontres: [lus[i].defi, lus[j].defi], motif: "joueurs" });
+    }
+  return out;
 }
 
 /** Le journal gardé en base : les 120 derniers faits. */
 export const JOURNAL_GARDE = 120;
+
+/**
+ * Les places d'entraîneur telles qu'elles sont vraiment (contrôle du
+ * 03/11/2026) : une place ouverte sans la ligne de membre (entraîneur) qui va
+ * avec n'en est pas une (une signature concurrente l'avait laissée) ; un
+ * préavis d'exclusion échu la ferme à son heure, même avant que le ménage
+ * ne le relève.
+ */
+export function placesReelles(l: Pick<LignesEntraineur, "entraineurs" | "membres">, maintenant: Date): LignesEntraineur["entraineurs"] {
+  const lignes = new Map(l.membres.filter((m) => m.statut === "membre" && m.role === "entraineur").map((m) => [`${m.equipe_id}:${m.joueur}`, m]));
+  return l.entraineurs.flatMap((p) => {
+    if (p.fin) return [p];
+    const m = lignes.get(`${p.equipe_id}:${p.joueur}`);
+    if (!m) return [];
+    if (m.depart_le && Date.parse(m.depart_le) <= maintenant.getTime()) return [{ ...p, fin: m.depart_le, motif: "exclusion" as const }];
+    return [p];
+  });
+}
 
 /**
  * Toutes les cartes d'entraîneur, et les normes à figer : les normes d'abord
@@ -499,14 +613,15 @@ export function cartesEntraineurs(
     aFiger.push({ saison: s, normes: n });
   }
   const parEntraineur = new Map<string, LignesEntraineur["entraineurs"]>();
-  for (const p of l.entraineurs) parEntraineur.set(p.joueur, [...(parEntraineur.get(p.joueur) ?? []), p]);
+  for (const p of placesReelles(l, o.maintenant)) parEntraineur.set(p.joueur, [...(parEntraineur.get(p.joueur) ?? []), p]);
   const cartes: CarteCalculee[] = [];
   for (const [joueur, places] of parEntraineur) {
     const ordre = [...places].sort((a, b) => a.debut.localeCompare(b.debut));
     const carrieres = ordre.map((p) => carriereDe(f, p, o.cartes));
     const ev = evoluerCarrieres(carrieres, { normes, plancher: o.planchers.get(joueur) });
     const ouverte = ordre.find((p) => !p.fin);
-    cartes.push({ joueur, equipe: (ouverte ?? ordre[ordre.length - 1]).equipe_id, stats: ev.officielles, ev });
+    const aRevoir = aRevoirDe(f, joueur, ordre.map((p) => p.equipe_id), ev.exploits);
+    cartes.push({ joueur, equipe: (ouverte ?? ordre[ordre.length - 1]).equipe_id, stats: ev.officielles, ev, aRevoir });
   }
   return { cartes, normes: aFiger };
 }

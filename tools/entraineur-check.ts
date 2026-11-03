@@ -37,7 +37,14 @@
 //      disent « invité ») ;
 //  15. la carte gardée en base : la note que calcule la base (l'arrondi
 //      supérieur de la moyenne) est celle de la carte, et la face dit les
-//      trois dans l'ordre rés, pré, coh.
+//      trois dans l'ordre rés, pré, coh ;
+//  16. les correctifs du contrôle adverse (03/11/2026) : un litige compte avec
+//      la version de l'adversaire, contre lui seulement ; une victoire saisie
+//      seule par son camp ne prend pas la place de l'adversaire dans la
+//      saison ; une force inconnue (une carte qui manque) fait sauter rés ;
+//      la force de son équipe ne passe jamais sous ses cinq meilleurs ; un
+//      même adversaire n'apporte pas plus de ±1,5 en tout ; une rencontre
+//      sans effet en rés se dit en mots, sans pastille.
 //   npx tsx tools/entraineur-check.ts
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -51,6 +58,7 @@ import {
   evoluerEntraineur,
   numeroDuJour,
   faceEntraineur,
+  forceDe,
   forceFeuille,
   LIBELLES_ENTRAINEUR,
   noteEntraineur,
@@ -205,20 +213,24 @@ const moy = (v: number[]) => v.reduce((a, b) => a + b, 0) / v.length;
   const apres = new Date("2026-11-25T12:00:00Z");
   // Son capitaine (équipe 10) ne saisit pas la défaite : l'adversaire saisit seul, ça compte quand même.
   const seule = { ...base, saisies: [{ equipe: 20, pour: 4, contre: 1, le: "2026-11-14T21:00:00Z" }] };
-  assert.deepEqual(rencontreComptee(classe(seule), 10, apres), { pour: 1, contre: 4, forfait: false, saisieSeule: false });
+  const lu = (o: Partial<ReturnType<typeof rencontreComptee> & object>) => ({ forfait: false, aQuatre: null, saisieSeule: false, litige: false, ...o });
+  assert.deepEqual(rencontreComptee(classe(seule), 10, apres), lu({ pour: 1, contre: 4 }));
   // D3 : la même défaite saisie seule par son capitaine à J+2 23 h compte aussi (lue 24 h après la fermeture).
   const tard = { ...base, saisies: [{ equipe: 10, pour: 1, contre: 4, le: "2026-11-17T18:00:00Z" }] };
-  assert.deepEqual(rencontreComptee(classe(tard), 10, apres), { pour: 1, contre: 4, forfait: false, saisieSeule: true });
+  assert.deepEqual(rencontreComptee(classe(tard), 10, apres), lu({ pour: 1, contre: 4, saisieSeule: true }));
   // Avant la lecture, rien (en attente).
   assert.equal(rencontreComptee(classe(tard), 10, new Date("2026-11-17T20:00:00Z")), null);
   // D11 : une rencontre que le championnat ne classe pas (3e contre la même équipe, deux divisions d'écart) ne compte pas.
   assert.equal(rencontreComptee(classe(seule, false), 10, apres), null);
-  // Un litige : ni pour l'un ni pour l'autre, en attendant la revue.
-  const litige = { ...base, saisies: [{ equipe: 10, pour: 3, contre: 0, le: "2026-11-14T21:00:00Z" }, { equipe: 20, pour: 1, contre: 3, le: "2026-11-14T21:05:00Z" }] };
-  assert.equal(rencontreComptee(classe(litige), 10, apres), null);
+  // Un litige jamais tranché (contrôle du 03/11) : la version de l'adversaire, s'il aurait été classé ; sinon rien.
+  const litige = { ...base, saisies: [{ equipe: 10, pour: 3, contre: 0, le: "2026-11-14T21:00:00Z" }, { equipe: 20, pour: 4, contre: 1, le: "2026-11-14T21:05:00Z" }] };
+  assert.equal(rencontreComptee(classe(litige), 10, apres), null, "un litige que le championnat n'aurait pas classé : rien");
+  const classable: MatchCompteTeam = { m: litige, etat: { etat: "non-classe" }, saison: 1, compte: false, classable: true };
+  assert.deepEqual(rencontreComptee(classable, 10, apres), lu({ pour: 1, contre: 4, litige: true }), "contester une défaite ne l'efface plus : la version de l'adversaire");
+  assert.deepEqual(rencontreComptee(classable, 20, apres), lu({ pour: 0, contre: 3, litige: true }), "et l'autre lit la sienne");
   // Le forfait de l'adversaire ne dit rien de lui ; le sien compte.
   assert.equal(rencontreComptee(classe({ ...base, statut: "forfait", forfaitDe: 20 }), 10, apres), null);
-  assert.deepEqual(rencontreComptee(classe({ ...base, statut: "forfait", forfaitDe: 10 }), 10, apres), { pour: 0, contre: 3, forfait: true, saisieSeule: false });
+  assert.deepEqual(rencontreComptee(classe({ ...base, statut: "forfait", forfaitDe: 10 }), 10, apres), lu({ pour: 0, contre: 3, forfait: true }));
 }
 
 // 4 · pré.
@@ -234,14 +246,18 @@ const moy = (v: number[]) => v.reduce((a, b) => a + b, 0) / v.length;
   // Un forfait coûte plus que tout le reste : 4 forfaits contre 4 rencontres sans rien, à la norme 0.
   const f = evoluerEntraineur(carriere(Array.from({ length: 8 }, (_, k) => match(k, { forfait: k < 4 }))), { normes: NORMES });
   assert.equal(gain(f, "PRES"), 0);
-  // D6 : reprendre une équipe fiable ne paie pas ; la redresser, si.
+  // D6 : reprendre une équipe fiable ne paie pas. Et (contrôle du 03/11) la référence n'est jamais plus douce que la
+  // ligue : une équipe sabotée avant lui (des forfaits juste avant de le nommer) ne lui rapporte rien.
   const L = -0.1;
   const fiable: EquipeAvant = { rencontres: 16, presence: 0, joursActifs: 840, departs: 0 };
   const perdue: EquipeAvant = { rencontres: 16, presence: -0.75, joursActifs: 840, departs: 0 };
+  const sabotee: EquipeAvant = { rencontres: 16, presence: -3, joursActifs: 840, departs: 0 };
   const quarante = () => Array.from({ length: 40 }, (_, k) => match(k));
-  const pres = (av?: EquipeAvant) => evoluerEntraineur(carriere(quarante(), membres(), { equipeAvant: av }), { normes: { 1: { presence: L, departsParJour: 0 } } }).officielles.PRES;
-  assert.ok(pres(fiable) <= pres(undefined), "une équipe déjà fiable ne lui rapporte rien de plus");
-  assert.ok(pres(perdue) >= pres(undefined) + 2, `une équipe redressée : pré ${pres(perdue)} contre ${pres(undefined)}`);
+  const avance = (av?: EquipeAvant) => evoluerEntraineur(carriere(quarante(), membres(), { equipeAvant: av }), { normes: { 1: { presence: L, departsParJour: 0 } } }).compteurs.PRES.avance;
+  assert.ok(avance(fiable) < avance(undefined) - 1, "une équipe déjà fiable ne lui rapporte rien de plus");
+  assert.ok(Math.abs(avance(perdue) - avance(undefined)) < 1e-9, "redresser une équipe sous la moyenne : ce qui dépasse la ligue, rien de plus");
+  assert.ok(Math.abs(avance(sabotee) - avance(undefined)) < 1e-9, "16 forfaits sur 16 avant lui : rien de plus que la ligue");
+  assert.ok(Math.abs(avance(undefined) - 40 * 0.1) < 1e-9, "une équipe qui vient toujours : la moyenne de la ligue à battre");
 }
 
 // 5 · coh : une exclusion vaut un départ ; dissolution et changement de place ne comptent pas ; fantômes, inactivité, fin de place.
@@ -279,6 +295,13 @@ const moy = (v: number[]) => v.reduce((a, b) => a + b, 0) / v.length;
   assert.ok(avecFin < sansFin - 1.5, `les départs de la dernière fenêtre comptent : ${avecFin.toFixed(2)} contre ${sansFin.toFixed(2)}`);
   // Personne ne part pendant deux ans, quand la ligue perd un joueur par équipe tous les quatre mois : coh monte.
   assert.ok(gain(evoluerEntraineur(carriere(cent()), { normes: N }), "COH") >= 3, "personne ne part : coh monte");
+  // Contrôle du 03/11 : des départs provoqués avant lui (10 en 120 jours) ne gonflent pas ce qu'on attend de lui ; une
+  // équipe qui ne perdait personne, si (plus exigeante que la ligue).
+  const departsAvant = (departs: number) =>
+    evoluerEntraineur(carriere(cent(), membres(), { equipeAvant: { rencontres: 16, presence: 0, joursActifs: 840, departs } }), { normes: N }).compteurs.COH.avance;
+  const ligue = evoluerEntraineur(carriere(cent()), { normes: N }).compteurs.COH.avance;
+  assert.ok(Math.abs(departsAvant(10) - ligue) < 1e-9, "dix départs provoqués avant lui : rien de plus que la ligue");
+  assert.ok(departsAvant(0) < ligue, "une équipe que personne ne quittait : plus exigeante");
 }
 
 // 6 · rés : l'attendu des cartes ; une rencontre par adversaire et par saison ; sa saisie seule ; le 5 contre 4 une fois.
@@ -333,9 +356,9 @@ const moy = (v: number[]) => v.reduce((a, b) => a + b, 0) / v.length;
 // 8 · Les trois saisons de Lucien : la carte des captures.
 {
   const ev = evoluerEntraineur(CARRIERE_DEMO);
-  assert.deepEqual(ev.officielles, { RES: 78, PRES: 76, COH: 75 });
-  assert.equal(noteEntraineur(ev.officielles), 77);
-  assert.ok(!Object.values(ev.officielles).includes(77), "aucun des trois ne répète la note");
+  assert.deepEqual(ev.officielles, { RES: 78, PRES: 75, COH: 75 });
+  assert.equal(noteEntraineur(ev.officielles), 76);
+  assert.ok(!Object.values(ev.officielles).includes(noteEntraineur(ev.officielles)), "aucun des trois ne répète la note");
   assert.equal(ev.rencontres, 40);
   assert.equal(ev.majs.length, 10);
   assert.deepEqual(ev.exploits, ["ma-23"]);
@@ -418,6 +441,11 @@ const moy = (v: number[]) => v.reduce((a, b) => a + b, 0) / v.length;
   const mois = deux.majs.map((m) => m.apres.slice(0, 7));
   assert.equal(new Set(mois).size, mois.length, "jamais deux mises à jour le même mois, d'une place à l'autre");
   assert.deepEqual(deux.majs, [...deux.majs].sort((x, y) => y.apres.localeCompare(x.apres)), "les mises à jour, de la plus récente à la plus ancienne");
+  // Deux places ouvertes ensemble (des données abîmées : la course d'equipe_signer) : la seconde est ignorée.
+  const ensemble = evoluerCarrieres([carriere(Array.from({ length: 6 }, (_, k) => match(k))), carriere(Array.from({ length: 6 }, (_, k) => match(k)))], { normes: N });
+  assert.equal(ensemble.rencontres, 6, "une place à la fois");
+  const moisEnsemble = ensemble.majs.map((m) => m.apres.slice(0, 7));
+  assert.equal(new Set(moisEnsemble).size, moisEnsemble.length, "jamais deux mises à jour le même mois");
   // Sans place : la carte de départ.
   assert.deepEqual(evoluerCarrieres([]).officielles, { RES: 75, PRES: 75, COH: 75 });
   // Une place qui ne fait que commencer : 75 partout.
@@ -465,6 +493,49 @@ const moy = (v: number[]) => v.reduce((a, b) => a + b, 0) / v.length;
   assert.equal(face.note, "77");
   assert.deepEqual(face.stats, [["rés", 78], ["pré", 76], ["coh", 75]]);
   assert.equal(face.court, "entraîneur");
+}
+
+// 16 · Les correctifs du contrôle adverse (03/11/2026).
+{
+  const N = { 1: { presence: 0, departsParJour: 0 }, 2: { presence: 0, departsParJour: 0 } };
+  const rs = (o: Partial<RencontreEntraineur>[]) => o.map((x, k) => match(k, x));
+  const ev = (r: RencontreEntraineur[]) => evoluerEntraineur(carriere(r), { normes: N });
+  // R1 / sécurité 2 : un litige se lit avec la version de l'adversaire, contre lui seulement.
+  const defaiteEnLitige = ev(rs([{ pour: 0, contre: 4, litige: true }]));
+  assert.equal(defaiteEnLitige.compteurs.RES.poids, 1, "une défaite contestée compte");
+  assert.equal(defaiteEnLitige.compteurs.RES.avance, -0.5, "comme une défaite");
+  assert.ok(defaiteEnLitige.journal.every((f) => f.litige), "le journal le dit");
+  const victoireEnLitige = ev(rs([{ pour: 4, contre: 0, litige: true }]));
+  assert.equal(victoireEnLitige.compteurs.RES.poids, 0, "une version de l'adversaire qui lui donne la victoire ne compte pas");
+  assert.equal(ev(rs([{ litige: true, cinqContreQuatre: "nous" }])).compteurs.PRES.poids, 1, "son 5 contre 4 dit par l'adversaire compte");
+  assert.equal(ev(rs([{ litige: true }])).compteurs.PRES.poids, 0, "« venue » en litige : rien");
+  // R2 : une victoire saisie seule par son camp ne prend pas la place ; la défaite validée qui suit contre lui compte.
+  const creneau = ev(rs([{ adversaire: 7, pour: 5, contre: 2, saisieSeule: true }, { adversaire: 7, pour: 2, contre: 5 }]));
+  assert.equal(creneau.compteurs.RES.poids, 1);
+  assert.equal(creneau.compteurs.RES.avance, -0.5, "la défaite contre le même adversaire compte");
+  // Sécurité 6 : une carte inconnue sur l'une des deux feuilles, rés saute (pré et coh comptent).
+  const inconnue = ev(rs([{ pour: 4, contre: 0, cartesInconnues: true }]));
+  assert.equal(inconnue.compteurs.RES.poids, 0);
+  assert.equal(inconnue.compteurs.PRES.poids, 1);
+  // Sécurité 8 : inscrire les faibles ne baisse pas ce qu'on attend : la force ne passe jamais sous ses cinq meilleurs.
+  const faible = { feuille: feuille(5, 70), effectif: [70, 70, 82, 82, 82, 82, 82], pour: 3, contre: 0 };
+  assert.equal(forceDe(faible), 82);
+  assert.equal(forceDe({ feuille: feuille(5, 84), effectif: [80, 80, 80, 80, 80] }), 84, "une feuille plus forte que l'effectif connu : la feuille");
+  const { effectif: _sans, ...seuleFeuille } = faible;
+  void _sans;
+  const avec = ev(rs([faible])).compteurs.RES.avance;
+  const sans = ev(rs([seuleFeuille])).compteurs.RES.avance;
+  assert.ok(avec < sans - 0.3, `une victoire attendue de ses cinq meilleurs : ${avec.toFixed(3)} au lieu de ${sans.toFixed(3)}`);
+  // Sécurité 7 : un même adversaire n'apporte pas plus de ±1,5 en tout, toutes saisons comprises.
+  const amis = ev(Array.from({ length: 6 }, (_, k) => match(k * 20, { saison: 1 + k, adversaire: 99, pour: 3, contre: 0, adverses: Array(6).fill(90) })));
+  assert.equal(amis.compteurs.RES.poids, 6);
+  assert.ok(Math.abs(amis.compteurs.RES.avance - BAREME_ENTRAINEUR.parAdversaire) < 1e-9, `six victoires contre la même équipe bien plus forte : ${amis.compteurs.RES.avance}`);
+  assert.deepEqual(amis.exploits.length, 6, "toutes des victoires « contre bien plus fort » (le serveur les signale)");
+  // Une rencontre sans effet en rés se dit en mots, sans pastille : la deuxième contre le même adversaire dans la saison.
+  const deux = ev(rs([{ adversaire: 7, pour: 3, contre: 1 }, { adversaire: 7, pour: 1, contre: 1 }]));
+  const second = deux.journal.filter((f) => f.cle === "RES")[1];
+  assert.deepEqual([second.texte, second.compte, second.sens], ["nul", false, 0]);
+  assert.equal(deux.compteurs.RES.poids, 1);
 }
 
 console.log("entraineur-check : ok");

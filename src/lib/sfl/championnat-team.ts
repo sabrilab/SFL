@@ -112,6 +112,8 @@ export interface FeuilleTeam {
   equipe: number;
   /** Les identifiants des joueurs inscrits. */
   joueurs: string[];
+  /** Leurs noms, dans le même ordre (les deux feuilles se lisent dans la ligue après le coup d'envoi). */
+  noms?: string[];
   /** Qui l'a déposée (son identifiant), et quand (ISO) : le dernier dépôt fait foi. */
   par: string | null;
   le: string;
@@ -174,6 +176,23 @@ export function coupDEnvoiTeam(m: Pick<MatchTeam, "jour" | "heure">): Date {
 
 /** La feuille ferme 3 jours après le coup d'envoi. */
 export const fermeture = (m: Pick<MatchTeam, "jour" | "heure">) => new Date(coupDEnvoiTeam(m).getTime() + CHAMPIONNAT.saisieJours * 24 * H);
+
+/**
+ * Jusqu'à quand une équipe peut saisir : la fermeture, 3 jours après le coup
+ * d'envoi ; mais une saisie faite seule par l'autre avant la fermeture lui
+ * laisse ses 24 h pour répondre (art. 8.7), même au-delà, à elle seule
+ * (contrôle du 03/11/2026 : une saisie faite seule deux minutes avant la
+ * fermeture ne se contestait plus). La base tient la même règle
+ * (equipe_resultat, supabase/schema.sql).
+ */
+export function fermeturePour(m: Pick<MatchTeam, "jour" | "heure" | "saisies">, equipe: number): Date {
+  const ferme = fermeture(m);
+  const autre = m.saisies.find((s) => s.equipe !== equipe);
+  const mienne = m.saisies.find((s) => s.equipe === equipe);
+  if (!autre || Date.parse(autre.le) > ferme.getTime()) return ferme;
+  if (mienne && Date.parse(mienne.le) <= ferme.getTime()) return ferme;
+  return new Date(Math.max(ferme.getTime(), Date.parse(autre.le) + CHAMPIONNAT.validationH * H));
+}
 
 /** Le score final d'après le score du terrain et les présents (art. 7.3), tout de `de` puis de `a`. */
 export interface ScoreFinal {
@@ -254,16 +273,28 @@ export function etatMatch(m: MatchTeam, maintenant = new Date()): EtatMatch {
   const sA = m.saisies.find((s) => s.equipe === m.a);
   if (sDe && sA) {
     if (collent(sDe, sA)) return valide(m, [sDe.pour, sDe.contre], presentsSaisis(m, sDe));
-    return ferme.getTime() > t ? { etat: "litige", ferme } : { etat: "non-classe" };
+    // L'équipe qui a répondu après la fermeture peut encore corriger la sienne, jusqu'au bout de ses 24 h.
+    const fin = new Date(Math.max(fermeturePour(m, m.de).getTime(), fermeturePour(m, m.a).getTime()));
+    return fin.getTime() > t ? { etat: "litige", ferme: fin } : { etat: "non-classe" };
   }
   const s = sDe ?? sA;
   if (s) {
     const buts: [number, number] = s.equipe === m.de ? [s.pour, s.contre] : [s.contre, s.pour];
     const vaut = new Date(new Date(s.le).getTime() + CHAMPIONNAT.validationH * H);
     if (vaut.getTime() <= t) return valide(m, buts, presentsSaisis(m, s));
-    return { etat: "a-confirmer", par: s.equipe, buts, vaut, ferme };
+    return { etat: "a-confirmer", par: s.equipe, buts, vaut, ferme: fermeturePour(m, s.equipe === m.de ? m.a : m.de) };
   }
   return ferme.getTime() > t ? { etat: "a-saisir", ferme } : { etat: "non-classe" };
+}
+
+/**
+ * Ce que dirait le match d'après une seule saisie (son score du terrain et
+ * ses présents) : la carte d'entraîneur lit ainsi un litige jamais tranché,
+ * avec la version de l'adversaire, en attendant la revue des litiges.
+ */
+export function versionDe(m: MatchTeam, s: SaisieTeam): EtatMatch {
+  const buts: [number, number] = s.equipe === m.de ? [s.pour, s.contre] : [s.contre, s.pour];
+  return valide(m, buts, presentsSaisis(m, s));
 }
 
 // ─────────────────────────────── Saisons ───────────────────────────────
@@ -314,6 +345,23 @@ export const saisonFinie = (n: number, maintenant = new Date()) => jourParis(mai
 
 /** La saison a-t-elle commencé ? */
 export const saisonCommencee = (n: number, maintenant = new Date()) => jourParis(maintenant) >= bornesSaison(n).debut;
+
+/** Le gel de fin de saison : ses 14 derniers jours (règles officielles, 04 §5). */
+export const GEL_JOURS = 14;
+
+/**
+ * Sommes-nous dans le gel de fin de saison (heure de Paris) ? Pas d'arrivée
+ * d'entraîneur pendant ces jours-là (contrôle du 03/11/2026 : rejoindre le
+ * leader la dernière semaine) ; les joueurs, eux, entrent comme avant. La
+ * base tient la même règle (equipe_gel, supabase/schema.sql).
+ */
+export function enGel(maintenant = new Date()): boolean {
+  const jour = jourParis(maintenant);
+  const s = saisonDuJour(jour);
+  if (s === 0) return false;
+  const debutGel = new Date(Date.parse(bornesSaison(s).finExclue) - GEL_JOURS * 86_400_000).toISOString().slice(0, 10);
+  return jour >= debutGel;
+}
 
 // ────────────────────────────── Divisions ──────────────────────────────
 
@@ -366,6 +414,13 @@ export interface MatchCompteTeam {
   compte: boolean;
   /** Pourquoi il ne compte pas, quand il est validé (deux équipes à 4 : un amical, art. 7.2). */
   amical?: "rencontres" | "divisions" | "hors-saison" | "deux-a-quatre";
+  /**
+   * Pas validé (en attente, en litige, non classé) : l'aurait-il été, entre
+   * divisions voisines et sous les 2 rencontres de la saison contre la même
+   * équipe ? Sans rien prendre au classement. La carte d'entraîneur lit ainsi
+   * un litige jamais tranché.
+   */
+  classable?: boolean;
 }
 
 export interface Classe {
@@ -480,7 +535,12 @@ export function championnat(
     const rencontres = new Map<string, number>();
     const joueurs = new Map<string, Classe>();
     const comptes: MatchCompteTeam[] = ici.map(({ m, etat }) => {
-      if (etat.etat !== "valide") return { m, etat, saison: s, compte: false };
+      if (etat.etat !== "valide") {
+        const [dDe, dA] = [divisionDe.get(m.de), divisionDe.get(m.a)];
+        const paire = m.de < m.a ? `${m.de}-${m.a}` : `${m.a}-${m.de}`;
+        const classable = dDe != null && dA != null && Math.abs(dDe - dA) <= 1 && (rencontres.get(paire) ?? 0) < CHAMPIONNAT.rencontres;
+        return { m, etat, saison: s, compte: false, classable };
+      }
       // Deux équipes à 4 : un amical, qui ne prend pas l'une des deux rencontres de la saison.
       if (etat.amical === "deux-a-quatre") return { m, etat, saison: s, compte: false, amical: "deux-a-quatre" as const };
       const dDe = divisionDe.get(m.de);

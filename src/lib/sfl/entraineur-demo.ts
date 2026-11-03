@@ -13,15 +13,20 @@
 //
 // Ce qu'il s'y passe :
 //   · avant lui, Mons Academy déclarait forfait : deux fois sur ses 16
-//     dernières rencontres ;
+//     dernières rencontres (pré ne compare jamais plus doucement que la
+//     ligue : redresser l'équipe ne rapporte que ce qui dépasse la moyenne,
+//     et pré reste à 75) ;
 //   · avec lui, plus un seul forfait ; le 9 janvier, Kevin, inscrit, ne vient
 //     pas : 5 contre 4, le 3-3 du terrain devient 2-3 (rés lit le 3-3) ;
 //   · l'équipe prend plus de points que ses cartes n'en promettaient : des
 //     victoires contre plus fort (dont Lambersart, bien plus fort, en mai) ;
 //   · Samir, inscrit aux deux premières rencontres puis laissé sur le banc,
 //     s'en va le 20 décembre ; Nassim arrive fin décembre ; personne d'autre
-//     ne part.
-// La carte qui en sort : rés 78, pré 76, coh 75, note 77 (aucun des trois ne
+//     ne part ;
+//   · le 28 novembre, son capitaine conteste la défaite contre Hellemmes : un
+//     litige jamais tranché, qui compte quand même, avec la version
+//     d'Hellemmes (contester une défaite ne l'efface pas).
+// La carte qui en sort : rés 78, pré 75, coh 75, note 76 (aucun des trois ne
 // répète la note).
 
 import { PALETTE } from "@/lib/sfl/blason";
@@ -91,13 +96,23 @@ const ADVERSES: Record<number, number[]> = {
 
 /** Sa feuille : ses joueurs inscrits, avec leur note de carte. */
 const feuille = (...ids: string[]): Inscrit[] => ids.map((id) => ({ id: `ma-${id}`, note: NOTES[`ma-${id}`] }));
+/** Tous ses joueurs ce jour-là, inscrits ou non (la force de l'équipe ne passe jamais sous ses cinq meilleurs). */
+const effectifAu = (le: string) =>
+  MEMBRES_DEMO.filter((m) => m.arrivee <= le && (!m.depart || m.depart.le > le)).map((m) => NOTES[m.id]);
 const AVANT_SAMIR = ["yanis", "bilal", "theo", "medhi", "kevin", "ryad"];
 const AVEC_NASSIM = ["yanis", "bilal", "theo", "medhi", "kevin", "ryad", "nassim"];
 
 const saison = (le: string) => (le < "2027-03-01" ? 1 : le < "2027-07-01" ? 2 : 3);
 let n = 0;
 /** Une rencontre : le jour, l'adversaire, le score du terrain, sa feuille ; un 5 contre 4 éventuel. */
-const r = (le: string, adversaire: number, [pour, contre]: [number, number], inscrits: string[], cinqContreQuatre: RencontreEntraineur["cinqContreQuatre"] = null): RencontreEntraineur => ({
+const r = (
+  le: string,
+  adversaire: number,
+  [pour, contre]: [number, number],
+  inscrits: string[],
+  cinqContreQuatre: RencontreEntraineur["cinqContreQuatre"] = null,
+  litige = false
+): RencontreEntraineur => ({
   id: `ma-${++n}`,
   le,
   saison: saison(le),
@@ -108,7 +123,9 @@ const r = (le: string, adversaire: number, [pour, contre]: [number, number], ins
   contre,
   cinqContreQuatre,
   feuille: feuille(...inscrits),
+  effectif: effectifAu(le),
   adverses: ADVERSES[adversaire],
+  ...(litige ? { litige: true } : {}),
 });
 const sauf = (qui: string, ids = AVEC_NASSIM) => ids.filter((x) => x !== qui);
 
@@ -117,7 +134,8 @@ export const RENCONTRES_DEMO: RencontreEntraineur[] = [
   r("2026-11-07", 12, [4, 3], [...AVANT_SAMIR, "samir"]),
   r("2026-11-14", 16, [2, 2], [...AVANT_SAMIR, "samir"]),
   r("2026-11-21", 13, [5, 2], AVANT_SAMIR),
-  r("2026-11-28", 15, [3, 4], AVANT_SAMIR),
+  // Son capitaine conteste la défaite (il saisit 4 – 4) : un litige jamais tranché, lu avec la version d'Hellemmes.
+  r("2026-11-28", 15, [3, 4], AVANT_SAMIR, null, true),
   r("2026-12-05", 14, [6, 4], sauf("theo", AVANT_SAMIR)),
   r("2026-12-12", 17, [3, 1], AVANT_SAMIR),
   r("2026-12-19", 18, [4, 4], sauf("kevin", AVANT_SAMIR)),
@@ -201,7 +219,7 @@ let demo: EvolutionEntraineur | null = null;
 /**
  * La carte de Lucien dans l'aperçu (le monde de démonstration de la page
  * Team) : ses trois saisons, une année plus tôt (jusqu'en octobre 2026). La
- * même carte que l'étude : rés 78, pré 76, coh 75, note 77.
+ * même carte que l'étude : rés 78, pré 75, coh 75, note 76.
  */
 export function carteEntraineurDemo(): EvolutionEntraineur {
   demo ??= evoluerEntraineur(decalerCarriere(CARRIERE_DEMO, -1));

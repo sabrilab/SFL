@@ -20,6 +20,7 @@ import assert from "node:assert/strict";
 import { CARRIERE_DEMO, AVANT_DEMO, MEMBRES_DEMO, RENCONTRES_DEMO } from "../src/lib/sfl/entraineur-demo";
 import { evoluerEntraineur, noteEntraineur, type CarriereEntraineur, type RencontreEntraineur } from "../src/lib/sfl/entraineur";
 import {
+  aRevoirDe,
   carriereDe,
   cartesDeLaLigue,
   cartesEntraineurs,
@@ -27,6 +28,7 @@ import {
   faitsDeLaLigue,
   normesDeLaSaison,
   normesFigeables,
+  placesReelles,
   type CartesDeLaLigue,
   type LignesEntraineur,
 } from "../src/lib/sfl/entraineur-faits";
@@ -65,14 +67,26 @@ function saisonDesNotes(): Saison {
   return { numero: 1, journees: [], roster, entries: [], convocations: [] };
 }
 
-/** Un match entre MA et un adversaire : le défi, les deux saisies (et leurs présents), les deux feuilles. */
-function poserMatch(l: LignesEntraineur, id: number, jour: string, adversaire: number, [pour, contre]: [number, number], feuille: string[], o: { nous?: number; eux?: number } = {}) {
+/**
+ * Un match entre MA et un adversaire : le défi, les deux saisies (et leurs présents), les deux feuilles.
+ * `conteste` : la saisie de MA dit autre chose (un litige jamais tranché ; l'adversaire dit le vrai score).
+ */
+function poserMatch(
+  l: LignesEntraineur,
+  id: number,
+  jour: string,
+  adversaire: number,
+  [pour, contre]: [number, number],
+  feuille: string[],
+  o: { nous?: number; eux?: number; conteste?: [number, number] } = {}
+) {
   const c = coup(jour);
   l.defis.push({ id, de: MA, a: adversaire, jour, heure: "20:00", lieu: "Five Lille Sud", statut: "accepte", forfait_de: null });
   const nous = o.nous ?? 5;
   const eux = o.eux ?? 5;
+  const [dit, ditContre] = o.conteste ?? [pour, contre];
   l.resultats.push(
-    { defi_id: id, equipe_id: MA, pour, contre, saisi_le: heures(c, 1), presents: nous, presents_adverses: eux },
+    { defi_id: id, equipe_id: MA, pour: dit, contre: ditContre, saisi_le: heures(c, 1), presents: nous, presents_adverses: eux },
     { defi_id: id, equipe_id: adversaire, pour: contre, contre: pour, saisi_le: heures(c, 2), presents: eux, presents_adverses: nous }
   );
   l.feuilles.push({ defi_id: id, equipe_id: MA, deposee_le: heures(c, -3) }, { defi_id: id, equipe_id: adversaire, deposee_le: heures(c, -4) });
@@ -121,6 +135,8 @@ function lignesDeLucien(): LignesEntraineur {
     poserMatch(l, 1000 + i, decaler(r.le), r.adversaire, [r.pour, r.contre], r.feuille.map((x) => x.id), {
       nous: r.cinqContreQuatre === "nous" ? 4 : 5,
       eux: r.cinqContreQuatre === "eux" ? 4 : 5,
+      // Le litige de l'étude : son capitaine dit un nul ; Hellemmes, la défaite.
+      ...(r.litige ? { conteste: [r.pour + 1, r.contre] as [number, number] } : {}),
     })
   );
   return l;
@@ -128,12 +144,12 @@ function lignesDeLucien(): LignesEntraineur {
 
 const MAINTENANT = new Date("2029-11-15T12:00:00Z");
 const cartesFixture = (): CartesDeLaLigue => cartesDeLaLigue({ saison: saisonDesNotes(), maintenant: MAINTENANT, matchsBola: [] });
-/** Une rencontre sans ce qui dépend de la base (son id, le nom de l'adversaire), sa saison ramenée à celle de l'étude. */
+/** Une rencontre sans ce qui dépend de la base (son id, le nom de l'adversaire, l'ordre de l'effectif), sa saison ramenée à celle de l'étude. */
 const nue = (r: RencontreEntraineur) => {
-  const { id, adversaireNom, ...reste } = r;
+  const { id, adversaireNom, effectif, ...reste } = r;
   void id;
   void adversaireNom;
-  return reste;
+  return { ...reste, effectif: [...(effectif ?? [])].sort((a, b) => a - b) };
 };
 
 // 1 · Les trois saisons de Lucien, en lignes : la même carrière, la même carte.
@@ -158,9 +174,9 @@ const nue = (r: RencontreEntraineur) => {
   // Avec son équipe d'avant de l'étude (16 rencontres, deux forfaits), la carte de l'étude.
   const ev = evoluerEntraineur({ ...c, equipeAvant: AVANT_DEMO });
   const etude = evoluerEntraineur(CARRIERE_DEMO);
-  assert.deepEqual(ev.officielles, { RES: 78, PRES: 76, COH: 75 });
+  assert.deepEqual(ev.officielles, { RES: 78, PRES: 75, COH: 75 });
   assert.deepEqual(ev.officielles, etude.officielles);
-  assert.equal(noteEntraineur(ev.officielles), 77);
+  assert.equal(noteEntraineur(ev.officielles), 76);
   assert.equal(ev.majs.length, etude.majs.length);
   assert.deepEqual(ev.exploits, ["1022"], "la victoire contre Lambersart, bien plus fort");
   assert.ok(ev.journal.some((x) => x.texte === "victoire contre bien plus fort" && x.adversaireNom === "Lambersart Athletic"));
@@ -200,6 +216,8 @@ const nue = (r: RencontreEntraineur) => {
   assert.ok(c.rencontres.every((r) => r.le < "2029-03-01"));
   // Une seconde place, ailleurs (Union Marcq), dès le 20 mars : ses compteurs le suivent.
   l.entraineurs.push({ equipe_id: 16, joueur: "lucien", debut: "2029-03-20T12:00:00Z", fin: null, motif: null });
+  // Sa ligne de membre a suivi : entraîneur d'Union Marcq (une place ouverte sans elle ne serait pas une place).
+  l.membres = l.membres.map((m) => (m.joueur === "lucien" ? { ...m, equipe_id: 16, signe_le: "2029-03-20T12:00:00Z", created_at: "2029-03-19T12:00:00Z" } : m));
   const deux = cartesEntraineurs(l, { cartes: cartesFixture(), normes: {}, planchers: new Map(), maintenant: MAINTENANT });
   assert.equal(deux.cartes.length, 1, "une carte par personne");
   assert.equal(deux.cartes[0].equipe, 16, "son équipe : celle qu'il entraîne");
@@ -271,10 +289,20 @@ const nue = (r: RencontreEntraineur) => {
   const fh = faitsDeLaLigue(h, MAINTENANT);
   assert.equal(fh.rencontres.get(MA)!.find((x) => x.defi === 1001), undefined);
   assert.equal(fh.rencontres.get(16)!.find((x) => x.defi === 1001), undefined);
-  // Un litige (deux saisies qui ne collent pas, feuille fermée) : non classé, nulle part.
+  // Un litige jamais tranché (deux saisies qui ne collent pas, feuille fermée) : non classé au championnat, mais lu pour la
+  // carte avec la version de l'adversaire (contrôle du 03/11/2026 : contester une défaite l'effaçait).
   const k = lignesDeLucien();
   k.resultats = k.resultats.map((x) => (x.defi_id === 1002 && x.equipe_id === MA ? { ...x, pour: 9 } : x));
-  assert.equal(faitsDeLaLigue(k, MAINTENANT).rencontres.get(MA)!.find((x) => x.defi === 1002), undefined);
+  const lk = faitsDeLaLigue(k, MAINTENANT).rencontres.get(MA)!.find((x) => x.defi === 1002)!;
+  assert.deepEqual([lk.litige, lk.pour, lk.contre], [true, 5, 2], "la version de Lomme Sporting : 5 – 2");
+  // Lomme Sporting conteste une défaite 2 – 5 en disant 6 – 0 : pour Lucien, sa version compte, contre lui.
+  const k2 = lignesDeLucien();
+  k2.resultats = k2.resultats.map((x) => (x.defi_id === 1002 && x.equipe_id === 13 ? { ...x, pour: 6, contre: 0 } : x));
+  const fk2 = faitsDeLaLigue(k2, MAINTENANT);
+  const l2 = fk2.rencontres.get(MA)!.find((x) => x.defi === 1002)!;
+  assert.deepEqual([l2.litige, l2.pour, l2.contre], [true, 0, 6]);
+  const ek2 = evoluerEntraineur({ ...carriereDe(fk2, k2.entraineurs[0], cartesFixture()), equipeAvant: AVANT_DEMO });
+  assert.ok(ek2.journal.some((x) => x.source === "1002" && x.cle === "RES" && x.litige && x.texte.startsWith("défaite")), "elle compte en rés, marquée litige");
   // Sa saisie restée seule : marquée.
   const s = lignesDeLucien();
   s.resultats = s.resultats.filter((x) => !(x.defi_id === 1003 && x.equipe_id !== MA));
@@ -288,7 +316,8 @@ const nue = (r: RencontreEntraineur) => {
   assert.deepEqual(sansAdverse.adverses, []);
   assert.ok(sansAdverse.feuille.length >= 5);
   const evn = evoluerEntraineur({ ...cn, equipeAvant: AVANT_DEMO });
-  assert.ok(!evn.journal.some((x) => x.source === "1004" && x.cle === "RES"));
+  assert.ok(!evn.journal.some((x) => x.source === "1004" && x.cle === "RES" && x.compte !== false), "rés ne la compte pas");
+  assert.ok(evn.journal.some((x) => x.source === "1004" && x.cle === "RES" && x.compte === false), "le journal dit son issue, sans pastille");
   assert.ok(evn.journal.some((x) => x.source === "1004" && x.cle === "PRES"));
 }
 
@@ -380,6 +409,55 @@ const nue = (r: RencontreEntraineur) => {
   // Déjà figées : rien de plus.
   const deja = Object.fromEntries(r.normes.map((x) => [x.saison, x.normes]));
   assert.deepEqual(cartesEntraineurs(l, { cartes: cartesFixture(), normes: deja, planchers: new Map(), maintenant: MAINTENANT }).normes, []);
+}
+
+// 6 · Les correctifs du contrôle adverse (03/11/2026), du côté des lignes.
+{
+  // La place fantôme (la course d'equipe_signer) : une place ouverte sans ligne de membre entraîneur est ignorée.
+  const l = lignesDeLucien();
+  l.membres.push({ equipe_id: 12, joueur: "bilal-x", statut: "membre", role: "membre", signe_le: "2028-10-05T10:00:00Z", created_at: "2028-10-05T10:00:00Z" });
+  l.profils.push({ id: "bilal-x", name: "Bilal X" });
+  l.entraineurs.push({ equipe_id: 13, joueur: "bilal-x", debut: "2028-10-05T10:00:00Z", fin: null, motif: null });
+  assert.deepEqual(placesReelles(l, MAINTENANT).map((p) => p.joueur), ["lucien"], "la place fantôme n'est pas une place");
+  assert.ok(!cartesEntraineurs(l, { cartes: cartesFixture(), normes: {}, planchers: new Map(), maintenant: MAINTENANT }).cartes.some((c) => c.joueur === "bilal-x"));
+  // Le préavis d'exclusion échu, pas encore relevé : sa place prend fin à l'heure du préavis.
+  const e = lignesDeLucien();
+  e.membres = e.membres.map((m) => (m.joueur === "lucien" ? { ...m, depart_le: "2029-03-01T10:00:00Z" } : m));
+  const [p] = placesReelles(e, MAINTENANT);
+  assert.deepEqual([p.fin, p.motif], ["2029-03-01T10:00:00Z", "exclusion"]);
+  assert.equal(carriereDe(faitsDeLaLigue(e, MAINTENANT), p, cartesFixture()).rencontres.length, 14, "rien après la fin du préavis");
+  // Un joueur exclu au préavis échu : parti à son heure, exclu (la cohésion le compte).
+  const j = lignesDeLucien();
+  j.membres = j.membres.map((m) => (m.joueur === "ma-kevin" ? { ...m, depart_le: "2029-01-05T12:00:00Z" } : m));
+  const kevin = faitsDeLaLigue(j, MAINTENANT).joueurs.get(MA)!.find((x) => x.id === "ma-kevin")!;
+  assert.deepEqual(kevin.depart, { le: "2029-01-05", motif: "exclusion" });
+  // La qualification : une rencontre dans ses 7 premiers jours ne compte pas.
+  const q = lignesDeLucien();
+  poserMatch(q, 950, "2028-10-27", 14, [0, 4], ["ma-yanis", "ma-bilal", "ma-theo", "ma-medhi", "ma-kevin"]);
+  const cq = carriereDe(faitsDeLaLigue(q, MAINTENANT), q.entraineurs[0], cartesFixture());
+  assert.ok(!cq.rencontres.some((r) => r.id === "950"), "trois jours après sa signature : pas encore qualifié");
+  assert.equal(cq.rencontres.length, 40);
+  // Une carte inconnue (un compte sans carte SFL ni Bola) sur l'une des deux feuilles : rés saute.
+  const u = lignesDeLucien();
+  u.feuilleJoueurs = u.feuilleJoueurs.map((x) => (x.defi_id === 1005 && x.joueur === "adv-17-0" ? { ...x, joueur: "neuf" } : x));
+  u.profils.push({ id: "neuf", name: "Nouveau" });
+  const ru = carriereDe(faitsDeLaLigue(u, MAINTENANT), u.entraineurs[0], cartesFixture()).rencontres.find((r) => r.id === "1005")!;
+  assert.equal(ru.cartesInconnues, true);
+  assert.equal(carriereDe(faitsDeLaLigue(lignesDeLucien(), MAINTENANT), u.entraineurs[0], cartesFixture()).rencontres.find((r) => r.id === "1005")!.cartesInconnues, undefined);
+  // L'effectif au coup d'envoi : les notes de ses joueurs du jour, inscrits ou non (Samir parti, Nassim pas encore là).
+  const c = carriereDe(faitsDeLaLigue(lignesDeLucien(), MAINTENANT), lignesDeLucien().entraineurs[0], cartesFixture());
+  assert.deepEqual([...c.rencontres[0].effectif!].sort(), [72, 73, 74, 75, 76, 77, 79], "le 7 novembre : Samir encore là");
+  assert.deepEqual([...c.rencontres.find((r) => r.le === "2029-01-16")!.effectif!].sort(), [73, 74, 75, 76, 76, 77, 79], "le 16 janvier : Nassim, plus Samir");
+  // Les matchs arrangés se répètent : deux victoires « contre bien plus fort » contre la même équipe, ou contre trois
+  // mêmes joueurs sous un autre nom, sont signalées à l'admin (aRevoirDe) ; rien ne change sur la carte.
+  const f = faitsDeLaLigue(lignesDeLucien(), MAINTENANT);
+  const lambersart = f.rencontres.get(MA)!.filter((r) => r.adversaire === 11).map((r) => String(r.defi));
+  assert.deepEqual(aRevoirDe(f, "lucien", [MA], lambersart.slice(0, 1)), []);
+  assert.deepEqual(aRevoirDe(f, "lucien", [MA], lambersart.slice(0, 2)).map((x) => x.motif), ["equipe"]);
+  const autre = f.rencontres.get(MA)!.find((r) => r.adversaire === 19)!;
+  for (const x of f.feuilles.get(`${autre.defi}:19`)!.keys()) void x;
+  f.feuilles.set(`${autre.defi}:19`, [...f.feuilles.get(`${lambersart[0]}:11`)!.slice(0, 3), "x1", "x2"]);
+  assert.deepEqual(aRevoirDe(f, "lucien", [MA], [lambersart[0], String(autre.defi)]).map((x) => x.motif), ["joueurs"], "trois mêmes joueurs sous un autre nom");
 }
 
 const typesUtilises: CarriereEntraineur | null = null;

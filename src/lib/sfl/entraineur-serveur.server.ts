@@ -16,7 +16,11 @@
 //     entraineur.ts), fige les normes d'une saison finie et lue en entier
 //     (figer_normes_entraineur), puis pose les cartes
 //     (poser_cartes_entraineur, qui garde la plus haute de chaque
-//     caractéristique : rien ne descend).
+//     caractéristique : rien ne descend) ;
+//   · rend dans son bilan les victoires « contre bien plus fort » qui se
+//     répètent (aRevoir) : la route ne le donne en entier qu'à l'admin.
+// Les préavis d'exclusion échus comptent à leur heure, même avant que le
+// ménage d'une équipe ne les relève (equipe_membres.depart_le).
 // Le même calcul deux fois donne la même carte : il repart chaque jour des
 // faits, sans rien retenir de la veille que le plancher.
 //
@@ -24,7 +28,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { NormesLigue, StatsEntraineur } from "./entraineur";
-import { cartesDeLaLigue, cartesEntraineurs, JOURNAL_GARDE, type LignesEntraineur } from "./entraineur-faits";
+import { cartesDeLaLigue, cartesEntraineurs, JOURNAL_GARDE, type ARevoir, type LignesEntraineur } from "./entraineur-faits";
 import type { MatchBola } from "./ligue-vierge";
 import { lireSaisonServeur, toutesLesLignes } from "./saison-serveur.server";
 
@@ -35,6 +39,12 @@ export interface BilanCartesEntraineur {
   ecrites: number;
   /** Les saisons dont les normes viennent d'être figées. */
   normes: number[];
+  /**
+   * À revoir par la modération : des victoires « contre bien plus fort » qui se
+   * répètent contre la même équipe, ou contre les mêmes joueurs sous un autre
+   * nom (entraineur-faits.ts, aRevoirDe). Seul l'admin le lit en entier.
+   */
+  aRevoir: ARevoir[];
   ms: number;
   erreur?: string;
 }
@@ -51,7 +61,7 @@ export async function calculerCartesEntraineur(sb: SupabaseClient, maintenant = 
     const [entraineurs, equipes, membres, signatures, departs, defis, resultats, feuilles, feuilleJoueurs, profils, gardees, figees] = await Promise.all([
       lire<Ligne<LignesEntraineur["entraineurs"]>>("equipe_entraineurs", "equipe_id, joueur, debut, fin, motif", ["id"]),
       lire<Ligne<LignesEntraineur["equipes"]>>("equipes", "id, nom, created_at, dissoute_le", ["id"]),
-      lire<Ligne<LignesEntraineur["membres"]>>("equipe_membres", "equipe_id, joueur, statut, role, signe_le, created_at", ["equipe_id", "joueur"]),
+      lire<Ligne<LignesEntraineur["membres"]>>("equipe_membres", "equipe_id, joueur, statut, role, signe_le, created_at, depart_le", ["equipe_id", "joueur"]),
       lire<Ligne<LignesEntraineur["signatures"]>>("equipe_signatures", "equipe_id, joueur, le", ["equipe_id", "joueur", "version"]),
       lire<Ligne<LignesEntraineur["departs"]>>("equipe_departs", "equipe_id, joueur, parti_le, motif, role", ["equipe_id", "joueur"]),
       lire<Ligne<LignesEntraineur["defis"]> & { statut: string }>("equipe_defis", "id, de, a, jour, heure, lieu, statut, forfait_de", ["id"]),
@@ -126,9 +136,16 @@ export async function calculerCartesEntraineur(sb: SupabaseClient, maintenant = 
       if (error) throw error;
       ecrites += Number(data ?? 0);
     }
-    return { statut: "ok", entraineurs: calcul.cartes.length, ecrites, normes: calcul.normes.map((n) => n.saison), ms: Date.now() - debut };
+    return {
+      statut: "ok",
+      entraineurs: calcul.cartes.length,
+      ecrites,
+      normes: calcul.normes.map((n) => n.saison),
+      aRevoir: calcul.cartes.flatMap((c) => c.aRevoir),
+      ms: Date.now() - debut,
+    };
   } catch (e) {
     const erreur = e instanceof Error ? e.message : typeof e === "object" && e && "message" in e ? String((e as { message: unknown }).message) : String(e);
-    return { statut: "erreur", entraineurs: 0, ecrites: 0, normes: [], ms: Date.now() - debut, erreur };
+    return { statut: "erreur", entraineurs: 0, ecrites: 0, normes: [], aRevoir: [], ms: Date.now() - debut, erreur };
   }
 }
