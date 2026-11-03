@@ -25,7 +25,9 @@
 //     de l'équipe.
 // Une équipe en formation reste cachée aux autres (doc 04 §6) ; ses joueurs
 // voient sa page. L'effectif compte les joueurs (« n / 7 ») : l'entraîneur
-// n'en est pas (03/11/2026), et ne touche ni à la couverture ni au maillot. Sur tablette et ordinateur, la couverture sur toute la
+// n'en est pas (03/11/2026), et ne touche ni à la couverture ni au maillot ;
+// sa carte d'entraîneur (le Tableau, carte-entraineur-de.tsx) vient après
+// les joueurs, sans buts ni passes. Sur tablette et ordinateur, la couverture sur toute la
 // largeur, puis deux colonnes au nombre d'or. En aperçu, le monde de
 // démonstration quand il est demandé (?apercu=1 sur la page Team).
 
@@ -36,6 +38,7 @@ import { Camera, ChevronLeft, Pencil } from "lucide-react";
 import { useMyPlayer } from "@/components/sfl/player-provider";
 import { useSeason } from "@/components/sfl/season-provider";
 import { CarteDe, FORMAT_CARTE } from "@/components/sfl/mini-carte";
+import { CarteEntraineurDe } from "@/components/sfl/carte-entraineur-de";
 import { Chiffre } from "@/components/sfl/profil-joueur";
 import { Nom } from "@/components/sfl/nom";
 import { RangMetal } from "@/components/sfl/rang-metal";
@@ -157,6 +160,8 @@ export default function PageEquipe() {
 
   const b = montree.blason ?? blasonParDefaut(montree.fond);
   const joueurs = signataires(montree);
+  // L'entraîneur en place : après les joueurs, hors du compte (« n / 7 » reste celui des joueurs).
+  const entraineur = montree.membres.find((m) => m.role === "entraineur" && m.statut === "membre") ?? null;
   const stats = new Map<string, { buts: number; passes: number }>();
   for (const x of saison?.buteurs ?? []) stats.set(x.name.toLowerCase(), { buts: x.buts, passes: x.passes });
   for (const x of saison?.passeurs ?? []) stats.set(x.name.toLowerCase(), { buts: x.buts, passes: x.passes });
@@ -256,6 +261,18 @@ export default function PageEquipe() {
                 );
               })}
             </div>
+            {/* Le banc : sa carte d'entraîneur (le Tableau), sans buts ni passes. */}
+            {entraineur && (
+              <div className="grid grid-cols-3 gap-x-2 border-t border-foreground/10 pt-[var(--fib-13)] sm:grid-cols-4">
+                <div className="flex min-w-0 flex-col items-center gap-1.5 text-center">
+                  <CarteEntraineurDe nom={entraineur.name} id={entraineur.id} equipe={montree} />
+                  <span className="w-full truncate text-ligne leading-tight font-bold">
+                    <Nom n={entraineur.name} />
+                  </span>
+                  <span className="mono-label -mt-1 text-micro text-encre-3">{NOM_ROLE.entraineur}</span>
+                </div>
+              </div>
+            )}
           </section>
 
           {/* Le prochain match et les derniers. */}

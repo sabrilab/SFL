@@ -22,6 +22,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { CarteDe, FORMAT_CARTE } from "@/components/sfl/mini-carte";
+import { CarteEntraineurDe } from "@/components/sfl/carte-entraineur-de";
 import { Ecusson } from "@/components/sfl/equipe/ecusson";
 import { Check } from "lucide-react";
 import {
@@ -144,6 +145,8 @@ export function SignerReglement({
   }
   const invitation = equipe?.membres.find((m) => m.id === moi && m.statut === "invite");
   const deja = equipe ? signataires(equipe) : [];
+  // L'entraîneur en place : sa pastille après les joueurs (l'écusson pour signe), jamais compté.
+  const coach = equipe?.membres.find((m) => m.role === "entraineur" && m.statut === "membre") ?? null;
   return (
     <Sheet open={!!equipe} onOpenChange={fermer}>
       <SheetContent side="bottom" className="max-h-[92dvh] overflow-y-auto rounded-t-[28px] pb-[calc(env(safe-area-inset-bottom,0px)+1.5rem)]">
@@ -173,6 +176,12 @@ export function SignerReglement({
                         <span className="w-full truncate text-center text-petit font-medium">{m.name.split(" ")[0]}</span>
                       </span>
                     ))}
+                    {coach && equipe && (
+                      <span className="flex w-[52px] flex-col items-center gap-1">
+                        <CarteEntraineurDe nom={coach.name} id={coach.id} equipe={equipe} size={FORMAT_CARTE.petite} />
+                        <span className="w-full truncate text-center text-petit font-medium">{coach.name.split(" ")[0]}</span>
+                      </span>
+                    )}
                   </div>
                 </div>
               )}

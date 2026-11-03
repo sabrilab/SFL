@@ -32,7 +32,7 @@
 // motifs des skins du Passe Bola sont dans motifs-passe.tsx, ceux des skins
 // offerts (la pépite, la palestine) dans motifs-offerts.tsx, ceux des recrues
 // (recruteur, filigrane, fondateur) dans motifs-recrues.tsx, ceux de la carte
-// d'entraîneur (tableau, aimants, manteau ; étude) dans motifs-entraineur.tsx.
+// d'entraîneur (le Tableau) dans motifs-entraineur.tsx.
 
 import { Fragment, useId } from "react";
 import type { Motif } from "@/components/sfl/finitions-carte";

@@ -79,19 +79,19 @@
 // (matchs arbitrés, notes reçues…) à la place des six stats.
 //
 // La carte d'un entraîneur de Bola Team (`edition="entraineur"`,
-// `entraineur` ; étude du 02/11, carte-entraineur.tsx) garde elle aussi toute
-// la disposition, dans la matière de son métier (le tableau de la causerie,
-// le tableau magnétique de la zone technique, le manteau du bord de touche ;
-// skins-entraineur.ts) : sa note à lui ; ses trois caractéristiques (rés,
-// pré, coh ; lib/sfl/entraineur.ts) l'une sous l'autre dans le carré des
-// stats, plus grandes que celles d'un joueur, la dernière sur la ligne de
-// base de la note ; son équipe à la place du poste (« lucien · mons
-// academy ») ; l'écusson de son équipe à la place du numéro, aussi dans la
-// pastille (ecusson-entraineur.tsx), seul, sans bord : des tirets autour
-// d'une pastille disent « invité » ou « place vide », un bord plein « toi ».
-// L'étiquette ENTRAÎNEUR dans le trait de la matière (cernée à la craie,
-// imprimée, tissée), jamais pleine comme celle de l'arbitre. Le calcul des
-// stats d'un joueur n'y est pour rien.
+// `entraineur` ; Ilyes, 02/11/2026, carte-entraineur.tsx) garde elle aussi
+// toute la disposition, dans la matière de son métier (le Tableau, la
+// causerie ; skins-entraineur.ts) : sa note à lui ; ses trois
+// caractéristiques (rés, pré, coh ; lib/sfl/entraineur.ts, calculées par le
+// serveur) l'une sous l'autre dans le carré des stats, plus grandes que
+// celles d'un joueur, la dernière sur la ligne de base de la note ; son
+// équipe à la place du poste (« lucien · mons academy ») ; l'écusson de son
+// équipe à la place du numéro, aussi dans la pastille
+// (ecusson-entraineur.tsx), seul, sans bord : des tirets autour d'une
+// pastille disent « invité » ou « place vide », un bord plein « toi ». Sans
+// photo, le portrait reste vide : le schéma de la mi-temps s'y lit.
+// L'étiquette ENTRAÎNEUR cernée à la craie, jamais pleine comme celle de
+// l'arbitre. Le calcul des stats d'un joueur n'y est pour rien.
 //
 // Mêmes calques que la carte éditoriale (`data-card-part` body / player /
 // stats) : la 3D de card-3d.tsx mesure la carte et la prend telle quelle,
@@ -120,6 +120,7 @@ import { GRADES, type FinitionArbitre, type GradeArbitre } from "@/components/sf
 import { BordEpoque, EmblemeEpoque, LosangeBallon, SigleSfl, SigleSouligne } from "@/components/sfl/marques-carte";
 import { MotifCarte } from "@/components/sfl/motif-carte";
 import { EcussonEntraineur } from "@/components/sfl/ecusson-entraineur";
+import { MATIERES_ENTRAINEUR } from "@/components/sfl/skins-entraineur";
 import type { BadgeCarte } from "@/lib/sfl/badge-carte";
 import { STAT_KEYS, type StatKey, type Stats } from "@/lib/sfl/engine";
 import { abrege, estGardien } from "@/lib/sfl/gardien";
@@ -190,11 +191,7 @@ const SIGLE_H = 46;
 const opaque = (hex: string, a: number) => `${hex}${Math.round(a * 255).toString(16).padStart(2, "0")}`;
 
 /**
- * Le portrait : la photo du joueur, ou à défaut son initiale en filigrane sur
- * les rayures (un entraîneur : l'écusson de son équipe, ou rien, le motif s'y lit).
- */
-/**
- * L'étiquette ENTRAÎNEUR cernée à la craie (le tableau) : un rectangle à main
+ * L'étiquette ENTRAÎNEUR cernée à la craie (le Tableau) : un rectangle à main
  * levée, en trois brins interrompus comme l'écusson, qui dépasse un peu aux
  * coins. Le repère suit la taille de l'étiquette (230 × 59 environ).
  */
@@ -214,17 +211,10 @@ function CadreCraie({ couleur }: { couleur: string }) {
   );
 }
 
-/** L'étiquette tissée (le manteau) : cousue aux deux bouts, quelques points de fil. */
-function PointsTissee({ couleur }: { couleur: string }) {
-  return (
-    <svg aria-hidden viewBox="0 0 100 20" preserveAspectRatio="none" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none" }}>
-      {[3.2, 96.8].map((x) => (
-        <line key={x} x1={x} y1={3} x2={x} y2={17} stroke={couleur} strokeWidth={0.7} strokeDasharray="2.2 1.6" vectorEffect="non-scaling-stroke" />
-      ))}
-    </svg>
-  );
-}
-
+/**
+ * Le portrait : la photo du joueur, ou à défaut son initiale en filigrane sur
+ * les rayures (un entraîneur : rien, le motif de sa matière s'y lit).
+ */
 function Portrait({
   photo,
   nom,
@@ -236,12 +226,12 @@ function Portrait({
   cote,
   traitement,
   u,
-  filigrane,
+  vide,
 }: {
   photo?: string | null;
   nom: string;
-  /** Sans photo, à la place de l'initiale ; null : rien. */
-  filigrane?: React.ReactNode | null;
+  /** Sans photo, ni initiale : le motif de la matière s'y lit (la carte d'entraîneur). */
+  vide?: boolean;
   /** Resserré sur le visage (cartes petites). */
   resserre: boolean;
   encre: string;
@@ -289,9 +279,7 @@ function Portrait({
             filter: filtrePhoto(traitement),
           }}
         />
-      ) : filigrane !== undefined ? (
-        filigrane && <div style={{ position: "absolute", inset: 0, display: "grid", placeItems: "center" }}>{filigrane}</div>
-      ) : (
+      ) : vide ? null : (
         <div
           style={{
             position: "absolute",
@@ -427,7 +415,7 @@ export function BolaCard({
     edition === "arbitre"
       ? MATIERES[arbitre?.finition ?? "arbitre"]
       : edition === "entraineur"
-        ? MATIERES[entraineur?.finition ?? "entraineur"]
+        ? MATIERES_ENTRAINEUR[entraineur?.finition ?? "tableau"]
         : matiereDe(edition, habillageDemande, epoque?.saison);
   // Une carte qui n'est pas celle d'un joueur : sa note et ses chiffres à elle.
   const autre = arbitre ?? entraineur;
@@ -442,14 +430,11 @@ export function BolaCard({
   const { serie, numero: numeroSerie } = serieDe(name, p.nom === "fondateur" ? habillage : undefined);
   const emission = p.epoque ? ligneDEmission(epoque ?? { saison: p.epoque.saison, le: null, n: null, sur: null }) : null;
   const nomUp = (affiche ?? name).toUpperCase();
-  // La carte d'entraîneur : l'écusson de son équipe dans le trait de sa matière (la craie, l'aimant, le fil).
+  // La carte d'entraîneur : l'écusson de son équipe, à la craie ; sans photo, le portrait vide où se lit le schéma.
   const trait = entraineur ? p.entraineur : undefined;
   const equipe = trait ? entraineur?.equipe : undefined;
   const ecusson = (hauteur: number, halo?: string) =>
-    equipe && trait ? <EcussonEntraineur equipe={equipe} encre={p.encre} trait={trait.ecusson} hauteur={hauteur} halo={halo} /> : null;
-  // Sans photo : l'écusson en grand (le manteau), ou le portrait vide où se lit le motif (les tableaux).
-  const filigrane = trait ? (trait.filigrane && equipe ? ecusson(largeur * 0.5, undefined) : null) : undefined;
-  const ecussonEnGrand = !photo && !!trait?.filigrane && !!equipe;
+    equipe ? <EcussonEntraineur equipe={equipe} encre={p.encre} hauteur={hauteur} halo={halo} /> : null;
   const halo = p.sombre ? "rgba(8,9,11,0.55)" : "rgba(255,255,255,0.7)";
 
   // La pastille : un carré, le visage, la note dans un onglet.
@@ -490,10 +475,10 @@ export function BolaCard({
             cote={largeur * 0.86}
             traitement={habillage?.traitement}
             u={u}
-            filigrane={trait ? (trait.filigrane && equipe ? ecusson(largeur * 0.46) : null) : undefined}
+            vide={!!trait}
           />
           {/* L'entraîneur : l'écusson de son équipe en haut à droite, là où un joueur n'a rien ; seul, c'est le signe. */}
-          {equipe && !ecussonEnGrand && (
+          {equipe && (
             <span style={{ position: "absolute", right: "5%", top: "5%", display: "flex" }}>{ecusson(largeur * 0.39, halo)}</span>
           )}
         </div>
@@ -584,7 +569,7 @@ export function BolaCard({
     cote: u(PORTRAIT.c),
     traitement: habillage?.traitement,
     u,
-    filigrane,
+    vide: !!trait,
   };
   // L'habillage porté (habillage-carte.tsx).
   const signes = habillage?.signes ?? [];
@@ -786,8 +771,8 @@ export function BolaCard({
               {marque}
             </div>
           )}
-          {/* L'entraîneur : l'écusson de son équipe à la place du numéro (sauf s'il est déjà en grand, sans photo) */}
-          {equipe && !ecussonEnGrand && (
+          {/* L'entraîneur : l'écusson de son équipe à la place du numéro */}
+          {equipe && (
             <span style={{ position: "absolute", right: u(complete ? 58 : 46), top: u(complete ? 50 : 36), display: "flex" }}>
               {ecusson(u(complete ? 150 : compacte ? 220 : 270), photo ? halo : undefined)}
             </span>
@@ -839,27 +824,13 @@ export function BolaCard({
                     alignItems: "center",
                     background: p.etiquette.fond,
                     border: `${u(2)}px solid ${p.etiquette.bord}`,
-                    // L'entraîneur : l'étiquette dans le trait de sa matière, jamais pleine comme celle de l'arbitre.
+                    // L'entraîneur : l'étiquette cernée à la craie, jamais pleine comme celle de l'arbitre.
                     ...(trait?.etiquette === "craie" && { border: "none" }),
-                    ...(trait?.etiquette === "imprimee" && {
-                      border: `${u(1.5)}px solid ${p.etiquette.bord}`,
-                      outline: `${u(1.5)}px solid ${p.etiquette.bord}`,
-                      outlineOffset: u(3.5),
-                      borderRadius: u(6),
-                    }),
-                    ...(trait?.etiquette === "tissee" && {
-                      border: "none",
-                      borderRadius: u(4),
-                      padding: `0 ${u(26)}px`,
-                      background: `repeating-linear-gradient(90deg, rgba(${p.encre},0.07) 0 ${u(1.2)}px, transparent ${u(1.2)}px ${u(3.4)}px), linear-gradient(180deg, rgba(255,255,255,0.07), rgba(0,0,0,0.16)), rgba(${p.encre},0.1)`,
-                      boxShadow: `0 ${u(3)}px ${u(4)}px rgba(0,0,0,0.5), inset 0 ${u(1)}px 0 rgba(255,255,255,0.1)`,
-                    }),
                     ...mono(26, 2.5, 1, 700),
                     color: p.etiquette.texte,
                   }}
                 >
                   {trait?.etiquette === "craie" && <CadreCraie couleur={p.etiquette.bord} />}
-                  {trait?.etiquette === "tissee" && <PointsTissee couleur={p.etiquette.bord} />}
                   {p.titre}
                 </div>
                 {habillage?.rang && <InsigneRang rang={habillage.rang} hauteur={u(82)} />}

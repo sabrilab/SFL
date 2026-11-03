@@ -207,7 +207,8 @@ function ProfilJoueurPage() {
                 {rangXp && ` · rang ${rangXp.rang}`}
               </span>
             </button>
-            <AppartenancesJoueur nom={player.name} />
+            {/* Ma carte d'entraîneur a sa tuile, plus bas (ma-carte/rubriques.tsx). */}
+            <AppartenancesJoueur nom={player.name} entraineur={false} />
             <ReseauJoueur nom={player.name} />
           </div>
           <div className="flex w-full items-stretch divide-x divide-foreground/10 border-y border-foreground/10 py-[var(--fib-13)]">

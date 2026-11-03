@@ -336,7 +336,8 @@ export interface FaitEntraineur {
   /** La rencontre (son id) ou la mise à jour (« maj »). */
   source: string;
   cle: CleEntraineur;
-  /** Au-dessus de ce qu'on attendait (1), dedans (0), en dessous (−1). */
+  /** Au-dessus de ce qu'on attendait (1), dedans (0), en dessous (−1). Un nul entre équipes proches
+   *  (« nul », ni plus fort ni plus faible) est dedans : la page ne le montre ni pour ni contre lui. */
   sens: 1 | 0 | -1;
   texte: string;
   /** Une rencontre : l'équipe adverse. */
@@ -577,7 +578,8 @@ export function evoluerEntraineur(carriere: CarriereEntraineur, options: Options
       // Sa saisie restée seule ne compte que contre lui.
       if (!r.saisieSeule || s <= e) {
         essai("RES", s - e);
-        note(r.le, r.id, "RES", s - e, resultatEnMots(s, e), r.adversaireNom);
+        const mots = resultatEnMots(s, e);
+        note(r.le, r.id, "RES", mots === "nul" ? 0 : s - e, mots, r.adversaireNom);
         if (s === 1 && e <= B.exploit) exploits.push(r.id);
       }
     }

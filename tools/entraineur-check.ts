@@ -19,7 +19,7 @@
 //   6. rés : l'attendu vient des cartes, pas de ses résultats (D2) ; une
 //      rencontre par adversaire et par saison ; sa saisie seule ne compte que
 //      contre lui ; le 5 contre 4 compté une fois (D10) ; le journal en mots
-//      (D13) ;
+//      (D13), où un nul entre équipes proches n'est ni pour ni contre lui ;
 //   7. les normes de chaque saison figées, la carte officielle en plancher
 //      (D8) ;
 //   8. les trois saisons de Lucien donnent la carte des captures ;
@@ -30,7 +30,14 @@
 //      aussi ;
 //  12. ses places s'enchaînent : ses compteurs le suivent, jamais deux mises
 //      à jour le même mois ; avant les feuilles d'avant-match, tout joueur
-//      compte actif.
+//      compte actif ;
+//  13. le Tableau seul part en ligne : MATIERES a « entraineur », aucune
+//      matière ni aucun motif des Aimants ou du Manteau ;
+//  14. jamais de tirets autour de la carte d'entraîneur (dans l'app, ils
+//      disent « invité ») ;
+//  15. la carte gardée en base : la note que calcule la base (l'arrondi
+//      supérieur de la moyenne) est celle de la carte, et la face dit les
+//      trois dans l'ordre rés, pré, coh.
 //   npx tsx tools/entraineur-check.ts
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -293,6 +300,13 @@ const moy = (v: number[]) => v.reduce((a, b) => a + b, 0) / v.length;
   const cinqQuatre = evoluerEntraineur(carriere([match(0, { cinqContreQuatre: "nous" })]), { normes: NORMES });
   assert.equal(cinqQuatre.compteurs.RES.avance, 0);
   assert.equal(cinqQuatre.compteurs.PRES.avance, -1);
+  // Un nul entre équipes proches est dans ce qu'on attendait : la page ne le montre ni pour ni contre lui.
+  const nul = (adverse: number) =>
+    evoluerEntraineur(carriere([match(0, { adverses: Array(6).fill(adverse) })]), { normes: NORMES }).journal.find((f) => f.cle === "RES")!;
+  assert.deepEqual([nul(75).texte, nul(75).sens], ["nul", 0]);
+  assert.deepEqual([nul(77).texte, nul(77).sens], ["nul", 0]);
+  assert.deepEqual([nul(82).texte, nul(82).sens], ["nul contre plus fort", 1]);
+  assert.deepEqual([nul(68).texte, nul(68).sens], ["nul contre plus faible", -1]);
   // D13 : le journal ne dit jamais l'attendu en chiffres.
   const ev = evoluerEntraineur(CARRIERE_DEMO);
   for (const f of ev.journal.filter((x) => x.cle === "RES")) assert.ok(!/\d/.test(f.texte), `l'attendu ne sort pas : « ${f.texte} »`);
@@ -329,9 +343,9 @@ const moy = (v: number[]) => v.reduce((a, b) => a + b, 0) / v.length;
   assert.ok(ev.journal.some((f) => f.texte === "5 contre 4"));
 }
 
-// 9 · Les matières : ni or, ni bleu, ni rouge, ni la braise, ni le mauve ; aucune n'entre dans les finitions d'un joueur.
+// 9 · La matière (le Tableau) : ni or, ni bleu, ni rouge, ni la braise, ni le mauve ; elle n'entre pas dans les finitions d'un joueur.
 {
-  const source = ["skins-entraineur.ts", "motifs-entraineur.tsx", "ecusson-entraineur.tsx"]
+  const source = ["skins-entraineur.ts", "motifs-entraineur.tsx", "ecusson-entraineur.tsx", "carte-entraineur.tsx", "carte-entraineur-de.tsx", "fiche-entraineur.tsx", "equipe/banc-entraineur.tsx"]
     .map((f) => readFileSync(new URL(`../src/components/sfl/${f}`, import.meta.url), "utf8"))
     .join("\n");
   const teinte = (hex: string) => {
@@ -351,10 +365,11 @@ const moy = (v: number[]) => v.reduce((a, b) => a + b, 0) / v.length;
     assert.ok(!(h >= 345 || h <= 15), `${hex} : du rouge`);
     assert.ok(!(h >= 280 && h <= 340), `${hex} : le mauve du rang A, le néon, l'aurore`);
   }
-  for (const nom of [...Object.keys(MATIERES_ENTRAINEUR), "entraineur"]) {
-    assert.ok(nom in MATIERES, `${nom} manque dans MATIERES`);
-    assert.ok(!(FINITIONS as readonly string[]).includes(nom), `${nom} ne doit pas être une finition de joueur`);
+  for (const m of Object.values(MATIERES_ENTRAINEUR)) {
+    assert.ok(m.nom in MATIERES, `${m.nom} manque dans MATIERES (le dos et la 3D le lisent)`);
+    assert.ok(!(FINITIONS as readonly string[]).includes(m.nom), `${m.nom} ne doit pas être une finition de joueur`);
   }
+  assert.ok(!(FINITIONS as readonly string[]).includes("entraineur"));
 }
 
 // 10 · Le barème lent (Ilyes, 02/11 : « la note lente ») : les marges et les crans du réglage proposé, pas du vif.
@@ -417,6 +432,39 @@ const moy = (v: number[]) => v.reduce((a, b) => a + b, 0) / v.length;
   const inscrit = activite([m], new Map([["x", [numeroDuJour("2026-11-10")]]]), numeroDuJour("2026-11-03"));
   assert.equal(inscrit(m, numeroDuJour("2027-01-08")), true, "59 jours après sa feuille");
   assert.equal(inscrit(m, numeroDuJour("2027-01-09")), false, "60 jours après");
+}
+
+// 13 · Le Tableau seul : ni les Aimants ni le Manteau de l'étude (ils restent dans l'historique, efb7fbd et 1476fcd).
+{
+  assert.ok("entraineur" in MATIERES);
+  for (const nom of ["aimants", "manteau", "tableau"]) assert.ok(!(nom in MATIERES), `${nom} ne part pas en ligne`);
+  assert.deepEqual(Object.keys(MATIERES_ENTRAINEUR), ["tableau"]);
+  assert.equal(MATIERES.entraineur.motif?.type, "tableau-craie");
+  const fichiers = ["skins-entraineur.ts", "motifs-entraineur.tsx", "ecusson-entraineur.tsx", "bola-card.tsx"].map((f) =>
+    readFileSync(new URL(`../src/components/sfl/${f}`, import.meta.url), "utf8")
+  );
+  for (const t of fichiers) assert.ok(!/aimants-terrain|manteau-laine|"aimant"|"fil"|tissee|imprimee/.test(t), "plus rien des Aimants ni du Manteau");
+}
+
+// 14 · Jamais de tirets autour de la carte d'entraîneur : dans l'app, ils disent « invité ».
+{
+  for (const f of ["equipe/banc-entraineur.tsx", "carte-entraineur-de.tsx", "carte-entraineur.tsx", "fiche-entraineur.tsx"]) {
+    const t = readFileSync(new URL(`../src/components/sfl/${f}`, import.meta.url), "utf8");
+    assert.ok(!/border-dashed|dashed/.test(t), `${f} : pas de tirets`);
+  }
+}
+
+// 15 · La carte gardée (entraineur_cartes) : la base calcule la note, ceil((rés + pré + coh) / 3.0) ; c'est celle de la carte.
+{
+  const schema = readFileSync(new URL("../supabase/schema.sql", import.meta.url), "utf8");
+  assert.ok(schema.includes("ceil((res + pres + coh) / 3.0)::smallint"), "la note calculée par la base");
+  for (let r = 75; r <= 99; r += 3)
+    for (let p = 75; p <= 99; p += 4)
+      for (let c = 75; c <= 99; c += 5) assert.equal(noteEntraineur({ RES: r, PRES: p, COH: c }), Math.ceil((r + p + c) / 3), `${r}/${p}/${c}`);
+  const face = faceEntraineur({ RES: 78, PRES: 76, COH: 75 }, { equipe: EQUIPE_DEMO });
+  assert.equal(face.note, "77");
+  assert.deepEqual(face.stats, [["rés", 78], ["pré", 76], ["coh", 75]]);
+  assert.equal(face.court, "entraîneur");
 }
 
 console.log("entraineur-check : ok");

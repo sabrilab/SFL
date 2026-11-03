@@ -81,7 +81,7 @@ import {
 import { MATIERES_OFFERTES, type FinitionOfferte, type MotifOffert } from "@/components/sfl/skins-offerts";
 import { MATIERE_ARBITRE, MATIERES_ARBITRE, type FinitionArbitre, type MotifArbitre } from "@/components/sfl/skins-arbitre";
 import { MATIERES_RECRUES, numeroFondateur, type FinitionRecrue, type MotifRecrue } from "@/components/sfl/skins-recrues";
-import { MATIERE_ENTRAINEUR, MATIERES_ENTRAINEUR, type FinitionEntraineur, type MotifEntraineur, type TraitEntraineur } from "@/components/sfl/skins-entraineur";
+import { MATIERE_ENTRAINEUR, type MotifEntraineur, type TraitEntraineur } from "@/components/sfl/skins-entraineur";
 import { MATIERES_AFRIQUE } from "@/components/sfl/afrique/registre";
 import { NATIONS, numeroSerieNation } from "@/lib/sfl/pack-afrique";
 import type { FinitionAfrique, MotifAfrique } from "@/components/sfl/afrique/types";
@@ -140,9 +140,9 @@ export type EditionEpoque = "s0" | "s0-mvp" | "s0-impact" | "s0-def";
 
 /**
  * Les matières : les quatre éditions, les finitions, l'ancienne rare, les éditions d'époque, la carte
- * d'arbitre et ses skins, et la carte d'entraîneur de Bola Team (étude, skins-entraineur.ts).
+ * d'arbitre et ses skins, et la carte d'entraîneur de Bola Team (le Tableau, skins-entraineur.ts).
  */
-export type NomMatiere = EditionCarte | Finition | "rare" | EditionEpoque | "arbitre" | FinitionArbitre | "entraineur" | FinitionEntraineur;
+export type NomMatiere = EditionCarte | Finition | "rare" | EditionEpoque | "arbitre" | FinitionArbitre | "entraineur";
 
 /** Le motif gravé d'une matière (motif-carte.tsx le dessine). */
 export type Motif =
@@ -256,7 +256,7 @@ export interface Matiere {
    * dessine lui-même la lune et le logotype.
    */
   dos?: Partial<Pick<Matiere, "encre" | "sombre" | "papier" | "micro" | "reflet" | "rebord" | "trame">> & { logo?: false };
-  /** La carte d'entraîneur (étude, skins-entraineur.ts) : l'écusson de son équipe, l'étiquette, le portrait sans photo. */
+  /** La carte d'entraîneur (skins-entraineur.ts) : l'écusson de son équipe et l'étiquette, à la craie. */
   entraineur?: TraitEntraineur;
 }
 
@@ -738,9 +738,8 @@ export const MATIERES: Record<NomMatiere, Matiere> = {
   ...MATIERES_ARBITRE,
   // Le PACK AFRIQUE 2027 (components/sfl/afrique/registre.ts).
   ...MATIERES_AFRIQUE,
-  // La carte d'entraîneur de Bola Team (étude du 02/11) : sa matière, et ses trois directions.
+  // La carte d'entraîneur de Bola Team (Ilyes, 02/11/2026) : le Tableau.
   entraineur: MATIERE_ENTRAINEUR,
-  ...MATIERES_ENTRAINEUR,
   couleurs: matiereCouleurs(PAYS_PAR_DEFAUT),
 };
 

@@ -1,10 +1,15 @@
-// Trois saisons inventées pour la carte d'entraîneur (étude du 02/11/2026,
-// branche coach-etude, troisième version revue) : Lucien, entraîneur de Mons
+// Trois saisons inventées pour la carte d'entraîneur (l'étude du 02/11/2026,
+// gardée pour les contrôles et la démonstration) : Lucien, entraîneur de Mons
 // Academy (une équipe de la démonstration du championnat, equipes-demo.ts :
 // le blason à tête plate, le chevron, le ballon), sept joueurs, 40
 // rencontres, de novembre 2026 à septembre 2027. Ni la base, ni un vrai
 // joueur : des faits plausibles, pour voir ce que donne le modèle
 // (lib/sfl/entraineur.ts) et en tirer les chiffres de la carte.
+// tools/entraineur-check.ts et entraineur-faits-check.ts les rejouent ;
+// l'aperçu de l'app (le monde de démonstration de la page Team, jamais en
+// production) montre la carte qu'elles donnent (carteEntraineurDemo), une
+// année plus tôt : Lucien a entraîné Mons Academy jusqu'en octobre 2026, puis
+// il est arrivé à Sunday Five.
 //
 // Ce qu'il s'y passe :
 //   · avant lui, Mons Academy déclarait forfait : deux fois sur ses 16
@@ -20,7 +25,16 @@
 // répète la note).
 
 import { PALETTE } from "@/lib/sfl/blason";
-import type { CarriereEntraineur, EquipeAvant, EquipeEntraineur, Inscrit, MembreEntraineur, RencontreEntraineur } from "@/lib/sfl/entraineur";
+import {
+  evoluerEntraineur,
+  type CarriereEntraineur,
+  type EquipeAvant,
+  type EquipeEntraineur,
+  type EvolutionEntraineur,
+  type Inscrit,
+  type MembreEntraineur,
+  type RencontreEntraineur,
+} from "@/lib/sfl/entraineur";
 
 const couleur = (id: string) => PALETTE.find((c) => c.id === id)!.hex;
 
@@ -46,6 +60,20 @@ export const MEMBRES_DEMO: MembreEntraineur[] = [
   { id: "ma-samir", nom: "Samir", arrivee: "2026-09-20", derniereFeuille: "2026-10-10", depart: { le: "2026-12-20", motif: "depart" } },
   { id: "ma-nassim", nom: "Nassim", arrivee: "2026-12-27" },
 ];
+
+/** Les noms des adversaires (le journal les dit : « victoire contre bien plus fort · Lambersart Athletic »). */
+export const ADVERSAIRES_DEMO: Record<number, string> = {
+  11: "Lambersart Athletic",
+  12: "Tourcoing United",
+  13: "Lomme Sporting",
+  14: "Vauban FC",
+  15: "Hellemmes City",
+  16: "Union Marcq",
+  17: "Croix Rovers",
+  18: "Villeneuve Five",
+  19: "Wattrelos Stars",
+  20: "Euralille FC",
+};
 
 /** Les adversaires de la démonstration du championnat (leurs ids), et les notes de carte de leur feuille. */
 const ADVERSES: Record<number, number[]> = {
@@ -74,6 +102,7 @@ const r = (le: string, adversaire: number, [pour, contre]: [number, number], ins
   le,
   saison: saison(le),
   adversaire,
+  adversaireNom: ADVERSAIRES_DEMO[adversaire],
   forfait: false,
   pour,
   contre,
@@ -148,3 +177,33 @@ export const EQUIPE_DEMO: EquipeEntraineur = {
   fond: "noir",
   blason: { forme: "blason", motif: "chevron", couleurs: [couleur("marine"), couleur("ciel"), couleur("blanc")], embleme: "ballon" },
 };
+
+/** Une carrière décalée de `ans` années (les jours AAAA-MM-JJ ; les mois et les écarts restent les mêmes). */
+export function decalerCarriere(c: CarriereEntraineur, ans: number): CarriereEntraineur {
+  const d = (iso: string) => `${Number(iso.slice(0, 4)) + ans}${iso.slice(4)}`;
+  return {
+    ...c,
+    arrivee: d(c.arrivee),
+    ...(c.fin ? { fin: d(c.fin) } : {}),
+    ...(c.feuillesDepuis ? { feuillesDepuis: d(c.feuillesDepuis) } : {}),
+    rencontres: c.rencontres.map((r) => ({ ...r, le: d(r.le) })),
+    membres: c.membres.map((m) => ({
+      ...m,
+      arrivee: d(m.arrivee),
+      ...(m.depart ? { depart: { ...m.depart, le: d(m.depart.le) } } : {}),
+      ...(m.derniereFeuille ? { derniereFeuille: d(m.derniereFeuille) } : {}),
+    })),
+  };
+}
+
+let demo: EvolutionEntraineur | null = null;
+
+/**
+ * La carte de Lucien dans l'aperçu (le monde de démonstration de la page
+ * Team) : ses trois saisons, une année plus tôt (jusqu'en octobre 2026). La
+ * même carte que l'étude : rés 78, pré 76, coh 75, note 77.
+ */
+export function carteEntraineurDemo(): EvolutionEntraineur {
+  demo ??= evoluerEntraineur(decalerCarriere(CARRIERE_DEMO, -1));
+  return demo;
+}

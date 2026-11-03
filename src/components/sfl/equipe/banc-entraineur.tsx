@@ -4,9 +4,10 @@
 // « une équipe = 7 joueurs + 1 entraîneur »). Sous le terrain de la page
 // Team (terrain-places.tsx garde ses 7 places de joueurs), une huitième
 // place, à part :
-//   · l'entraîneur en place : sa carte d'entraîneur (carte-entraineur.tsx,
-//     le Tableau) au format moyen, 78 px, le palier réduit (la note centrée
-//     et l'écusson de l'équipe), son prénom dessous ;
+//   · l'entraîneur en place : sa carte d'entraîneur (carte-entraineur-de.tsx,
+//     le Tableau, telle que le serveur la garde) au format moyen, 78 px, le
+//     palier réduit (la note centrée et l'écusson de l'équipe), son prénom
+//     dessous ; la toucher ouvre sa fiche ;
 //   · invité : sa carte voilée et le temps qui lui reste (« Adil · 71 h ») ;
 //   · personne : au capitaine, un + comme une place libre du terrain, qui
 //     ouvre la liste des joueurs ; aux autres, rien.
@@ -15,32 +16,15 @@
 // que le calcul de ses trois caractéristiques n'a rien posé.
 
 import { Plus } from "lucide-react";
-import { CarteEntraineur } from "@/components/sfl/carte-entraineur";
+import { CarteEntraineurDe } from "@/components/sfl/carte-entraineur-de";
 import { FORMAT_CARTE } from "@/components/sfl/mini-carte";
-import { usePhotoPerso } from "@/hooks/use-player-photo";
-import { DEPART_ENTRAINEUR, type StatsEntraineur } from "@/lib/sfl/entraineur";
 import { finInvitation, resteAvant } from "@/lib/sfl/equipes-temps";
 import type { Equipe, Membre } from "@/lib/sfl/equipes";
 import { cn } from "@/lib/utils";
 
-const DEPART: StatsEntraineur = { RES: DEPART_ENTRAINEUR, PRES: DEPART_ENTRAINEUR, COH: DEPART_ENTRAINEUR };
 /** La carte au format moyen : 78 px de large (mini-carte.tsx). */
 const COTE = 254 * FORMAT_CARTE.moyenne;
 const prenom = (nom: string) => nom.split(" ")[0];
-
-/** La carte d'entraîneur d'un membre, avec sa photo du studio. */
-export function CarteEntraineurDuMembre({ equipe, nom, stats = DEPART, size = FORMAT_CARTE.moyenne }: { equipe: Equipe; nom: string; stats?: StatsEntraineur; size?: number }) {
-  const photo = usePhotoPerso(nom);
-  return (
-    <CarteEntraineur
-      nom={nom}
-      equipe={{ nom: equipe.nom, initiales: equipe.initiales, fond: equipe.fond, blason: equipe.blason }}
-      photo={photo}
-      stats={stats}
-      size={size}
-    />
-  );
-}
 
 export function BancEntraineur({
   equipe,
@@ -86,7 +70,7 @@ export function BancEntraineur({
         className="relative flex transition-transform active:scale-95"
       >
         <span className={cn("flex", invite && "opacity-45")}>
-          <CarteEntraineurDuMembre equipe={equipe} nom={entraineur.name} />
+          <CarteEntraineurDe nom={entraineur.name} id={entraineur.id} equipe={equipe} inerte />
         </span>
       </button>
       <span className={cn("text-ligne", toi ? "font-extrabold" : "font-semibold")}>

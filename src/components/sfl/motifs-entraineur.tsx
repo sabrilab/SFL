@@ -1,33 +1,21 @@
 "use client";
 
-// Les motifs de la carte d'entraîneur (skins-entraineur.ts, troisième
-// version revue après la relecture), que dessine motif-carte.tsx comme les
-// autres : du SVG dans le repère de la carte (1024 × 1656), étiré sur toute
-// la carte, sans image, sans flou ni filtre (la capture de la 3D le prend tel
-// quel). Chaque matière se fait en couches, et dessine son dos elle-même, la
-// lune et le logotype compris (Matiere.dos.logo = false) :
-//   · tableau-craie : le grain du tableau (deux trames de tailles premières
-//     entre elles, pour que la répétition ne se voie pas) ; les passes
-//     d'effacement, à bouts carrés, striées par la brosse, à gauche de la
-//     colonne des chiffres ; les schémas des causeries d'avant, mal effacés
-//     (sous la note, la course fléchée d'une autre mi-temps) ; la poussière au
-//     pied, en traînées ; sans photo, le schéma de la mi-temps dans le
-//     portrait ; photo ou pas, le rond central autour de la note. Au dos, le
-//     rond central autour de la lune ; la lune et BOLA à la craie, couchée à
-//     plat en passes, le tableau entre elles, et cernées de trois brins.
-//     Chaque trait est fait de brins de craie interrompus, tirés de la
-//     graine ;
-//   · aimants-terrain : le tableau magnétique blanc, le terrain imprimé en
-//     vert (net : c'est une impression), les aimants de ses joueurs et ceux
-//     de l'adversaire, ronds, avec leur arête et leur ombre ; le feutre du
-//     schéma, et le gris de ce qu'on a effacé avant. Avec une photo, la bande
-//     garde le bas du terrain : la surface, le gardien. Au dos, le terrain
-//     entier, la lune en aimant au point central, BOLA imprimé ;
-//   · manteau-laine : le drap foulé (des fibres courtes, chinées, deux
-//     trames), la surpiqûre ton sur ton de l'ourlet ; au dos, la doublure de
-//     satin, sa lumière, la bride du col, la lune et BOLA brodés au passé plat.
-// En petit, les traits s'épaississent (`epaisseur`) : le rond de craie se lit
-// encore à 78 px autour de la note, et le terrain imprimé aussi.
+// Le motif de la carte d'entraîneur (skins-entraineur.ts : le Tableau, la
+// causerie), que dessine motif-carte.tsx comme les autres : du SVG dans le
+// repère de la carte (1024 × 1656), étiré sur toute la carte, sans image,
+// sans flou ni filtre (la capture de la 3D le prend tel quel). La craie se
+// fait en couches, et dessine son dos elle-même, la lune et le logotype
+// compris (Matiere.dos.logo = false) : le grain du tableau (deux trames de
+// tailles premières entre elles, pour que la répétition ne se voie pas) ; les
+// passes d'effacement, à bouts carrés, striées par la brosse, à gauche de la
+// colonne des chiffres ; les schémas des causeries d'avant, mal effacés (sous
+// la note, la course fléchée d'une autre mi-temps) ; la poussière au pied, en
+// traînées ; sans photo, le schéma de la mi-temps dans le portrait ; photo ou
+// pas, le rond central autour de la note. Au dos, le rond central autour de
+// la lune ; la lune et BOLA à la craie, couchée à plat en passes, le tableau
+// entre elles, et cernées de trois brins. Chaque trait est fait de brins de
+// craie interrompus, tirés de la graine. En petit, les traits s'épaississent
+// (`epaisseur`) : le rond de craie se lit encore à 78 px autour de la note.
 
 import { useId } from "react";
 import { LOGO_BOLA } from "@/components/sfl/finitions-carte";
@@ -518,267 +506,6 @@ function Tableau({ m, graine, dos, noteCentree, k, id }: { m: Craie; graine: num
   );
 }
 
-/* --------------------------- Le tableau aimanté --------------------------- */
-
-/** Le terrain imprimé : un five aux coins arrondis, en retrait du bord, le point central au milieu de la carte. */
-const TERRAIN = { x0: 26, y0: 26, x1: 998, y1: 1590, r: 66, cx: 512, cy: 808, rond: 128, surface: 150 } as const;
-
-/**
- * Le terrain, net comme une impression : la ligne de touche (les coins
- * arrondis d'un five), la ligne médiane, le rond central, les deux surfaces
- * (des demi-cercles devant les buts), les points de réparation. Le rond de la
- * surface du bas reste sous la colonne des chiffres.
- */
-function TerrainImprime({ couleur, k, dos }: { couleur: string; k: number; dos: boolean }) {
-  const { x0, y0, x1, y1, r, cx, cy, rond, surface } = TERRAIN;
-  const w = 2.4 * k;
-  return (
-    <g fill="none" stroke={couleur} strokeWidth={w}>
-      <rect x={x0} y={y0} width={x1 - x0} height={y1 - y0} rx={r} />
-      <line x1={x0} y1={cy} x2={x1} y2={cy} />
-      <circle cx={cx} cy={cy} r={rond} />
-      <circle cx={cx} cy={cy} r={4.5 * k} fill={couleur} stroke="none" />
-      <path d={`M${cx - surface} ${y0} A${surface} ${surface} 0 0 0 ${cx + surface} ${y0}`} />
-      <path d={`M${cx - surface} ${y1} A${surface} ${surface} 0 0 1 ${cx + surface} ${y1}`} />
-      <circle cx={cx} cy={y0 + 104} r={4 * k} fill={couleur} stroke="none" />
-      <circle cx={cx} cy={y1 - 104} r={4 * k} fill={couleur} stroke="none" />
-      {/* Les buts, dehors, sur l'épaisseur du cadre. */}
-      {dos && (
-        <>
-          <rect x={cx - 64} y={y0 - 14} width={128} height={14} />
-          <rect x={cx - 64} y={y1} width={128} height={14} />
-        </>
-      )}
-    </g>
-  );
-}
-
-/** Un aimant rond : son ombre sur le tableau (deux couches, sans flou), sa face, son arête claire, la lumière en biais. */
-function Aimant({ x, y, r, couleur, clair, id }: { x: number; y: number; r: number; couleur: string; clair?: boolean; id: string }) {
-  return (
-    <g>
-      <circle cx={f(x + r * 0.12)} cy={f(y + r * 0.22)} r={f(r * 1.04)} fill="rgba(10,24,16,0.1)" />
-      <circle cx={f(x + r * 0.06)} cy={f(y + r * 0.11)} r={r} fill="rgba(10,24,16,0.18)" />
-      <circle cx={x} cy={y} r={r} fill={couleur} />
-      <circle cx={x} cy={y} r={r} fill={`url(#am-${id})`} />
-      <circle cx={x} cy={y} r={f(r - 1.2)} fill="none" stroke={clair ? "rgba(20,32,26,0.34)" : "rgba(255,255,255,0.2)"} strokeWidth={clair ? 2 : 1.4} />
-    </g>
-  );
-}
-
-/**
- * Le feutre effaçable : un trait plein, d'une seule épaisseur, un peu
- * transparent là où la pointe passe deux fois ; et le gris de ce qu'on a
- * effacé avant (les fantômes du tableau blanc).
- */
-function Feutre({ pts, couleur, rnd, w = 5, o = 0.82, tirets = false }: { pts: P[]; couleur: string; rnd: () => number; w?: number; o?: number; tirets?: boolean }) {
-  const d = chemin(aMainLevee(pts, rnd, 1.1));
-  return <path d={d} fill="none" stroke={couleur} strokeWidth={w} strokeLinecap="round" strokeLinejoin="round" opacity={o} strokeDasharray={tirets ? "22 16" : undefined} />;
-}
-
-function Aimants({ motif, graine, dos, k, id }: { motif: Extract<MotifEntraineur, { type: "aimants-terrain" }> & Couleurs; graine: number; dos: boolean; k: number; id: string }) {
-  const rnd = alea(graine ^ 0x3c6ef372);
-  const imp = motif.impression;
-  const clairAimant = "#f7f8f6";
-  // La face : ses cinq (sombres) en losange, les leurs (clairs) ; le gardien dans la surface du bas, sous la note.
-  const nous: P[] = [
-    [512, 1532],
-    [300, 640],
-    [724, 640],
-    [512, 470],
-    [512, 250],
-  ];
-  const eux: P[] = [
-    [380, 352],
-    [650, 330],
-    [512, 140],
-    [430, 560],
-  ];
-  const fleche = courbe([300, 610], [210, 470], [360, 330]);
-  const passe: P[] = [[512, 498], [690, 380]];
-  return (
-    <>
-      <defs>
-        <radialGradient id={`am-${id}`} cx="0.34" cy="0.3" r="0.75">
-          <stop offset="0" stopColor="#fff" stopOpacity={0.2} />
-          <stop offset="0.4" stopColor="#fff" stopOpacity={0.02} />
-          <stop offset="1" stopColor="#000" stopOpacity={0.16} />
-        </radialGradient>
-      </defs>
-      {/* Ce qu'on a effacé avant : du gris, en larges traînées. */}
-      <g>
-        <Feutre pts={courbe([80, 1180], [260, 1100], [430, 1220])} couleur={motif.feutre} rnd={rnd} w={9} o={0.05} />
-        <Feutre pts={courbe([120, 960], [420, 900], [700, 1000])} couleur={motif.feutre} rnd={rnd} w={12} o={0.04} />
-        <Feutre pts={courbe([640, 220], [860, 300], [900, 520])} couleur={motif.feutre} rnd={rnd} w={10} o={0.045} />
-        <Feutre pts={[[150, 1530], [400, 1500]]} couleur={motif.feutre} rnd={rnd} w={7} o={0.05} />
-      </g>
-      <TerrainImprime couleur={dos ? imp : `${imp}`} k={k} dos={dos} />
-      {dos ? (
-        <>
-          {/* Au dos, la lune est l'aimant du ballon, au point central ; BOLA imprimé dessous, comme la marque du tableau. */}
-          <Aimant x={TERRAIN.cx} y={TERRAIN.cy} r={176} couleur={motif.aimant} id={id} />
-          <path d={LOGO_BOLA.symbole} fillRule="evenodd" transform={luneT(TERRAIN.cx, TERRAIN.cy, 236)} fill="#f4f6f3" />
-          <path d={LOGO_BOLA.logotype} fillRule="evenodd" transform={LOGO_T} fill={imp} />
-        </>
-      ) : (
-        <>
-          {/* Le schéma au feutre, dans le portrait (sous la photo). */}
-          <Feutre pts={fleche} couleur={motif.feutre} rnd={rnd} />
-          <Feutre pts={pointe(fleche, 30)[0].pts} couleur={motif.feutre} rnd={rnd} />
-          <Feutre pts={pointe(fleche, 30)[1].pts} couleur={motif.feutre} rnd={rnd} />
-          <Feutre pts={passe} couleur={motif.feutre} rnd={rnd} tirets />
-          {eux.map(([x, y], i) => (
-            <Aimant key={`e${i}`} x={x} y={y} r={30} couleur={clairAimant} clair id={id} />
-          ))}
-          {nous.map(([x, y], i) => (
-            <Aimant key={`n${i}`} x={x} y={y} r={i === 0 ? 28 : 30} couleur={motif.aimant} id={id} />
-          ))}
-        </>
-      )}
-    </>
-  );
-}
-
-/* ------------------------------ Le manteau ------------------------------- */
-
-/** Le rayon des coins de la carte (finitions-carte.ts, RAYON_CARTE = 1024 ÷ φ⁵). */
-const RAYON = 1024 / ((1 + Math.sqrt(5)) / 2) ** 5;
-
-/**
- * Le drap de laine foulé : des fibres courtes, dans tous les sens, claires et
- * sombres, et des points chinés plus clairs ; deux trames de tailles
- * premières entre elles (97 et 61) qui se superposent.
- */
-function Drap({ id, m, graine, k }: { id: string; m: Couleurs; graine: number; k: number }) {
-  const rnd = alea(graine ^ 0x1b873593);
-  const tuile = (T: number, n: number, l0: number, l1: number) =>
-    Array.from({ length: n }, () => {
-      const x = rnd() * T;
-      const y = rnd() * T;
-      const a = rnd() * Math.PI;
-      const l = l0 + rnd() * (l1 - l0);
-      return { x, y, x2: x + l * Math.cos(a), y2: y + l * Math.sin(a), clair: rnd() < 0.5, o: 0.35 + rnd() * 0.65 };
-    });
-  const tuiles = [
-    { T: 97, g: tuile(97, 420, 1.4, 4.2) },
-    { T: 61, g: tuile(61, 120, 2.5, 6.5) },
-  ];
-  const chine = Array.from({ length: 26 }, () => ({ x: rnd() * 113, y: rnd() * 113, r: 0.6 + rnd() * 0.8, o: 0.03 + rnd() * 0.05 }));
-  return (
-    <>
-      <defs>
-        {tuiles.map((t, j) => (
-          <pattern key={j} id={`dr${j}-${id}`} width={t.T} height={t.T} patternUnits="userSpaceOnUse">
-            {t.g.map((p, i) => (
-              <line key={i} x1={f(p.x)} y1={f(p.y)} x2={f(p.x2)} y2={f(p.y2)} stroke={p.clair ? m.clair : m.fonce} strokeWidth={0.7} strokeLinecap="round" opacity={o2(p.o * 0.8)} />
-            ))}
-          </pattern>
-        ))}
-        <pattern id={`ch-${id}`} width={113} height={113} patternUnits="userSpaceOnUse">
-          {chine.map((p, i) => (
-            <circle key={i} cx={f(p.x)} cy={f(p.y)} r={f(p.r)} fill="rgba(206,236,232,1)" opacity={o2(p.o)} />
-          ))}
-        </pattern>
-      </defs>
-      {tuiles.map((_, j) => (
-        <rect key={j} width={W} height={H} fill={`url(#dr${j}-${id})`} opacity={j ? 0.7 : 1} />
-      ))}
-      <rect width={W} height={H} fill={`url(#ch-${id})`} opacity={k > 1.5 ? 0.5 : 1} />
-    </>
-  );
-}
-
-/** La surpiqûre de l'ourlet : à 16 du bord, en suivant les coins ; des points ton sur ton, un peu inégaux. */
-function Surpiqure({ fil, k, graine }: { fil: string; k: number; graine: number }) {
-  const rnd = alea(graine ^ 0x7f4a7c15);
-  const retrait = 16;
-  const b = { x: retrait, y: retrait, width: W - retrait * 2, height: H - retrait * 2, rx: RAYON - retrait };
-  const pas = Array.from({ length: 16 }, () => [7 + rnd() * 2.2, 4.4 + rnd() * 1.6]).flat().map(f).join(" ");
-  return (
-    <>
-      <rect {...b} fill="none" stroke="rgba(0,0,0,0.4)" strokeWidth={3 * k} transform="translate(0.8 1.2)" />
-      <rect {...b} fill="none" stroke={fil} strokeWidth={1.6 * k} strokeDasharray={pas} strokeLinecap="round" opacity={0.2} />
-    </>
-  );
-}
-
-/**
- * La lune et BOLA brodés au passé plat (le dos, sur la doublure) : des points
- * serrés en biais, alternés clairs et sombres comme la lumière sur le fil,
- * l'ombre du relief sur le satin, puis un point de contour qui les borde.
- */
-function MarqueBrodee({ id, fil }: { id: string; fil: string }) {
-  const lignes = Array.from({ length: 330 }, (_, i) => i * 4.2 - 300);
-  return (
-    <>
-      <defs>
-        <clipPath id={`mb-${id}`}>
-          <Marque />
-        </clipPath>
-        <linearGradient id={`ml-${id}`} x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#fff" stopOpacity={0.28} />
-          <stop offset="0.45" stopColor="#fff" stopOpacity={0} />
-          <stop offset="1" stopColor="#000" stopOpacity={0.22} />
-        </linearGradient>
-      </defs>
-      <g transform="translate(3 5)">
-        <Marque fill="rgba(0,0,0,0.42)" />
-      </g>
-      <g clipPath={`url(#mb-${id})`}>
-        <rect width={W} height={H} fill={fil} opacity={0.94} />
-        {lignes.map((x, i) => (
-          <line key={i} x1={x} y1={0} x2={x + 620} y2={H} stroke={i % 3 ? "rgba(0,0,0,0.09)" : "rgba(255,255,255,0.4)"} strokeWidth={1.3} />
-        ))}
-        <rect width={W} height={H} fill={`url(#ml-${id})`} />
-      </g>
-      <Marque fill="none" stroke="rgba(0,0,0,0.38)" strokeWidth={2.2} strokeDasharray="4 2.2 3 2.6" />
-    </>
-  );
-}
-
-/** La doublure de satin (le dos) : sa lumière en biais, les reflets qui courent, la bride du col en haut. */
-function Doublure({ id, couleurs }: { id: string; couleurs: [string, string, string] }) {
-  return (
-    <>
-      <defs>
-        <linearGradient id={`sa-${id}`} x1="0" y1="0" x2="1" y2="0.62">
-          <stop offset="0" stopColor="#fff" stopOpacity={0} />
-          <stop offset="0.3" stopColor="#fff" stopOpacity={0.1} />
-          <stop offset="0.38" stopColor="#fff" stopOpacity={0.02} />
-          <stop offset="0.6" stopColor="#fff" stopOpacity={0.07} />
-          <stop offset="0.7" stopColor="#000" stopOpacity={0.12} />
-          <stop offset="1" stopColor="#000" stopOpacity={0.02} />
-        </linearGradient>
-        <pattern id={`sw-${id}`} width={5} height={5} patternUnits="userSpaceOnUse" patternTransform="rotate(-28)">
-          <line x1="0" y1="0" x2="5" y2="0" stroke="rgba(255,255,255,0.035)" strokeWidth={1} />
-        </pattern>
-      </defs>
-      <rect width={W} height={H} fill={`url(#sa-${id})`} />
-      <rect width={W} height={H} fill={`url(#sw-${id})`} />
-      {/* La bride du col : un ruban plié, cousu au bord haut. */}
-      <path d="M486 0 L486 74 Q512 92 538 74 L538 0 Z" fill={couleurs[2]} opacity={0.9} />
-      <path d="M492 0 L492 70 Q512 84 532 70 L532 0" fill="none" stroke="rgba(255,255,255,0.14)" strokeWidth={1.4} />
-      <path d="M486 74 Q512 92 538 74" fill="none" stroke="rgba(0,0,0,0.35)" strokeWidth={2} />
-    </>
-  );
-}
-
-function Manteau({ motif, id, graine, dos, k }: { motif: Extract<MotifEntraineur, { type: "manteau-laine" }> & Couleurs; id: string; graine: number; dos: boolean; k: number }) {
-  if (dos)
-    return (
-      <>
-        <Doublure id={id} couleurs={motif.doublure} />
-        <MarqueBrodee id={id} fil={motif.fil} />
-      </>
-    );
-  return (
-    <>
-      <Drap id={id} m={motif} graine={graine} k={k} />
-      <Surpiqure fil={motif.fil} k={k} graine={graine} />
-    </>
-  );
-}
-
 export function MotifEntraineurSvg({
   motif,
   graine = 1,
@@ -799,13 +526,7 @@ export function MotifEntraineurSvg({
   const k = Math.max(1, Math.min(3.4, epaisseur));
   return (
     <svg aria-hidden viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={style}>
-      {motif.type === "tableau-craie" ? (
-        <Tableau m={{ ...m, craie: motif.craie }} graine={graine} dos={dos} noteCentree={noteCentree} k={k} id={id} />
-      ) : motif.type === "aimants-terrain" ? (
-        <Aimants motif={motif} graine={graine} dos={dos} k={k} id={id} />
-      ) : (
-        <Manteau motif={motif} id={id} graine={graine} dos={dos} k={k} />
-      )}
+      <Tableau m={{ ...m, craie: motif.craie }} graine={graine} dos={dos} noteCentree={noteCentree} k={k} id={id} />
     </svg>
   );
 }

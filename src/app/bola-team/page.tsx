@@ -108,7 +108,8 @@ import { VitrineTeam } from "@/components/sfl/equipe/vitrine-team";
 import { TerrainRetenu } from "@/components/sfl/matchs/choisir-terrain";
 import { TerrainPlaces, type Occupant } from "@/components/sfl/matchs/terrain-places";
 import { ChoisirJoueur } from "@/components/sfl/matchs/choisir-joueur";
-import { BancEntraineur, CarteEntraineurDuMembre } from "@/components/sfl/equipe/banc-entraineur";
+import { BancEntraineur } from "@/components/sfl/equipe/banc-entraineur";
+import { CarteEntraineurDe } from "@/components/sfl/carte-entraineur-de";
 import { useSession } from "@/hooks/use-session";
 import { useAccesTeam, useEssaiTeam } from "@/hooks/use-acces-team";
 import { useApercuTeam } from "@/hooks/use-equipes";
@@ -1282,7 +1283,7 @@ function FicheJoueur({
     <>
       <SheetHeader className="flex-row items-center gap-4 px-5 pt-5 pb-0">
         <span className={cn("shrink-0", invite && "opacity-60")}>
-          {coach ? <CarteEntraineurDuMembre equipe={equipe} nom={joueur.name} /> : <CarteDe name={joueur.name} size={FORMAT_CARTE.moyenne} />}
+          {coach ? <CarteEntraineurDe nom={joueur.name} id={joueur.id} equipe={equipe} /> : <CarteDe name={joueur.name} size={FORMAT_CARTE.moyenne} />}
         </span>
         <span className="flex min-w-0 flex-col gap-1 pr-8">
           <SheetTitle className="text-titre-g leading-tight font-bold tracking-tight">{joueur.name}</SheetTitle>
