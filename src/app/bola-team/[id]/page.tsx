@@ -284,8 +284,9 @@ export default function PageEquipe() {
                 if (em.etat !== "valide") return null;
                 const chezNous = m.de === montree.id;
                 const autre = adversaire(chezNous ? m.a : m.de);
-                const pour = chezNous ? em.buts[0] : em.buts[1];
-                const contre = chezNous ? em.buts[1] : em.buts[0];
+                // Le score final : le 5 contre 4 a pu le changer.
+                const pour = chezNous ? em.final[0] : em.final[1];
+                const contre = chezNous ? em.final[1] : em.final[0];
                 const r: Res = pour > contre ? "V" : pour === contre ? "N" : "D";
                 return (
                   <Link
@@ -299,7 +300,15 @@ export default function PageEquipe() {
                       <span className="truncate text-lecture font-semibold">{autre?.nom ?? "Adversaire"}</span>
                       <span className="mono-label text-encre-3">
                         {libelleJour(m.jour)}
-                        {em.forfaitDe != null ? " · forfait" : !compte ? " · amical" : ""}
+                        {em.forfaitDe != null
+                          ? " · forfait"
+                          : !compte
+                            ? " · amical"
+                            : em.aQuatre === montree.id
+                              ? " · à 4"
+                              : em.aQuatre != null
+                                ? " · 5 contre 4"
+                                : ""}
                       </span>
                     </span>
                     <span className="shrink-0 text-titre-m leading-none tabular-nums" style={{ fontFamily: ANTON }}>

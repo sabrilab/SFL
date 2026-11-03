@@ -12,7 +12,8 @@
 //   · resultat (24/10) : mon équipe vient de remplir la feuille d'un match ;
 //     le capitaine et le vice de l'autre équipe l'apprennent, avec le score,
 //     pour confirmer (sans réponse, il vaut 24 h plus tard). Une fois par
-//     saisie (equipe_resultats.notifie_le).
+//     saisie (equipe_resultats.notifie_le). Depuis le 03/11/2026, les
+//     présents des deux équipes doivent coller aussi (le 5 contre 4).
 // Depuis le 03/11/2026, l'entraîneur (Ilyes : 7 joueurs + 1 entraîneur) :
 // son invitation s'annonce « Ilyes t'invite à entraîner · Sunday Five », le
 // capitaine et le vice apprennent sa signature, et les comptes (« 3 / 5 »,
@@ -229,19 +230,29 @@ async function resultat(sb: NonNullable<ReturnType<typeof serveur>>, moi: string
   if (!ici) return NextResponse.json({ error: "Réservé aux capitaines." }, { status: 403 });
   const mienne = ici.equipe_id;
   const autre = mienne === defi.de ? defi.a : defi.de;
-  const { data: saisie } = await sb
-    .from("equipe_resultats")
-    .select("pour, contre, saisi_le, notifie_le")
-    .eq("defi_id", d)
-    .eq("equipe_id", mienne)
-    .maybeSingle();
+  // Les présents (le 5 contre 4) : sur la base d'avant (une préversion), sans eux.
+  type Saisie = { pour: number; contre: number; saisi_le: string; notifie_le: string | null; presents?: number | null; presents_adverses?: number | null };
+  const lire = async (equipe: number) => {
+    const r = await sb.from("equipe_resultats").select("pour, contre, saisi_le, notifie_le, presents, presents_adverses").eq("defi_id", d).eq("equipe_id", equipe).maybeSingle();
+    if (r.error?.code !== "42703") return r.data as Saisie | null;
+    return (await sb.from("equipe_resultats").select("pour, contre, saisi_le, notifie_le").eq("defi_id", d).eq("equipe_id", equipe).maybeSingle()).data as Saisie | null;
+  };
+  const saisie = await lire(mienne);
   if (!saisie || Date.now() - new Date(saisie.saisi_le).getTime() > FRAIS)
     return NextResponse.json({ error: "Aucune saisie récente." }, { status: 403 });
   if (saisie.notifie_le) return NextResponse.json({ envoyes: 0 });
-  // L'autre a déjà saisi le même score : le match est validé, rien à confirmer.
-  const { data: leur } = await sb.from("equipe_resultats").select("pour, contre").eq("defi_id", d).eq("equipe_id", autre).maybeSingle();
+  // L'autre a déjà saisi le même score et les mêmes présents : le match est validé, rien à confirmer.
+  const leur = await lire(autre);
   await sb.from("equipe_resultats").update({ notifie_le: new Date().toISOString() }).eq("defi_id", d).eq("equipe_id", mienne);
-  if (leur && leur.pour === saisie.contre && leur.contre === saisie.pour) return NextResponse.json({ envoyes: 0 });
+  const p = (x: number | null | undefined) => x ?? 5;
+  if (
+    leur &&
+    leur.pour === saisie.contre &&
+    leur.contre === saisie.pour &&
+    p(leur.presents) === p(saisie.presents_adverses) &&
+    p(leur.presents_adverses) === p(saisie.presents)
+  )
+    return NextResponse.json({ envoyes: 0 });
 
   const { data: noms } = await sb.from("equipes").select("id, nom").in("id", [mienne, autre]);
   const nom = (id: number) => ((noms ?? []) as { id: number; nom: string }[]).find((x) => x.id === id)?.nom ?? "";

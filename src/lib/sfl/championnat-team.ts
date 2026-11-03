@@ -28,6 +28,14 @@
 //     peut corriger la sienne tant que la feuille est ouverte, sinon le
 //     match n'est pas classé) ;
 //   · un forfait (un match annulé à moins de 48 h) se compte 3 – 0 ;
+//   · le 5 contre 4 (art. 7.2 et 7.3 ; 03/11/2026, Q4 à Ilyes) : avec le
+//     score du terrain, chaque capitaine déclare les présents des deux
+//     équipes (5 et plus, 4, 3 et moins), qui doivent coller eux aussi.
+//     L'équipe à 4 face à 5 ou plus perd 1 but au score final, ou
+//     l'adversaire en gagne 1 si elle n'a pas marqué (scoreFinal) ; deux
+//     équipes à 4 : un amical, qui ne prend pas l'une des 2 rencontres de
+//     la saison ; 3 ou moins : le forfait de cette équipe, 0 – 3 ; les deux :
+//     non classé. Les buts et passes du terrain gardent leur valeur ;
 //   · à égalité de points : la différence de buts, les buts marqués, les
 //     victoires.
 // Les buts et les passes n'entrent pas dans les points de l'équipe : ils
@@ -73,12 +81,18 @@ export interface EquipeChampionnat {
   active: boolean;
 }
 
+/** Les présents déclarés d'une équipe : 5 (cinq ou plus), 4, ou 3 (trois ou moins). */
+export type Presents = 3 | 4 | 5;
+
 export interface SaisieTeam {
   equipe: number;
   pour: number;
   contre: number;
   /** ISO. */
   le: string;
+  /** Les présents de son équipe, puis ceux de l'autre ; absents (une feuille d'avant le 03/11/2026) : 5. */
+  presents?: Presents;
+  presentsAdverses?: Presents;
 }
 
 export interface ButeurTeam {
@@ -128,8 +142,21 @@ export type EtatMatch =
   | { etat: "a-confirmer"; par: number; buts: [number, number]; vaut: Date; ferme: Date }
   /** Les deux saisies ne collent pas, la feuille est encore ouverte. */
   | { etat: "litige"; ferme: Date }
-  /** Le score de `de`, puis celui de `a`. */
-  | { etat: "valide"; buts: [number, number]; forfaitDe: number | null }
+  /**
+   * `buts` : le score du terrain, de `de` puis de `a` (un forfait : 3 – 0) ;
+   * `final` : celui qui décide du résultat (le 5 contre 4 l'a changé) ;
+   * `aQuatre` : l'équipe arrêtée à 4 face à 5 ou plus ; `amical` : deux
+   * équipes à 4 ; `presents` : ceux de `de`, puis de `a`.
+   */
+  | {
+      etat: "valide";
+      buts: [number, number];
+      final: [number, number];
+      forfaitDe: number | null;
+      aQuatre: number | null;
+      presents: [Presents, Presents];
+      amical?: "deux-a-quatre";
+    }
   /** Feuille fermée sans score qui tienne. */
   | { etat: "non-classe" };
 
@@ -148,11 +175,77 @@ export function coupDEnvoiTeam(m: Pick<MatchTeam, "jour" | "heure">): Date {
 /** La feuille ferme 3 jours après le coup d'envoi. */
 export const fermeture = (m: Pick<MatchTeam, "jour" | "heure">) => new Date(coupDEnvoiTeam(m).getTime() + CHAMPIONNAT.saisieJours * 24 * H);
 
+/** Le score final d'après le score du terrain et les présents (art. 7.3), tout de `de` puis de `a`. */
+export interface ScoreFinal {
+  final: [number, number];
+  /** Le côté arrêté à 4 face à 5 ou plus (0 : `de`, 1 : `a`). */
+  aQuatre: 0 | 1 | null;
+  /** Le côté forfait, à 3 ou moins (0 – 3). */
+  forfait: 0 | 1 | null;
+  /** Deux équipes à 4 : un amical, rien de retiré. */
+  amical: boolean;
+  /** Les deux à 3 ou moins : personne ne gagne, le match n'est pas classé. */
+  nonClasse: boolean;
+}
+
+/**
+ * Le 5 contre 4 (Règlement Team art. 7.3, règle du fondateur) : l'équipe à
+ * 4 face à 5 ou plus perd 1 but au score final ; si elle n'a pas marqué,
+ * l'adversaire en gagne 1 (le score final ne descend pas sous 0). 3 ou moins
+ * d'un côté : son forfait, 0 – 3 ; des deux côtés : non classé.
+ */
+export function scoreFinal(terrain: [number, number], presents: [Presents, Presents]): ScoreFinal {
+  const [pDe, pA] = presents;
+  const rien = { aQuatre: null, forfait: null, amical: false, nonClasse: false } as const;
+  const f = CHAMPIONNAT.forfait;
+  if (pDe <= 3 && pA <= 3) return { ...rien, final: [0, 0], nonClasse: true };
+  if (pDe <= 3) return { ...rien, final: [0, f], forfait: 0 };
+  if (pA <= 3) return { ...rien, final: [f, 0], forfait: 1 };
+  if (pDe === 4 && pA === 4) return { ...rien, final: [terrain[0], terrain[1]], amical: true };
+  if (pDe === 4) return { ...rien, final: terrain[0] > 0 ? [terrain[0] - 1, terrain[1]] : [terrain[0], terrain[1] + 1], aQuatre: 0 };
+  if (pA === 4) return { ...rien, final: terrain[1] > 0 ? [terrain[0], terrain[1] - 1] : [terrain[0] + 1, terrain[1]], aQuatre: 1 };
+  return { ...rien, final: [terrain[0], terrain[1]] };
+}
+
+const presentsDe = (p: number | undefined): Presents => (p === 3 || p === 4 ? p : 5);
+
+/** Les présents qu'une saisie déclare, de `de` puis de `a`. */
+export function presentsSaisis(m: Pick<MatchTeam, "de">, s: SaisieTeam): [Presents, Presents] {
+  const miens = presentsDe(s.presents);
+  const siens = presentsDe(s.presentsAdverses);
+  return s.equipe === m.de ? [miens, siens] : [siens, miens];
+}
+
+/** Deux saisies collent : le même score du terrain et les mêmes présents, vus de chaque côté. */
+export const collent = (a: SaisieTeam, b: SaisieTeam) =>
+  a.pour === b.contre &&
+  a.contre === b.pour &&
+  presentsDe(a.presents) === presentsDe(b.presentsAdverses) &&
+  presentsDe(a.presentsAdverses) === presentsDe(b.presents);
+
+/** Le match validé : son score final, son forfait, son 5 contre 4 ; ou non classé (les deux à 3 ou moins). */
+function valide(m: MatchTeam, terrain: [number, number], presents: [Presents, Presents]): EtatMatch {
+  const s = scoreFinal(terrain, presents);
+  if (s.nonClasse) return { etat: "non-classe" };
+  const cote = (c: 0 | 1 | null) => (c == null ? null : c === 0 ? m.de : m.a);
+  if (s.forfait != null) return { etat: "valide", buts: s.final, final: s.final, forfaitDe: cote(s.forfait), aQuatre: null, presents };
+  return {
+    etat: "valide",
+    buts: terrain,
+    final: s.final,
+    forfaitDe: null,
+    aQuatre: cote(s.aQuatre),
+    presents,
+    ...(s.amical ? { amical: "deux-a-quatre" as const } : {}),
+  };
+}
+
 /** Où en est un match : à venir, à saisir, à confirmer, en litige, validé ou non classé. */
 export function etatMatch(m: MatchTeam, maintenant = new Date()): EtatMatch {
   if (m.statut === "forfait") {
     const f = CHAMPIONNAT.forfait;
-    return { etat: "valide", buts: m.forfaitDe === m.de ? [0, f] : [f, 0], forfaitDe: m.forfaitDe };
+    const buts: [number, number] = m.forfaitDe === m.de ? [0, f] : [f, 0];
+    return { etat: "valide", buts, final: buts, forfaitDe: m.forfaitDe, aQuatre: null, presents: [5, 5] };
   }
   const t = maintenant.getTime();
   if (coupDEnvoiTeam(m).getTime() > t) return { etat: "a-venir" };
@@ -160,14 +253,14 @@ export function etatMatch(m: MatchTeam, maintenant = new Date()): EtatMatch {
   const sDe = m.saisies.find((s) => s.equipe === m.de);
   const sA = m.saisies.find((s) => s.equipe === m.a);
   if (sDe && sA) {
-    if (sDe.pour === sA.contre && sDe.contre === sA.pour) return { etat: "valide", buts: [sDe.pour, sDe.contre], forfaitDe: null };
+    if (collent(sDe, sA)) return valide(m, [sDe.pour, sDe.contre], presentsSaisis(m, sDe));
     return ferme.getTime() > t ? { etat: "litige", ferme } : { etat: "non-classe" };
   }
   const s = sDe ?? sA;
   if (s) {
     const buts: [number, number] = s.equipe === m.de ? [s.pour, s.contre] : [s.contre, s.pour];
     const vaut = new Date(new Date(s.le).getTime() + CHAMPIONNAT.validationH * H);
-    if (vaut.getTime() <= t) return { etat: "valide", buts, forfaitDe: null };
+    if (vaut.getTime() <= t) return valide(m, buts, presentsSaisis(m, s));
     return { etat: "a-confirmer", par: s.equipe, buts, vaut, ferme };
   }
   return ferme.getTime() > t ? { etat: "a-saisir", ferme } : { etat: "non-classe" };
@@ -271,8 +364,8 @@ export interface MatchCompteTeam {
   etat: EtatMatch;
   saison: number;
   compte: boolean;
-  /** Pourquoi il ne compte pas, quand il est validé. */
-  amical?: "rencontres" | "divisions" | "hors-saison";
+  /** Pourquoi il ne compte pas, quand il est validé (deux équipes à 4 : un amical, art. 7.2). */
+  amical?: "rencontres" | "divisions" | "hors-saison" | "deux-a-quatre";
 }
 
 export interface Classe {
@@ -388,6 +481,8 @@ export function championnat(
     const joueurs = new Map<string, Classe>();
     const comptes: MatchCompteTeam[] = ici.map(({ m, etat }) => {
       if (etat.etat !== "valide") return { m, etat, saison: s, compte: false };
+      // Deux équipes à 4 : un amical, qui ne prend pas l'une des deux rencontres de la saison.
+      if (etat.amical === "deux-a-quatre") return { m, etat, saison: s, compte: false, amical: "deux-a-quatre" as const };
       const dDe = divisionDe.get(m.de);
       const dA = divisionDe.get(m.a);
       if (dDe == null || dA == null || Math.abs(dDe - dA) > 1) return { m, etat, saison: s, compte: false, amical: "divisions" as const };
@@ -395,7 +490,8 @@ export function championnat(
       const n = rencontres.get(paire) ?? 0;
       if (n >= CHAMPIONNAT.rencontres) return { m, etat, saison: s, compte: false, amical: "rencontres" as const };
       rencontres.set(paire, n + 1);
-      const [bDe, bA] = etat.buts;
+      // Le score final : le 5 contre 4 a pu le changer.
+      const [bDe, bA] = etat.final;
       for (const [id, pour, contre] of [
         [m.de, bDe, bA],
         [m.a, bA, bDe],

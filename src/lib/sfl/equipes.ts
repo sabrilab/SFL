@@ -43,7 +43,7 @@ import { SUPABASE_URL, supabase } from "@/lib/supabase";
 import { finInvitation } from "@/lib/sfl/equipes-temps";
 import { lireBlason, type Blason } from "@/lib/sfl/blason";
 import { joue, type Role } from "@/lib/sfl/equipes-droits";
-import type { ButeurTeam, EquipeChampionnat, FeuilleTeam, MatchTeam, SaisieTeam } from "@/lib/sfl/championnat-team";
+import type { ButeurTeam, EquipeChampionnat, FeuilleTeam, MatchTeam, Presents, SaisieTeam } from "@/lib/sfl/championnat-team";
 
 export { DROITS, FEUILLE_AVANT_MATCH, brassard, droitDe, joue, peut, peutDeposer, type Geste, type Role } from "@/lib/sfl/equipes-droits";
 
@@ -525,16 +525,20 @@ export async function poserCouverture(e: number, image: string): Promise<void> {
 export const retirerCouverture = (e: number) => rpc("equipe_couverture", { e, posee: false });
 
 /**
- * La feuille d'un match : le score vu de mon équipe, ses buteurs et ses
- * passeurs ; puis l'autre capitaine est prévenu qu'il confirme.
+ * La feuille d'un match : le score du terrain vu de mon équipe, ses buteurs
+ * et ses passeurs, et les présents des deux équipes (5 : cinq ou plus ; 4 ;
+ * 3 : trois ou moins, le forfait) ; puis l'autre capitaine est prévenu qu'il
+ * confirme.
  */
 export async function saisirResultat(
   d: number,
   pour: number,
   contre: number,
-  lignes: { joueur: string; buts: number; passes: number }[]
+  lignes: { joueur: string; buts: number; passes: number }[],
+  presents: Presents = 5,
+  presentsAdverses: Presents = 5
 ): Promise<void> {
-  await rpc("equipe_resultat", { d, pour, contre, lignes });
+  await rpc("equipe_resultat", { d, pour, contre, lignes, presents, presents_adverses: presentsAdverses });
   void notifierResultat(d);
 }
 
@@ -543,10 +547,13 @@ export async function lireChampionnat(): Promise<{ equipes: EquipeTeam[]; matchs
   const sb = supabase();
   const lireEquipes = (blason: boolean) =>
     sb.from("equipes").select(`id, nom, initiales, fond, ville, ${blason ? "blason, " : ""}created_at, dissoute_le, equipe_membres(statut, role)`);
-  const [avecBlason, df, rs, bt, feuilles] = await Promise.all([
+  // Les présents (le 5 contre 4, 03/11/2026) : une préversion sur la base d'avant ne les a pas (42703), on relit sans.
+  const lireSaisies = (presents: boolean) =>
+    sb.from("equipe_resultats").select(`defi_id, equipe_id, pour, contre, saisi_le${presents ? ", presents, presents_adverses" : ""}`);
+  const [avecBlason, df, avecPresents, bt, feuilles] = await Promise.all([
     lireEquipes(true),
     sb.from("equipe_defis").select("id, de, a, jour, heure, lieu, statut, forfait_de").in("statut", ["accepte", "forfait"]),
-    sb.from("equipe_resultats").select("defi_id, equipe_id, pour, contre, saisi_le"),
+    lireSaisies(true),
     sb
       .from("equipe_resultat_joueurs")
       .select("defi_id, equipe_id, joueur, buts, passes, p:profiles!equipe_resultat_joueurs_joueur_fkey(name)"),
@@ -555,8 +562,19 @@ export async function lireChampionnat(): Promise<{ equipes: EquipeTeam[]; matchs
   const eq = sansColonne(avecBlason.error) ? await lireEquipes(false) : avecBlason;
   if (eq.error) throw eq.error;
   if (df.error) throw df.error;
+  const rs = sansColonne(avecPresents.error) ? await lireSaisies(false) : avecPresents;
   // Sans la migration (une préversion), pas encore de feuilles : le championnat reste vide.
-  const saisies = rs.error ? [] : ((rs.data ?? []) as { defi_id: number; equipe_id: number; pour: number; contre: number; saisi_le: string }[]);
+  const saisies = rs.error
+    ? []
+    : ((rs.data ?? []) as unknown as {
+        defi_id: number;
+        equipe_id: number;
+        pour: number;
+        contre: number;
+        saisi_le: string;
+        presents?: Presents | null;
+        presents_adverses?: Presents | null;
+      }[]);
   const buteurs = bt.error
     ? []
     : ((bt.data ?? []) as unknown as { defi_id: number; equipe_id: number; joueur: string; buts: number; passes: number; p: Un<{ name: string }> }[]);
@@ -596,7 +614,16 @@ export async function lireChampionnat(): Promise<{ equipes: EquipeTeam[]; matchs
       forfaitDe: d.forfait_de,
       saisies: saisies
         .filter((s) => s.defi_id === d.id)
-        .map((s): SaisieTeam => ({ equipe: s.equipe_id, pour: s.pour, contre: s.contre, le: s.saisi_le })),
+        .map(
+          (s): SaisieTeam => ({
+            equipe: s.equipe_id,
+            pour: s.pour,
+            contre: s.contre,
+            le: s.saisi_le,
+            ...(s.presents ? { presents: s.presents } : {}),
+            ...(s.presents_adverses ? { presentsAdverses: s.presents_adverses } : {}),
+          })
+        ),
       buteurs: buteurs
         .filter((b) => b.defi_id === d.id)
         .map((b): ButeurTeam => ({ equipe: b.equipe_id, joueur: b.joueur, name: un(b.p)?.name ?? "?", buts: b.buts, passes: b.passes })),

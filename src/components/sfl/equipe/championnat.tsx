@@ -338,15 +338,21 @@ export function ChampionnatTeam({
                   </span>
                   <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
                     <span className="flex min-w-0 items-center justify-end gap-2">
-                      <span className="truncate text-right text-ligne font-semibold">{a.nom}</span>
+                      <span className="flex min-w-0 flex-col items-end">
+                        <span className="w-full truncate text-right text-ligne font-semibold">{a.nom}</span>
+                        {etat.aQuatre === m.de && <span className="mono-label text-encre-3">à 4</span>}
+                      </span>
                       <Ecusson initiales={a.initiales} fond={a.fond} blason={a.blason} taille={24} />
                     </span>
                     <span className="font-display text-titre-m leading-none tabular-nums">
-                      {etat.buts[0]} <span className="text-encre-4">–</span> {etat.buts[1]}
+                      {etat.final[0]} <span className="text-encre-4">–</span> {etat.final[1]}
                     </span>
                     <span className="flex min-w-0 items-center gap-2">
                       <Ecusson initiales={b.initiales} fond={b.fond} blason={b.blason} taille={24} />
-                      <span className="truncate text-ligne font-semibold">{b.nom}</span>
+                      <span className="flex min-w-0 flex-col items-start">
+                        <span className="w-full truncate text-ligne font-semibold">{b.nom}</span>
+                        {etat.aQuatre === m.a && <span className="mono-label text-encre-3">à 4</span>}
+                      </span>
                     </span>
                   </div>
                 </div>

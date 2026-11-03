@@ -5116,9 +5116,11 @@ $$;
 -- est ouverte, sinon le match n'est pas classé. Un forfait (equipe_defis,
 -- 'forfait') se compte 3 – 0 sans feuille. Les buts attribués ne dépassent
 -- jamais le score, les passes jamais les buts attribués (art. 8.4). Depuis
--- le 03/11/2026 : jamais l'entraîneur, qui ne joue pas ; et si l'équipe a
--- déposé sa feuille d'avant-match (equipe_feuille, plus bas), seuls les
--- joueurs de cette feuille marquent pour elle.
+-- le 03/11/2026 : jamais l'entraîneur, qui ne joue pas, ni ne saisit ; si
+-- l'équipe a déposé sa feuille d'avant-match (equipe_feuille, plus bas),
+-- seuls les joueurs de cette feuille marquent pour elle ; et chaque
+-- capitaine déclare avec le score les présents des deux équipes (le 5
+-- contre 4, juste en dessous).
 create table if not exists public.equipe_resultats (
   defi_id    bigint not null references public.equipe_defis(id) on delete cascade,
   equipe_id  bigint not null references public.equipes(id) on delete cascade,
@@ -5139,6 +5141,20 @@ create table if not exists public.equipe_resultat_joueurs (
   primary key (defi_id, joueur)
 );
 create index if not exists equipe_resultat_joueurs_joueur on public.equipe_resultat_joueurs (joueur);
+-- Les présents (Règlement Team art. 7.2 et 7.3, le 5 contre 4 ; Ilyes,
+-- 02/11/2026, Q4 : la recommandation appliquée) : avec le score du terrain,
+-- chaque capitaine déclare les présents de son équipe (presents) et ceux de
+-- l'autre (presents_adverses) : 5 pour « cinq ou plus », 4, ou 3 pour
+-- « trois ou moins ». La double validation porte sur tout : les deux scores
+-- et les deux paires de présents ; un désaccord, c'est un litige. Le score
+-- final s'en déduit dans l'app (lib/sfl/championnat-team.ts, scoreFinal) :
+-- l'équipe à 4 face à 5 ou plus perd 1 but, ou l'adversaire en gagne 1 si
+-- elle n'a pas marqué ; deux équipes à 4, un amical ; 3 ou moins, le
+-- forfait de cette équipe, 0 – 3, sans score de terrain ni buteurs ; les
+-- deux à 3 ou moins, non classé. Vides pour les feuilles d'avant le
+-- 03/11/2026 : 5 et 5.
+alter table public.equipe_resultats add column if not exists presents smallint check (presents between 3 and 5);
+alter table public.equipe_resultats add column if not exists presents_adverses smallint check (presents_adverses between 3 and 5);
 
 alter table public.equipe_resultats enable row level security;
 alter table public.equipe_resultat_joueurs enable row level security;
@@ -5151,7 +5167,10 @@ create policy "equipe_resultat_joueurs: lecture" on public.equipe_resultat_joueu
 revoke all on public.equipe_resultats, public.equipe_resultat_joueurs from anon, authenticated;
 grant select on public.equipe_resultats, public.equipe_resultat_joueurs to authenticated;
 
-create or replace function public.equipe_resultat(d bigint, pour int, contre int, lignes jsonb)
+-- Avant le 03/11/2026, sans les présents : l'ancienne app, qui appelle par
+-- les noms, tombe sur les valeurs par défaut (5 et 5).
+drop function if exists public.equipe_resultat(bigint, int, int, jsonb);
+create or replace function public.equipe_resultat(d bigint, pour int, contre int, lignes jsonb, presents int default 5, presents_adverses int default 5)
 returns void
 language plpgsql
 security definer
@@ -5190,10 +5209,21 @@ begin
   if pour is null or contre is null or pour not between 0 and 99 or contre not between 0 and 99 then
     raise exception 'Score invalide.' using errcode = '22023';
   end if;
+  if equipe_resultat.presents is null or equipe_resultat.presents_adverses is null
+     or equipe_resultat.presents not between 3 and 5 or equipe_resultat.presents_adverses not between 3 and 5 then
+    raise exception 'Présents invalides.' using errcode = '22023';
+  end if;
+  -- Trois ou moins d'un côté : le forfait de cette équipe, le match ne se joue pas (art. 7.5).
+  if equipe_resultat.presents = 3 or equipe_resultat.presents_adverses = 3 then
+    pour := 0;
+    contre := 0;
+    lignes := '[]'::jsonb;
+  end if;
   select r.* into mien from public.equipe_resultats r where r.defi_id = d and r.equipe_id = e;
   select r.* into autre from public.equipe_resultats r where r.defi_id = d and r.equipe_id <> e;
-  -- Déjà validé : les deux saisies collent, ou l'une est seule depuis 24 h.
-  if (mien.defi_id is not null and autre.defi_id is not null and mien.pour = autre.contre and mien.contre = autre.pour)
+  -- Déjà validé : les deux saisies collent (scores et présents), ou l'une est seule depuis 24 h.
+  if (mien.defi_id is not null and autre.defi_id is not null and mien.pour = autre.contre and mien.contre = autre.pour
+      and coalesce(mien.presents, 5) = coalesce(autre.presents_adverses, 5) and coalesce(mien.presents_adverses, 5) = coalesce(autre.presents, 5))
      or (mien.defi_id is null and autre.defi_id is not null and autre.saisi_le < now() - interval '24 hours')
      or (mien.defi_id is not null and autre.defi_id is null and mien.saisi_le < now() - interval '24 hours') then
     raise exception 'Ce résultat est validé.' using errcode = 'P0001';
@@ -5224,10 +5254,11 @@ begin
   if tp > tb then
     raise exception 'Plus de passes décisives que de buts attribués.' using errcode = 'P0001';
   end if;
-  insert into public.equipe_resultats (defi_id, equipe_id, pour, contre, saisi_par)
-  values (d, e, equipe_resultat.pour, equipe_resultat.contre, (select auth.uid()))
+  insert into public.equipe_resultats (defi_id, equipe_id, pour, contre, saisi_par, presents, presents_adverses)
+  values (d, e, equipe_resultat.pour, equipe_resultat.contre, (select auth.uid()), equipe_resultat.presents, equipe_resultat.presents_adverses)
   on conflict (defi_id, equipe_id) do update
-    set pour = excluded.pour, contre = excluded.contre, saisi_par = excluded.saisi_par, saisi_le = now(), notifie_le = null;
+    set pour = excluded.pour, contre = excluded.contre, saisi_par = excluded.saisi_par, saisi_le = now(), notifie_le = null,
+        presents = excluded.presents, presents_adverses = excluded.presents_adverses;
   delete from public.equipe_resultat_joueurs j where j.defi_id = d and j.equipe_id = e;
   insert into public.equipe_resultat_joueurs (defi_id, equipe_id, joueur, buts, passes)
   select d, e, t.joueur, sum(coalesce(t.buts, 0)), sum(coalesce(t.passes, 0))
@@ -5418,9 +5449,9 @@ end;
 $$;
 
 revoke execute on function public.equipe_blason(bigint, jsonb), public.equipe_signer_charte(bigint),
-  public.equipe_resultat(bigint, int, int, jsonb), public.equipe_couverture(bigint, boolean) from public, anon;
+  public.equipe_resultat(bigint, int, int, jsonb, int, int), public.equipe_couverture(bigint, boolean) from public, anon;
 grant execute on function public.equipe_blason(bigint, jsonb), public.equipe_signer_charte(bigint),
-  public.equipe_resultat(bigint, int, int, jsonb), public.equipe_couverture(bigint, boolean) to authenticated;
+  public.equipe_resultat(bigint, int, int, jsonb, int, int), public.equipe_couverture(bigint, boolean) to authenticated;
 
 do $$
 begin

@@ -29,7 +29,12 @@
 --   F6 la feuille de score : seuls les joueurs de la feuille marquent ; un
 --      joueur parti, non plus ; sans feuille, les joueurs de l'équipe ;
 --   F7 un joueur sur une seule des deux feuilles ; un défi effacé emporte
---      ses feuilles.
+--      ses feuilles ;
+--   F8 le 5 contre 4 dans la feuille de score : les présents des deux
+--      équipes, de 3 à 5 ; l'appel d'avant, par les noms et sans eux, passe
+--      (5 et 5) ; deux saisies qui collent, présents compris, valident le
+--      match ; des présents qui diffèrent ne le valident pas ; à 3 ou moins,
+--      ni score du terrain ni buteurs.
 
 \set ON_ERROR_STOP 1
 begin;
@@ -180,6 +185,36 @@ select pg_temp.passe('F7 sans lui ailleurs, il y va', 'Lucien', pg_temp.deposer(
 delete from public.equipe_defis where id = :d2;
 select pg_temp.vrai('F7 le défi effacé emporte ses feuilles',
   not exists (select 1 from public.equipe_feuilles where defi_id = :d2) and not exists (select 1 from public.equipe_feuille_joueurs where defi_id = :d2));
+
+-- ═══ F8 · Le 5 contre 4 dans la feuille de score ═══
+-- d5, d6, d7 : trois matchs joués il y a deux heures, sans feuille d'avant-match.
+select pg_temp.match('Sunday Five', 'Racing Wazemmes', -2) as d5 \gset
+select pg_temp.match('Racing Wazemmes', 'Sunday Five', -2) as d6 \gset
+select pg_temp.match('Sunday Five', 'Racing Wazemmes', -3) as d7 \gset
+create function pg_temp.score(d bigint, pour int, contre int, presents int, adverses int, lignes jsonb default '[]') returns text language sql stable as $$
+  select format('public.equipe_resultat(%s, %s, %s, %L::jsonb, %s, %s)', d, pour, contre, lignes, presents, adverses) $$;
+create function pg_temp.saisie(d bigint, equipe text) returns public.equipe_resultats language sql volatile as $$
+  select r.* from public.equipe_resultats r where r.defi_id = d and r.equipe_id = pg_temp.eq(equipe) $$;
+select pg_temp.refuse('F8 des présents à 2, non', 'Ilyes', pg_temp.score(:d5, 2, 1, 2, 5), '22023', 'Présents');
+select pg_temp.refuse('F8 à 6, non', 'Ilyes', pg_temp.score(:d5, 2, 1, 5, 6), '22023', 'Présents');
+select pg_temp.refuse('F8 sans valeur, non', 'Ilyes', format('public.equipe_resultat(%s, 2, 1, %L::jsonb, null, 5)', :d5, '[]'), '22023', 'Présents');
+select pg_temp.passe('F8 l''appel d''avant, par les noms et sans les présents', 'Ilyes',
+  format('public.equipe_resultat(d => %s, pour => 1, contre => 0, lignes => %L::jsonb)', :d5, '[]'));
+select pg_temp.vrai('F8 il vaut 5 et 5', (pg_temp.saisie(:d5, 'Sunday Five')).presents = 5 and (pg_temp.saisie(:d5, 'Sunday Five')).presents_adverses = 5);
+select pg_temp.passe('F8 Sunday Five : 2 – 1, le Racing à 4', 'Ilyes', pg_temp.score(:d6, 2, 1, 5, 4));
+select pg_temp.vrai('F8 les présents sont gardés', (pg_temp.saisie(:d6, 'Sunday Five')).presents = 5 and (pg_temp.saisie(:d6, 'Sunday Five')).presents_adverses = 4);
+select pg_temp.passe('F8 le Racing dit 1 – 2 mais tout le monde à 5', 'Yanis', pg_temp.score(:d6, 1, 2, 5, 5));
+select pg_temp.passe('F8 des présents qui diffèrent : la feuille reste ouverte, Yanis corrige', 'Yanis', pg_temp.score(:d6, 1, 2, 4, 5));
+select pg_temp.refuse('F8 le score et les présents collent : le match est validé', 'Ilyes', pg_temp.score(:d6, 2, 1, 5, 4), 'P0001', 'validé');
+select pg_temp.refuse('F8 et le Racing non plus ne la change plus', 'Omar', pg_temp.score(:d6, 1, 2, 4, 5), 'P0001', 'validé');
+select pg_temp.passe('F8 à 3 ou moins : le forfait de Sunday Five', 'Ilyes', pg_temp.score(:d7, 3, 1, 3, 5, pg_temp.but(:d7, 'Badis')));
+select pg_temp.vrai('F8 ni score du terrain ni buteurs',
+  (pg_temp.saisie(:d7, 'Sunday Five')).pour = 0 and (pg_temp.saisie(:d7, 'Sunday Five')).contre = 0
+  and (pg_temp.saisie(:d7, 'Sunday Five')).presents = 3
+  and not exists (select 1 from public.equipe_resultat_joueurs j where j.defi_id = :d7));
+select pg_temp.passe('F8 le Racing confirme le forfait', 'Yanis', pg_temp.score(:d7, 0, 0, 5, 3));
+select pg_temp.refuse('F8 le forfait est validé', 'Ilyes', pg_temp.score(:d7, 0, 0, 3, 5), 'P0001', 'validé');
+select pg_temp.refuse('F8 l''entraîneur ne déclare jamais les présents', 'Lucien', pg_temp.score(:d5, 1, 0, 5, 4), '42501');
 
 select 'feuille-team-check : tout est ok' as fin;
 rollback;

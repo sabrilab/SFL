@@ -343,6 +343,13 @@ export function demoChampionnat(
     return [...lignes.values()];
   }
 
+  // Un 5 contre 4 parmi mes derniers résultats : l'adversaire était à 4, les deux feuilles le disent.
+  const quatre = matchs.find((x) => x.statut === "accepte" && x.saisies.length === 2 && (x.de === 1 || x.a === 1));
+  if (quatre) {
+    const adverse = quatre.de === 1 ? quatre.a : quatre.de;
+    quatre.saisies = quatre.saisies.map((x) => (x.equipe === adverse ? { ...x, presents: 4, presentsAdverses: 5 } : { ...x, presents: 5, presentsAdverses: 4 }));
+  }
+
   // Mes deux feuilles en cours : celle d'hier soir, à remplir (Lucien avait déposé la feuille d'avant-match),
   // et celle de samedi, que le Racing a déjà remplie.
   matchs.push({
@@ -367,7 +374,8 @@ export function demoChampionnat(
     lieu: "Urban Lomme",
     statut: "accepte",
     forfaitDe: null,
-    saisies: [{ equipe: 3, pour: 3, contre: 5, le: "2026-12-15T09:00:00Z" }],
+    // Le Racing n'était que quatre : le 5 contre 4 (le score final 5 – 2).
+    saisies: [{ equipe: 3, pour: 3, contre: 5, le: "2026-12-15T09:00:00Z", presents: 4, presentsAdverses: 5 }],
     buteurs: [{ equipe: 3, joueur: `demo-${effectifs.get(3)?.[0] ?? "?"}`, name: effectifs.get(3)?.[0] ?? "?", buts: 2, passes: 0 }],
   });
   return { equipes, matchs, maintenant: MAINTENANT_DEMO, effectifs };
