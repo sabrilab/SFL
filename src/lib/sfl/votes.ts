@@ -31,9 +31,11 @@
 //     Match 2 ne finissent pas à la même heure) ;
 //   · à la révélation (19 h ; minuit jusqu'à la J4), CHAQUE ÉQUIPE de chaque
 //     match a son Joueur Impact et sa Défensive : le plus voté de ses
-//     joueurs, par l'équipe adverse ; à égalité, tous les ex æquo ; personne
-//     si aucune voix ne va à cette équipe. Un même joueur peut avoir
-//     l'Impact et la Défensive. Ilyes, 02/11/2026 : « Le principe c'est
+//     joueurs, par l'équipe adverse ; à égalité, tous les ex æquo. Une
+//     équipe à qui aucune voix valable ne va garde ce que l'admin a coché
+//     à la main, compté en entier (Ilyes, 03/11/2026 : « Garder »). Un
+//     même joueur peut avoir l'Impact et la Défensive. Ilyes, 02/11/2026 :
+//     « Le principe c'est
 //     qu'il y en ait un par équipe : un joueur Impact pour chaque équipe et
 //     un joueur Défensive pour chaque équipe. Il n'y a que le MVP qui est
 //     unique, sauf en cas d'égalité. » Puis : « oui, un joueur peut avoir la
@@ -276,36 +278,50 @@ export function feuilleRemplie(saison: Pick<Saison, "entries">, j: number, match
 /**
  * Pose les élus des votes tombés (titresTombes) sur les lignes de la saison (Impact,
  * Défensive), journée par journée, match par match et équipe par équipe —
- * comme appliquerMvpAuto pour le MVP. Une journée sans aucune voix valable
- * pour un titre garde ce que l'admin a saisi. Même référence renvoyée si
- * rien ne change.
+ * comme appliquerMvpAuto pour le MVP. Dès qu'une équipe a au moins une voix
+ * valable pour un titre, les votes décident pour ses joueurs ; une équipe
+ * sans AUCUNE voix valable pour ce titre garde ce que l'admin a coché à la
+ * main sur leurs lignes, compté en entier comme aux J1 et J2 (ni faible, ni
+ * effacé). Ilyes, 03/11/2026 : « Garder » (la J4, au Match 4, Noirs 4 contre
+ * Blancs 5 : aucune voix, l'Impact de Yanis Bouzenita et la Défensive
+ * d'Ayman cochés par l'admin). Le MVP ne change pas. Même référence
+ * renvoyée si rien ne change.
  */
 export function appliquerVotes(saison: Saison, journees: Journee[], votes: VoteFigure[], maintenant: Date): Saison {
   if (!votes.length) return saison;
   const numero = saison.numero ?? 0;
-  // j → titre → élus (par nom), seulement pour les votes fermés.
-  const elus = new Map<number, Map<CategorieVote, Set<string>>>();
+  // j → titre → équipe → ses élus : seulement les votes tombés, et seulement
+  // les équipes qui ont reçu au moins une voix valable pour ce titre.
+  const decidees = new Map<number, Map<CategorieVote, Map<string, Set<string>>>>();
   for (const jn of journees) {
     if (!journeeAvecVote(jn) || !titresTombes(saison, jn.j, maintenant)) continue;
+    const valables = votesDuJour(votes, jn.date, jn.j);
     for (const cat of CATEGORIES_VOTE) {
-      if (!votes.some((v) => v.saison === numero && v.j === jn.j && v.categorie === cat)) continue;
-      const set = new Set<string>();
-      const valables = votesDuJour(votes, jn.date, jn.j);
-      for (const m of jn.matches ?? []) decompterMatch(valables, numero, jn.j, m, cat).elus.forEach((n) => set.add(n));
-      if (!set.size) continue;
-      if (!elus.has(jn.j)) elus.set(jn.j, new Map());
-      elus.get(jn.j)!.set(cat, set);
+      if (!valables.some((v) => v.saison === numero && v.j === jn.j && v.categorie === cat)) continue;
+      const parEquipe = new Map<string, Set<string>>();
+      for (const m of jn.matches ?? []) {
+        for (const eq of decompterMatch(valables, numero, jn.j, m, cat).equipes) {
+          if (eq.voix.length) parEquipe.set(eq.equipe, new Set(eq.elus));
+        }
+      }
+      if (!parEquipe.size) continue;
+      if (!decidees.has(jn.j)) decidees.set(jn.j, new Map());
+      decidees.get(jn.j)!.set(cat, parEquipe);
     }
   }
-  if (!elus.size) return saison;
+  if (!decidees.size) return saison;
 
   let change = false;
   const entries = saison.entries.map((e) => {
-    const parCat = elus.get(e.j);
+    const parCat = decidees.get(e.j);
     if (!parCat || e.extraTime) return e;
     let next = e;
-    for (const [cat, set] of parCat) {
-      const doit = set.has(e.player);
+    for (const [cat, parEquipe] of parCat) {
+      // Une équipe s'appelle d'un seul nom dans sa journée (computeJournees) :
+      // hors des équipes qui ont des voix, la case de l'admin reste.
+      const elus = e.team ? parEquipe.get(e.team) : undefined;
+      if (!elus) continue;
+      const doit = elus.has(e.player);
       if (!!next[cat] !== doit) next = { ...next, [cat]: doit };
     }
     if (next !== e) change = true;

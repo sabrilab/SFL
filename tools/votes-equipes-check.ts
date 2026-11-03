@@ -13,7 +13,10 @@
 //       Défensive au seul Sidali ; Noirs 1 a désormais Youss en Impact et en
 //       Défensive, Blancs 1 Jouneid en Impact et Sidali en Défensive ;
 //   2 · des ex æquo dans une équipe : tous élus, l'autre garde le sien ;
-//   3 · une équipe sans voix : personne, même une case cochée par l'admin ;
+//   3 · une équipe sans aucune voix valable pour un titre garde les cases
+//       que l'admin a cochées sur ses lignes, comptées en entier (ni
+//       faibles, ni effacées) ; dès qu'elle a une voix valable, les votes
+//       décident (Ilyes, 03/11/2026 : « Garder » ; la J4, Match 4) ;
 //   4 · un même joueur Impact et Défensive le même jour (Youss, en 1) ;
 //   5 · une voix pour un coéquipier ne compte pas, ni un bulletin d'une
 //       autre saison ou d'une autre journée ;
@@ -215,16 +218,60 @@ const B = ["B1", "B2", "B3", "B4"];
 
 /* ----------------------- 3 · Une équipe sans voix ----------------------- */
 {
-  // L'admin avait coché la Défensive de A3 : la journée a ses votes, ils décident.
+  // L'admin avait coché la Défensive de A3 (Noirs 1) et de B3 (Blancs 1). Les Noirs n'ont aucune voix de
+  // Défensive : la case de l'admin reste. Les Blancs en ont une : les votes décident, B3 laisse la place à B1.
   const s = journee([[A, B]]);
-  s.entries = s.entries.map((e) => (e.player === "A3" ? { ...e, def: true } : e));
+  s.entries = s.entries.map((e) => (e.player === "A3" || e.player === "B3" ? { ...e, def: true } : e));
   const votes = voix("def", "B1", ["A1", "A2"]);
   const d = decompte(s, votes, 0, "def");
-  assert.deepEqual(d.equipes[0], { equipe: "Noirs 1", voix: [], votants: 0, inscrits: 4, elus: [] }, "les Noirs : aucune voix, personne");
+  assert.deepEqual(d.equipes[0], { equipe: "Noirs 1", voix: [], votants: 0, inscrits: 4, elus: [] }, "les Noirs : aucune voix, aucun élu");
   assert.deepEqual(d.equipes[1].elus, ["B1"]);
-  assert.deepEqual(titres(poser(s, votes), "def"), ["B1"], "la case de l'admin tombe : personne pour les Noirs");
-  // Sans aucune voix de Défensive dans la journée, ce que l'admin a coché reste.
-  assert.deepEqual(titres(poser(s, voix("impact", "B1", ["A1"])), "def"), ["A3"]);
+  const titree = poser(s, votes);
+  assert.deepEqual(titres(titree, "def"), ["A3", "B1"], "les Noirs gardent la case de l'admin, les Blancs ont leur élu");
+  // Comptée en entier, comme aux J1 et J2 : pas faible, la note monte.
+  assert.deepEqual(faibles(s, votes), [], "deux voix pour B1, aucune pour les Noirs : rien de faible");
+  const lue = saisonAvecVotes(s, votes, LOIN);
+  assert.deepEqual(lue.entries, titree.entries, "le serveur lit la même saison");
+  const crans = (nom: string) =>
+    (deriveSeason(lue).evolution.joueurs.get(nom)?.journal ?? [])
+      .flatMap((jour) => jour.faits)
+      .filter((f) => f.raison === "titre Défensive")
+      .reduce((n, f) => n + f.crans, 0);
+  assert.ok(crans("A3") > 0, "la Défensive gardée de A3 fait monter sa note");
+  // Une voix pour un coéquipier n'est pas valable : la case reste. Une voix valable, et les votes décident.
+  assert.deepEqual(titres(poser(s, [...votes, ...voix("def", "A2", ["A1"])]), "def"), ["A3", "B1"], "voix d'un coéquipier : la case reste");
+  assert.deepEqual(titres(poser(s, [...votes, ...voix("def", "A2", ["B4"])]), "def"), ["A2", "B1"], "une voix valable : A2 élu, la case de A3 tombe");
+  // Un bulletin envoyé un autre jour que le match (votesDuJour) n'est pas valable non plus.
+  const tard = voix("def", "A2", ["B4"]).map((v) => ({ ...v, jour: "2026-11-02" }));
+  assert.deepEqual(titres(poser(s, [...votes, ...tard]), "def"), ["A3", "B1"], "voix d'un autre jour : la case reste");
+  // Sans aucune voix de Défensive dans la journée, tout ce que l'admin a coché reste.
+  assert.deepEqual(titres(poser(s, voix("impact", "B1", ["A1"])), "def"), ["A3", "B3"]);
+}
+{
+  // La J4, Match 4 : Noirs 4 contre Blancs 5, aucune voix ; l'admin avait coché l'Impact de Yanis
+  // Bouzenita et la Défensive d'Ayman (Noirs 4), rien chez les Blancs 5. Le Match 1 a ses votes.
+  const s = journee([
+    [["n1", "n2", "n3"], ["b1", "b2", "b3"]],
+    [[], []],
+    [[], []],
+    [["Yanis Bouzenita", "Ayman", "m3"], ["c1", "c2", "c3"]],
+  ]);
+  s.journees[0].matchsDuJour = [{ equipes: ["Noirs 1", "Blancs 1"] }, { equipes: ["Noirs 4", "Blancs 5"] }];
+  s.entries = s.entries.map((e) => {
+    const t = e.team === "Blancs 4" ? "Blancs 5" : e.team;
+    if (e.player === "Yanis Bouzenita") return { ...e, team: t, impact: true };
+    if (e.player === "Ayman") return { ...e, team: t, def: true, mvp: true };
+    return { ...e, team: t };
+  });
+  assert.deepEqual(jourDe(s).matches!.map((m) => `${m.teamA.name}-${m.teamB.name}`), ["Noirs 1-Blancs 1", "Noirs 4-Blancs 5"]);
+  const votes = [...voix("impact", "n1", ["b1", "b2"]), ...voix("def", "b2", ["n1", "n2"])];
+  const titree = poser(s, votes);
+  assert.deepEqual(titres(titree, "impact"), ["Yanis Bouzenita", "n1"], "Impact : Yanis Bouzenita gardé, n1 élu au Match 1");
+  assert.deepEqual(titres(titree, "def"), ["Ayman", "b2"], "Défensive : Ayman gardé, b2 élu au Match 1");
+  assert.deepEqual(titree.entries.filter((e) => e.mvp).map((e) => e.player), ["Ayman"], "le MVP ne change pas");
+  assert.deepEqual(faibles(s, votes), [], "deux voix au Match 1, les cases gardées : rien de faible");
+  // La révélation ne change pas : le jour du match, rien n'est posé.
+  assert.equal(appliquerVotes(s, computeJournees(s), votes, LE_JOUR), s);
 }
 
 /* ----------------------- 5 · Une voix pour un coéquipier ----------------------- */
