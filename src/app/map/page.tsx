@@ -233,15 +233,18 @@ const NUIT_DU_PLAN: Partial<Record<Ambiance, Ambiance>> = { "bulle-gomme": "nuit
 const ambianceDeLAdresse = (): Ambiance => {
   // Le jour (02/11, Sabri : « le côté dark […] ça fait fuir un peu ») ; la
   // production le prend à la fusion, après son accord.
-  if (!ESSAIS) return "jour";
+  // Bulle (18) est le style de l'app depuis le 03/11 : son plan est celui de tous.
+  if (!ESSAIS) return "bulle-gomme";
   const q = new URLSearchParams(window.location.search);
   const a = q.get("ambiance");
   if (TOUTES_AMBIANCES.includes(a as Ambiance)) return a as Ambiance;
   // Les styles d'interface 12 à 17 (style-ui/essai.tsx) ont chacun leur plan.
   let style = Number(q.get("style"));
   if (!q.has("style")) {
+    style = 18;
     try {
-      style = Number(localStorage.getItem("bola-style-ui") ?? 0);
+      const v = localStorage.getItem("bola-style-ui-2");
+      if (v != null) style = Number(v);
     } catch {}
   }
   return PLAN_DU_STYLE[style] ?? "jour";

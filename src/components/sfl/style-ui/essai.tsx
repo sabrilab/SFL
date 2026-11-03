@@ -13,7 +13,11 @@
 import { useEffect, useState } from "react";
 import { useTheme } from "next-themes";
 
-const CLE = "bola-style-ui";
+// Nouvelle clé le 03/11 : tous les téléphones repartent de Bulle, le style retenu.
+const CLE = "bola-style-ui-2";
+/** Le style de l'app : Bulle, Gomme le jour et Nuit le soir (Sabri, 03/11 : « vas-y »). */
+export const STYLE_APP = 18;
+const PRODUCTION = process.env.NEXT_PUBLIC_BOLA_ENV === "production";
 export const STYLES_UI = ["Origine", "Galet", "Or", "Vestiaire", "Pelouse", "Velours", "Affiche", "Affiche nuit", "Riso", "Billet", "Pop", "Brutal", "Bulle", "Chaleur", "Trace", "Sticker", "Pelouse", "Gravure", "Bulle", "Bulle nuit", "Bulle pêche", "Bulle lilas", "Bulle encre", "Bulle verre"] as const;
 const SOMBRES = new Set([3, 5, 7, 13, 16, 19]);
 /** 18 et 23 suivent le réglage Apparence (clair, sombre, auto) : ils ont leurs deux modes (Sabri, 03/11). */
@@ -22,6 +26,7 @@ const DEUX_MODES = new Set([18, 23]);
 const AFFICHE = 6;
 
 function lire(): number {
+  if (PRODUCTION) return STYLE_APP;
   try {
     const q = new URLSearchParams(window.location.search).get("style");
     if (q != null) {
@@ -31,15 +36,16 @@ function lire(): number {
         return n;
       }
     }
-    const n = Number(localStorage.getItem(CLE) ?? 0);
-    return n >= 0 && n < STYLES_UI.length ? n : 0;
+    const v = localStorage.getItem(CLE);
+    const n = v == null ? STYLE_APP : Number(v);
+    return n >= 0 && n < STYLES_UI.length ? n : STYLE_APP;
   } catch {
-    return 0;
+    return STYLE_APP;
   }
 }
 
 export function EssaiStyleUi() {
-  const [style, setStyle] = useState(0);
+  const [style, setStyle] = useState(STYLE_APP);
   const { setTheme } = useTheme();
 
   useEffect(() => {
@@ -57,7 +63,7 @@ export function EssaiStyleUi() {
     if (style && !DEUX_MODES.has(style)) setTheme(SOMBRES.has(style) ? "dark" : "light");
   }, [style, setTheme]);
 
-  if (process.env.NEXT_PUBLIC_BOLA_ENV === "production" || !style) return null;
+  if (PRODUCTION || !style) return null;
   return (
     <button
       type="button"

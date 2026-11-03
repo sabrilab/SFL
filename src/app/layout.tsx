@@ -90,6 +90,10 @@ export default function RootLayout({
   return (
     <html
       lang="fr"
+      // Bulle (style 18) est le style de l'app (Sabri, 03/11) : posé dès le
+      // serveur pour qu'il n'y ait aucun éclair de l'ancien style.
+      data-style="18"
+      data-famille="bulle"
       suppressHydrationWarning
       className={`${inter.variable} ${anton.variable} ${barlow.variable} h-full antialiased`}
     >
