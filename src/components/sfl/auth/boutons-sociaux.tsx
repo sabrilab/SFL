@@ -16,6 +16,7 @@ import { Loader2 } from "lucide-react";
 import { connexionSociale, fournisseursActifs, type Fournisseur } from "@/lib/sfl/auth/session";
 import { lienSortie, lireEnvironnement } from "@/lib/pwa/environnement";
 import { cn } from "@/lib/utils";
+import { useT } from "@/lib/i18n/langue";
 
 function LogoGoogle() {
   return (
@@ -54,6 +55,7 @@ export function BoutonsSociaux({
   enLigne?: boolean;
   className?: string;
 }) {
+  const t = useT();
   const [actifs, setActifs] = useState<Fournisseur[]>([]);
   const [depart, setDepart] = useState<Fournisseur | null>(null);
 
@@ -82,7 +84,7 @@ export function BoutonsSociaux({
     const erreur = await connexionSociale(f, retour);
     if (erreur) {
       setDepart(null);
-      onErreur?.(erreur);
+      onErreur?.(t(erreur));
     }
   }
 
@@ -101,7 +103,7 @@ export function BoutonsSociaux({
           )}
         >
           {depart === f ? <Loader2 className="size-[18px] animate-spin" /> : f === "apple" ? <LogoApple /> : <LogoGoogle />}
-          {enLigne ? NOMS[f] : `Continuer avec ${NOMS[f]}`}
+          {enLigne ? NOMS[f] : t("Continuer avec {nom}", { nom: NOMS[f] })}
         </button>
       ))}
     </div>

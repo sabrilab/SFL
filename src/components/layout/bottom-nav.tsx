@@ -42,6 +42,7 @@ import { useInvitationsMatch } from "@/hooks/use-invitations";
 import { useDiscussionsMatch } from "@/hooks/use-discussions-match";
 import { useMonEquipe } from "@/hooks/use-mon-equipe";
 import { useModeClair } from "@/hooks/use-mode-clair";
+import { useT } from "@/lib/i18n/langue";
 
 const TABS = [
   { href: "/", Icon: MapIcon, label: "Map" },
@@ -62,6 +63,7 @@ const SANS_BARRE = ["/inscription", "/bienvenue", "/equipe/", "/p/", "/confident
 
 export function BottomNav() {
   const pathname = usePathname();
+  const t = useT();
   const onglet = ongletActif(pathname);
   const actif = TABS.findIndex(({ href }) => href === onglet);
   // La bulle ouvre la discussion : le Vestiaire, et Bola Agent à côté. Le
@@ -94,7 +96,10 @@ export function BottomNav() {
   if (SANS_BARRE.some((r) => pathname.startsWith(r))) return null;
 
   return (
+    // De gauche à droite dans toutes les langues : la lentille glisse d'un
+    // tiers à l'autre (globals.css, .liquid-tabbar__lentille).
     <div
+      dir="ltr"
       className="fixed left-1/2 z-40 flex [html[data-clavier]_&]:hidden -translate-x-1/2 items-center gap-2"
       style={{
         bottom: "max(calc(env(safe-area-inset-bottom) - 4px), 14px)",
@@ -102,7 +107,7 @@ export function BottomNav() {
       }}
     >
       <nav
-        aria-label="Onglets"
+        aria-label={t("Onglets")}
         className="liquid-tabbar relative flex min-w-0 flex-1"
         data-clair={clair ? "" : undefined}
         // La place de la lentille : un tiers, décalé de l'onglet choisi.
@@ -134,7 +139,7 @@ export function BottomNav() {
                 {href === "/" && surOngletMap > 0 && <Pastille n={surOngletMap} clair={clair} />}
               </span>
               <span className="liquid-tabbar__libelle" style={{ fontWeight: choisi ? 600 : 500 }}>
-                {label}
+                {t(label)}
               </span>
             </Link>
           );
@@ -143,7 +148,7 @@ export function BottomNav() {
 
       {!bola && horsSflEtat === false && <Link
         href="/vestiaire"
-        aria-label={nonLus > 0 ? `Vestiaire, ${nonLus} nouveaux messages` : "Vestiaire"}
+        aria-label={nonLus > 0 ? t("Vestiaire, {n} nouveaux messages", { n: nonLus }) : t("Vestiaire")}
         aria-current={vestiaire ? "page" : undefined}
         className="liquid-tabbar liquid-tabbar--rond"
         data-clair={clair ? "" : undefined}

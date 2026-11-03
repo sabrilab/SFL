@@ -8,6 +8,7 @@ import { useEffect, useState } from "react";
 import { Bell, BellOff, Check } from "lucide-react";
 import { toast } from "sonner";
 import { activerNotifications, etatNotifications, type EtatNotifications } from "@/lib/sfl/notifications";
+import { useT } from "@/lib/i18n/langue";
 
 const LIBELLE: Record<EtatNotifications, string> = {
   indisponible: "Pas disponibles sur ce navigateur",
@@ -21,6 +22,7 @@ const LIBELLE: Record<EtatNotifications, string> = {
 export function ReglageNotifications() {
   const [etat, setEtat] = useState<EtatNotifications | null>(null);
   const [busy, setBusy] = useState(false);
+  const t = useT();
 
   useEffect(() => {
     void etatNotifications().then(setEtat);
@@ -31,10 +33,10 @@ export function ReglageNotifications() {
     try {
       const e = await activerNotifications("reglages");
       setEtat(e);
-      if (e === "actives") toast.success("Notifications activées");
-      else if (e === "refusees") toast.error("Refusées : change-le dans les réglages du téléphone.");
+      if (e === "actives") toast.success(t("Notifications activées"));
+      else if (e === "refusees") toast.error(t("Refusées : change-le dans les réglages du téléphone."));
     } catch {
-      toast.error("Impossible d'activer les notifications.");
+      toast.error(t("Impossible d'activer les notifications."));
     } finally {
       setBusy(false);
     }
@@ -51,8 +53,8 @@ export function ReglageNotifications() {
         )}
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block text-lecture font-semibold">Notifications</span>
-        <span className="block text-petit text-encre-3">{etat ? LIBELLE[etat] : " "}</span>
+        <span className="block text-lecture font-semibold">{t("Notifications")}</span>
+        <span className="block text-petit text-encre-3">{etat ? t(LIBELLE[etat]) : " "}</span>
       </span>
       {actives ? (
         <Check className="size-4 text-encre-2" />
@@ -63,7 +65,7 @@ export function ReglageNotifications() {
           disabled={busy}
           className="bouton-principal bouton--mauve shrink-0 px-4 py-2 text-corps font-bold disabled:opacity-40"
         >
-          Activer
+          {t("Activer")}
         </button>
       ) : null}
     </div>

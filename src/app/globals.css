@@ -1922,3 +1922,17 @@
     animation: chargement-bola-souffle 2.4s ease-in-out infinite;
   }
 }
+
+/* ───────────── L'arabe (lib/i18n) ─────────────
+   L'écriture arabe est liée : un interlettrage (les tracking-*, les
+   étiquettes en capitales espacées) casse les liaisons. On le rend à la
+   normale quand l'app est en arabe, et l'étiquette, sans capitales en
+   arabe, gagne deux pixels pour rester lisible. Les cartes ne portent
+   aucune de ces classes : elles ne bougent pas. Les lettres arabes viennent
+   de la police du système (SF Arabic sur iPhone), Inter n'en a pas. */
+html[lang="ar"] :is([class*="tracking-"], .mono-label, .titre-lettrage) {
+  letter-spacing: normal !important;
+}
+html[lang="ar"] .mono-label {
+  font-size: 12px;
+}
