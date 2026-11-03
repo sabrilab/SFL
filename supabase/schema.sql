@@ -4135,7 +4135,7 @@ create unique index if not exists equipe_membres_un_entraineur on public.equipe_
 -- d'entraîneur, la cohésion) : un départ, une exclusion arrivée à terme, la
 -- dissolution. Vides pour les départs d'avant le 03/11/2026.
 alter table public.equipe_departs add column if not exists motif text check (motif in ('depart', 'exclusion', 'dissolution'));
-alter table public.equipe_departs add column if not exists role text;
+alter table public.equipe_departs add column if not exists role text check (role in ('capitaine', 'vice', 'membre', 'entraineur'));
 grant select on public.equipe_departs to authenticated;
 drop policy if exists "equipe_departs: les miens" on public.equipe_departs;
 create policy "equipe_departs: les miens" on public.equipe_departs for select to authenticated

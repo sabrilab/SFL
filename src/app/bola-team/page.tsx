@@ -649,7 +649,9 @@ export default function BolaTeamPage() {
   if (mienne) {
     for (const e of monde.equipes) {
       if (e.id === mienne.id) continue;
-      for (const m of signataires(e)) raisons.set(m.id, active(e) ? `Chez ${e.nom}` : RAISON_INDISPO.equipe);
+      // Ses joueurs et son entraîneur : une seule équipe par personne.
+      for (const m of e.membres)
+        if (m.statut === "membre") raisons.set(m.id, active(e) ? `Chez ${e.nom}` : RAISON_INDISPO.equipe);
     }
     for (const [id, raison] of indispos ?? []) if (raison !== "equipe" || !raisons.has(id)) raisons.set(id, RAISON_INDISPO[raison]);
   }
