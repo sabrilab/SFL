@@ -187,6 +187,8 @@ function lisser(geo, zones, garder, iterations) {
  * tenue : 'noirs' | 'blancs' | 'marbre' | 'obsidienne' ; tete : un THREE.Object3D (creerTete) ; peau : THREE.Color.
  * packs : paquets d'animations ('player', 'keeper', 'celeb').
  */
+const geometriesPeintes = new WeakMap();
+
 export async function creerPersonnage({ modele = 'homme', tenue = 'noirs', tete = null, peau = null, packs = ['player'], echelleTete = 1.55 }) {
   const gltf = await chargerCorps(modele);
   const corps = cloneSkinned(gltf.scene);
@@ -201,7 +203,10 @@ export async function creerPersonnage({ modele = 'homme', tenue = 'noirs', tete 
     o.castShadow = true;
     o.receiveShadow = false;
     o.frustumCulled = false;
-    peindre(o);
+    // la géométrie habillée ne dépend que du corps : peinte une fois, partagée par tous les joueurs (dix sur le terrain)
+    const source = o.geometry;
+    if (geometriesPeintes.has(source)) o.geometry = geometriesPeintes.get(source);
+    else { peindre(o); geometriesPeintes.set(source, o.geometry); }
     o.material = materiauTenue(couleurs, statue);
   });
 
@@ -334,7 +339,7 @@ export async function creerPersonnage({ modele = 'homme', tenue = 'noirs', tete 
     },
     liberer() {
       mixer.stopAllAction();
-      corps.traverse((o) => { if (o.isSkinnedMesh) { o.geometry.dispose(); o.material.dispose(); } });
+      corps.traverse((o) => { if (o.isSkinnedMesh) o.material.dispose(); }); // la géométrie est partagée (geometriesPeintes)
       tete?.userData.dispose?.();
     },
   };

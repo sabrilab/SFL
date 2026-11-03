@@ -3,14 +3,16 @@
 // Jouer : le jeu de foot de Bola (Sabri, 02/11/2026 : « je veux du FIFA »,
 // vertical, au pouce, les joueurs en 3D avec leur visage).
 //
-// « Cinq attaques » : toi, balle au pied, contre un défenseur et un gardien de
-// marbre. Le moteur est dans lib/jeu (three.js, chargé seulement ici) ; cette
-// page tient le plein écran, le tableau du haut, les écrans d'avant et
-// d'après. Ta tête porte ta photo du studio ; personne d'autre n'y paraît.
+// 03/11 : « le plateau Bola avec un gameplay de 5 contre 5, à fond ». Les Noirs
+// contre les Blancs sur le plateau BOLA, un match minuté. Le moteur est dans
+// lib/jeu (three.js, chargé seulement ici) ; cette page tient le plein écran,
+// le tableau du haut (score, chrono), les écrans d'avant et d'après. Ta tête
+// porte ta photo du studio ; les autres sont des statues.
 //
-// Gestes, dans le bas de l'écran : glisser = courir (loin = sprint) ; un coup
-// sec puis lâcher = frapper ; toucher = dribbler. Pas de texte d'aide : un
-// pouce fantôme montre le geste tant qu'on n'a pas touché l'écran.
+// Gestes, dans le bas de l'écran : glisser = courir (loin = sprint) ; toucher =
+// passe (ou tacle en défense) ; coup sec vers le haut = frappe ; coup sec de
+// côté = roulette. Pas de texte d'aide : un pouce fantôme montre le geste tant
+// qu'on n'a pas touché l'écran.
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
@@ -22,15 +24,19 @@ import { photoPerso, rafraichirPhotos } from "@/lib/sfl/photos";
 import { cn } from "@/lib/utils";
 
 type Etat = {
-  phase: "attente" | "intro" | "jeu" | "frappe" | "resultat" | "fin";
-  attaque: number;
-  buts: number;
-  resultats: string[];
+  phase: "attente" | "intro" | "engagement" | "jeu" | "but" | "fin";
+  noirs: number;
+  blancs: number;
+  reste: number;
   message: string | null;
+  buteur: "moi" | "noirs" | "blancs" | null;
 };
 type Match = { demarrer: () => void; detruire: () => void };
 
-const ATTAQUES = 5;
+const chrono = (s: number) => {
+  const t = Math.max(0, Math.ceil(s));
+  return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, "0")}`;
+};
 const rien = () => () => {};
 
 export default function JouerPage() {
@@ -38,6 +44,7 @@ export default function JouerPage() {
   const monte = useSyncExternalStore(rien, () => true, () => false);
   const [etat, setEtat] = useState<Etat | null>(null);
   const [pret, setPret] = useState(false);
+  const [progres, setProgres] = useState(0);
   const [erreur, setErreur] = useState<string | null>(null);
   const [touche, setTouche] = useState(false);
   const boite = useRef<HTMLDivElement>(null);
@@ -53,7 +60,7 @@ export default function JouerPage() {
         const reduit = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
         const { creerMatch } = await import("@/lib/jeu/match.js");
         if (fini || !boite.current) return;
-        const m = (await creerMatch(boite.current, { photo, reduit, surEtat: (e: Etat) => setEtat(e) })) as Match;
+        const m = (await creerMatch(boite.current, { photo, reduit, surEtat: (e: Etat) => setEtat(e), surProgres: (p: number) => setProgres(p) })) as Match;
         if (fini) {
           m.detruire();
           return;
@@ -75,7 +82,7 @@ export default function JouerPage() {
 
   if (!monte) return null;
   const phase = etat?.phase ?? "attente";
-  const enJeu = phase === "intro" || phase === "jeu" || phase === "frappe" || phase === "resultat";
+  const enJeu = phase === "intro" || phase === "engagement" || phase === "jeu" || phase === "but";
 
   const page = (
     <div
@@ -85,7 +92,7 @@ export default function JouerPage() {
     >
       <div ref={boite} className="absolute inset-0" />
 
-      {/* le tableau : buts et les cinq ballons */}
+      {/* le tableau : Noirs, Blancs, le temps qui reste */}
       <div
         className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between px-4"
         style={{ paddingTop: "calc(env(safe-area-inset-top) + 10px)" }}
@@ -93,23 +100,16 @@ export default function JouerPage() {
         <div className={cn("pointer-events-auto transition-opacity", enJeu && "opacity-0")}>
           <BoutonRetour parent="/" titre="Map" />
         </div>
-        {etat && phase !== "attente" && (
-          <div className="flex flex-col items-end gap-1.5">
-            <span className="font-[family-name:var(--font-anton)] text-[44px] leading-none tabular-nums">{etat.buts}</span>
-            <div className="flex gap-1.5">
-              {Array.from({ length: ATTAQUES }, (_, i) => {
-                const r = etat.resultats[i];
-                return (
-                  <span
-                    key={i}
-                    className={cn(
-                      "h-2 w-2 rounded-full",
-                      r === "but" ? "bg-white" : r ? "bg-white/25" : i === etat.attaque ? "bg-white/70 ring-2 ring-white/30" : "border border-white/40",
-                    )}
-                  />
-                );
-              })}
-            </div>
+        {etat && enJeu && (
+          <div className="absolute left-1/2 top-[calc(env(safe-area-inset-top)+10px)] flex -translate-x-1/2 items-center overflow-hidden rounded-full bg-black/55 font-[family-name:var(--font-anton)] leading-none backdrop-blur">
+            <span className="flex items-center gap-2 py-1.5 pl-3.5 pr-3 text-[22px] tabular-nums">
+              <span className="h-2.5 w-2.5 rounded-full border border-white/70 bg-black" />
+              {etat.noirs}
+              <span className="text-white/40">–</span>
+              {etat.blancs}
+              <span className="h-2.5 w-2.5 rounded-full bg-white" />
+            </span>
+            <span className="border-l border-white/15 py-1.5 pl-3 pr-3.5 text-[18px] tabular-nums text-white/80">{chrono(etat.reste)}</span>
           </div>
         )}
       </div>
@@ -118,7 +118,7 @@ export default function JouerPage() {
       {etat?.message && (
         <div className="pointer-events-none absolute inset-x-0 top-[64%] text-center">
           <span
-            key={`${etat.attaque}-${etat.message}`}
+            key={`${etat.noirs}-${etat.blancs}`}
             className="jeu-mot inline-block font-[family-name:var(--font-anton)] text-[84px] leading-none tracking-tight"
           >
             {etat.message}
@@ -140,11 +140,10 @@ export default function JouerPage() {
           style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 28px)" }}
         >
           {phase === "fin" && etat && (
-            <div className="text-center">
-              <div className="font-[family-name:var(--font-anton)] text-[96px] leading-none">
-                {etat.buts}
-                <span className="text-white/40"> / {ATTAQUES}</span>
-              </div>
+            <div className="flex items-center gap-5 font-[family-name:var(--font-anton)] text-[88px] leading-none tabular-nums">
+              <span className={cn(etat.noirs < etat.blancs && "text-white/40")}>{etat.noirs}</span>
+              <span className="text-[40px] text-white/40">–</span>
+              <span className={cn(etat.blancs < etat.noirs && "text-white/40")}>{etat.blancs}</span>
             </div>
           )}
           {erreur ? (
@@ -158,7 +157,7 @@ export default function JouerPage() {
               }}
               className="h-14 w-full max-w-[320px] rounded-full bg-white text-[17px] font-bold text-black transition-opacity disabled:opacity-40"
             >
-              {!pret ? "Chargement" : phase === "fin" ? "Rejouer" : "Jouer"}
+              {!pret ? `${Math.round(progres * 100)} %` : phase === "fin" ? "Rejouer" : "Jouer"}
             </button>
           )}
           {isAdmin(me) && phase === "attente" && (
