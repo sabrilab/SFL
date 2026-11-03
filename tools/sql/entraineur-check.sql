@@ -19,7 +19,8 @@
 --   E2  son invitation ne prend pas l'une des six ;
 --   E3  il signe la version 3, sa place commence (equipe_entraineurs) ;
 --   E4  ses droits, geste par geste : il recrute, défie, répond ; jamais le
---       score, l'annulation d'un match, l'écusson, la couverture, la direction ;
+--       score, l'excuse d'un absent, l'annulation d'un match, l'écusson, la
+--       couverture, la direction ;
 --   E5  il ne compte nulle part (5 pour défier, le ménage, le lien) ;
 --   E6  une équipe à 7 joueurs l'invite, il signe, sa place ne tombe pas à 7 ;
 --   E7  les refus : joueur ou invité de l'équipe, joueur ou entraîneur d'une
@@ -121,15 +122,19 @@ select pg_temp.vrai('E4 … mais il n''est jamais vice',
   and not exists (select 1 from public.equipe_membres m where m.equipe_id = pg_temp.eq('Sunday Five') and m.role = 'vice'));
 select pg_temp.passe('E4 Théo redevient vice', 'Ilyes', pg_temp.appel('equipe_vice', 'Sunday Five', 'Théo'));
 select pg_temp.vrai('E4 equipe_droit : la table de l''entraîneur', pg_temp.droits('Lucien', 'Sunday Five')
-  = 'annuler=false,couverture=false,defier=true,direction=false,ecusson=false,feuille=true,inviter=true,score=false');
+  = 'annuler=false,couverture=false,defier=true,direction=false,ecusson=false,excuser=false,feuille=true,inviter=true,score=false');
 select pg_temp.vrai('E4 celle du capitaine', pg_temp.droits('Ilyes', 'Sunday Five')
-  = 'annuler=true,couverture=true,defier=true,direction=true,ecusson=true,feuille=true,inviter=true,score=true');
+  = 'annuler=true,couverture=true,defier=true,direction=true,ecusson=true,excuser=true,feuille=true,inviter=true,score=true');
 select pg_temp.vrai('E4 celle du vice', pg_temp.droits('Théo', 'Sunday Five')
-  = 'annuler=true,couverture=true,defier=true,direction=false,ecusson=true,feuille=true,inviter=true,score=true');
+  = 'annuler=true,couverture=true,defier=true,direction=false,ecusson=true,excuser=true,feuille=true,inviter=true,score=true');
 select pg_temp.vrai('E4 celle d''un joueur sans brassard', pg_temp.droits('Badis', 'Sunday Five')
-  = 'annuler=false,couverture=false,defier=false,direction=false,ecusson=false,feuille=false,inviter=false,score=false');
+  = 'annuler=false,couverture=false,defier=false,direction=false,ecusson=false,excuser=false,feuille=false,inviter=false,score=false');
 select pg_temp.vrai('E4 hors de l''équipe, aucun droit', pg_temp.droits('Yanis', 'Sunday Five')
-  = 'annuler=false,couverture=false,defier=false,direction=false,ecusson=false,feuille=false,inviter=false,score=false');
+  = 'annuler=false,couverture=false,defier=false,direction=false,ecusson=false,excuser=false,feuille=false,inviter=false,score=false');
+select pg_temp.vrai('E4 il n''excuse jamais un absent (art. 7.6), le capitaine et le vice oui',
+  pg_temp.lire('Lucien', format('select public.equipe_droit(%s, ''excuser'')', pg_temp.eq('Sunday Five'))) = 'false'
+  and pg_temp.lire('Ilyes', format('select public.equipe_droit(%s, ''excuser'')', pg_temp.eq('Sunday Five'))) = 'true'
+  and pg_temp.lire('Théo', format('select public.equipe_droit(%s, ''excuser'')', pg_temp.eq('Sunday Five'))) = 'true');
 select pg_temp.vrai('E4 un geste inconnu, aucun droit', pg_temp.lire('Ilyes', format('select public.equipe_droit(%s, ''adjoint'')', pg_temp.eq('Sunday Five'))) = 'false');
 
 -- ═══ E5 · Il ne compte nulle part ═══
@@ -215,13 +220,13 @@ select pg_temp.passe('E9 le capitaine l''écarte', 'Ilyes', pg_temp.appel('equip
 select pg_temp.vrai('E9 48 h de préavis, sa place gardée',
   (pg_temp.ligne('Sunday Five', 'Lucien')).depart_le = now() + interval '48 hours' and (pg_temp.ligne('Sunday Five', 'Lucien')).role = 'entraineur');
 select pg_temp.vrai('E9 pendant le préavis, aucun droit', pg_temp.droits('Lucien', 'Sunday Five')
-  = 'annuler=false,couverture=false,defier=false,direction=false,ecusson=false,feuille=false,inviter=false,score=false');
+  = 'annuler=false,couverture=false,defier=false,direction=false,ecusson=false,excuser=false,feuille=false,inviter=false,score=false');
 select pg_temp.refuse('E9 il n''invite plus', 'Lucien', pg_temp.appel('equipe_inviter', 'Sunday Five', 'Ilan'), '42501');
 select pg_temp.refuse('E9 ni ne partage le lien', 'Lucien', pg_temp.appel('equipe_lien', 'Sunday Five'), '42501');
 select pg_temp.vrai('E9 il ne compte toujours pas', public.equipe_effectif(pg_temp.eq('Sunday Five')) = 7);
 select pg_temp.passe('E9 annuler le retrait', 'Ilyes', pg_temp.appel('equipe_exclure', 'Sunday Five', 'Lucien'));
 select pg_temp.vrai('E9 lui rend tout', (pg_temp.ligne('Sunday Five', 'Lucien')).depart_le is null
-  and pg_temp.droits('Lucien', 'Sunday Five') = 'annuler=false,couverture=false,defier=true,direction=false,ecusson=false,feuille=true,inviter=true,score=false');
+  and pg_temp.droits('Lucien', 'Sunday Five') = 'annuler=false,couverture=false,defier=true,direction=false,ecusson=false,excuser=false,feuille=true,inviter=true,score=false');
 select pg_temp.passe('E9 écarté de nouveau', 'Ilyes', pg_temp.appel('equipe_exclure', 'Sunday Five', 'Lucien'));
 -- Les 48 h passent (son départ, une heure plus tôt) ; le ménage, au premier geste de l'équipe.
 update public.equipe_membres set depart_le = now() - interval '1 hour' where equipe_id = pg_temp.eq('Sunday Five') and joueur = pg_temp.uid('Lucien');

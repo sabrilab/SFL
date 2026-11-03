@@ -4255,8 +4255,10 @@ $$;
 -- joueurs + 1 entraîneur). Jamais « rôle différent de membre » : un rôle de
 -- plus n'hérite de rien. L'entraîneur recrute, défie et dépose la feuille
 -- d'avant-match ; il n'annule pas un match programmé, ne saisit jamais un
--- score et ne dirige pas l'équipe (le vice, l'entraîneur, l'exclusion, la
--- dissolution restent au capitaine). Pendant un préavis d'exclusion, aucun
+-- score, n'excuse jamais un absent et ne dirige pas l'équipe (le vice,
+-- l'entraîneur, l'exclusion, la dissolution restent au capitaine). « excuser »
+-- (Règlement Team art. 7.6) attend l'excuse elle-même, qui n'existe pas
+-- encore : elle passera par ce geste. Pendant un préavis d'exclusion, aucun
 -- droit. Un geste inconnu : aucun droit. La même table, en TypeScript :
 -- DROITS (lib/sfl/equipes-droits.ts), vérifiée contre celle-ci
 -- (tools/equipe-droits-check.ts).
@@ -4274,6 +4276,7 @@ as $$
       when 'feuille'    then array['capitaine', 'vice', 'entraineur']
       when 'annuler'    then array['capitaine', 'vice']
       when 'score'      then array['capitaine', 'vice']
+      when 'excuser'    then array['capitaine', 'vice']
       when 'ecusson'    then array['capitaine', 'vice']
       when 'couverture' then array['capitaine', 'vice']
       when 'direction'  then array['capitaine']

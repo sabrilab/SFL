@@ -86,10 +86,10 @@ create function pg_temp.match(de text, a text, h numeric) returns bigint languag
 create function pg_temp.ligne(equipe text, qui text) returns public.equipe_membres language sql volatile as $$
   select m.* from public.equipe_membres m where m.equipe_id = pg_temp.eq(equipe) and m.joueur = pg_temp.uid(qui)
 $$;
--- Les huit gestes, « geste=oui » à la suite, pour un joueur dans une équipe.
+-- Les neuf gestes, « geste=oui » à la suite, pour un joueur dans une équipe.
 create function pg_temp.droits(qui text, equipe text) returns text language sql volatile as $$
   select pg_temp.lire(qui, format($q$select string_agg(g || '=' || public.equipe_droit(%s, g), ',' order by g)
-    from unnest(array['annuler', 'couverture', 'defier', 'direction', 'ecusson', 'feuille', 'inviter', 'score']) g$q$, pg_temp.eq(equipe)))
+    from unnest(array['annuler', 'couverture', 'defier', 'direction', 'ecusson', 'excuser', 'feuille', 'inviter', 'score']) g$q$, pg_temp.eq(equipe)))
 $$;
 -- Déposer la feuille d'avant-match d'un match : « public.equipe_feuille(12, '{…}'::uuid[]) ».
 create function pg_temp.deposer(d bigint, joueurs text[]) returns text language sql stable as $$

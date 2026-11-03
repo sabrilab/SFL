@@ -8,8 +8,8 @@
 //      DROITS (lib/sfl/equipes-droits.ts), geste par geste ; chaque geste
 //      demandé à la base existe ;
 //   4. l'entraîneur : recrute, défie, dépose la feuille ; jamais le score,
-//      l'annulation, l'écusson, la couverture ni la direction ; aucun droit
-//      pendant un préavis ;
+//      l'excuse d'un absent, l'annulation, l'écusson, la couverture ni la
+//      direction ; aucun droit pendant un préavis ;
 //   5. une équipe 7 + 1 : 7 joueurs, plus aucune invitation de joueur,
 //      « Active · 7 / 7 » ; 4 + 1 n'est pas active ; l'invitation de
 //      l'entraîneur ne prend pas l'une des six ;
@@ -96,6 +96,7 @@ const ENTRAINEUR: Record<Geste, boolean> = {
   feuille: true,
   annuler: false,
   score: false,
+  excuser: false,
   ecusson: false,
   couverture: false,
   direction: false,

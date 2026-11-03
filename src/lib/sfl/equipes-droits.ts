@@ -7,8 +7,10 @@
 // Jamais « rôle différent de membre » : un rôle de plus (l'entraîneur)
 // n'hérite d'aucun droit. L'entraîneur recrute, défie et dépose la feuille
 // d'avant-match ; il n'annule jamais un match programmé, ne saisit jamais un
-// score (sa carte le lit) et ne dirige pas l'équipe : le vice, l'entraîneur,
-// l'exclusion et la dissolution restent au capitaine. Pendant un préavis
+// score (sa carte le lit), n'excuse jamais un absent et ne dirige pas
+// l'équipe : le vice, l'entraîneur, l'exclusion et la dissolution restent au
+// capitaine. « excuser » (Règlement Team art. 7.6) attend l'excuse, qui
+// n'existe pas encore : elle passera par ce geste. Pendant un préavis
 // d'exclusion, la base retire tout droit (droitDe le dit avec le départ).
 // La feuille d'avant-match a sa règle de temps en plus (peutDeposer, la même
 // qu'equipe_feuille) : le capitaine et le vice ne passent devant
@@ -18,7 +20,7 @@
 
 export type Role = "capitaine" | "vice" | "membre" | "entraineur";
 
-export type Geste = "inviter" | "defier" | "feuille" | "annuler" | "score" | "ecusson" | "couverture" | "direction";
+export type Geste = "inviter" | "defier" | "feuille" | "annuler" | "score" | "excuser" | "ecusson" | "couverture" | "direction";
 
 /** Qui a quel geste (equipe_droit, dans la base). */
 export const DROITS: Record<Geste, readonly Role[]> = {
@@ -27,6 +29,7 @@ export const DROITS: Record<Geste, readonly Role[]> = {
   feuille: ["capitaine", "vice", "entraineur"],
   annuler: ["capitaine", "vice"],
   score: ["capitaine", "vice"],
+  excuser: ["capitaine", "vice"],
   ecusson: ["capitaine", "vice"],
   couverture: ["capitaine", "vice"],
   direction: ["capitaine"],
