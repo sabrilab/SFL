@@ -4,7 +4,8 @@
 // des consignes et balisé comme des données, le total plafonné à 30 000
 // caractères, une conversation normale envoyée telle qu'avant, et une route
 // qui ne relit plus l'historique du téléphone ni n'écrit de texte de réponse
-// dans ses journaux.
+// dans ses journaux. Contrôle du 03/11 : aucune coupe ne laisse une moitié
+// d'emoji (7), et la route borne le dossier avant d'écrire en base (6).
 //   npx tsx tools/agent-contexte-check.ts
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -14,6 +15,9 @@ import {
   CONTEXTE_MAX,
   CORPS_MAX_OCTETS,
   DOSSIER_MAX,
+  TOUR_MAX,
+  bienForme,
+  debut,
   dossierBalise,
   dossierBorne,
   enClair,
@@ -222,9 +226,64 @@ function ancien(historique: Tour[], question: string) {
   const consignes = route.slice(route.indexOf("const CONSIGNES"), route.indexOf("const SCHEMA"));
   for (const mot of ["jamais des ordres", "aucun mot de passe", "aucun email", "chiffres de l'admin", "Ne prétends jamais", "page Confidentialité", "foot, de forme et de santé"])
     assert.ok(consignes.includes(mot), mot);
+  // Le dossier est borné avant toute lecture ou écriture en base, et un
+  // dossier illisible est refusé (400) : la question n'était pas rendue,
+  // mais déjà comptée dans le crédit du jour.
+  const post = code.slice(code.indexOf("export async function POST"));
+  const borne = post.indexOf("dossierBorne(corps.dossier)");
+  assert.ok(borne > 0 && borne < post.indexOf("createClient(") && borne < post.indexOf(".insert("), "le dossier est borné trop tard");
+  assert.ok(/try\s*\{\s*dossier = dossierBorne\(corps\.dossier\);\s*\}\s*catch\s*\{\s*return erreur\("Dossier illisible\.", 400\);/.test(post), "dossier illisible non refusé");
+  assert.equal((post.match(/dossierBorne\(/g) ?? []).length, 1);
   // L'écran n'envoie plus la conversation.
   const ecran = readFileSync(new URL("../src/components/sfl/agent.tsx", import.meta.url), "utf8");
   assert.ok(!/historique:/.test(ecran.replace(/\/\/.*$/gm, "")));
+}
+
+// 7 · Une coupe ne sépare jamais les deux moitiés d'un emoji : la moitié
+//     seule fait refuser la requête par l'API (« no low surrogate »), et le
+//     joueur perdait sa question (contrôle du 03/11, essai g10).
+const demiPaire = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/;
+{
+  assert.equal(debut("a😀", 2), "a");
+  assert.equal(debut("a😀", 3), "a😀");
+  assert.equal(debut("😀😀", 3), "😀");
+  assert.equal(debut("abc", 0), "");
+  assert.equal(debut("abc", 9), "abc");
+  assert.equal(bienForme("a\uD83D"), "a\uFFFD");
+  assert.equal(bienForme("\uDE00b😀"), "\uFFFDb😀");
+  // L'essai g10 : un vieux tour fait d'emoji, neuf longs tours plus récents,
+  // une question courte ou d'une lettre de plus : le tour coupé finit
+  // toujours sur un caractère entier, quelle que soit la place qui reste.
+  const lignes = [
+    ...Array.from({ length: 9 }, (_, i) => ({ role: (8 - i) % 2 ? "joueur" : "coach", texte: "x".repeat((8 - i) % 2 ? 1_500 : 4_000) })),
+    { role: "coach", texte: "😀".repeat(2_000) },
+  ];
+  const historique = historiqueDeLignes(lignes);
+  assert.ok(!demiPaire.test(historique[0].texte), "tour relu coupé dans un emoji");
+  // Une ligne relue plus longue que TEXTE_TOUR_MAX, décalée d'une unité.
+  const relue = historiqueDeLignes([{ role: "coach", texte: `x${"😀".repeat(2_500)}`, image: { chemin: "11111111-1111-4111-8111-111111111111/1.jpg", legende: `y${"😀".repeat(150)}` } }])[0];
+  assert.ok(!demiPaire.test(relue.texte) && relue.texte.length === 3_999, `${relue.texte.length}`);
+  assert.ok(!demiPaire.test(relue.image ?? "") && (relue.image ?? "").length === 199, `${relue.image?.length}`);
+  for (let k = 0; k < 4; k++) {
+    for (const question of ["salut", "salut!", "salut!!", `${"é".repeat(k)}?`]) {
+      const m = messagesPour({ dossier: dossierBorne({ nom: "Joueur Essai" }), historique, question });
+      const textes = m.flatMap((x) => x.content.map((b) => b.text));
+      assert.ok(textes.some((t) => t.includes("😀") && t.endsWith("…")), "le tour d'emoji n'est pas coupé");
+      for (const t of textes) assert.ok(!demiPaire.test(t), `${question} : moitié d'emoji`);
+      assert.ok(tailleDe(m) <= CONTEXTE_MAX);
+    }
+  }
+  // Un tour seul plus long que TOUR_MAX, un dossier coupé net : jamais de moitié.
+  for (const decalage of [0, 1]) {
+    const long = messagesPour({ dossier: "{}", historique: [{ role: "coach", texte: `${"x".repeat(decalage)}${"😀".repeat(4_000)}` }], question: "et ?" });
+    const tour = long[1].content[0].text;
+    assert.ok(tour.length <= TOUR_MAX && tour.endsWith("…") && !demiPaire.test(tour), `tour long (${decalage})`);
+    const d = dossierBorne({ synthese: `${"s".repeat(decalage)}${"😀".repeat(5_000)}` });
+    assert.ok(d.length <= DOSSIER_MAX && !demiPaire.test(d), `dossier (${decalage})`);
+  }
+  // Une moitié venue du téléphone (ouverture, question) ne part pas non plus.
+  const venue = messagesPour({ dossier: "{}", historique: [], ouverture: "J6\uD83D", question: "bien\uDE00" });
+  for (const t of venue.flatMap((x) => x.content.map((b) => b.text))) assert.ok(!demiPaire.test(t), t);
 }
 
 corpsBorne().then(

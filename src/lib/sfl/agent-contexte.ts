@@ -18,6 +18,9 @@
 //     conversation, question d'ouverture, question) tient en CONTEXTE_MAX
 //     caractères, cartes comprises : les tours les plus anciens tombent
 //     d'abord (messagesPour).
+// Une coupe ne sépare jamais les deux moitiés d'un emoji (debut) : un texte
+// qui finit par une moitié seule fait refuser la requête par l'API, et le
+// joueur perdait sa question (contrôle du 03/11/2026).
 // Le joueur peut encore écrire lui-même des lignes « coach » dans sa
 // conversation (la base le lui permet) : il ne trompe que la sienne, et le
 // plafond borne ce que cela coûte.
@@ -78,6 +81,22 @@ export async function lireCorps(req: Request, max = CORPS_MAX_OCTETS): Promise<s
   return new TextDecoder().decode(tout);
 }
 
+/**
+ * Les n premières unités d'un texte, sans couper un caractère en deux : un
+ * emoji (et tout caractère hors du plan de base) en occupe deux, et sa
+ * première moitié seule rend le texte invalide pour l'API.
+ */
+export function debut(s: string, n: number): string {
+  if (s.length <= n) return s;
+  if (n <= 0) return "";
+  const code = s.charCodeAt(n - 1);
+  return s.slice(0, code >= 0xd800 && code <= 0xdbff ? n - 1 : n);
+}
+
+/** Une moitié d'emoji restée seule (venue d'un téléphone) devient « � » : l'API refuse un texte qui en a. */
+export const bienForme = (s: string) =>
+  s.replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, "\uFFFD");
+
 /** Une ligne d'agent_messages relue en base, telle que l'écran l'affiche ; null si elle n'en est pas une. */
 export function tourDeLigne(v: unknown): Tour | null {
   if (!v || typeof v !== "object") return null;
@@ -88,9 +107,9 @@ export function tourDeLigne(v: unknown): Tour | null {
     lireImage(r.image)?.legende || (schema ? `schéma ${schema.type}${schema.legende ? ` : ${schema.legende}` : ""}` : "");
   return {
     role: r.role,
-    texte: r.texte.slice(0, TEXTE_TOUR_MAX),
+    texte: debut(r.texte, TEXTE_TOUR_MAX),
     cartes: lireCartes(r.cartes),
-    ...(image ? { image: image.slice(0, 200) } : {}),
+    ...(image ? { image: debut(image, 200) } : {}),
   };
 }
 
@@ -152,7 +171,7 @@ export function dossierBorne(brut: unknown, max = DOSSIER_MAX): string {
     if (!listes.length) break;
     listes.reduce((a, b) => (JSON.stringify(b).length > JSON.stringify(a).length ? b : a)).pop();
   }
-  return `${s.slice(0, max - 1)}…`;
+  return `${debut(s, max - 1)}…`;
 }
 
 /** Le dossier tel qu'il ouvre la conversation : des données, entre balises. */
@@ -173,7 +192,7 @@ export function enClair(t: Tour): string {
   return [t.texte, montree, ...cartes].filter(Boolean).join("\n\n");
 }
 
-const couper = (s: string, n: number) => (s.length > n ? `${s.slice(0, Math.max(0, n - 1))}…` : s);
+const couper = (s: string, n: number) => (s.length > n ? `${debut(s, n - 1)}…` : s);
 
 /**
  * La conversation pour l'API : le dossier d'abord (premier message, du côté
@@ -185,14 +204,14 @@ const couper = (s: string, n: number) => (s.length > n ? `${s.slice(0, Math.max(
  * plus est coupé, les plus anciens tombent.
  */
 export function messagesPour(p: { dossier: string; historique: Tour[]; ouverture?: string; question: string }): MessageModele[] {
-  const dossier = dossierBalise(p.dossier);
-  const ouverture = p.ouverture?.trim() ?? "";
-  const question = p.question.trim();
+  const dossier = dossierBalise(bienForme(p.dossier));
+  const ouverture = bienForme(p.ouverture?.trim() ?? "");
+  const question = bienForme(p.question.trim());
   let reste = CONTEXTE_MAX - dossier.length - ouverture.length - question.length;
   const gardes: { role: Tour["role"]; texte: string }[] = [];
   for (let i = p.historique.length - 1; i >= 0 && reste > 0; i--) {
     const t = p.historique[i];
-    const texte = couper(enClair(t).trim(), TOUR_MAX);
+    const texte = couper(bienForme(enClair(t).trim()), TOUR_MAX);
     if (!texte) continue;
     if (texte.length <= reste) {
       gardes.unshift({ role: t.role, texte });
