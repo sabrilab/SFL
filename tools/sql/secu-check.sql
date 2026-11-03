@@ -9,7 +9,12 @@
 --     règle : le service Storage lit la ligne de storage.objects avec le
 --     jeton du joueur, c'est ce SELECT que le banc joue ;
 --   · T17 : anon et authenticated n'ont plus TRUNCATE, TRIGGER ni REFERENCES
---     sur aucune table de public, et l'app n'en a pas besoin.
+--     sur aucune table de public, et l'app n'en a pas besoin ;
+--   · contrôle adverse du 03/11 (17, 18) : ce compte n'abonne aucun
+--     téléphone, n'a plus de rôle d'organisateur ni de capitaine, ne touche
+--     plus à ses lignes de match, ni aux feuilles (Bola, SFL en direct), ni
+--     aux missions d'arbitre ; un lien signé trouve son message par l'index
+--     et le relit par sa clé, sans lire toute la table messages.
 --
 -- À jouer sur un Postgres 16 local, JAMAIS sur la base de la ligue :
 --   psql -f tools/sql/supabase-reduit.sql      (Postgres nu)
@@ -280,9 +285,11 @@ select pg_temp.vrai('12 Cyr est membre', pg_temp.en('Cyr', 'select public.est_me
 select pg_temp.vrai('12 Ora n''est ni admin ni membre', pg_temp.en('Ora', 'select (public.is_league_admin() or public.est_membre())::text') = 'false');
 select pg_temp.vrai('12 Ada est admin', pg_temp.en('Ada', 'select (public.is_league_admin() and public.est_membre())::text') = 'true');
 select pg_temp.vrai('12 un visiteur n''appelle pas est_membre', pg_temp.en('anon', 'select public.est_membre()::text') like 'refus %');
--- 13 · Partout, Dan voit exactement ce que voit un compte en attente (ni
---     membre ni admin) : rien de ce qu'un membre lit. Même chose pour Ora.
---     Seule différence, par construction : sa ligne à changer (15).
+-- 13 · Partout, Dan ne voit jamais plus que ce que voit un compte en attente
+--     (ni membre ni admin) : rien de ce qu'un membre lit. Même chose pour
+--     Ora. Il voit même moins : un compte en attente inscrit à un match le
+--     voit, Dan non (voit_match, 17). Seule ligne en plus, par construction :
+--     sa ligne à changer (15).
 create temp table vu (qui text, etat text, t text, n bigint);
 insert into vu select 'Cyr', 'membre', t, n from pg_temp.vues('Cyr');
 insert into vu select 'Dan', 'ligne', t, n from pg_temp.vues('Dan');
@@ -296,14 +303,14 @@ insert into vu select 'Ora', 'attente', t, n from pg_temp.vues('Ora');
 update public.profiles set valide = true where id in (select id from banc where nom in ('Dan', 'Ora'));
 update public.profiles set is_admin = true where id = (select id from banc where nom = 'Ora');
 insert into public.mot_de_passe_a_changer (user_id, motif) select id, 'origine' from banc where nom in ('Dan', 'Ora');
-select pg_temp.vrai('13 Dan = un compte en attente, table par table',
-  not exists (select 1 from vu l join vu a using (t) where l.qui = 'Dan' and l.etat = 'ligne' and a.qui = 'Dan' and a.etat = 'attente' and l.n <> a.n and t <> 'public.mot_de_passe_a_changer'),
-  (select string_agg(l.t || ' ' || l.n || '≠' || a.n, ', ') from vu l join vu a using (t)
-    where l.qui = 'Dan' and l.etat = 'ligne' and a.qui = 'Dan' and a.etat = 'attente' and l.n <> a.n and t <> 'public.mot_de_passe_a_changer'));
-select pg_temp.vrai('13 Ora = un compte en attente, table par table',
-  not exists (select 1 from vu l join vu a using (t) where l.qui = 'Ora' and l.etat = 'ligne' and a.qui = 'Ora' and a.etat = 'attente' and l.n <> a.n and t <> 'public.mot_de_passe_a_changer'),
-  (select string_agg(l.t || ' ' || l.n || '≠' || a.n, ', ') from vu l join vu a using (t)
-    where l.qui = 'Ora' and l.etat = 'ligne' and a.qui = 'Ora' and a.etat = 'attente' and l.n <> a.n and t <> 'public.mot_de_passe_a_changer'));
+select pg_temp.vrai('13 Dan ne voit jamais plus qu''un compte en attente, table par table',
+  not exists (select 1 from vu l join vu a using (t) where l.qui = 'Dan' and l.etat = 'ligne' and a.qui = 'Dan' and a.etat = 'attente' and l.n > a.n and t <> 'public.mot_de_passe_a_changer'),
+  (select string_agg(l.t || ' ' || l.n || '>' || a.n, ', ') from vu l join vu a using (t)
+    where l.qui = 'Dan' and l.etat = 'ligne' and a.qui = 'Dan' and a.etat = 'attente' and l.n > a.n and t <> 'public.mot_de_passe_a_changer'));
+select pg_temp.vrai('13 Ora ne voit jamais plus qu''un compte en attente, table par table',
+  not exists (select 1 from vu l join vu a using (t) where l.qui = 'Ora' and l.etat = 'ligne' and a.qui = 'Ora' and a.etat = 'attente' and l.n > a.n and t <> 'public.mot_de_passe_a_changer'),
+  (select string_agg(l.t || ' ' || l.n || '>' || a.n, ', ') from vu l join vu a using (t)
+    where l.qui = 'Ora' and l.etat = 'ligne' and a.qui = 'Ora' and a.etat = 'attente' and l.n > a.n and t <> 'public.mot_de_passe_a_changer'));
 -- Le banc n'est pas vide : un membre, et plus encore l'admin, voient bien plus que Dan.
 select pg_temp.vrai('13 Cyr voit plus que Dan dans au moins 6 tables',
   (select count(*) from vu m join vu d using (t) where m.qui = 'Cyr' and d.qui = 'Dan' and d.etat = 'ligne' and m.n > d.n) >= 6,
@@ -315,6 +322,13 @@ select pg_temp.vrai('13 Dan : 0 ligne de la saison, des votes, du Vestiaire, du 
   pg_temp.nb('Dan', 'select (select count(*) from public.saison) + (select count(*) from public.votes_figures)
                           + (select count(*) from public.messages where canal in (''sfl'', ''match''))') = 0);
 select pg_temp.vrai('13 Dan ne voit des profils que le sien', pg_temp.nb('Dan', 'select count(*) from public.profiles') = 1);
+select pg_temp.vrai('13 Dan ne voit pas son match ni ses joueurs ; en attente, il les voyait',
+  (select l.n + l2.n = 0 and a.n > 0 and a2.n > 0
+     from vu l, vu l2, vu a, vu a2
+    where l.qui = 'Dan' and l.etat = 'ligne' and l.t = 'public.matchs'
+      and l2.qui = 'Dan' and l2.etat = 'ligne' and l2.t = 'public.match_joueurs'
+      and a.qui = 'Dan' and a.etat = 'attente' and a.t = 'public.matchs'
+      and a2.qui = 'Dan' and a2.etat = 'attente' and a2.t = 'public.match_joueurs'));
 -- Ce qui reste à Dan est à lui : sa fiche, ses privés, ses fichiers (voir le compte rendu).
 select pg_temp.vrai('13 Dan garde son fichier', pg_temp.lit('Dan', 'images', 'f0000000-0000-0000-0000-0000000000d4/6000.jpg') = 1);
 -- 14 · L'admin qui n'a pas changé son mot de passe ne fait plus rien d'admin.
@@ -372,5 +386,147 @@ select pg_temp.vrai('16 Bea réagit au privé (clé étrangère)',
                            '🔥', 'f0000000-0000-0000-0000-0000000000a1/1001.jpg')) = 1);
 select pg_temp.vrai('16 Ali pose une question au coach (trigger du crédit)',
   pg_temp.nb('Ali', 'with x as (insert into public.agent_messages (role, texte) values (''joueur'', ''Question du banc'') returning 1) select count(*) from x') = 1);
+
+-- ═══ T1.2 · ce qui ne passait pas par est_membre (contrôle du 03/11) ═══
+-- 17 · Ali, organisateur du match 99001 et capitaine de l'équipe 99701, puis
+--      Bea (inscrite au match) et Eva (de l'équipe), reçoivent une ligne :
+--      leur session ne change plus rien, ni par une fonction, ni par une
+--      règle, ni dans les seaux. Chaque essai est annulé aussitôt (essai,
+--      ci-dessous) : sur un schéma qui laisserait passer, un geste réussi ne
+--      fausse pas les suivants. Chaque refus a son témoin : le même geste,
+--      sans la ligne, passe.
+create function pg_temp.essai(qui text, requete text) returns text language plpgsql as $$
+declare r text; uid uuid;
+begin
+  select id into uid from banc where nom = qui;
+  begin
+    perform set_config('request.jwt.claims', json_build_object('sub', uid, 'role', 'authenticated')::text, true);
+    set local role authenticated;
+    execute requete into r;
+    raise exception using errcode = 'P0099', message = coalesce(r, 'null');
+  exception when others then
+    reset role;
+    perform set_config('request.jwt.claims', '', true);
+    if sqlstate = 'P0099' then return sqlerrm; end if;
+    return 'refus ' || sqlerrm;
+  end;
+end; $$;
+insert into public.push_abonnements (endpoint, user_id, p256dh, auth)
+values ('https://fcm.googleapis.com/fcm/send/banc-ali', :a', 'cle-inventee', 'auth-inventee');
+update public.matchs set jour = current_date - 1 where id = 99001;
+insert into public.match_joueurs (match_id, player_id, statut) values (99001, 'f0000000-0000-0000-0000-0000000000c3', 'invite');
+update public.profiles set arbitre = true where id = :a';
+insert into public.mot_de_passe_a_changer (user_id, motif) select id, 'origine' from banc where nom in ('Ali', 'Bea', 'Eva');
+-- Les notifications (elles portent le texte des messages).
+select pg_temp.vrai('17 Ali n''abonne pas un téléphone',
+  pg_temp.essai('Ali', format('with x as (insert into public.push_abonnements (endpoint, user_id, p256dh, auth) values (%L, %L, %L, %L) returning 1) select count(*)::text from x',
+    'https://fcm.googleapis.com/fcm/send/banc-ali-2', 'f0000000-0000-0000-0000-0000000000a1', 'k', 'a')) like 'refus new row violates row-level security%');
+select pg_temp.vrai('17 Ali ne réécrit pas son abonnement',
+  pg_temp.essai('Ali', 'with x as (update public.push_abonnements set p256dh = ''autre'' where user_id = auth.uid() returning 1) select count(*)::text from x') like 'refus new row violates row-level security%');
+select pg_temp.vrai('17 témoin : Cyr abonne un téléphone',
+  pg_temp.essai('Cyr', format('with x as (insert into public.push_abonnements (endpoint, user_id, p256dh, auth) values (%L, %L, %L, %L) returning 1) select count(*)::text from x',
+    'https://fcm.googleapis.com/fcm/send/banc-cyr', 'f0000000-0000-0000-0000-0000000000c3', 'k', 'a')) = '1');
+-- L'équipe : plus de rôle, donc plus aucune fonction de capitaine.
+select pg_temp.vrai('17 Ali n''a plus de rôle dans son équipe', pg_temp.essai('Ali', 'select public.role_equipe(99701)') = 'null');
+select pg_temp.vrai('17 Ali ne nomme pas de vice',
+  pg_temp.essai('Ali', format('select public.equipe_vice(99701, %L)::text', 'f0000000-0000-0000-0000-0000000000e5')) like 'refus %');
+select pg_temp.vrai('17 Ali ne tire pas de lien d''invitation', pg_temp.essai('Ali', 'select public.equipe_lien(99701)') like 'refus %');
+select pg_temp.vrai('17 Ali n''invite pas',
+  pg_temp.essai('Ali', format('select public.equipe_inviter(99701, %L)::text', 'f0000000-0000-0000-0000-0000000000c3')) like 'refus %');
+select pg_temp.vrai('17 Ali n''exclut pas',
+  pg_temp.essai('Ali', format('select public.equipe_exclure(99701, %L)::text', 'f0000000-0000-0000-0000-0000000000e5')) like 'refus %');
+select pg_temp.vrai('17 Ali ne dissout pas', pg_temp.essai('Ali', 'select public.equipe_dissoudre(99701)::text') like 'refus %');
+select pg_temp.vrai('17 Ali ne pose pas de couverture',
+  pg_temp.essai('Ali', 'with x as (insert into storage.objects (bucket_id, name, owner) values (''couvertures'', ''99701.jpg'', auth.uid()) returning 1) select count(*)::text from x') like 'refus %');
+select pg_temp.vrai('17 Eva ne signe pas la charte', pg_temp.essai('Eva', 'select public.equipe_signer_charte(99701)::text') like 'refus %');
+-- Le match : ni le match, ni ses joueurs, ni sa feuille.
+select pg_temp.vrai('17 Ali ne voit plus son match', pg_temp.essai('Ali', 'select count(*)::text from public.matchs where id = 99001') = '0');
+select pg_temp.vrai('17 Ali ne change pas le lieu',
+  pg_temp.essai('Ali', 'with x as (update public.matchs set lieu = ''ailleurs'' where id = 99001 returning 1) select count(*)::text from x') = '0');
+select pg_temp.vrai('17 Ali n''annule pas',
+  pg_temp.essai('Ali', 'with x as (delete from public.matchs where id = 99001 returning 1) select count(*)::text from x') = '0');
+select pg_temp.vrai('17 Ali n''inscrit personne',
+  pg_temp.essai('Ali', format('with x as (insert into public.match_joueurs (match_id, player_id, statut) values (99001, %L, ''invite'') returning 1) select count(*)::text from x',
+    'f0000000-0000-0000-0000-0000000000a0')) like 'refus %');
+select pg_temp.vrai('17 Ali ne sort personne',
+  pg_temp.essai('Ali', 'with x as (delete from public.match_joueurs where match_id = 99001 returning 1) select count(*)::text from x') = '0');
+select pg_temp.vrai('17 Ali ne fait pas la feuille',
+  pg_temp.essai('Ali', format('select public.enregistrer_feuille_bola(99001, 3, 1, %L::jsonb)::text',
+    '[{"playerId":"f0000000-0000-0000-0000-0000000000d4","equipe":"clairs","buts":3},{"playerId":"f0000000-0000-0000-0000-0000000000b2","equipe":"fonces","buts":1},{"playerId":"f0000000-0000-0000-0000-0000000000c3","equipe":"absent"}]'))
+  like 'refus feuille réservée%');
+select pg_temp.vrai('17 Bea ne voit plus le match', pg_temp.essai('Bea', 'select count(*)::text from public.match_joueurs where match_id = 99001') = '0');
+select pg_temp.vrai('17 Bea ne touche pas sa ligne du match',
+  pg_temp.essai('Bea', 'with x as (update public.match_joueurs set statut = statut where match_id = 99001 and player_id = auth.uid() returning 1) select count(*)::text from x') = '0');
+-- La feuille SFL en direct et les missions d'arbitre : refusées dès l'identité.
+select pg_temp.vrai('17 Ali ne prend pas la feuille en direct',
+  pg_temp.essai('Ali', 'select public.prendre_feuille(1, ''Noirs 1'', ''Blancs 1'')::text') = 'refus Réservé aux joueurs de la ligue.');
+select pg_temp.vrai('17 Ali ne compte rien sur la feuille en direct',
+  pg_temp.essai('Ali', 'select public.compter_feuille(1, ''Noirs 1'', ''Blancs 1'', ''[]''::jsonb)::text') = 'refus Réservé aux joueurs de la ligue.');
+select pg_temp.vrai('17 Ali ne scelle pas la feuille en direct',
+  pg_temp.essai('Ali', 'select public.sceller_feuille(1, ''Noirs 1'', ''Blancs 1'')::text') = 'refus Réservé aux joueurs de la ligue.');
+select pg_temp.vrai('17 Ali, arbitre, ne répond pas à une mission',
+  pg_temp.essai('Ali', 'select public.repondre_mission_arbitre(77, 1, ''m1'', ''fait'')::text') = 'refus Réservé aux arbitres.');
+-- Les témoins : la ligne effacée (comme par le trigger), tout repasse.
+delete from public.mot_de_passe_a_changer where user_id in (select id from banc where nom in ('Ali', 'Bea', 'Eva'));
+select pg_temp.vrai('17 témoin : Ali a son rôle', pg_temp.en('Ali', 'select public.role_equipe(99701)') = 'capitaine');
+select pg_temp.vrai('17 témoin : Ali tire un lien', pg_temp.essai('Ali', 'select public.equipe_lien(99701)') not like 'refus %');
+select pg_temp.vrai('17 témoin : Ali nomme un vice',
+  pg_temp.essai('Ali', format('select public.equipe_vice(99701, %L)::text', 'f0000000-0000-0000-0000-0000000000e5')) not like 'refus %');
+select pg_temp.vrai('17 témoin : Ali voit son match', pg_temp.essai('Ali', 'select count(*)::text from public.matchs where id = 99001') = '1');
+select pg_temp.vrai('17 témoin : Ali sort un joueur',
+  pg_temp.essai('Ali', format('with x as (delete from public.match_joueurs where match_id = 99001 and player_id = %L returning 1) select count(*)::text from x',
+    'f0000000-0000-0000-0000-0000000000c3')) = '1');
+select pg_temp.vrai('17 témoin : Bea voit le match', pg_temp.essai('Bea', 'select count(*)::text from public.match_joueurs where match_id = 99001') = '3');
+select pg_temp.vrai('17 témoin : Bea touche sa ligne du match',
+  pg_temp.essai('Bea', 'with x as (update public.match_joueurs set statut = statut where match_id = 99001 and player_id = auth.uid() returning 1) select count(*)::text from x') = '1');
+select pg_temp.vrai('17 témoin : Eva signe la charte', pg_temp.en('Eva', 'select public.equipe_signer_charte(99701)::text') not like 'refus %');
+select pg_temp.vrai('17 témoin : Ali change le lieu',
+  pg_temp.nb('Ali', 'with x as (update public.matchs set lieu = ''Terrain du banc'' where id = 99001 returning 1) select count(*) from x') = 1);
+select pg_temp.vrai('17 témoin : Ali fait la feuille',
+  pg_temp.en('Ali', format('select public.enregistrer_feuille_bola(99001, 3, 1, %L::jsonb)::text',
+    '[{"playerId":"f0000000-0000-0000-0000-0000000000d4","equipe":"clairs","buts":3},{"playerId":"f0000000-0000-0000-0000-0000000000b2","equipe":"fonces","buts":1},{"playerId":"f0000000-0000-0000-0000-0000000000c3","equipe":"absent"}]'))
+  = '1');
+select pg_temp.vrai('17 témoin : Ali passe la garde de la feuille en direct',
+  pg_temp.en('Ali', 'select public.prendre_feuille(1, ''Noirs 1'', ''Blancs 1'')::text') <> 'refus Réservé aux joueurs de la ligue.');
+select pg_temp.vrai('17 témoin : Ali, arbitre, passe la garde des missions',
+  pg_temp.en('Ali', 'select public.repondre_mission_arbitre(77, 1, ''m1'', ''fait'')::text') <> 'refus Réservé aux arbitres.');
+-- Confirmer un résultat : Bea est sur la feuille ; avec une ligne, non.
+insert into public.mot_de_passe_a_changer (user_id, motif) select id, 'origine' from banc where nom = 'Bea';
+select pg_temp.vrai('17 Bea ne confirme pas le résultat',
+  pg_temp.essai('Bea', 'select public.repondre_resultat(99001, 1, ''confirme'')') = 'refus pas sur la feuille');
+delete from public.mot_de_passe_a_changer where user_id = :b';
+select pg_temp.vrai('17 témoin : Bea confirme le résultat',
+  pg_temp.en('Bea', 'select public.repondre_resultat(99001, 1, ''confirme'')') not like 'refus %');
+
+-- ═══ T2 · le coût de la règle des seaux (contrôle du 03/11) ═══
+-- 18 · Les messages qui portent un fichier se trouvent par l'index, puis se
+--      relisent par leur clé sous leurs règles : jamais de lecture de toute
+--      la table messages à chaque lien signé (seqscan interdit : s'il n'y a
+--      pas d'autre chemin, le plan le dit quand même).
+create function pg_temp.plan_de(qui text, requete text) returns text language plpgsql as $$
+declare l text; tout text := ''; uid uuid;
+begin
+  select id into uid from banc where nom = qui;
+  perform set_config('request.jwt.claims', json_build_object('sub', uid, 'role', 'authenticated')::text, true);
+  set local role authenticated;
+  for l in execute 'explain ' || requete loop tout := tout || l || E'\n'; end loop;
+  reset role;
+  perform set_config('request.jwt.claims', '', true);
+  return tout;
+end; $$;
+set local enable_seqscan = off;
+select pg_temp.vrai('18 un lien signé relit les messages par leur clé, jamais toute la table',
+  pg_temp.plan_de('Cyr', format('select 1 from storage.objects where bucket_id = ''images'' and name = %L', 'f0000000-0000-0000-0000-0000000000b2/4000.jpg'))
+    ~ 'Index Cond: \(id = ANY'
+  and pg_temp.plan_de('Cyr', format('select 1 from storage.objects where bucket_id = ''images'' and name = %L', 'f0000000-0000-0000-0000-0000000000b2/4000.jpg'))
+    !~ 'Seq Scan on messages',
+  pg_temp.plan_de('Cyr', format('select 1 from storage.objects where bucket_id = ''images'' and name = %L', 'f0000000-0000-0000-0000-0000000000b2/4000.jpg')));
+reset enable_seqscan;
+select pg_temp.vrai('18 messages_de_piece : le message de l''auteur, pas celui qui pointe son fichier',
+  cardinality(public.messages_de_piece('f0000000-0000-0000-0000-0000000000a1/1001.jpg')) = 1
+  and cardinality(public.messages_de_piece('f0000000-0000-0000-0000-0000000000a1/5000.m4a')) = 0
+  and cardinality(public.messages_de_piece('sans-dossier')) = 0);
+select pg_temp.vrai('18 un visiteur n''appelle pas messages_de_piece',
+  pg_temp.en('anon', 'select cardinality(public.messages_de_piece(''x/1.m4a''))::text') like 'refus %');
 
 rollback;

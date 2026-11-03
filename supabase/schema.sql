@@ -146,6 +146,30 @@ alter table public.mot_de_passe_a_changer enable row level security;
 revoke all on public.mot_de_passe_a_changer from anon, authenticated;
 grant select on public.mot_de_passe_a_changer to authenticated;
 
+-- « L'appelant a-t-il choisi son mot de passe ? » — false tant qu'il a une
+-- ligne ici (mot de passe d'origine, devenu public, ou provisoire). Les
+-- gestes qui ne passent pas par est_membre() s'en servent (03/11/2026) : ce
+-- qu'un joueur fait sur ses propres lignes (répondre à une invitation de
+-- match, confirmer un résultat, abonner un téléphone aux notifications,
+-- signer la charte de son équipe), et qu'un compte en attente garde. Le
+-- mot de passe changé, le trigger efface la ligne et tout revient.
+-- Recherche par la clé primaire : le coût est négligeable.
+create or replace function public.mot_de_passe_choisi()
+returns boolean
+language sql
+security definer
+set search_path = ''
+stable
+as $$
+  select not exists (
+    select 1 from public.mot_de_passe_a_changer m
+    where m.user_id = (select auth.uid())
+  );
+$$;
+
+revoke execute on function public.mot_de_passe_choisi() from public, anon;
+grant execute on function public.mot_de_passe_choisi() to authenticated;
+
 -- Helper : « l'appelant est-il admin ? » — SECURITY DEFINER pour lire profiles
 -- sans récursion de RLS, avec le contrôle d'identité DANS la fonction.
 --
@@ -1243,6 +1267,31 @@ alter table public.messages add column if not exists piece jsonb;
 create index if not exists messages_piece_chemin_idx
   on public.messages ((piece ->> 'chemin'))
   where piece ->> 'chemin' is not null;
+-- Les messages, de l'auteur du fichier, qui le portent : leurs seuls
+-- identifiants. Sous les règles de messages, Postgres ne sait pas se servir
+-- de l'index ci-dessus (l'opérateur ->> n'est pas « leakproof ») et relisait
+-- toute la table à chaque lien signé, de plus en plus lentement à mesure que
+-- les messages s'accumulent (contrôle du 03/11/2026 : 1 s pour 30 000
+-- messages). Cette fonction, SECURITY DEFINER, trouve les messages par
+-- l'index ; les règles des buckets relisent ensuite ces messages par leur
+-- clé, AVEC les règles de messages : on ne voit le fichier que si l'on peut
+-- lire l'un d'eux. Elle ne rend rien d'autre que des numéros de messages.
+create or replace function public.messages_de_piece(chemin text)
+returns bigint[]
+language sql
+security definer
+set search_path = ''
+stable
+as $$
+  select coalesce(array_agg(m.id), '{}'::bigint[])
+    from public.messages m
+   where m.piece ->> 'chemin' = chemin
+     and strpos(chemin, '/') > 0
+     and m.auteur::text = split_part(chemin, '/', 1);
+$$;
+
+revoke execute on function public.messages_de_piece(text) from public, anon;
+grant execute on function public.messages_de_piece(text) to authenticated;
 -- Répondre à un message précis (19/10) : la réponse cite l'original. Si
 -- l'original est retiré, la réponse reste, sans citation.
 alter table public.messages add column if not exists reponse_a bigint references public.messages(id) on delete set null;
@@ -1414,7 +1463,8 @@ $$;
 -- d'un privé, ceux du match ou de l'équipe, l'effectif de la SFL pour le
 -- Vestiaire. Le message doit être de l'auteur du fichier : sans cela, un
 -- joueur pourrait écrire un message qui pointe le vocal d'un autre et
--- l'ouvrir. Un vocal dont le message est retiré ne s'ouvre plus que pour son
+-- l'ouvrir. Les messages sont trouvés par messages_de_piece (l'index, plus
+-- haut), puis relus par leur clé sous leurs règles. Un vocal dont le message est retiré ne s'ouvre plus que pour son
 -- auteur. Avant, tout membre de la ligue écoutait tout (« vocaux: la ligue
 -- écoute »), privés compris.
 --
@@ -1439,8 +1489,7 @@ begin
         (storage.foldername(name))[1] = (select auth.uid())::text
         or exists (
           select 1 from public.messages m
-          where m.piece ->> 'chemin' = objects.name
-            and m.auteur::text = (storage.foldername(objects.name))[1]
+          where m.id = any (public.messages_de_piece(objects.name))
         )
       )
     );
@@ -1510,8 +1559,7 @@ begin
         (storage.foldername(name))[1] = (select auth.uid())::text
         or exists (
           select 1 from public.messages m
-          where m.piece ->> 'chemin' = objects.name
-            and m.auteur::text = (storage.foldername(objects.name))[1]
+          where m.id = any (public.messages_de_piece(objects.name))
         )
       )
     );
@@ -1832,11 +1880,24 @@ create table if not exists public.match_joueurs (
 
 create index if not exists match_joueurs_player_idx on public.match_joueurs (player_id);
 
+-- Deux colonnes que le fichier présente plus bas, avec leur histoire
+-- (saisi_le : la feuille d'un match Bola ; accepte_le : qui a lui-même pris
+-- sa place) : elles naissent aussi ICI depuis le 03/11/2026, avant les
+-- règles et les fonctions qui les lisent. Une base neuve butait sinon au
+-- premier passage ; sur une base qui les a déjà, rien ne change.
+alter table public.matchs add column if not exists saisi_le timestamptz;
+alter table public.match_joueurs add column if not exists accepte_le timestamptz;
+
 alter table public.matchs enable row level security;
 alter table public.match_joueurs enable row level security;
 
 -- Helpers SECURITY DEFINER : les règles des deux tables se lisent l'une
 -- l'autre, ce qui bouclerait en RLS. L'identité est vérifiée DANS la fonction.
+--
+-- L'organisateur n'a ses droits que s'il est membre (03/11/2026) : avec son
+-- mot de passe d'origine, devenu public, une session ne change plus son
+-- match, ses joueurs ni sa feuille (est_membre, plus haut). De même, un
+-- joueur ne voit ses matchs (voit_match) qu'une fois son mot de passe choisi.
 create or replace function public.organise_match(m bigint)
 returns boolean
 language sql
@@ -1846,7 +1907,7 @@ stable
 as $$
   select exists (
     select 1 from public.matchs x where x.id = m and x.organisateur = (select auth.uid())
-  );
+  ) and public.est_membre();
 $$;
 
 create or replace function public.voit_match(m bigint)
@@ -1861,10 +1922,13 @@ as $$
      where x.id = m
        and (
          (x.visibilite = 'public' and public.est_membre())
-         or x.organisateur = (select auth.uid())
-         or exists (
-           select 1 from public.match_joueurs j
-            where j.match_id = x.id and j.player_id = (select auth.uid())
+         or (
+           (x.organisateur = (select auth.uid())
+            or exists (
+              select 1 from public.match_joueurs j
+               where j.match_id = x.id and j.player_id = (select auth.uid())
+            ))
+           and public.mot_de_passe_choisi()
          )
        )
   ) or public.is_league_admin();
@@ -1884,7 +1948,7 @@ create policy "matchs: lecture"
   -- puisse le voir.
   using (
     (visibilite = 'public' and (select public.est_membre()))
-    or organisateur = (select auth.uid())
+    or (organisateur = (select auth.uid()) and (select public.mot_de_passe_choisi()))
     or (select public.voit_match(id))
   );
 
@@ -1898,8 +1962,8 @@ drop policy if exists "matchs: je modifie le mien" on public.matchs;
 create policy "matchs: je modifie le mien"
   on public.matchs for update
   to authenticated
-  using (organisateur = (select auth.uid()) or (select public.is_league_admin()))
-  with check (organisateur = (select auth.uid()) or (select public.is_league_admin()));
+  using ((organisateur = (select auth.uid()) and (select public.est_membre())) or (select public.is_league_admin()))
+  with check ((organisateur = (select auth.uid()) and (select public.est_membre())) or (select public.is_league_admin()));
 
 -- Un match dont la feuille est faite ne s'efface plus que par l'admin :
 -- l'organisateur effaçait un match perdu, et la Ligue vierge oubliait la
@@ -1908,7 +1972,8 @@ drop policy if exists "matchs: j'annule le mien" on public.matchs;
 create policy "matchs: j'annule le mien"
   on public.matchs for delete
   to authenticated
-  using ((organisateur = (select auth.uid()) and saisi_le is null) or (select public.is_league_admin()));
+  using ((organisateur = (select auth.uid()) and saisi_le is null and (select public.est_membre()))
+         or (select public.is_league_admin()));
 
 drop policy if exists "match_joueurs: lecture" on public.match_joueurs;
 create policy "match_joueurs: lecture"
@@ -1934,22 +1999,26 @@ create policy "match_joueurs: on entre"
     )
   );
 
--- Accepter une invitation : on ne touche qu'à sa propre ligne.
+-- Accepter une invitation : on ne touche qu'à sa propre ligne, une fois son
+-- mot de passe choisi (03/11/2026).
 drop policy if exists "match_joueurs: j'accepte" on public.match_joueurs;
 create policy "match_joueurs: j'accepte"
   on public.match_joueurs for update
   to authenticated
-  using (player_id = (select auth.uid()) or (select public.organise_match(match_id)))
-  with check (player_id = (select auth.uid()) or (select public.organise_match(match_id)));
+  using ((player_id = (select auth.uid()) and (select public.mot_de_passe_choisi()))
+         or (select public.organise_match(match_id)))
+  with check ((player_id = (select auth.uid()) and (select public.mot_de_passe_choisi()))
+              or (select public.organise_match(match_id)));
 
--- On se retire soi-même (avant la feuille : match_sortie_gardee, plus bas) ;
--- l'organisateur retire n'importe qui de son match.
+-- On se retire soi-même (avant la feuille : match_sortie_gardee, plus bas),
+-- une fois son mot de passe choisi ; l'organisateur retire n'importe qui de
+-- son match.
 drop policy if exists "match_joueurs: on sort" on public.match_joueurs;
 create policy "match_joueurs: on sort"
   on public.match_joueurs for delete
   to authenticated
   using (
-    player_id = (select auth.uid())
+    (player_id = (select auth.uid()) and (select public.mot_de_passe_choisi()))
     or (select public.organise_match(match_id))
     or (select public.is_league_admin())
   );
@@ -2544,7 +2613,10 @@ begin
   if not found or x.mode <> 'bola' then
     raise exception 'match inconnu' using errcode = 'P0002';
   end if;
-  if x.organisateur is distinct from (select auth.uid()) and not public.is_league_admin() then
+  -- Un organisateur qui n'est pas membre (mot de passe d'origine, 03/11/2026)
+  -- ne fait plus la feuille.
+  if (x.organisateur is distinct from (select auth.uid()) or not public.est_membre())
+     and not public.is_league_admin() then
     raise exception 'feuille réservée à l''organisateur' using errcode = '42501';
   end if;
   if x.saisi_le is not null and x.saisi_le < now() - interval '24 hours' and not public.is_league_admin() then
@@ -2655,8 +2727,11 @@ begin
   if v is distinct from x.feuille_version then
     raise exception 'feuille corrigée' using errcode = 'P0001';
   end if;
-  if not exists (select 1 from public.match_feuilles f
-                  where f.match_id = m and f.version = v and (select auth.uid()) = any (f.destinataires)) then
+  -- Une session au mot de passe d'origine (03/11/2026) ne répond pas à la
+  -- place du joueur.
+  if not public.mot_de_passe_choisi()
+     or not exists (select 1 from public.match_feuilles f
+                     where f.match_id = m and f.version = v and (select auth.uid()) = any (f.destinataires)) then
     raise exception 'pas sur la feuille' using errcode = '42501';
   end if;
   if exists (select 1 from public.match_confirmations c
@@ -2961,6 +3036,9 @@ create policy "photo_studio: je note la mienne"
 -- joueur n'écrit et n'efface que les siens ; seul l'admin les lit tous, avec
 -- ses propres droits, pour envoyer depuis /api/push/envoyer, et efface ceux
 -- que le service de push dit morts (appli supprimée, permission retirée).
+-- Une session au mot de passe d'origine (03/11/2026) n'abonne aucun
+-- téléphone : les notifications portent le texte des messages. Les
+-- abonnements déjà posés, le serveur les saute (lib/server/push-envoi.ts).
 create table if not exists public.push_abonnements (
   endpoint    text primary key,
   user_id     uuid not null default auth.uid() references auth.users(id) on delete cascade,
@@ -2980,13 +3058,13 @@ create policy "push: je lis les miens, l'admin tout"
 drop policy if exists "push: j'ajoute le mien" on public.push_abonnements;
 create policy "push: j'ajoute le mien"
   on public.push_abonnements for insert to authenticated
-  with check (user_id = (select auth.uid()));
+  with check (user_id = (select auth.uid()) and (select public.mot_de_passe_choisi()));
 
 drop policy if exists "push: je remplace le mien" on public.push_abonnements;
 create policy "push: je remplace le mien"
   on public.push_abonnements for update to authenticated
   using (user_id = (select auth.uid()))
-  with check (user_id = (select auth.uid()));
+  with check (user_id = (select auth.uid()) and (select public.mot_de_passe_choisi()));
 
 drop policy if exists "push: j'efface le mien, l'admin les morts" on public.push_abonnements;
 create policy "push: j'efface le mien, l'admin les morts"
@@ -4317,7 +4395,10 @@ $$;
 revoke execute on function public.joueur_sfl(uuid), public.acces_team(uuid), public.team_sur_invitation(), public.mon_acces_team(), public.essai_team_fin() from public, anon;
 grant execute on function public.joueur_sfl(uuid), public.acces_team(uuid), public.team_sur_invitation(), public.mon_acces_team(), public.essai_team_fin() to authenticated;
 
--- Mon rôle dans une équipe (null : pas membre).
+-- Mon rôle dans une équipe (null : pas membre). Toutes les fonctions et les
+-- règles d'équipe passent par ici : un joueur qui n'est pas membre de la
+-- ligue (mot de passe d'origine, 03/11/2026, est_membre) n'y a plus de rôle,
+-- ni capitaine, ni vice, ni joueur.
 create or replace function public.role_equipe(e bigint)
 returns text
 language sql
@@ -4326,7 +4407,8 @@ set search_path = ''
 stable
 as $$
   select m.role from public.equipe_membres m
-   where m.equipe_id = e and m.joueur = (select auth.uid()) and m.statut = 'membre';
+   where m.equipe_id = e and m.joueur = (select auth.uid()) and m.statut = 'membre'
+     and public.est_membre();
 $$;
 
 create or replace function public.equipe_effectif(e bigint)
@@ -5097,7 +5179,7 @@ as $$
 declare
   moi uuid := (select auth.uid());
 begin
-  if moi is null or not exists (
+  if moi is null or not public.mot_de_passe_choisi() or not exists (
     select 1 from public.equipe_membres m where m.equipe_id = e and m.joueur = moi and m.statut = 'membre'
   ) then
     raise exception 'Réservé aux joueurs de l''équipe.' using errcode = '42501';
@@ -7801,7 +7883,8 @@ as $$
 declare
   v_le timestamptz := now();
 begin
-  if not exists (select 1 from public.profiles p where p.id = (select auth.uid()) and p.arbitre) then
+  if not exists (select 1 from public.profiles p where p.id = (select auth.uid()) and p.arbitre)
+     or not public.est_membre() then
     raise exception 'Réservé aux arbitres.' using errcode = '42501';
   end if;
   if p_mission not in ('sang-froid', 'tribune', 'unanime') or p_reponse not in ('acceptee', 'passee') then
@@ -8361,7 +8444,7 @@ declare
   existe boolean;
   f     public.feuilles_direct;
 begin
-  select p.name into nom from public.profiles p where p.id = moi and p.valide;
+  select p.name into nom from public.profiles p where p.id = moi and p.valide and public.est_membre();
   if nom is null then
     raise exception 'Réservé aux joueurs de la ligue.' using errcode = '42501';
   end if;
@@ -8442,7 +8525,7 @@ declare
   refus text;
   faits jsonb := '[]'::jsonb;
 begin
-  select p.name into nom from public.profiles p where p.id = moi and p.valide;
+  select p.name into nom from public.profiles p where p.id = moi and p.valide and public.est_membre();
   if nom is null then
     raise exception 'Réservé aux joueurs de la ligue.' using errcode = '42501';
   end if;
@@ -8659,7 +8742,7 @@ declare
   refus    text;
   f        public.feuilles_direct;
 begin
-  select p.name into nom from public.profiles p where p.id = moi and p.valide;
+  select p.name into nom from public.profiles p where p.id = moi and p.valide and public.est_membre();
   if nom is null then
     raise exception 'Réservé aux joueurs de la ligue.' using errcode = '42501';
   end if;
