@@ -34,7 +34,12 @@
 --      équipes, de 3 à 5 ; l'appel d'avant, par les noms et sans eux, passe
 --      (5 et 5) ; deux saisies qui collent, présents compris, valident le
 --      match ; des présents qui diffèrent ne le valident pas ; à 3 ou moins,
---      ni score du terrain ni buteurs.
+--      ni score du terrain ni buteurs ;
+--   F9 la saisie seule faite juste avant la fermeture (contrôle du
+--      03/11/2026) : l'autre équipe a encore ses 24 h pour répondre, et elle
+--      seule ; une saisie seule déjà validée ne se conteste plus ;
+--   F10 un exclu dont le préavis était échu au coup d'envoi ne marque pas,
+--      même avant que le ménage l'ait relevé.
 
 \set ON_ERROR_STOP 1
 begin;
@@ -215,6 +220,38 @@ select pg_temp.vrai('F8 ni score du terrain ni buteurs',
 select pg_temp.passe('F8 le Racing confirme le forfait', 'Yanis', pg_temp.score(:d7, 0, 0, 5, 3));
 select pg_temp.refuse('F8 le forfait est validé', 'Ilyes', pg_temp.score(:d7, 0, 0, 3, 5), 'P0001', 'validé');
 select pg_temp.refuse('F8 l''entraîneur ne déclare jamais les présents', 'Lucien', pg_temp.score(:d5, 1, 0, 5, 4), '42501');
+
+-- ═══ F9 · La saisie seule de la dernière minute : l'autre a ses 24 h ═══
+-- d8 : joué il y a 73 h (la feuille a fermé il y a une heure) ; le Racing a saisi seul deux minutes avant la fermeture,
+-- « Sunday Five à 3 ou moins » (un forfait). d9 : la même chose, mais saisie 25 h avant la fermeture (déjà validée).
+select pg_temp.match('Sunday Five', 'Racing Wazemmes', -73) as d8 \gset
+select pg_temp.match('Sunday Five', 'Racing Wazemmes', -73) as d9 \gset
+create function pg_temp.saisie_seule(d bigint, equipe text, avant interval) returns void language sql as $$
+  insert into public.equipe_resultats (defi_id, equipe_id, pour, contre, saisi_par, saisi_le, presents, presents_adverses)
+  select d, pg_temp.eq(equipe), 0, 0, (select capitaine from public.equipes where id = pg_temp.eq(equipe)),
+         public.equipe_defi_heure(f.jour, f.heure) + interval '3 days' - avant, 5, 3
+    from public.equipe_defis f where f.id = d $$;
+select pg_temp.saisie_seule(:d8, 'Racing Wazemmes', interval '2 minutes');
+select pg_temp.saisie_seule(:d9, 'Racing Wazemmes', interval '25 hours');
+select pg_temp.passe('F9 Sunday Five répond après la fermeture, dans ses 24 h', 'Ilyes', pg_temp.score(:d8, 2, 1, 5, 5));
+select pg_temp.refuse('F9 le Racing, lui, ne change plus la sienne', 'Yanis', pg_temp.score(:d8, 0, 0, 5, 4), 'P0001', 'fermée');
+select pg_temp.passe('F9 Sunday Five corrige la sienne, toujours dans ses 24 h', 'Théo', pg_temp.score(:d8, 2, 2, 5, 5));
+select pg_temp.vrai('F9 deux saisies qui ne collent pas : un litige, plus un forfait imposé',
+  (pg_temp.saisie(:d8, 'Sunday Five')).pour = 2 and (pg_temp.saisie(:d8, 'Sunday Five')).presents = 5
+  and (pg_temp.saisie(:d8, 'Racing Wazemmes')).presents_adverses = 3);
+select pg_temp.refuse('F9 une saisie seule validée depuis longtemps ne se conteste plus', 'Ilyes', pg_temp.score(:d9, 2, 1, 5, 5), 'P0001', 'fermée');
+select pg_temp.refuse('F9 l''entraîneur ne répond pas non plus', 'Lucien', pg_temp.score(:d8, 2, 1, 5, 5), '42501');
+
+-- ═══ F10 · Un exclu au préavis échu ne marque pas ═══
+-- d10 : joué il y a deux heures. Le préavis d'exclusion de Kader est tombé il y a trois heures (avant le coup
+-- d'envoi), et le ménage ne l'a pas encore relevé ; celui de Badis tombe après le coup d'envoi.
+select pg_temp.match('Sunday Five', 'Racing Wazemmes', -2) as d10 \gset
+update public.equipe_membres set depart_le = now() - interval '3 hours'
+ where equipe_id = pg_temp.eq('Sunday Five') and joueur = pg_temp.uid('Kader');
+update public.equipe_membres set depart_le = now() - interval '1 hour'
+ where equipe_id = pg_temp.eq('Sunday Five') and joueur = pg_temp.uid('Badis');
+select pg_temp.refuse('F10 Kader, parti avant le coup d''envoi, ne marque pas', 'Ilyes', pg_temp.score(:d10, 1, 0, 5, 5, pg_temp.but(:d10, 'Kader')), 'P0001', 'Seuls les joueurs');
+select pg_temp.passe('F10 Badis, encore là au coup d''envoi, marque', 'Ilyes', pg_temp.score(:d10, 1, 0, 5, 5, pg_temp.but(:d10, 'Badis')));
 
 select 'feuille-team-check : tout est ok' as fin;
 rollback;

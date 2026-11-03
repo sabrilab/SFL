@@ -31,7 +31,10 @@
 --       (equipe_departs, equipe_entraineurs) et ne revient pas ;
 --   E10 son départ laisse la couverture ;
 --   E11 la dissolution : l'entraîneur seul ne garde pas l'équipe ;
---   E12 une invitation tombée après 72 h ; une seule place, même à la main.
+--   E12 une invitation tombée après 72 h ; une seule place, même à la main ;
+--   E13 le gel de fin de saison (equipe_gel, les mêmes jours que enGel en
+--       TypeScript) : ni invitation ni signature d'entraîneur ; les joueurs
+--       entrent comme avant.
 
 \set ON_ERROR_STOP 1
 begin;
@@ -70,8 +73,10 @@ select pg_temp.vrai('E3 sa place commence à sa signature',
   (select t.debut = now() and t.fin is null and t.motif is null from public.equipe_entraineurs t
     where t.equipe_id = pg_temp.eq('Sunday Five') and t.joueur = pg_temp.uid('Lucien')));
 select pg_temp.vrai('E3 l''effectif reste à 5 joueurs', public.equipe_effectif(pg_temp.eq('Sunday Five')) = 5);
-select pg_temp.vrai('E3 la ligue lit sa place',
-  pg_temp.lire('Yanis', format('select count(*) from public.equipe_entraineurs where equipe_id = %s', pg_temp.eq('Sunday Five'))) = '1');
+select pg_temp.vrai('E3 sa place et son motif ne se lisent pas dans la ligue',
+  pg_temp.lire('Yanis', format('select count(*) from public.equipe_entraineurs where equipe_id = %s', pg_temp.eq('Sunday Five'))) = '0');
+select pg_temp.vrai('E3 lui, il lit la sienne',
+  pg_temp.lire('Lucien', format('select count(*) from public.equipe_entraineurs where equipe_id = %s', pg_temp.eq('Sunday Five'))) = '1');
 select pg_temp.vrai('E3 personne n''écrit sa place à la main',
   pg_temp.lire('Lucien', format('with x as (update public.equipe_entraineurs set fin = now() where equipe_id = %s returning 1) select count(*) from x', pg_temp.eq('Sunday Five'))) like 'refus 42501%');
 select pg_temp.vrai('E3 role_equipe dit sa place', pg_temp.lire('Lucien', format('select public.role_equipe(%s)', pg_temp.eq('Sunday Five'))) = 'entraineur');
@@ -294,6 +299,27 @@ begin
 exception when check_violation then
   raise notice 'E12 la contrainte des rôles tient ok';
 end; $$;
+
+-- ═══ E13 · Le gel de fin de saison ═══
+select pg_temp.vrai('E13 les jours du gel (heure de Paris)',
+  not public.equipe_gel('2026-10-31 12:00+01') and not public.equipe_gel('2026-11-01 00:00+01')
+  and not public.equipe_gel('2027-02-14 23:59+01') and public.equipe_gel('2027-02-15 00:00+01') and public.equipe_gel('2027-02-28 23:59+01')
+  and not public.equipe_gel('2027-03-01 00:00+01') and not public.equipe_gel('2027-06-16 23:59+02') and public.equipe_gel('2027-06-17 00:00+02')
+  and not public.equipe_gel('2027-10-17 23:59+02') and public.equipe_gel('2027-10-18 00:00+02') and public.equipe_gel('2027-10-31 23:30+01')
+  and not public.equipe_gel('2027-11-01 00:00+01') and not public.equipe_gel('2028-02-15 12:00+01') and public.equipe_gel('2028-02-16 00:00+01')
+  and public.equipe_gel('2028-02-29 23:59+01') and not public.equipe_gel('2028-03-01 00:00+01')
+  and not public.equipe_gel(now()));
+-- Le Racing (Rayan, capitaine depuis E8) nomme Moussa ; puis le gel tombe (la fonction remplacée, dans cette transaction seulement).
+select pg_temp.passe('E13 avant le gel, Rayan nomme Moussa', 'Rayan', pg_temp.appel('equipe_entraineur_inviter', 'Racing Wazemmes', 'Moussa'));
+create or replace function public.equipe_gel(t timestamptz) returns boolean language sql stable set search_path = '' as $$ select true $$;
+select pg_temp.refuse('E13 pendant le gel, Moussa ne signe pas', 'Moussa', pg_temp.appel('equipe_signer', 'Racing Wazemmes'), 'P0001', 'Fin de saison');
+select pg_temp.vrai('E13 aucune place ouverte', not exists (select 1 from public.equipe_entraineurs t where t.joueur = pg_temp.uid('Moussa'))
+  and (pg_temp.ligne('Racing Wazemmes', 'Moussa')).statut = 'invite');
+select pg_temp.passe('E13 Rayan retire l''invitation', 'Rayan', pg_temp.appel('equipe_retirer_invitation', 'Racing Wazemmes', 'Moussa'));
+select pg_temp.refuse('E13 pendant le gel, pas de nouvelle invitation d''entraîneur', 'Rayan', pg_temp.appel('equipe_entraineur_inviter', 'Racing Wazemmes', 'Moussa'), 'P0001', 'Fin de saison');
+select pg_temp.passe('E13 un joueur, lui, est invité…', 'Rayan', pg_temp.appel('equipe_inviter', 'Racing Wazemmes', 'Moussa'));
+select pg_temp.passe('E13 … et signe', 'Moussa', pg_temp.appel('equipe_signer', 'Racing Wazemmes'));
+select pg_temp.vrai('E13 Moussa joue au Racing', (pg_temp.ligne('Racing Wazemmes', 'Moussa')).statut = 'membre' and (pg_temp.ligne('Racing Wazemmes', 'Moussa')).role = 'membre');
 
 select 'entraineur-check : tout est ok' as fin;
 rollback;

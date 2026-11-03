@@ -10,9 +10,10 @@
 //     équipe), lues une fois pour tout l'écran, relues au retour dans l'app
 //     (une fois par minute au plus) et après un geste de la page Team : le
 //     banc, la page d'une équipe, le profil d'un joueur, Ma carte ;
-//   · le détail d'une carte (ce qui attend la prochaine mise à jour, les
+//   · le détail de MA carte (ce qui attend la prochaine mise à jour, les
 //     jauges, le journal en mots, les mises à jour passées) : la page
-//     Entraîneur de Ma carte seulement.
+//     Entraîneur de Ma carte seulement, par ma_carte_entraineur (la ligue ne
+//     lit que la face : le journal dit qui a été exclu).
 // Une personne qui a entraîné garde sa carte : elle le suit d'une équipe à
 // l'autre. Un entraîneur qui vient d'arriver n'a pas encore de ligne : sa
 // carte part de 75 (DEPART_ENTRAINEUR), comme un nouveau joueur.
@@ -188,6 +189,7 @@ export function useCarteEntraineur(qui: { id?: string | null; nom?: string | nul
 export const statsDe = (c: CarteEntraineurLue | null | undefined): StatsEntraineur => c?.stats ?? STATS_DEPART;
 
 interface LigneDetail {
+  joueur: string;
   en_attente: Partial<StatsEntraineur> | null;
   jauges: Partial<DetailEntraineur["jauges"]> | null;
   journal: FaitEntraineur[] | null;
@@ -196,7 +198,12 @@ interface LigneDetail {
 
 const JAUGE_VIDE = { crans: 0, taille: 2, dette: 0 };
 
-/** Le détail de la carte d'une personne (la page Entraîneur) ; null tant qu'il n'est pas lu, ou sans carte. */
+/**
+ * Le détail de MA carte (la page Entraîneur de Ma carte) ; null tant qu'il
+ * n'est pas lu, sans carte, ou pour la carte de quelqu'un d'autre : le
+ * journal (« Sami a été exclu »), les jauges et ce qui attend ne se lisent que
+ * par leur entraîneur (ma_carte_entraineur, supabase/schema.sql).
+ */
 export function useDetailEntraineur(nom: string): DetailEntraineur | null {
   const { demo } = useCartesEntraineur();
   const carte = useCarteEntraineur({ nom });
@@ -206,13 +213,13 @@ export function useDetailEntraineur(nom: string): DetailEntraineur | null {
     if (!joueur) return;
     let fini = false;
     void supabase()
-      .from("entraineur_cartes")
-      .select("en_attente, jauges, journal, majs")
-      .eq("joueur", joueur)
+      .rpc("ma_carte_entraineur")
       .maybeSingle()
       .then(({ data, error }) => {
         if (fini || error || !data) return;
         const d = data as LigneDetail;
+        // Ma carte seulement : la ligne rendue est la mienne, pas forcément celle qu'on regarde.
+        if (d.joueur !== joueur) return;
         setLu({
           joueur,
           detail: {

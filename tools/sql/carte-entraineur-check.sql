@@ -94,7 +94,20 @@ select pg_temp.vrai('5 doublons', pg_temp.poser(jsonb_build_array(pg_temp.ligne_
 select pg_temp.vrai('6 un joueur d''une autre équipe lit', pg_temp.lire('Yanis', 'select count(*)::text from public.entraineur_cartes') = '2');
 select pg_temp.vrai('6 l''entraîneur lit la sienne', pg_temp.lire('Lucien', format('select note::text from public.entraineur_cartes where joueur = %L', pg_temp.uid('Lucien'))) = '78');
 select pg_temp.vrai('6 non validé : rien', pg_temp.lire('Nolan', 'select count(*)::text from public.entraineur_cartes') = '0');
-select pg_temp.vrai('6 anonyme : rien', has_table_privilege('anon', 'public.entraineur_cartes', 'select') = false);
+select pg_temp.vrai('6 anonyme : rien', has_table_privilege('anon', 'public.entraineur_cartes', 'select') = false
+  and not has_any_column_privilege('anon', 'public.entraineur_cartes', 'select'));
+-- La ligue lit la face, pas le détail (le journal dit qui a été exclu) : il passe par ma_carte_entraineur, à lui seul.
+select pg_temp.vrai('6 la face se lit', pg_temp.lire('Yanis', format('select res || ''/'' || pres || ''/'' || coh || '' '' || note || '' '' || rencontres from public.entraineur_cartes where joueur = %L', pg_temp.uid('Lucien'))) = '78/79/77 78 12');
+select pg_temp.vrai('6 un autre joueur ne lit pas son journal', pg_temp.lire('Yanis', 'select journal::text from public.entraineur_cartes limit 1') like 'refus 42501%');
+select pg_temp.vrai('6 ni ce qui attend, ni les jauges, ni les compteurs',
+  pg_temp.lire('Yanis', 'select en_attente::text from public.entraineur_cartes limit 1') like 'refus 42501%'
+  and pg_temp.lire('Yanis', 'select jauges::text from public.entraineur_cartes limit 1') like 'refus 42501%'
+  and pg_temp.lire('Yanis', 'select compteurs::text from public.entraineur_cartes limit 1') like 'refus 42501%'
+  and pg_temp.lire('Yanis', 'select count(*)::text from (select * from public.entraineur_cartes) x') like 'refus 42501%');
+select pg_temp.vrai('6 l''entraîneur lit le détail de la sienne, par la fonction',
+  pg_temp.lire('Lucien', 'select (joueur = (select auth.uid()))::text || '' '' || (en_attente ->> ''RES'') from public.ma_carte_entraineur()') = 'true 1');
+select pg_temp.vrai('6 la fonction ne rend rien à qui n''a pas de carte', pg_temp.lire('Yanis', 'select count(*)::text from public.ma_carte_entraineur()') = '0');
+select pg_temp.vrai('6 ni à l''anonyme', not has_function_privilege('anon', 'public.ma_carte_entraineur()', 'execute'));
 
 -- 7 · Personne n'écrit directement : ni l'entraîneur, ni un joueur, ni le capitaine.
 select pg_temp.vrai('7 pas d''écriture', pg_temp.lire('Lucien', format($q$insert into public.entraineur_cartes (joueur, res, pres, coh, note) values (%L, 99, 99, 99, 99) returning 'écrit'$q$, pg_temp.uid('Ilyes'))) like 'refus 42501%');
@@ -150,7 +163,7 @@ create temp table lues (tab text, cols text[]);
 insert into lues values
   ('equipe_entraineurs', '{equipe_id,joueur,debut,fin,motif,id}'),
   ('equipes', '{id,nom,created_at,dissoute_le}'),
-  ('equipe_membres', '{equipe_id,joueur,statut,role,signe_le,created_at}'),
+  ('equipe_membres', '{equipe_id,joueur,statut,role,signe_le,created_at,depart_le}'),
   ('equipe_signatures', '{equipe_id,joueur,le,version}'),
   ('equipe_departs', '{equipe_id,joueur,parti_le,motif,role}'),
   ('equipe_defis', '{id,de,a,jour,heure,lieu,statut,forfait_de}'),
