@@ -16,7 +16,7 @@
 // Rien ne change à ce qui part au serveur : signIn, comme avant.
 // Mouvement réduit : tout est posé d'emblée, la carte ne flotte pas.
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
@@ -26,6 +26,7 @@ import { LOGO_BOLA, matiereDe, RAYON_CARTE } from "@/components/sfl/finitions-ca
 import { BoutonsSociaux } from "./boutons-sociaux";
 import { cn } from "@/lib/utils";
 import { useT } from "@/lib/i18n/langue";
+import { noterSite } from "@/lib/sfl/site-visites";
 import { ChoixLangue } from "@/components/sfl/langue/choix-langue";
 
 const MESSAGES: Record<string, string> = {
@@ -91,6 +92,8 @@ function CarteQuiFlotte({ size }: { size: number }) {
 
 export function LoginScreen() {
   const reduit = useReducedMotion();
+  // L'entonnoir de getbola.app : la connexion ouverte (lib/sfl/site-visites.ts).
+  useEffect(() => noterSite("connexion"), []);
   const t = useT();
   const [user, setUser] = useState("");
   const [password, setPassword] = useState("");

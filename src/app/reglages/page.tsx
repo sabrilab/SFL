@@ -172,9 +172,9 @@ export default function ReglagesPage() {
               <ShieldCheck className="size-[18px]" />
             </span>
             <span className="flex-1">
-              <span className="block text-lecture font-semibold">Activité &amp; rétention</span>
+              <span className="block text-lecture font-semibold">Analytics</span>
               <span className="block text-petit text-encre-3">
-                Qui se connecte, quand — et les emails collectés
+                Acquisition, activation, rétention, revenu, recommandation
               </span>
             </span>
             <ChevronRight className="size-4 text-encre-3" />

@@ -18,7 +18,7 @@ export function BoutonStats({ className }: { className?: string }) {
   return (
     <Link
       href="/admin/activite"
-      aria-label="Activité et rétention"
+      aria-label="Analytics"
       className={cn("bouton-secondaire flex size-11 shrink-0 items-center justify-center", className)}
     >
       <ChartSpline className="size-[19px]" strokeWidth={2.1} />
