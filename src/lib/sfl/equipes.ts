@@ -19,7 +19,12 @@
 //     rend que les joueurs, entraineurDe le rend lui), invité par le
 //     capitaine seul (inviterEntraineur). Ses droits, geste par geste :
 //     equipes-droits.ts (peut), la même table que la base. Le Règlement
-//     passe en version 3, avec sa formule à lui (acceptationEntraineur).
+//     passe en version 3, avec sa formule à lui (acceptationEntraineur) ;
+//   · la feuille d'avant-match (même jour) : l'entraîneur dépose de 5 à 7
+//     joueurs pour un match programmé (deposerFeuille ; le capitaine ou le
+//     vice sans entraîneur, ou dès H-2 : peutDeposer), figée au coup
+//     d'envoi ; on la lit avec le match (lireFeuilles : la base ne montre
+//     que celle de son équipe avant le coup d'envoi, les deux ensuite).
 // Les délais (invitation 72 h, carence 14 jours, préavis d'exclusion 48 h,
 // créneau d'un défi entre +48 h et +21 jours, réponse sous 48 h, forfait à
 // moins de 48 h) sont gardés par la base ; l'app les montre.
@@ -38,9 +43,9 @@ import { SUPABASE_URL, supabase } from "@/lib/supabase";
 import { finInvitation } from "@/lib/sfl/equipes-temps";
 import { lireBlason, type Blason } from "@/lib/sfl/blason";
 import { joue, type Role } from "@/lib/sfl/equipes-droits";
-import type { ButeurTeam, EquipeChampionnat, MatchTeam, SaisieTeam } from "@/lib/sfl/championnat-team";
+import type { ButeurTeam, EquipeChampionnat, FeuilleTeam, MatchTeam, SaisieTeam } from "@/lib/sfl/championnat-team";
 
-export { DROITS, brassard, droitDe, joue, peut, type Geste, type Role } from "@/lib/sfl/equipes-droits";
+export { DROITS, FEUILLE_AVANT_MATCH, brassard, droitDe, joue, peut, peutDeposer, type Geste, type Role } from "@/lib/sfl/equipes-droits";
 
 export type Fond = "noir" | "blanc";
 
@@ -89,6 +94,8 @@ export interface Defi {
   forfaitDe?: number | null;
   /** Envoyé quand : sans réponse sous 48 h, il expire. */
   le?: string;
+  /** Un match programmé : les feuilles d'avant-match qu'on peut lire (celle de mon équipe, avant le coup d'envoi). */
+  feuilles?: FeuilleTeam[];
 }
 
 /** Le coup d'envoi d'un défi (heure de Paris, à la minute près l'hiver comme l'été). */
@@ -293,7 +300,7 @@ export async function mesInvitations(moi: string): Promise<Equipe[]> {
   return ((data ?? []) as unknown as LigneEquipe[]).map(versEquipe);
 }
 
-/** Les défis en jeu (un défi sans réponse depuis 48 h, ou à moins de 36 h du match, a expiré). */
+/** Les défis en jeu (un défi sans réponse depuis 48 h, ou à moins de 36 h du match, a expiré), et les feuilles des matchs programmés. */
 export async function listerDefis(): Promise<Defi[]> {
   const { data, error } = await supabase()
     .from("equipe_defis")
@@ -302,13 +309,41 @@ export async function listerDefis(): Promise<Defi[]> {
     .order("jour");
   if (error) throw error;
   const maintenant = Date.now();
-  return ((data ?? []) as (Defi & { created_at: string })[])
+  const defis = ((data ?? []) as (Defi & { created_at: string })[])
     .map(({ created_at, ...d }) => ({ ...d, le: created_at }))
     .filter((d) => {
       if (d.statut === "accepte") return true;
       const coup = coupDEnvoi(d).getTime();
       return new Date(d.le).getTime() > maintenant - 48 * 3600_000 && coup > maintenant + 36 * 3600_000;
     });
+  const feuilles = await lireFeuilles(defis.filter((d) => d.statut === "accepte").map((d) => d.id));
+  return defis.map((d) => (feuilles.has(d.id) ? { ...d, feuilles: feuilles.get(d.id) } : d));
+}
+
+interface LigneFeuille {
+  defi_id: number;
+  equipe_id: number;
+  deposee_par: string | null;
+  deposee_le: string;
+  equipe_feuille_joueurs: { joueur: string }[] | null;
+}
+
+/**
+ * Les feuilles d'avant-match que je peux lire, par match : la base ne montre
+ * que celle de mon équipe avant le coup d'envoi, les deux ensuite. Sans la
+ * migration (une préversion), aucune.
+ */
+export async function lireFeuilles(defis?: number[]): Promise<Map<number, FeuilleTeam[]>> {
+  const par = new Map<number, FeuilleTeam[]>();
+  if (defis && defis.length === 0) return par;
+  const lire = supabase().from("equipe_feuilles").select("defi_id, equipe_id, deposee_par, deposee_le, equipe_feuille_joueurs(joueur)");
+  const { data, error } = await (defis ? lire.in("defi_id", defis) : lire);
+  if (error) return par;
+  for (const r of (data ?? []) as unknown as LigneFeuille[]) {
+    const f: FeuilleTeam = { equipe: r.equipe_id, joueurs: (r.equipe_feuille_joueurs ?? []).map((j) => j.joueur), par: r.deposee_par, le: r.deposee_le };
+    par.set(r.defi_id, [...(par.get(r.defi_id) ?? []), f]);
+  }
+  return par;
 }
 
 async function rpc<T = void>(fn: string, args: Record<string, unknown>): Promise<T> {
@@ -414,6 +449,31 @@ export const dessinerBlason = (e: number, b: Blason) => rpc("equipe_blason", { e
 /** Un membre signe la version en cours (le Règlement et la Charte). */
 export const signerCharte = (e: number) => rpc("equipe_signer_charte", { e });
 
+/**
+ * Déposer (ou redéposer) la feuille d'avant-match de mon équipe : de 5 à 7
+ * de ses joueurs, jusqu'au coup d'envoi (la base garde qui peut, et quand) ;
+ * puis ceux qui viennent d'y entrer sont prévenus.
+ */
+export async function deposerFeuille(d: number, joueurs: string[]): Promise<void> {
+  await rpc("equipe_feuille", { d, joueurs });
+  void notifierFeuille(d);
+}
+
+/** Prévenir les joueurs mis sur la feuille (une notification perdue ne bloque rien). */
+async function notifierFeuille(defi: number): Promise<void> {
+  try {
+    const { data } = await supabase().auth.getSession();
+    const jeton = data.session?.access_token;
+    if (!jeton) return;
+    await fetch("/api/equipes/notifier", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${jeton}` },
+      body: JSON.stringify({ type: "feuille", defi }),
+      keepalive: true,
+    });
+  } catch {}
+}
+
 /** Le bucket public des couvertures : une image par équipe, « <id>.jpg ». */
 const COUVERTURES = "couvertures";
 
@@ -483,13 +543,14 @@ export async function lireChampionnat(): Promise<{ equipes: EquipeTeam[]; matchs
   const sb = supabase();
   const lireEquipes = (blason: boolean) =>
     sb.from("equipes").select(`id, nom, initiales, fond, ville, ${blason ? "blason, " : ""}created_at, dissoute_le, equipe_membres(statut, role)`);
-  const [avecBlason, df, rs, bt] = await Promise.all([
+  const [avecBlason, df, rs, bt, feuilles] = await Promise.all([
     lireEquipes(true),
     sb.from("equipe_defis").select("id, de, a, jour, heure, lieu, statut, forfait_de").in("statut", ["accepte", "forfait"]),
     sb.from("equipe_resultats").select("defi_id, equipe_id, pour, contre, saisi_le"),
     sb
       .from("equipe_resultat_joueurs")
       .select("defi_id, equipe_id, joueur, buts, passes, p:profiles!equipe_resultat_joueurs_joueur_fkey(name)"),
+    lireFeuilles(),
   ]);
   const eq = sansColonne(avecBlason.error) ? await lireEquipes(false) : avecBlason;
   if (eq.error) throw eq.error;
@@ -539,6 +600,7 @@ export async function lireChampionnat(): Promise<{ equipes: EquipeTeam[]; matchs
       buteurs: buteurs
         .filter((b) => b.defi_id === d.id)
         .map((b): ButeurTeam => ({ equipe: b.equipe_id, joueur: b.joueur, name: un(b.p)?.name ?? "?", buts: b.buts, passes: b.passes })),
+      ...(feuilles.has(d.id) ? { feuilles: feuilles.get(d.id) } : {}),
     })
   );
   return { equipes, matchs };

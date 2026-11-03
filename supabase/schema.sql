@@ -5115,7 +5115,10 @@ $$;
 -- qui ne collent pas : chacun peut corriger la sienne tant que la feuille
 -- est ouverte, sinon le match n'est pas classé. Un forfait (equipe_defis,
 -- 'forfait') se compte 3 – 0 sans feuille. Les buts attribués ne dépassent
--- jamais le score, les passes jamais les buts attribués (art. 8.4).
+-- jamais le score, les passes jamais les buts attribués (art. 8.4). Depuis
+-- le 03/11/2026 : jamais l'entraîneur, qui ne joue pas ; et si l'équipe a
+-- déposé sa feuille d'avant-match (equipe_feuille, plus bas), seuls les
+-- joueurs de cette feuille marquent pour elle.
 create table if not exists public.equipe_resultats (
   defi_id    bigint not null references public.equipe_defis(id) on delete cascade,
   equipe_id  bigint not null references public.equipes(id) on delete cascade,
@@ -5163,6 +5166,7 @@ declare
   l record;
   tb int := 0;
   tp int := 0;
+  avec_feuille boolean;
 begin
   select * into x from public.equipe_defis f where f.id = d for update;
   if x is null or x.statut <> 'accepte' then
@@ -5197,9 +5201,15 @@ begin
   if lignes is not null and jsonb_typeof(lignes) <> 'array' then
     raise exception 'Feuille invalide.' using errcode = '22023';
   end if;
+  -- La feuille d'avant-match de mon équipe, si elle en a déposé une : seuls ses joueurs marquent.
+  avec_feuille := exists (select 1 from public.equipe_feuilles f where f.defi_id = d and f.equipe_id = e);
   for l in select * from jsonb_to_recordset(coalesce(lignes, '[]'::jsonb)) as t(joueur uuid, buts int, passes int) loop
     if l.joueur is null or coalesce(l.buts, 0) not between 0 and 99 or coalesce(l.passes, 0) not between 0 and 99 then
       raise exception 'Feuille invalide.' using errcode = '22023';
+    end if;
+    if avec_feuille and not exists (select 1 from public.equipe_feuille_joueurs j
+                                     where j.defi_id = d and j.equipe_id = e and j.joueur = l.joueur) then
+      raise exception 'Seuls les joueurs de la feuille marquent pour elle.' using errcode = 'P0001';
     end if;
     if not exists (select 1 from public.equipe_membres m
                     where m.equipe_id = e and m.joueur = l.joueur and m.statut = 'membre' and m.role <> 'entraineur') then
@@ -5527,6 +5537,180 @@ $$;
 
 revoke execute on function public.equipe_entraineur_inviter(bigint, uuid) from public, anon;
 grant execute on function public.equipe_entraineur_inviter(bigint, uuid) to authenticated;
+
+-- ──────────── Bola Team : la feuille d'avant-match (Ilyes, 02/11/2026) ────────────
+-- Règles officielles (docs/gameplay 04 §7, 11 art. 6.5, 13 §1.4) : avant le
+-- match, chaque équipe dépose sa feuille, de 5 à 7 de ses joueurs, jamais
+-- l'entraîneur ; elle se fige au coup d'envoi. Qui la dépose (Q1 à Ilyes, la
+-- recommandation appliquée en attendant) : l'entraîneur, c'est son geste ;
+-- le capitaine ou le vice seulement si l'équipe n'a pas d'entraîneur en
+-- place, ou, à partir de 2 h avant le coup d'envoi, si la feuille n'est pas
+-- celle de l'entraîneur. Pas de feuille faite d'office : sans feuille, les
+-- buteurs se choisissent parmi les joueurs de l'équipe, comme avant. Le
+-- dernier dépôt fait foi, avec son auteur et son heure.
+--
+-- Avant le coup d'envoi, seule l'équipe (entraîneur compris) lit les noms ;
+-- l'adversaire et la ligue savent seulement qu'elle est déposée, et quand
+-- (equipe_feuilles_deposees). Ensuite, toute la ligue lit les deux feuilles
+-- et leurs auteurs. Si l'équipe a déposé une feuille, seuls ses joueurs
+-- marquent pour elle (equipe_resultat) : inscrire des joueurs faibles pour
+-- baisser ce qu'on attend d'elle, puis faire jouer les forts, se voit et
+-- leur coûte leurs buts. Aucune note de carte ici : la force d'une feuille
+-- se recalcule au serveur, à partir des faits (la carte d'entraîneur).
+-- Toute écriture passe par equipe_feuille : aucune écriture directe.
+create table if not exists public.equipe_feuilles (
+  defi_id      bigint not null references public.equipe_defis(id) on delete cascade,
+  equipe_id    bigint not null references public.equipes(id) on delete cascade,
+  deposee_par  uuid references public.profiles(id) on delete set null,
+  deposee_le   timestamptz not null default now(),
+  primary key (defi_id, equipe_id)
+);
+-- Un joueur sur une seule des deux feuilles d'un match. notifie_le : prévenu
+-- d'y être (/api/equipes/notifier, « feuille »), une fois tant qu'il y reste ;
+-- au serveur seul.
+create table if not exists public.equipe_feuille_joueurs (
+  defi_id    bigint not null,
+  equipe_id  bigint not null,
+  joueur     uuid   not null references public.profiles(id) on delete cascade,
+  notifie_le timestamptz,
+  primary key (defi_id, joueur),
+  foreign key (defi_id, equipe_id) references public.equipe_feuilles (defi_id, equipe_id) on delete cascade
+);
+create index if not exists equipe_feuille_joueurs_feuille on public.equipe_feuille_joueurs (defi_id, equipe_id);
+create index if not exists equipe_feuille_joueurs_joueur on public.equipe_feuille_joueurs (joueur);
+
+-- Qui lit la feuille d'une équipe pour un match : ses membres (l'entraîneur
+-- compris) ; toute la ligue dès le coup d'envoi ; l'admin de la ligue. Le
+-- test d'appartenance est celui de dans_l_equipe, recopié : elle est définie
+-- plus bas, et une fonction SQL qui l'appellerait ici buterait au premier
+-- passage d'une base neuve.
+create or replace function public.equipe_feuille_lisible(d bigint, e bigint)
+returns boolean
+language sql
+security definer
+set search_path = ''
+stable
+as $$
+  select public.est_membre() and (
+    exists (select 1 from public.equipe_membres m
+             where m.equipe_id = e and m.joueur = (select auth.uid()) and m.statut = 'membre')
+    or exists (select 1 from public.equipe_defis f
+                where f.id = d and now() >= public.equipe_defi_heure(f.jour, f.heure))
+    or public.is_league_admin()
+  );
+$$;
+
+alter table public.equipe_feuilles enable row level security;
+alter table public.equipe_feuille_joueurs enable row level security;
+drop policy if exists "equipe_feuilles: lecture" on public.equipe_feuilles;
+create policy "equipe_feuilles: lecture" on public.equipe_feuilles for select to authenticated
+  using (public.equipe_feuille_lisible(defi_id, equipe_id));
+drop policy if exists "equipe_feuille_joueurs: lecture" on public.equipe_feuille_joueurs;
+create policy "equipe_feuille_joueurs: lecture" on public.equipe_feuille_joueurs for select to authenticated
+  using (public.equipe_feuille_lisible(defi_id, equipe_id));
+revoke all on public.equipe_feuilles, public.equipe_feuille_joueurs from anon, authenticated;
+grant select on public.equipe_feuilles, public.equipe_feuille_joueurs to authenticated;
+
+-- Déposer (ou redéposer) la feuille de son équipe pour un match programmé.
+create or replace function public.equipe_feuille(d bigint, joueurs uuid[])
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  moi uuid := (select auth.uid());
+  x record;
+  e bigint;
+  coup timestamptz;
+  place text;
+  entraineur uuid;
+  auteur uuid;
+  n int;
+begin
+  -- Le verrou du match : deux dépôts au même instant se suivent, le dernier fait foi.
+  select * into x from public.equipe_defis f where f.id = d for update;
+  if x is null or x.statut <> 'accepte' then
+    raise exception 'Ce match n''est pas programmé.' using errcode = 'P0001';
+  end if;
+  if public.equipe_droit(x.de, 'feuille') then
+    e := x.de;
+  elsif public.equipe_droit(x.a, 'feuille') then
+    e := x.a;
+  else
+    raise exception 'Réservé à l''entraîneur et aux capitaines.' using errcode = '42501';
+  end if;
+  coup := public.equipe_defi_heure(x.jour, x.heure);
+  if now() >= coup then
+    raise exception 'La feuille est fermée.' using errcode = 'P0001';
+  end if;
+  -- Le capitaine ou le vice : sans entraîneur en place, ou dès H-2 si la feuille n'est pas la sienne.
+  select m.role into place from public.equipe_membres m where m.equipe_id = e and m.joueur = moi and m.statut = 'membre';
+  if place is distinct from 'entraineur' then
+    select m.joueur into entraineur from public.equipe_membres m
+     where m.equipe_id = e and m.statut = 'membre' and m.role = 'entraineur' and m.depart_le is null;
+    select f.deposee_par into auteur from public.equipe_feuilles f where f.defi_id = d and f.equipe_id = e;
+    if entraineur is not null and (now() < coup - interval '2 hours' or auteur is not distinct from entraineur) then
+      raise exception 'Réservé à l''entraîneur.' using errcode = '42501';
+    end if;
+  end if;
+  if joueurs is null or array_position(joueurs, null) is not null then
+    raise exception 'Feuille invalide.' using errcode = '22023';
+  end if;
+  n := cardinality(joueurs);
+  if n <> (select count(distinct j) from unnest(joueurs) j) then
+    raise exception 'Un joueur est deux fois sur la feuille.' using errcode = '22023';
+  end if;
+  if n not between 5 and 7 then
+    raise exception 'De 5 à 7 joueurs sur la feuille.' using errcode = 'P0001';
+  end if;
+  -- Des joueurs de l'équipe, l'entraîneur jamais, et aucun dont l'exclusion tombe avant le coup d'envoi.
+  if exists (select 1 from unnest(joueurs) j
+              where not exists (select 1 from public.equipe_membres m
+                                 where m.equipe_id = e and m.joueur = j and m.statut = 'membre' and m.role <> 'entraineur'
+                                   and (m.depart_le is null or m.depart_le > coup))) then
+    raise exception 'Seuls les joueurs de l''équipe vont sur sa feuille.' using errcode = 'P0001';
+  end if;
+  if exists (select 1 from public.equipe_feuille_joueurs f where f.defi_id = d and f.equipe_id <> e and f.joueur = any (joueurs)) then
+    raise exception 'Un de ces joueurs est sur l''autre feuille.' using errcode = 'P0001';
+  end if;
+  insert into public.equipe_feuilles (defi_id, equipe_id, deposee_par, deposee_le)
+  values (d, e, moi, now())
+  on conflict (defi_id, equipe_id) do update set deposee_par = excluded.deposee_par, deposee_le = excluded.deposee_le;
+  -- Ceux qui y restent gardent leur ligne (et son avertissement) ; les autres en sortent.
+  delete from public.equipe_feuille_joueurs f where f.defi_id = d and f.equipe_id = e and f.joueur <> all (joueurs);
+  insert into public.equipe_feuille_joueurs (defi_id, equipe_id, joueur)
+  select d, e, j from unnest(joueurs) j
+  on conflict (defi_id, joueur) do nothing;
+end;
+$$;
+
+-- Les feuilles déposées pour ces matchs, sans les noms : qui a déposé (l'équipe), et quand.
+create or replace function public.equipe_feuilles_deposees(d bigint[])
+returns table (defi_id bigint, equipe_id bigint, deposee_le timestamptz)
+language sql
+security definer
+set search_path = ''
+stable
+as $$
+  select f.defi_id, f.equipe_id, f.deposee_le from public.equipe_feuilles f
+   where f.defi_id = any (d) and public.est_membre();
+$$;
+
+revoke execute on function public.equipe_feuille_lisible(bigint, bigint), public.equipe_feuille(bigint, uuid[]),
+  public.equipe_feuilles_deposees(bigint[]) from public, anon;
+grant execute on function public.equipe_feuille_lisible(bigint, bigint), public.equipe_feuille(bigint, uuid[]),
+  public.equipe_feuilles_deposees(bigint[]) to authenticated;
+
+-- Le temps réel : une feuille déposée se voit chez l'entraîneur et ses capitaines.
+do $$
+begin
+  alter publication supabase_realtime add table public.equipe_feuilles;
+exception
+  when duplicate_object then null;
+  when undefined_object then null;
+end;
+$$;
 
 -- ─────────────────── Confidentialité : les accords ───────────────────
 -- L'accord de chaque joueur à la politique de confidentialité (22/10/2026) :

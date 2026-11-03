@@ -19,7 +19,11 @@
 // le cinquième qui rend l'équipe active) ne comptent que les joueurs. Les
 // droits suivent la base, geste par geste (peut, lib/sfl/equipes-droits.ts) :
 // l'entraîneur invite et relance des joueurs, mais ne saisit ni ne confirme
-// jamais une feuille de match.
+// jamais une feuille de match. Et un type de plus :
+//   · feuille : je viens de déposer la feuille d'avant-match de mon équipe ;
+//     les joueurs qui viennent d'y entrer l'apprennent (« Lucien t'a mis sur
+//     la feuille · sam. 20:00 »), une fois tant qu'ils y restent
+//     (equipe_feuille_joueurs.notifie_le).
 // Toucher une invitation ouvre la signature (/bola-team?invitation=id) ;
 // sur Android, elle porte aussi ses deux réponses, Oui et Non (Sabri,
 // 24/10 : « qu'ils soient quand même contraints de répondre à cette notif :
@@ -39,10 +43,11 @@ import { prevenir, type Envoi } from "@/lib/server/push-envoi";
 import { appelant, serveur } from "@/lib/sfl/serveur-ligue.server";
 import { finInvitation, quandTombe } from "@/lib/sfl/equipes-temps";
 import { joue, peut, type Role } from "@/lib/sfl/equipes-droits";
+import { coupDEnvoiTeam } from "@/lib/sfl/championnat-team";
 
 export const maxDuration = 30;
 
-type Type = "invitation" | "relance" | "signature" | "resultat";
+type Type = "invitation" | "relance" | "signature" | "resultat" | "feuille";
 
 /** Une relance au plus par tranche de 12 h, pour un même invité. */
 const RELANCE = 12 * 3600_000;
@@ -77,6 +82,7 @@ export async function POST(req: NextRequest) {
   const corps = (await req.json().catch(() => ({}))) as { equipe?: unknown; type?: unknown; joueur?: unknown; defi?: unknown };
   const type = corps.type as Type;
   if (type === "resultat") return resultat(sb, moi.id, Number(corps.defi));
+  if (type === "feuille") return feuille(sb, moi.id, Number(corps.defi));
   const id = Number(corps.equipe);
   if (!Number.isInteger(id) || !["invitation", "relance", "signature"].includes(type))
     return NextResponse.json({ error: "Demande inconnue." }, { status: 400 });
@@ -255,5 +261,55 @@ async function resultat(sb: NonNullable<ReturnType<typeof serveur>>, moi: string
   const cle = cleVapid();
   if (!cle || envois.size === 0) return NextResponse.json({ envoyes: 0, prevenus: envois.size });
   const { recus } = await prevenir(sb, cle, envois);
+  return NextResponse.json({ envoyes: recus.size, prevenus: envois.size });
+}
+
+/**
+ * La feuille d'avant-match que je viens de déposer : ceux qui viennent d'y
+ * entrer l'apprennent, une fois tant qu'ils y restent. Relu ici : la feuille
+ * est la mienne (déposée par moi, à l'instant), le match est programmé.
+ */
+async function feuille(sb: NonNullable<ReturnType<typeof serveur>>, moi: string, d: number) {
+  if (!Number.isInteger(d)) return NextResponse.json({ error: "Demande inconnue." }, { status: 400 });
+  const { data: f } = await sb.from("equipe_feuilles").select("equipe_id, deposee_le").eq("defi_id", d).eq("deposee_par", moi).maybeSingle();
+  if (!f || Date.now() - new Date(f.deposee_le).getTime() > FRAIS) return NextResponse.json({ error: "Aucune feuille récente." }, { status: 403 });
+  const { data: defi } = await sb.from("equipe_defis").select("id, de, a, jour, heure, lieu, statut").eq("id", d).maybeSingle();
+  if (!defi || defi.statut !== "accepte") return NextResponse.json({ error: "Match inconnu." }, { status: 404 });
+  const { data: lignes } = await sb
+    .from("equipe_feuille_joueurs")
+    .select("joueur")
+    .eq("defi_id", d)
+    .eq("equipe_id", f.equipe_id)
+    .is("notifie_le", null);
+  const nouveaux = ((lignes ?? []) as { joueur: string }[]).map((l) => l.joueur);
+  if (nouveaux.length === 0) return NextResponse.json({ envoyes: 0 });
+  // Marqué avant l'envoi : un deuxième appel ne prévient personne deux fois.
+  await sb.from("equipe_feuille_joueurs").update({ notifie_le: new Date().toISOString() }).eq("defi_id", d).in("joueur", nouveaux);
+
+  const autre = f.equipe_id === defi.de ? defi.a : defi.de;
+  const [{ data: noms }, { data: profil }] = await Promise.all([
+    sb.from("equipes").select("id, nom").in("id", [f.equipe_id, autre]),
+    sb.from("profiles").select("name, nom_affiche").eq("id", moi).maybeSingle(),
+  ]);
+  const nom = (id: number) => ((noms ?? []) as { id: number; nom: string }[]).find((x) => x.id === id)?.nom ?? "";
+  const qui = ((profil?.nom_affiche as string | null) ?? (profil?.name as string | undefined) ?? "Ton entraîneur").split(" ")[0];
+  const coup = coupDEnvoiTeam({ jour: defi.jour, heure: String(defi.heure).slice(0, 5) });
+  const jour = new Intl.DateTimeFormat("fr-FR", { weekday: "short", timeZone: "Europe/Paris" }).format(coup);
+  const envois = new Map<string, Envoi>();
+  for (const j of nouveaux)
+    if (j !== moi)
+      envois.set(j, {
+        notif: {
+          titre: couper(`${qui} t'a mis sur la feuille · ${jour} ${String(defi.heure).slice(0, 5)}`, 60),
+          texte: couper(`${nom(f.equipe_id)} – ${nom(autre)} · ${defi.lieu}`, 180),
+          url: "/bola-team",
+          tag: `equipe-feuille-${d}`,
+        },
+        motif: "equipe-feuille",
+        ref: `defi:${d}`,
+      });
+  const cle = cleVapid();
+  if (!cle || envois.size === 0) return NextResponse.json({ envoyes: 0, prevenus: envois.size });
+  const { recus } = await prevenir(sb, cle, envois, { de: moi });
   return NextResponse.json({ envoyes: recus.size, prevenus: envois.size });
 }

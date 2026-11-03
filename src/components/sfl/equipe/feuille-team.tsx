@@ -12,7 +12,8 @@
 // validé et la feuille se ferme ; seule, une saisie vaut au bout de 24 h
 // (lib/sfl/championnat-team.ts, etatMatch). Si l'autre a déjà saisi, sa
 // feuille est posée sous le score, entre les deux écussons : on voit tout de
-// suite si elle colle.
+// suite si elle colle. Depuis le 03/11/2026, si l'équipe a déposé sa feuille
+// d'avant-match, seuls ses joueurs marquent (la base le garde aussi).
 
 import { useMemo, useState } from "react";
 import { Minus, Plus } from "lucide-react";
@@ -114,7 +115,9 @@ function Contenu({
   const leur = match.saisies.find((s) => s.equipe !== mienne.id) ?? null;
   const etat = etatMatch(match, maintenant);
   const ferme = etat.etat === "valide" || etat.etat === "non-classe";
-  const joueurs = signataires(mienne);
+  // Les buteurs et passeurs : les joueurs de la feuille d'avant-match, si elle a été déposée ; sinon ceux de l'équipe.
+  const inscrits = match.feuilles?.find((f) => f.equipe === mienne.id)?.joueurs;
+  const joueurs = signataires(mienne).filter((j) => !inscrits || inscrits.includes(j.id));
   const [pour, setPour] = useState(ma?.pour ?? leur?.contre ?? 0);
   const [contre, setContre] = useState(ma?.contre ?? leur?.pour ?? 0);
   const [lignes, setLignes] = useState<Record<string, { buts: number; passes: number }>>(() =>

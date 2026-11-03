@@ -89,6 +89,20 @@ export interface ButeurTeam {
   passes: number;
 }
 
+/**
+ * La feuille d'avant-match d'une équipe (03/11/2026, equipe_feuille dans la
+ * base) : 5 à 7 de ses joueurs, figée au coup d'envoi. Avant, seule
+ * l'équipe la lit ; ensuite, toute la ligue.
+ */
+export interface FeuilleTeam {
+  equipe: number;
+  /** Les identifiants des joueurs inscrits. */
+  joueurs: string[];
+  /** Qui l'a déposée (son identifiant), et quand (ISO) : le dernier dépôt fait foi. */
+  par: string | null;
+  le: string;
+}
+
 export interface MatchTeam {
   /** L'id du défi. */
   id: number;
@@ -102,6 +116,8 @@ export interface MatchTeam {
   forfaitDe: number | null;
   saisies: SaisieTeam[];
   buteurs: ButeurTeam[];
+  /** Les feuilles d'avant-match qu'on peut lire (aucune avant leur dépôt). */
+  feuilles?: FeuilleTeam[];
 }
 
 export type EtatMatch =

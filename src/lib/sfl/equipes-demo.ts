@@ -14,7 +14,8 @@
 //
 // Depuis le 03/11/2026, Sunday Five a un entraîneur, Lucien (un nom de
 // démonstration, hors de la ligue) : le 7 + 1 se voit sans base, sa carte
-// d'entraîneur sur le banc.
+// d'entraîneur sur le banc ; et un match programmé contre le Racing, dans
+// deux jours, dont Lucien a déposé la feuille d'avant-match.
 //
 // Le monde de démonstration se demande une fois par appareil (?apercu=1 sur
 // la page Team, ?apercu=0 pour revenir à la base) : la page Team, la page de
@@ -155,7 +156,26 @@ export function demoEquipes(noms: string[], moi: string): { equipes: Equipe[]; d
       equipe(3, "Racing Wazemmes", "RW", "noir", "Lille", pris(11, 7)),
       equipe(4, "AS Fives", "ASF", "blanc", "Lille", pris(18, 3)),
     ],
-    defis: [{ id: 1, de: 2, a: 1, jour: dans(4), heure: "20:00", lieu: "Five Lille Sud", statut: "propose" }],
+    defis: [
+      { id: 1, de: 2, a: 1, jour: dans(4), heure: "20:00", lieu: "Five Lille Sud", statut: "propose" },
+      {
+        id: 2,
+        de: 1,
+        a: 3,
+        jour: dans(2),
+        heure: "20:00",
+        lieu: "Urban Lomme",
+        statut: "accepte",
+        feuilles: [
+          {
+            equipe: 1,
+            joueurs: mienne.membres.filter((x) => x.statut === "membre" && joue(x.role)).map((x) => x.id),
+            par: `demo-${ENTRAINEUR_DEMO}`,
+            le: new Date(Date.now() - 3 * 3600_000).toISOString(),
+          },
+        ],
+      },
+    ],
   };
 }
 
@@ -323,7 +343,8 @@ export function demoChampionnat(
     return [...lignes.values()];
   }
 
-  // Mes deux feuilles en cours : celle d'hier soir, à remplir, et celle de samedi, que le Racing a déjà remplie.
+  // Mes deux feuilles en cours : celle d'hier soir, à remplir (Lucien avait déposé la feuille d'avant-match),
+  // et celle de samedi, que le Racing a déjà remplie.
   matchs.push({
     id: 98,
     de: 2,
@@ -335,6 +356,7 @@ export function demoChampionnat(
     forfaitDe: null,
     saisies: [],
     buteurs: [],
+    feuilles: [{ equipe: 1, joueurs: (effectifs.get(1) ?? []).map((n) => `demo-${n}`), par: `demo-${ENTRAINEUR_DEMO}`, le: "2026-12-14T15:30:00Z" }],
   });
   matchs.push({
     id: 99,

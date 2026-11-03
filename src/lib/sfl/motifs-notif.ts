@@ -69,6 +69,8 @@ export const MOTIFS_NOTIF = {
   "equipe-active": { famille: "equipe", label: "L'équipe est active", effet: null },
   // La feuille d'un match remplie par l'autre équipe : confirmer, ou corriger (24/10).
   "equipe-resultat": { famille: "equipe", label: "Un score à confirmer", effet: "a rempli sa feuille" },
+  // Mis sur la feuille d'avant-match par l'entraîneur (ou le capitaine), une fois tant qu'il y reste (03/11).
+  "equipe-feuille": { famille: "equipe", label: "Sur la feuille du match", effet: null },
   "equipe-message": { famille: "equipe", label: "Un nouveau message", effet: A_L_EQUIPE },
   "equipe-reponse": { famille: "equipe", label: "On lui répond", effet: A_L_EQUIPE },
   "equipe-cite": { famille: "equipe", label: "On le cite (@pseudo)", effet: A_L_EQUIPE },

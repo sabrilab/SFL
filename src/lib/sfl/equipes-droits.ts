@@ -10,6 +10,9 @@
 // score (sa carte le lit) et ne dirige pas l'équipe : le vice, l'entraîneur,
 // l'exclusion et la dissolution restent au capitaine. Pendant un préavis
 // d'exclusion, la base retire tout droit (droitDe le dit avec le départ).
+// La feuille d'avant-match a sa règle de temps en plus (peutDeposer, la même
+// qu'equipe_feuille) : le capitaine et le vice ne passent devant
+// l'entraîneur qu'à partir de 2 h avant le coup d'envoi.
 //
 // Module pur, sans base ni React : importable par les routes serveur.
 
@@ -41,3 +44,34 @@ export const joue = (role: Role | null | undefined): boolean => !!role && role !
 
 /** Le brassard, à dire sous une carte (« Capitaine », « Vice-capitaine ») : un nom, jamais un droit. */
 export const brassard = (role: Role | null | undefined): role is "capitaine" | "vice" => role === "capitaine" || role === "vice";
+
+/**
+ * La feuille d'avant-match (03/11/2026) : de 5 à 7 joueurs de l'équipe,
+ * figée au coup d'envoi. Le capitaine et le vice ne la déposent qu'à partir
+ * de 2 h avant le match quand l'équipe a un entraîneur (Q1 à Ilyes).
+ */
+export const FEUILLE_AVANT_MATCH = { min: 5, max: 7, capitainesAvantH: 2 } as const;
+
+type MembreDroits = { id: string; role: Role; statut: "invite" | "membre"; departLe?: string | null };
+
+/**
+ * Puis-je déposer (ou redéposer) la feuille de mon équipe maintenant ? La
+ * même règle qu'equipe_feuille, dans la base : l'entraîneur, toujours avant
+ * le coup d'envoi ; le capitaine ou le vice sans entraîneur en place, ou dès
+ * H-2 si la feuille n'est pas celle de l'entraîneur (`auteur` : qui a déposé
+ * la feuille actuelle).
+ */
+export function peutDeposer(
+  moi: MembreDroits | null | undefined,
+  membres: readonly MembreDroits[],
+  auteur: string | null | undefined,
+  coup: Date,
+  maintenant = new Date()
+): boolean {
+  if (!moi || moi.statut !== "membre" || !droitDe(moi, "feuille")) return false;
+  if (maintenant.getTime() >= coup.getTime()) return false;
+  if (moi.role === "entraineur") return true;
+  const entraineur = membres.find((m) => m.role === "entraineur" && m.statut === "membre" && !m.departLe);
+  if (!entraineur) return true;
+  return maintenant.getTime() >= coup.getTime() - FEUILLE_AVANT_MATCH.capitainesAvantH * 3600_000 && auteur !== entraineur.id;
+}

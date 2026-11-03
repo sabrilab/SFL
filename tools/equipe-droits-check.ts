@@ -14,12 +14,17 @@
 //      « Active · 7 / 7 » ; 4 + 1 n'est pas active ; l'invitation de
 //      l'entraîneur ne prend pas l'une des six ;
 //   6. le Règlement en version 3 partout, la formule de l'entraîneur ;
-//   7. le banc ne porte jamais de tirets (ils disent « invité »).
+//   7. le banc ne porte jamais de tirets (ils disent « invité ») ;
+//   8. la feuille d'avant-match : qui la dépose, et quand (peutDeposer,
+//      la même règle qu'equipe_feuille : 5 à 7 joueurs, l'entraîneur
+//      toujours avant le coup d'envoi, le capitaine et le vice sans
+//      entraîneur ou dès H-2 si la feuille n'est pas la sienne) ; la feuille
+//      de score ne propose que ses joueurs.
 //   npx tsx tools/equipe-droits-check.ts
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
-import { DROITS, brassard, droitDe, peut, type Geste, type Role } from "../src/lib/sfl/equipes-droits";
+import { DROITS, FEUILLE_AVANT_MATCH, brassard, droitDe, peut, peutDeposer, type Geste, type Role } from "../src/lib/sfl/equipes-droits";
 import {
   INVITATIONS_MAX,
   VERSION_REGLEMENT,
@@ -147,6 +152,40 @@ assert.ok(formule.includes("(version 3)") && formule.includes("Entraîneur de Su
 const banc = SRC.find((f) => f.chemin === "components/sfl/equipe/banc-entraineur.tsx");
 assert.ok(banc, "le banc existe");
 assert.ok(!/dashed/.test(banc.texte.replace(/^\s*\/\/.*$/gm, "")), "le banc ne porte aucun bord en tirets");
+
+// 8 · La feuille d'avant-match.
+const H = 3600_000;
+const maintenant = new Date("2026-11-07T15:00:00Z");
+const dans = (h: number) => new Date(maintenant.getTime() + h * H);
+const avecCoach = [...sept, m("lucien", "entraineur")];
+const qui = (id: string, membres: Membre[] = avecCoach) => membres.find((x) => x.id === id)!;
+assert.equal(peutDeposer(qui("lucien"), avecCoach, null, dans(72), maintenant), true, "l'entraîneur dépose, 72 h avant");
+assert.equal(peutDeposer(qui("lucien"), avecCoach, "a", dans(0.1), maintenant), true, "l'entraîneur redépose jusqu'au coup d'envoi");
+assert.equal(peutDeposer(qui("lucien"), avecCoach, null, dans(0), maintenant), false, "au coup d'envoi, la feuille est fermée");
+assert.equal(peutDeposer(qui("lucien"), avecCoach, null, dans(-1), maintenant), false, "après, aussi");
+assert.equal(peutDeposer(qui("a"), avecCoach, null, dans(72), maintenant), false, "avec un entraîneur, le capitaine attend H-2");
+assert.equal(peutDeposer(qui("b"), avecCoach, null, dans(2.5), maintenant), false, "le vice aussi");
+assert.equal(peutDeposer(qui("a"), avecCoach, null, dans(2), maintenant), true, "à H-2, sans feuille de l'entraîneur, le capitaine dépose");
+assert.equal(peutDeposer(qui("b"), avecCoach, "a", dans(1), maintenant), true, "à H-1, après le capitaine, le vice redépose");
+assert.equal(peutDeposer(qui("a"), avecCoach, "lucien", dans(1), maintenant), false, "après l'entraîneur, le capitaine ne change plus rien");
+assert.equal(peutDeposer(qui("c"), avecCoach, null, dans(1), maintenant), false, "un joueur sans brassard, jamais");
+assert.equal(peutDeposer(qui("a", sept), sept, null, dans(72), maintenant), true, "sans entraîneur, le capitaine dépose quand il veut");
+const ecarte = avecCoach.map((x) => (x.id === "lucien" ? { ...x, departLe: dans(48).toISOString() } : x));
+assert.equal(peutDeposer(qui("lucien", ecarte), ecarte, null, dans(72), maintenant), false, "l'entraîneur écarté ne dépose plus");
+assert.equal(peutDeposer(qui("a", ecarte), ecarte, null, dans(72), maintenant), true, "sans entraîneur en place, le capitaine dépose");
+assert.equal(peutDeposer(null, avecCoach, null, dans(72), maintenant), false, "hors de l'équipe, rien");
+// La même règle dans la base : 5 à 7, deux heures, la feuille fermée au coup d'envoi.
+const feuilleSql = SCHEMA.slice(SCHEMA.indexOf("create or replace function public.equipe_feuille("));
+const corpsFeuille = feuilleSql.slice(0, feuilleSql.indexOf("$$;"));
+assert.ok(corpsFeuille.includes(`coup - interval '${FEUILLE_AVANT_MATCH.capitainesAvantH} hours'`), "la base attend aussi H-2");
+assert.ok(corpsFeuille.includes(`n not between ${FEUILLE_AVANT_MATCH.min} and ${FEUILLE_AVANT_MATCH.max}`), "la base borne aussi de 5 à 7");
+assert.ok(/if now\(\) >= coup then/.test(corpsFeuille), "la base ferme la feuille au coup d'envoi");
+assert.ok(/m\.role <> 'entraineur'/.test(corpsFeuille), "jamais l'entraîneur sur la feuille");
+// La feuille de score propose les joueurs de la feuille d'avant-match, s'il y en a une.
+const feuilleScore = SRC.find((f) => f.chemin === "components/sfl/equipe/feuille-team.tsx")!.texte;
+assert.ok(/match\.feuilles\?\.find\(\(f\) => f\.equipe === mienne\.id\)\?\.joueurs/.test(feuilleScore), "la feuille de score lit la feuille d'avant-match");
+const avantMatch = SRC.find((f) => f.chemin === "components/sfl/equipe/feuille-avant-match.tsx");
+assert.ok(avantMatch && !/dashed/.test(avantMatch.texte.replace(/^\s*\/\/.*$/gm, "")), "la feuille d'avant-match ne porte aucun bord en tirets");
 
 assert.deepEqual(fautes, [], fautes.join("\n"));
 console.log("equipe-droits-check : ok");

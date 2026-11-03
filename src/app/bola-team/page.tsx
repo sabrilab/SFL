@@ -80,7 +80,11 @@
 // répond aux défis ; il n'annule pas un match, ne remplit jamais la feuille
 // de match et ne touche ni à l'écusson ni à la couverture. Sa fiche, au
 // capitaine : « Retirer l'entraîneur » (48 h de préavis), ou, invité, le
-// relancer et retirer l'invitation.
+// relancer et retirer l'invitation. Sous chaque match programmé, la feuille
+// d'avant-match (equipe/feuille-avant-match.tsx) : « Feuille » à qui peut la
+// déposer (l'entraîneur ; sans lui, ou dès H-2, le capitaine et le vice),
+// « Feuille · Lucien » une fois déposée ; un joueur inscrit lit « Sur la
+// feuille ». Elle se fige au coup d'envoi.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
@@ -98,6 +102,7 @@ import { SignerCharte, SignerReglement } from "@/components/sfl/equipe/reglement
 import { Defier } from "@/components/sfl/equipe/defier";
 import { ChampionnatTeam } from "@/components/sfl/equipe/championnat";
 import { FeuilleTeam } from "@/components/sfl/equipe/feuille-team";
+import { FeuilleAvantMatch } from "@/components/sfl/equipe/feuille-avant-match";
 import { FicheBlason } from "@/components/sfl/equipe/editeur-blason";
 import { VitrineTeam } from "@/components/sfl/equipe/vitrine-team";
 import { TerrainRetenu } from "@/components/sfl/matchs/choisir-terrain";
@@ -117,6 +122,7 @@ import {
   aSignerLaCharte,
   active,
   annulerSeraitForfait,
+  coupDEnvoi,
   direErreurEquipe,
   dissoudreEquipe,
   droitDe,
@@ -138,6 +144,7 @@ import {
   listerEquipes,
   nommerVice,
   notifierEquipe,
+  peutDeposer,
   quitterEquipe,
   rejoindreParLien,
   repondreDefi,
@@ -331,6 +338,8 @@ export default function BolaTeamPage() {
   const [joueur, setJoueur] = useState<Membre | null>(null);
   const [confirmer, setConfirmer] = useState<AConfirmer | null>(null);
   const [feuille, setFeuille] = useState<number | null>(null);
+  // La feuille d'avant-match ouverte (l'id du match programmé).
+  const [avantMatch, setAvantMatch] = useState<number | null>(null);
   const [blasonOuvert, setBlasonOuvert] = useState(false);
   const [charte, setCharte] = useState(false);
   // Une invitation à ouvrir dès que les équipes sont là (notification, Map,
@@ -422,6 +431,7 @@ export default function BolaTeamPage() {
         .on("postgres_changes", { event: "*", schema: "public", table: "equipe_membres" }, recharger)
         .on("postgres_changes", { event: "*", schema: "public", table: "equipe_defis" }, recharger)
         .on("postgres_changes", { event: "*", schema: "public", table: "equipe_resultats" }, recharger)
+        .on("postgres_changes", { event: "*", schema: "public", table: "equipe_feuilles" }, recharger)
         .subscribe();
     } catch {}
     return () => {
@@ -988,25 +998,41 @@ export default function BolaTeamPage() {
               {[...aJouer, ...envoyes].map((d) => {
                 const e = nomDe(d.de === mienne.id ? d.a : d.de);
                 if (!e) return null;
+                // La feuille d'avant-match d'un match programmé : qui peut la déposer la voit sous la ligne ;
+                // le capitaine, quand l'entraîneur l'a déposée, la lit ; un joueur inscrit le sait.
+                const feuille = d.statut === "accepte" ? (d.feuilles?.find((f) => f.equipe === mienne.id) ?? null) : null;
+                const deposer = d.statut === "accepte" && peutDeposer(moiMembre, mienne.membres, feuille?.par, coupDEnvoi(d));
+                const lire = !!feuille && puis("feuille");
+                const inscrit = !!feuille && !!moi && feuille.joueurs.includes(moi);
+                const auteur = feuille ? mienne.membres.find((m) => m.id === feuille.par) : undefined;
                 return (
-                  <div key={d.id} className="flex items-center gap-3 rounded-[20px] bg-card px-3 py-2.5">
-                    <Ecusson initiales={e.initiales} fond={e.fond} blason={e.blason} taille={36} />
-                    <span className="flex min-w-0 flex-1 flex-col">
-                      <span className="truncate text-lecture font-semibold">{e.nom}</span>
-                      <span className="truncate text-corps text-muted-foreground">{quand(d)}</span>
-                    </span>
-                    {d.statut === "propose" ? (
-                      puis("defier") && d.de === mienne.id ? (
-                        <Pilule plein={false} ton="bouton--rouge" onClick={() => void agir(() => repondreDefi(d.id, "annule"), "Défi retiré.")}>
-                          Retirer
+                  <div key={d.id} className="flex flex-col gap-2 rounded-[20px] bg-card px-3 py-2.5">
+                    <div className="flex items-center gap-3">
+                      <Ecusson initiales={e.initiales} fond={e.fond} blason={e.blason} taille={36} />
+                      <span className="flex min-w-0 flex-1 flex-col">
+                        <span className="truncate text-lecture font-semibold">{e.nom}</span>
+                        <span className="truncate text-corps text-muted-foreground">{quand(d)}</span>
+                      </span>
+                      {d.statut === "propose" ? (
+                        puis("defier") && d.de === mienne.id ? (
+                          <Pilule plein={false} ton="bouton--rouge" onClick={() => void agir(() => repondreDefi(d.id, "annule"), "Défi retiré.")}>
+                            Retirer
+                          </Pilule>
+                        ) : null
+                      ) : puis("annuler") ? (
+                        <Pilule plein={false} ton="bouton--rouge" onClick={() => annulerMatch(d)}>
+                          Annuler
                         </Pilule>
-                      ) : null
-                    ) : puis("annuler") ? (
-                      <Pilule plein={false} ton="bouton--rouge" onClick={() => annulerMatch(d)}>
-                        Annuler
-                      </Pilule>
-                    ) : (
-                      <span className="mono-label text-foreground">À jouer</span>
+                      ) : (
+                        <span className="mono-label text-foreground">{inscrit ? "Sur la feuille" : "À jouer"}</span>
+                      )}
+                    </div>
+                    {(deposer || lire) && (
+                      <div className="pl-12">
+                        <Pilule plein={!feuille} ton={feuille ? undefined : "bouton--vert"} onClick={() => setAvantMatch(d.id)}>
+                          {feuille && auteur ? `Feuille · ${prenom(auteur.name)}` : "Feuille"}
+                        </Pilule>
+                      </div>
                     )}
                   </div>
                 );
@@ -1082,6 +1108,21 @@ export default function BolaTeamPage() {
         apercu={apercu}
         maintenant={heureFeuilles}
         onSaisie={() => {
+          recharger();
+          signalerEquipe();
+        }}
+      />
+      <FeuilleAvantMatch
+        defi={avantMatch != null ? (aJouer.find((d) => d.id === avantMatch) ?? null) : null}
+        mienne={mienne}
+        adverse={(() => {
+          const d = aJouer.find((x) => x.id === avantMatch);
+          return d && mienne ? (nomDe(d.de === mienne.id ? d.a : d.de) ?? null) : null;
+        })()}
+        moi={moiMembre}
+        apercu={apercu}
+        onOpenChange={(o) => !o && setAvantMatch(null)}
+        onDepose={() => {
           recharger();
           signalerEquipe();
         }}
