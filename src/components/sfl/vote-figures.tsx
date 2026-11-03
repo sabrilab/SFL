@@ -30,6 +30,7 @@ import {
   decompterMatch,
   feuilleRemplie,
   monVote,
+  urneDuVotant,
   voter,
   type CategorieVote,
 } from "@/lib/sfl/votes";
@@ -97,7 +98,7 @@ export function VoteFigures({ journee, me }: { journee: Journee; me: string }) {
         CATEGORIES_VOTE.map((cat) => {
           const mien = monVote(votes, numero, journee.j, cat, me);
           // L'élection de l'équipe adverse, celle où je vote.
-          const urne = decompterMatch(votes, numero, journee.j, place.match, cat).equipes[place.opponents === place.match.teamA ? 0 : 1];
+          const urne = urneDuVotant(decompterMatch(votes, numero, journee.j, place.match, cat), place);
           return (
             <section
               key={cat}

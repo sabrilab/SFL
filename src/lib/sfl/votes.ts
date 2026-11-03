@@ -242,6 +242,15 @@ export function decompterMatch(votes: VoteFigure[], saison: number, j: number, m
   };
 }
 
+/**
+ * L'élection où vote un joueur du match : celle de l'équipe adverse, dont ses
+ * coéquipiers et lui sont les électeurs. C'est elle que compte « n/N ont
+ * voté » sur le vote du jour (vote-figures.tsx). `place` : findPlayerMatch.
+ */
+export function urneDuVotant(d: Decompte, place: { match: JourneeMatch; opponents: MatchTeam }): DecompteEquipe {
+  return d.equipes[place.opponents === place.match.teamA ? 0 : 1];
+}
+
 /** Mon vote pour un titre dans une journée, s'il existe. */
 export function monVote(votes: VoteFigure[], saison: number, j: number, cat: CategorieVote, moi: string): string | null {
   return votes.find((v) => v.saison === saison && v.j === j && v.categorie === cat && v.votant === moi)?.candidat ?? null;

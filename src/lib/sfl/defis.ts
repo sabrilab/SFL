@@ -62,7 +62,7 @@ const pluriel = (n: number, un: string, plusieurs: string) => `${n} ${n > 1 ? pl
 /** Ce qu'il reste à faire, à la deuxième personne. */
 export function phraseDefi(id: TropheeId, n: number, premiere = false): string {
   if (premiere && n === 1 && (id === "mvp" || id === "mur" || id === "impact"))
-    return id === "mvp" ? "Sois MVP d'un match." : id === "mur" ? "Sois le Mur d'un match." : "Sois Impact d'un match.";
+    return id === "mvp" ? "Sois MVP d'un match." : id === "mur" ? "Sois le Mur de ton équipe." : "Sois Impact de ton équipe.";
   switch (id) {
     case "buts":
       return `Marque encore ${pluriel(n, "but", "buts")}.`;
@@ -75,9 +75,9 @@ export function phraseDefi(id: TropheeId, n: number, premiere = false): string {
     case "mvp":
       return n > 1 ? `Sois encore ${n} fois MVP du match.` : "Sois MVP du match une fois de plus.";
     case "mur":
-      return n > 1 ? `Sois encore ${n} fois le Mur du match.` : "Sois le Mur du match une fois de plus.";
+      return n > 1 ? `Sois encore ${n} fois le Mur de ton équipe.` : "Sois le Mur de ton équipe une fois de plus.";
     case "impact":
-      return n > 1 ? `Sois encore ${n} fois Impact du match.` : "Sois Impact du match une fois de plus.";
+      return n > 1 ? `Sois encore ${n} fois Impact de ton équipe.` : "Sois Impact de ton équipe une fois de plus.";
   }
 }
 

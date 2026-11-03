@@ -93,10 +93,10 @@ function faitDuJour(e: MatchEntry): { quoi: string; poids: number } | null {
     parts.push("MVP du match");
     poids += 4;
   } else if (e.def) {
-    parts.push("Le Mur du match");
+    parts.push("Le Mur de son équipe");
     poids += 3;
   } else if (e.impact) {
-    parts.push("Impact du match");
+    parts.push("Impact de son équipe");
     poids += 3;
   }
   if (e.buts >= 2) poids += e.buts >= 3 ? 5 : 3;
