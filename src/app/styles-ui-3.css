@@ -1,0 +1,244 @@
+/* Six variations de Bulle, 18 à 23 (Sabri, 03/11/2026 : « je pense que
+   j'aime le style 12, fais des variations de celui-ci »). Même règle que
+   styles-ui.css et styles-ui-2.css : l'UX ne bouge pas, seule la peau
+   change ; jamais en production (style-ui/essai.tsx pose data-famille="bulle").
+
+   Ce qui fait Bulle et que les six gardent : des visages ronds qui flottent
+   sur la Map, des boutons en gomme qui s'enfoncent (une marche dessous),
+   des arrondis φ (21 · 34 · 55), un plan qui respire (nuages, onde autour
+   de toi), une seule couleur qui appelle. Ce qui change : la lumière,
+   la matière, le trait.
+
+   18 Bulle gomme  : la 12 poussée. Plus rond, plus épais, plus mou ; bord blanc large.
+   19 Bulle nuit   : Zenly le soir. Vert nuit, bulles qui luisent, étoiles qui scintillent.
+   20 Bulle pêche  : crème et pêche pâle, joues roses (jamais la braise du « il manque »).
+   21 Bulle lilas  : lavande et menthe, doux comme un bonbon.
+   22 Bulle encre  : Bulle + Affiche. Crème, trait noir épais, ombre portée franche.
+   23 Bulle verre  : verre dépoli sur un fond aurore, tout est translucide.
+
+   Or, bleu et rouge restent aux cartes MVP, Défensive et Impact. */
+
+/* ───────────────────────────── Les jetons ───────────────────────────── */
+:root[data-style="18"], :root[data-style="18"].dark, :root[data-style="18"] .surfaces-jour {
+  --background: #e9f8ef; --foreground: #0e2a1f; --card: #ffffff; --card-foreground: #0e2a1f;
+  --popover: #ffffff; --popover-foreground: #0e2a1f; --primary: #0e2a1f; --primary-foreground: #ffffff;
+  --secondary: #d7f2e1; --secondary-foreground: #0e2a1f; --muted: #d7f2e1; --muted-foreground: #557566;
+  --accent: #d7f2e1; --accent-foreground: #0e2a1f; --border: #c8e9d4; --input: #c8e9d4; --ring: #0e2a1f;
+  --vert: #7fd99a; --mauve: #f5b3d4; --contraste: #0e2a1f; --radius: 2.125rem; color-scheme: light;
+  --b-ombre: 40, 120, 80; --b-haut: #c2f7d3; --b-bas: #7fd99a; --b-marche: #5cbf7a; --b-encre: #0e2a1f;
+  --b-bord: #ffffff; --b-compte: #ff9ccc; --b-verre: rgba(255, 255, 255, 0.9); --b-plein: #0e2a1f;
+  --b-nuage: rgba(255, 255, 255, 0.6); --b-nuage-ombre: rgba(40, 110, 76, 0.14); --b-vignette: rgba(14, 42, 31, 0.14);
+  --toi-onde: rgba(14, 42, 31, 0.5);
+}
+:root[data-style="19"], :root[data-style="19"].dark, :root[data-style="19"] .surfaces-jour {
+  --background: #0b1814; --foreground: #effaf3; --card: #13241f; --card-foreground: #effaf3;
+  --popover: #172b25; --popover-foreground: #effaf3; --primary: #8fd6a4; --primary-foreground: #0b1814;
+  --secondary: #182d27; --secondary-foreground: #effaf3; --muted: #13241f; --muted-foreground: #8fb1a2;
+  --accent: #182d27; --accent-foreground: #effaf3; --border: #23403a; --input: #23403a; --ring: #8fd6a4;
+  --vert: #8fd6a4; --mauve: #f3bfd8; --contraste: #ffffff; --radius: 1.3125rem; color-scheme: dark;
+  --b-ombre: 0, 0, 0; --b-haut: #b6f0c6; --b-bas: #74c98d; --b-marche: #3f8f5a; --b-encre: #0b1814;
+  --b-bord: #effaf3; --b-compte: #f3bfd8; --b-verre: rgba(19, 36, 31, 0.78); --b-plein: #8fd6a4;
+  --b-nuage: rgba(255, 255, 255, 0.0); --b-nuage-ombre: rgba(0, 0, 0, 0.0); --b-vignette: rgba(0, 0, 0, 0.45);
+  --toi-onde: rgba(143, 214, 164, 0.85);
+}
+:root[data-style="20"], :root[data-style="20"].dark, :root[data-style="20"] .surfaces-jour {
+  --background: #fff4ec; --foreground: #3a2219; --card: #ffffff; --card-foreground: #3a2219;
+  --popover: #ffffff; --popover-foreground: #3a2219; --primary: #3a2219; --primary-foreground: #ffffff;
+  --secondary: #ffe6d8; --secondary-foreground: #3a2219; --muted: #ffe6d8; --muted-foreground: #8a6656;
+  --accent: #ffe6d8; --accent-foreground: #3a2219; --border: #f6dccd; --input: #f6dccd; --ring: #3a2219;
+  --vert: #a8e3a8; --mauve: #ffc2d6; --contraste: #3a2219; --radius: 1.3125rem; color-scheme: light;
+  --b-ombre: 170, 100, 70; --b-haut: #ffe1d2; --b-bas: #ffbfa3; --b-marche: #eba185; --b-encre: #3a2219;
+  --b-bord: #ffffff; --b-compte: #a8e3a8; --b-verre: rgba(255, 255, 255, 0.88); --b-plein: #3a2219;
+  --b-nuage: rgba(255, 255, 255, 0.55); --b-nuage-ombre: rgba(160, 90, 60, 0.12); --b-vignette: rgba(58, 34, 25, 0.12);
+  --toi-onde: rgba(58, 34, 25, 0.45);
+}
+:root[data-style="21"], :root[data-style="21"].dark, :root[data-style="21"] .surfaces-jour {
+  --background: #f4f0fd; --foreground: #231a3d; --card: #ffffff; --card-foreground: #231a3d;
+  --popover: #ffffff; --popover-foreground: #231a3d; --primary: #231a3d; --primary-foreground: #ffffff;
+  --secondary: #e9e2fa; --secondary-foreground: #231a3d; --muted: #e9e2fa; --muted-foreground: #6c6390;
+  --accent: #e9e2fa; --accent-foreground: #231a3d; --border: #ded5f4; --input: #ded5f4; --ring: #231a3d;
+  --vert: #a9e3b6; --mauve: #d5c2f7; --contraste: #231a3d; --radius: 1.3125rem; color-scheme: light;
+  --b-ombre: 90, 70, 150; --b-haut: #e6dbfc; --b-bas: #c3acf1; --b-marche: #a58dda; --b-encre: #231a3d;
+  --b-bord: #ffffff; --b-compte: #a9e3b6; --b-verre: rgba(255, 255, 255, 0.88); --b-plein: #231a3d;
+  --b-nuage: rgba(255, 255, 255, 0.55); --b-nuage-ombre: rgba(90, 70, 150, 0.12); --b-vignette: rgba(35, 26, 61, 0.12);
+  --toi-onde: rgba(35, 26, 61, 0.45);
+}
+:root[data-style="22"], :root[data-style="22"].dark, :root[data-style="22"] .surfaces-jour {
+  --background: #fff8ec; --foreground: #1a1714; --card: #ffffff; --card-foreground: #1a1714;
+  --popover: #ffffff; --popover-foreground: #1a1714; --primary: #1a1714; --primary-foreground: #ffffff;
+  --secondary: #e3f6e8; --secondary-foreground: #1a1714; --muted: #fbefd9; --muted-foreground: #6b5f52;
+  --accent: #e3f6e8; --accent-foreground: #1a1714; --border: #1a1714; --input: #1a1714; --ring: #1a1714;
+  --vert: #8fd6a4; --mauve: #ffc6e2; --contraste: #1a1714; --radius: 1.3125rem; color-scheme: light;
+  --b-ombre: 26, 23, 20; --b-haut: #b7f0c8; --b-bas: #8fd6a4; --b-marche: #1a1714; --b-encre: #1a1714;
+  --b-bord: #1a1714; --b-compte: #ffc6e2; --b-verre: #ffffff; --b-plein: #1a1714;
+  --b-nuage: rgba(255, 255, 255, 0.5); --b-nuage-ombre: rgba(26, 23, 20, 0.08); --b-vignette: rgba(26, 23, 20, 0.0);
+  --toi-onde: rgba(26, 23, 20, 0.7);
+}
+:root[data-style="23"], :root[data-style="23"].dark, :root[data-style="23"] .surfaces-jour {
+  --background: #e4f6ee; --foreground: #10241c; --card: #ffffff; --card-foreground: #10241c;
+  --popover: #ffffff; --popover-foreground: #10241c; --primary: #10241c; --primary-foreground: #ffffff;
+  --secondary: #ffffff; --secondary-foreground: #10241c; --muted: #ffffff; --muted-foreground: #48685b;
+  --accent: #ffffff; --accent-foreground: #10241c; --border: #ffffff; --input: #ffffff; --ring: #10241c;
+  --vert: #7fd99a; --mauve: #f5b3d4; --contraste: #10241c; --radius: 1.3125rem; color-scheme: light;
+  --b-ombre: 40, 110, 90; --b-haut: rgba(255, 255, 255, 0.85); --b-bas: rgba(255, 255, 255, 0.45); --b-marche: rgba(255, 255, 255, 0.6); --b-encre: #10241c;
+  --b-bord: rgba(255, 255, 255, 0.9); --b-compte: #ffffff; --b-verre: rgba(255, 255, 255, 0.42); --b-plein: rgba(255, 255, 255, 0.9);
+  --b-nuage: rgba(255, 255, 255, 0.5); --b-nuage-ombre: rgba(40, 110, 90, 0.08); --b-vignette: rgba(255, 255, 255, 0.25);
+  --toi-onde: rgba(255, 255, 255, 0.95);
+}
+
+/* ───────────────────────────── Le fond de page ───────────────────────────── */
+:root[data-style="18"] body { background: radial-gradient(70% 40% at 10% 0%, #ffdcee, transparent 70%), radial-gradient(60% 40% at 100% 35%, #cbf4d9, transparent 70%), var(--background); }
+:root[data-style="19"] body {
+  background:
+    radial-gradient(1.5px 1.5px at 20% 12%, rgba(255, 255, 255, 0.7), transparent),
+    radial-gradient(1px 1px at 70% 8%, rgba(255, 255, 255, 0.55), transparent),
+    radial-gradient(1.5px 1.5px at 85% 22%, rgba(255, 255, 255, 0.5), transparent),
+    radial-gradient(1px 1px at 40% 30%, rgba(255, 255, 255, 0.4), transparent),
+    radial-gradient(80% 45% at 85% -5%, rgba(243, 191, 216, 0.16), transparent 62%),
+    radial-gradient(70% 40% at 0% 100%, rgba(143, 214, 164, 0.14), transparent 60%), var(--background);
+}
+:root[data-style="20"] body { background: radial-gradient(70% 40% at 0% 0%, #ffd9e4, transparent 70%), radial-gradient(60% 40% at 100% 30%, #ffe4cf, transparent 70%), var(--background); }
+:root[data-style="21"] body { background: radial-gradient(70% 40% at 0% 0%, #e2d4fb, transparent 70%), radial-gradient(60% 40% at 100% 35%, #d6f3df, transparent 70%), var(--background); }
+:root[data-style="22"] body { background: radial-gradient(circle at 1px 1px, rgba(26, 23, 20, 0.08) 1px, transparent 1.5px) 0 0 / 13px 13px, var(--background); }
+:root[data-style="23"] body {
+  background:
+    radial-gradient(60% 35% at 0% 5%, #ffc9e6, transparent 70%),
+    radial-gradient(55% 35% at 100% 20%, #9ff0c0, transparent 70%),
+    radial-gradient(60% 40% at 30% 70%, #c9f4ff, transparent 70%),
+    radial-gradient(60% 40% at 100% 95%, #ffd8ef, transparent 70%), var(--background);
+  background-attachment: fixed;
+}
+
+/* ───────────────────────────── La barre d'onglets ───────────────────────────── */
+:root[data-famille="bulle"] .liquid-tabbar { --tabbar-verre: var(--b-verre); --tabbar-plein: var(--b-plein); color: var(--foreground); box-shadow: 0 13px 34px rgba(var(--b-ombre), 0.22), 0 2px 0 rgba(255, 255, 255, 0.9) inset !important; }
+:root[data-famille="bulle"] .liquid-tabbar__onglet { color: var(--foreground) !important; }
+:root[data-famille="bulle"] .liquid-tabbar:not([data-tenu]) .liquid-tabbar__onglet[aria-current="page"] { color: var(--background) !important; }
+:root[data-style="18"] .liquid-tabbar { border: 4px solid #ffffff; }
+:root[data-style="19"] .liquid-tabbar { box-shadow: 0 0 0 1px rgba(143, 214, 164, 0.22) inset, 0 13px 34px rgba(0, 0, 0, 0.5), 0 0 34px rgba(143, 214, 164, 0.14) !important; }
+:root[data-style="22"] .liquid-tabbar { border: 2.5px solid #1a1714; box-shadow: 0 5px 0 #1a1714 !important; backdrop-filter: none; }
+:root[data-style="23"] .liquid-tabbar { border: 1px solid rgba(255, 255, 255, 0.85); backdrop-filter: blur(24px) saturate(190%); box-shadow: 0 13px 34px rgba(40, 110, 90, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.95) !important; }
+:root[data-style="23"] .liquid-tabbar:not([data-tenu]) .liquid-tabbar__onglet[aria-current="page"] { color: var(--foreground) !important; }
+:root[data-style="23"] .liquid-tabbar__lentille:not([data-verre]) { box-shadow: 0 4px 13px rgba(40, 110, 90, 0.2), inset 0 1px 0 #ffffff; }
+
+/* ───────────────────────────── Les boutons (la gomme) ───────────────────────────── */
+:root[data-famille="bulle"] :is(.bouton-principal, .bouton-secondaire, .bouton-encre, .bouton-givre) { border-radius: 999px !important; box-shadow: 0 5px 0 rgba(var(--b-ombre), 0.12), 0 13px 21px rgba(var(--b-ombre), 0.14) !important; transition: transform 0.12s, box-shadow 0.12s; }
+:root[data-famille="bulle"] .bouton-principal { background: linear-gradient(180deg, var(--b-haut), var(--b-bas)) !important; color: var(--b-encre) !important; box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.7), 0 5px 0 var(--b-marche), 0 13px 21px rgba(var(--b-ombre), 0.24) !important; }
+:root[data-famille="bulle"] :is(.bouton-secondaire, .bouton-givre) { background: var(--card) !important; color: var(--foreground) !important; }
+:root[data-famille="bulle"] :is(.bouton-principal, .bouton-secondaire, .bouton-encre, .bouton-givre):active { transform: translateY(4px) scale(0.98); }
+:root[data-style="18"] .bouton-principal { box-shadow: inset 0 3px 0 rgba(255, 255, 255, 0.8), inset 0 -3px 0 rgba(0, 0, 0, 0.05), 0 8px 0 var(--b-marche), 0 18px 26px rgba(var(--b-ombre), 0.28) !important; }
+:root[data-style="18"] :is(.bouton-secondaire, .bouton-givre) { box-shadow: 0 0 0 3px #ffffff, 0 6px 0 #c8e9d4, 0 13px 21px rgba(var(--b-ombre), 0.16) !important; }
+:root[data-style="19"] .bouton-principal { box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.55), 0 5px 0 var(--b-marche), 0 0 26px rgba(143, 214, 164, 0.4) !important; }
+:root[data-style="19"] :is(.bouton-secondaire, .bouton-givre, .bouton-encre) { background: rgba(255, 255, 255, 0.07) !important; color: #effaf3 !important; box-shadow: 0 0 0 1px rgba(143, 214, 164, 0.25) inset, 0 5px 0 rgba(0, 0, 0, 0.4) !important; }
+:root[data-style="22"] :is(.bouton-principal, .bouton-secondaire, .bouton-encre, .bouton-givre) { border: 2.5px solid #1a1714 !important; box-shadow: 0 5px 0 #1a1714 !important; }
+:root[data-style="22"] .bouton-principal { box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.7), 0 5px 0 #1a1714 !important; }
+:root[data-style="22"] :is(.bouton-principal, .bouton-secondaire, .bouton-encre, .bouton-givre):active { box-shadow: 0 1px 0 #1a1714 !important; }
+:root[data-style="23"] :is(.bouton-principal, .bouton-secondaire, .bouton-encre, .bouton-givre) { backdrop-filter: blur(18px) saturate(180%); border: 1px solid rgba(255, 255, 255, 0.9) !important; }
+:root[data-style="23"] .bouton-principal { background: linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.55)) !important; box-shadow: inset 0 1px 0 #ffffff, 0 8px 21px rgba(40, 110, 90, 0.22) !important; }
+:root[data-style="23"] :is(.bouton-secondaire, .bouton-givre) { background: rgba(255, 255, 255, 0.4) !important; }
+
+/* ───────────────────────────── Les tuiles et le tiroir ───────────────────────────── */
+:root[data-famille="bulle"] .tuile-match { border-radius: 34px !important; box-shadow: 0 0 0 4px var(--b-bord), 0 13px 26px rgba(var(--b-ombre), 0.22) !important; }
+:root[data-famille="bulle"] .tiroir-map { border-radius: 34px !important; box-shadow: 0 -8px 34px rgba(var(--b-ombre), 0.16) !important; }
+:root[data-style="18"] .tuile-match { border-radius: 42px !important; box-shadow: 0 0 0 6px #ffffff, 0 8px 0 6px #c8e9d4, 0 21px 30px rgba(var(--b-ombre), 0.24) !important; }
+:root[data-style="18"] .tiroir-map { border-radius: 42px !important; }
+:root[data-style="19"] .tuile-match { box-shadow: 0 0 0 2px rgba(143, 214, 164, 0.6), 0 0 26px rgba(143, 214, 164, 0.25), 0 13px 26px rgba(0, 0, 0, 0.5) !important; }
+:root[data-style="19"] .tiroir-map { background: rgba(16, 32, 27, 0.82) !important; backdrop-filter: blur(21px) saturate(160%); box-shadow: 0 0 0 1px rgba(143, 214, 164, 0.12) inset, 0 -13px 40px rgba(0, 0, 0, 0.5) !important; }
+:root[data-style="22"] .tuile-match { box-shadow: 0 0 0 2.5px #1a1714, 0 6px 0 2.5px #1a1714 !important; }
+:root[data-style="22"] .tiroir-map { box-shadow: 0 0 0 2.5px #1a1714, 0 -6px 0 0 #1a1714 !important; }
+:root[data-style="23"] .tuile-match { box-shadow: 0 0 0 1.5px rgba(255, 255, 255, 0.95), 0 13px 30px rgba(40, 110, 90, 0.22) !important; }
+:root[data-style="23"] .tiroir-map { background: rgba(255, 255, 255, 0.5) !important; backdrop-filter: blur(26px) saturate(190%); box-shadow: inset 0 1px 0 #ffffff, 0 -8px 34px rgba(40, 110, 90, 0.16) !important; }
+
+/* ───────────────────────────── Les titres ───────────────────────────── */
+:root[data-famille="bulle"] :is(h1, h2) { font-weight: 900; letter-spacing: -0.035em; }
+:root[data-style="18"] :is(h1, h2) { letter-spacing: -0.045em; }
+:root[data-style="19"] :is(h1, h2) { text-shadow: 0 0 21px rgba(143, 214, 164, 0.35); }
+:root[data-style="22"] :is(h1, h2) { text-shadow: 2px 2px 0 #ffc6e2; }
+
+/* ───────────────────────────── Les blocs de l'app ───────────────────────────── */
+:root[data-famille="bulle"] :is(section, a, div)[class*="rounded-[2"]:not(.tuile-match):not([class*="carte"]) { border-radius: 34px; }
+:root[data-famille="bulle"] :is(section, a)[class*="rounded-[2"]:not(.tuile-match):not([class*="carte"]) { box-shadow: 0 13px 30px rgba(var(--b-ombre), 0.12); }
+:root[data-style="18"] :is(section, a, div)[class*="rounded-[2"]:not(.tuile-match):not([class*="carte"]) { border-radius: 42px; }
+:root[data-style="18"] :is(section, a)[class*="rounded-[2"]:not(.tuile-match):not([class*="carte"]) { box-shadow: 0 0 0 4px #ffffff, 0 6px 0 4px #d7f2e1, 0 18px 30px rgba(var(--b-ombre), 0.14); }
+:root[data-style="19"] :is(section, a)[class*="rounded-[2"]:not(.tuile-match):not([class*="carte"]) { box-shadow: 0 0 0 1px rgba(143, 214, 164, 0.14) inset, 0 13px 34px rgba(0, 0, 0, 0.35); }
+:root[data-style="22"] :is(section, a)[class*="rounded-[2"]:not(.tuile-match):not([class*="carte"]) { box-shadow: 0 0 0 2.5px #1a1714, 0 5px 0 2.5px #1a1714; }
+:root[data-style="23"] :is(section, a)[class*="rounded-[2"]:not(.tuile-match):not([class*="carte"]) { background-color: rgba(255, 255, 255, 0.5) !important; backdrop-filter: blur(21px) saturate(180%); box-shadow: inset 0 1px 0 #ffffff, 0 0 0 1px rgba(255, 255, 255, 0.7), 0 13px 30px rgba(40, 110, 90, 0.12); }
+
+/* ───────────────────────────── La surcouche de la Map ───────────────────────────── */
+:root[data-famille="bulle"] .surcouche-map { display: block; }
+:root[data-famille="bulle"] .sc--a {
+  inset: -50%;
+  background:
+    radial-gradient(closest-side, var(--b-nuage-ombre), transparent) 0 0 / 420px 300px,
+    radial-gradient(closest-side, var(--b-nuage-ombre), transparent) 210px 170px / 520px 360px;
+  background-position: var(--sx, 0px) var(--sy, 0px), calc(var(--sx, 0px) + 210px) calc(var(--sy, 0px) + 170px);
+  animation: sc-derive 34s linear infinite;
+  mix-blend-mode: multiply;
+}
+:root[data-famille="bulle"] .sc--b {
+  inset: -50%;
+  background:
+    radial-gradient(closest-side, var(--b-nuage), transparent) 0 0 / 260px 150px,
+    radial-gradient(closest-side, var(--b-nuage), transparent) 0 0 / 340px 190px;
+  background-position: calc(var(--sx, 0px) * 1.25 + 60px) calc(var(--sy, 0px) * 1.25 + 40px), calc(var(--sx, 0px) * 1.25 + 300px) calc(var(--sy, 0px) * 1.25 + 230px);
+  animation: sc-derive 21s linear infinite;
+}
+:root[data-famille="bulle"] .sc--c { background: radial-gradient(120% 70% at 50% 40%, transparent 55%, var(--b-vignette)); }
+/* 19 : des étoiles qui scintillent à la place des nuages. */
+:root[data-style="19"] .sc--a {
+  inset: 0;
+  mix-blend-mode: screen;
+  background:
+    radial-gradient(1.5px 1.5px at 12% 18%, #ffffff, transparent), radial-gradient(1px 1px at 33% 9%, #ffffff, transparent),
+    radial-gradient(1.5px 1.5px at 58% 26%, #ffffff, transparent), radial-gradient(1px 1px at 81% 14%, #ffffff, transparent),
+    radial-gradient(1px 1px at 24% 52%, #ffffff, transparent), radial-gradient(1.5px 1.5px at 72% 61%, #ffffff, transparent),
+    radial-gradient(1px 1px at 44% 78%, #ffffff, transparent), radial-gradient(1.5px 1.5px at 90% 84%, #ffffff, transparent);
+  animation: sc-scintille 3.4s ease-in-out infinite;
+}
+:root[data-style="19"] .sc--b { inset: 0; background: radial-gradient(60% 40% at 50% 45%, rgba(143, 214, 164, 0.12), transparent 70%); animation: sc-respire 5.5s ease-in-out infinite; }
+/* 22 : un cadre d'encre autour du plan, comme une vignette dessinée. */
+:root[data-style="22"] .sc--c { box-shadow: inset 0 0 0 3px #1a1714; }
+/* 23 : un reflet qui passe sur le verre. */
+:root[data-style="23"] .sc--c { background: linear-gradient(115deg, transparent 35%, rgba(255, 255, 255, 0.28) 48%, transparent 60%); animation: sc-vernis 9s ease-in-out infinite; }
+
+/* ───────────────────────────── Les joueurs sur la Map ───────────────────────────── */
+:root[data-famille="bulle"] .grp__carte { height: calc(var(--w) * 1.15); width: calc(var(--w) * 1.15); border-radius: 50%; }
+:root[data-famille="bulle"] .grp__pile { height: calc(var(--w) * 1.15 + 6px); }
+:root[data-famille="bulle"] .jr__carte { width: 36px; height: 36px; border-radius: 50%; }
+:root[data-famille="bulle"] .jc img { transform: scale(1.5); transform-origin: 50% 24%; }
+:root[data-famille="bulle"] .jc { border: 3px solid var(--b-bord); box-shadow: 0 4px 10px rgba(var(--b-ombre), 0.3); }
+:root[data-famille="bulle"] .grp { animation: sc-flotte 3.4s ease-in-out infinite; }
+:root[data-famille="bulle"] .grp:nth-of-type(2n) { animation-delay: -1.2s; }
+:root[data-famille="bulle"] .grp:nth-of-type(3n) { animation-delay: -2.1s; }
+:root[data-famille="bulle"] .grp__compte { background: var(--b-compte); color: var(--b-encre); border: 2.5px solid var(--b-bord); }
+:root[data-famille="bulle"] .grp__ville { border-radius: 999px; font-weight: 900; }
+:root[data-famille="bulle"] .stk__vignette { border-radius: 26px; }
+:root[data-style="18"] .grp__carte { height: calc(var(--w) * 1.3); width: calc(var(--w) * 1.3); }
+:root[data-style="18"] .grp__pile { height: calc(var(--w) * 1.3 + 6px); }
+:root[data-style="18"] .jc { border-width: 4px; box-shadow: 0 5px 0 rgba(var(--b-ombre), 0.25), 0 10px 16px rgba(var(--b-ombre), 0.3); }
+:root[data-style="19"] .jc { border: 2.5px solid #8fd6a4; box-shadow: 0 0 0 3px rgba(143, 214, 164, 0.22), 0 0 21px rgba(143, 214, 164, 0.6); }
+:root[data-style="19"] .grp__compte { border-color: #0b1814; }
+:root[data-style="19"] :is(.grp__ville, .vil) { background: rgba(19, 36, 31, 0.88); color: #effaf3; box-shadow: 0 0 0 1px rgba(143, 214, 164, 0.35); }
+:root[data-style="22"] .jc { border: 2.5px solid #1a1714; box-shadow: 0 0 0 2px #ffffff, 0 4px 0 2px #1a1714; }
+:root[data-style="22"] .grp__compte { border: 2px solid #1a1714; }
+:root[data-style="22"] :is(.grp__ville, .vil) { background: #ffffff; color: #1a1714; box-shadow: 0 0 0 2px #1a1714, 0 3px 0 2px #1a1714; }
+:root[data-style="23"] .jc { border: 2px solid rgba(255, 255, 255, 0.95); box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.35), 0 8px 18px rgba(40, 110, 90, 0.3); }
+:root[data-style="23"] .grp__compte { background: rgba(255, 255, 255, 0.75); backdrop-filter: blur(10px); }
+:root[data-style="23"] :is(.grp__ville, .vil) { background: rgba(255, 255, 255, 0.6); backdrop-filter: blur(12px); }
+
+/* Toi : l'onde (même dessin que 12 à 17). */
+:root[data-famille="bulle"] .toi__anneau { position: relative; border: 0; box-shadow: none; }
+:root[data-famille="bulle"] .toi__anneau::before,
+:root[data-famille="bulle"] .toi__anneau::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 2px solid var(--toi-onde);
+  animation: sc-onde 2.6s cubic-bezier(0.2, 0.6, 0.3, 1) infinite;
+}
+:root[data-famille="bulle"] .toi__anneau::after { animation-delay: -1.3s; }
+
+@media (prefers-reduced-motion: reduce) {
+  :root[data-famille="bulle"] .grp,
+  :root[data-famille="bulle"] .sc { animation: none !important; }
+}

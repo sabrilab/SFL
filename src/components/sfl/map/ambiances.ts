@@ -49,10 +49,11 @@ import { chaleur, contoursDesZones, FONDU_PAS, voilesEnFondu, type Zone } from "
 
 export type Ambiance =
   | "jour" | "aube" | "classique" | "territoire" | "nuit" | "encre" | "brume" | "rouge" | "braise" | "nuit-brume" | "nuit-braise" | "nuit-encre"
-  | "bulle" | "nuit-chaleur" | "trace" | "sticker" | "nuit-pelouse" | "gravure";
+  | "bulle" | "nuit-chaleur" | "trace" | "sticker" | "nuit-pelouse" | "gravure"
+  | "bulle-gomme" | "nuit-bulle" | "bulle-peche" | "bulle-lilas" | "bulle-encre" | "bulle-verre";
 /** Les essais montrés dans l'aperçu (l'encre reste par l'adresse). */
 export const AMBIANCES: Ambiance[] = ["jour", "aube", "nuit-encre", "brume", "rouge", "braise", "nuit-brume", "nuit-braise", "nuit", "territoire", "classique"];
-export const TOUTES_AMBIANCES: Ambiance[] = [...AMBIANCES, "encre", "bulle", "nuit-chaleur", "trace", "sticker", "nuit-pelouse", "gravure"];
+export const TOUTES_AMBIANCES: Ambiance[] = [...AMBIANCES, "encre", "bulle", "nuit-chaleur", "trace", "sticker", "nuit-pelouse", "gravure", "bulle-gomme", "nuit-bulle", "bulle-peche", "bulle-lilas", "bulle-encre", "bulle-verre"];
 /** Les ambiances sur le plan noir. */
 export const estNuit = (a: Ambiance) => a.startsWith("nuit");
 
@@ -258,8 +259,46 @@ const GRAVURE: Palette = {
   texte: "#3d372e", texteRues: "#6f6656", texteEau: "#6f7670", halo: "#fbf8f0",
 };
 
+/* Les variations de Bulle, styles 18 à 23 (Sabri, 03/11 : « j'aime le style 12, fais des variations »). */
+const BULLE_GOMME: Palette = {
+  terre: "#e6f7ee", quartier: "#ddf3e7", parc: "#a9ecba", bois: "#94e3a8", terrain: "#78d98f",
+  eau: "#9fe3ee", eauBord: "#83d6e4", rue: "#ffffff", rueBord: "#c6e6d3", grande: "#ffd9ec", grandeBord: "#f5b3d4",
+  bati: "#d6efe0", volume: "#ffffff", rail: "#c4dccd", ombre: "rgba(50, 110, 80, 0.45)",
+  texte: "#3f6455", texteRues: "#5f8173", texteEau: "#2e8b9c", halo: "#ffffff",
+};
+const NUIT_BULLE: Palette = {
+  terre: "#10221d", quartier: "#132722", parc: "#1a3a2c", bois: "#183428", terrain: "#2b6046",
+  eau: "#0d1a1c", eauBord: "#112224", rue: "#20403a", rueBord: "#16302a", grande: "#5a3550", grandeBord: "#3a2436",
+  bati: "#183029", volume: "#21413a", rail: "#1f3a33", ombre: "rgba(0, 0, 0, 0.55)",
+  texte: "#9cc9b5", texteRues: "#76a291", texteEau: "#6aa7a5", halo: "#0c1a16",
+};
+const BULLE_PECHE: Palette = {
+  terre: "#fff3ea", quartier: "#ffeee2", parc: "#c9efc4", bois: "#b6e7b0", terrain: "#9fdf98",
+  eau: "#bfe9ec", eauBord: "#a6dfe3", rue: "#ffffff", rueBord: "#f3dccb", grande: "#ffd5c4", grandeBord: "#f7b9a4",
+  bati: "#fde6d6", volume: "#fffaf5", rail: "#ead6c7", ombre: "rgba(150, 90, 60, 0.38)",
+  texte: "#7a5a4a", texteRues: "#977a6a", texteEau: "#3f969c", halo: "#ffffff",
+};
+const BULLE_LILAS: Palette = {
+  terre: "#f3effc", quartier: "#eee9fa", parc: "#cdeccf", bois: "#bce4c0", terrain: "#a7dcae",
+  eau: "#cfe3f3", eauBord: "#bcd6ec", rue: "#ffffff", rueBord: "#ddd5ef", grande: "#e4d5fa", grandeBord: "#c9b4f2",
+  bati: "#e8e2f7", volume: "#ffffff", rail: "#d7cfea", ombre: "rgba(90, 70, 140, 0.36)",
+  texte: "#5d5379", texteRues: "#7d7398", texteEau: "#5a86a8", halo: "#ffffff",
+};
+const BULLE_ENCRE: Palette = {
+  terre: "#fff8ec", quartier: "#fff3e2", parc: "#b4ecc0", bois: "#a0e3af", terrain: "#86da9a",
+  eau: "#b4e6ef", eauBord: "#1a1714", rue: "#ffffff", rueBord: "#1a1714", grande: "#ffd9ec", grandeBord: "#1a1714",
+  bati: "#fbe9d2", volume: "#ffffff", rail: "#1a1714", ombre: "rgba(26, 23, 20, 0.5)",
+  texte: "#1a1714", texteRues: "#3d362f", texteEau: "#1a1714", halo: "#ffffff",
+};
+const BULLE_VERRE: Palette = {
+  terre: "#dff5ec", quartier: "#d7f1e6", parc: "#99e8b1", bois: "#86e0a2", terrain: "#62d585",
+  eau: "#8fe0f0", eauBord: "#72d4e8", rue: "#ffffff", rueBord: "#bfe4d3", grande: "#ffc9e6", grandeBord: "#f3a6cf",
+  bati: "#cfeee0", volume: "#ffffff", rail: "#b9dccb", ombre: "rgba(40, 120, 90, 0.4)",
+  texte: "#305848", texteRues: "#4f7767", texteEau: "#1f8496", halo: "#ffffff",
+};
 const PALETTES: Record<Ambiance, Palette> = { jour: JOUR, aube: AUBE, classique: SNAP, territoire: SNAP, nuit: NUIT, encre: ENCRE, brume: SNAP, rouge: SNAP, braise: SNAP, "nuit-brume": NUIT, "nuit-braise": NUIT, "nuit-encre": TABLEAU,
-  bulle: BULLE, "nuit-chaleur": CHALEUR, trace: TRACE, sticker: STICKER, "nuit-pelouse": PELOUSE, gravure: GRAVURE };
+  bulle: BULLE, "nuit-chaleur": CHALEUR, trace: TRACE, sticker: STICKER, "nuit-pelouse": PELOUSE, gravure: GRAVURE,
+  "bulle-gomme": BULLE_GOMME, "nuit-bulle": NUIT_BULLE, "bulle-peche": BULLE_PECHE, "bulle-lilas": BULLE_LILAS, "bulle-encre": BULLE_ENCRE, "bulle-verre": BULLE_VERRE };
 
 /** Les halos de chaleur des styles 12 à 17, façon Snap Map, sans or, bleu ni rouge (réservés aux cartes). */
 const HALOS: Partial<Record<Ambiance, unknown[]>> = {
@@ -268,6 +307,12 @@ const HALOS: Partial<Record<Ambiance, unknown[]>> = {
   trace: ["interpolate", ["linear"], ["heatmap-density"], 0, "rgba(0,0,0,0)", 0.3, "rgba(0,0,0,0.03)", 1, "rgba(0,0,0,0.08)"],
   sticker: ["interpolate", ["linear"], ["heatmap-density"], 0, "rgba(255,255,255,0)", 0.2, "rgba(255,255,255,0.35)", 0.6, "rgba(255,214,236,0.5)", 1, "rgba(255,255,255,0.8)"],
   "nuit-pelouse": ["interpolate", ["linear"], ["heatmap-density"], 0, "rgba(255,255,255,0)", 0.2, "rgba(240,255,236,0.08)", 0.6, "rgba(240,255,236,0.2)", 1, "rgba(250,255,248,0.4)"],
+  "bulle-gomme": ["interpolate", ["linear"], ["heatmap-density"], 0, "rgba(255,255,255,0)", 0.2, "rgba(255,206,230,0.3)", 0.55, "rgba(255,180,216,0.5)", 0.85, "rgba(170,240,190,0.6)", 1, "rgba(255,255,255,0.75)"],
+  "nuit-bulle": ["interpolate", ["linear"], ["heatmap-density"], 0, "rgba(143,214,164,0)", 0.15, "rgba(143,214,164,0.14)", 0.45, "rgba(143,214,164,0.38)", 0.75, "rgba(243,191,216,0.55)", 1, "rgba(255,250,240,0.8)"],
+  "bulle-peche": ["interpolate", ["linear"], ["heatmap-density"], 0, "rgba(255,255,255,0)", 0.2, "rgba(255,214,196,0.3)", 0.55, "rgba(255,196,176,0.45)", 0.85, "rgba(255,226,236,0.6)", 1, "rgba(255,255,255,0.75)"],
+  "bulle-lilas": ["interpolate", ["linear"], ["heatmap-density"], 0, "rgba(255,255,255,0)", 0.2, "rgba(220,204,250,0.3)", 0.55, "rgba(205,184,246,0.45)", 0.85, "rgba(196,236,206,0.55)", 1, "rgba(255,255,255,0.75)"],
+  "bulle-encre": ["interpolate", ["linear"], ["heatmap-density"], 0, "rgba(255,255,255,0)", 0.2, "rgba(255,217,236,0.35)", 0.6, "rgba(255,200,228,0.55)", 1, "rgba(255,255,255,0.8)"],
+  "bulle-verre": ["interpolate", ["linear"], ["heatmap-density"], 0, "rgba(255,255,255,0)", 0.2, "rgba(255,255,255,0.3)", 0.5, "rgba(255,201,230,0.5)", 0.8, "rgba(160,240,200,0.6)", 1, "rgba(255,255,255,0.85)"],
   gravure: ["interpolate", ["linear"], ["heatmap-density"], 0, "rgba(61,55,46,0)", 0.2, "rgba(61,55,46,0.04)", 0.6, "rgba(61,55,46,0.1)", 1, "rgba(61,55,46,0.2)"],
 };
 
