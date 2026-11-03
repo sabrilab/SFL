@@ -58,7 +58,7 @@ const surMap = (pathname: string) => pathname === "/" || pathname === "/map";
  * place sous la barre quel que soit son z-index : la barre couvrait le
  * bouton « Continuer » de l'inscription (Sabri, 02/11/2026).
  */
-const SANS_BARRE = ["/inscription", "/bienvenue", "/equipe/", "/p/", "/confidentialite"];
+const SANS_BARRE = ["/inscription", "/bienvenue", "/equipe/", "/p/", "/confidentialite", "/jouer"];
 
 export function BottomNav() {
   const pathname = usePathname();

@@ -191,6 +191,12 @@ export function photosPartagees(): string[] {
   return Object.values(lireDistantes());
 }
 
+/** Les joueurs qui ont une photo partagée, avec son adresse (la liste en cache) : le studio du jeu. */
+export function photosParJoueur(): [string, string][] {
+  if (!hasWindow()) return [];
+  return Object.entries(lireDistantes());
+}
+
 /** La largeur des vignettes de la Map : une carte de 36 px, grossie 1,22 fois, sur un écran 3×. */
 export const LARGEUR_VIGNETTE = 128;
 
