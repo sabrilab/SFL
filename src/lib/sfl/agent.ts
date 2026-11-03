@@ -374,5 +374,7 @@ export function lireImage(v: unknown): ImageCoach | null {
   const chemin = typeof i.chemin === "string" && /^[0-9a-f-]{36}\/[\w.-]+$/.test(i.chemin) ? i.chemin : undefined;
   const url = typeof i.url === "string" && i.url.startsWith("data:image/") ? i.url : undefined;
   if (!chemin && !url) return null;
-  return { chemin, url, legende: typeof i.legende === "string" ? i.legende.slice(0, 200) : "" };
+  // 200 unités, sans garder la première moitié d'un emoji coupé.
+  const legende = typeof i.legende === "string" ? i.legende.slice(0, 200).replace(/[\uD800-\uDBFF]$/, "") : "";
+  return { chemin, url, legende };
 }
