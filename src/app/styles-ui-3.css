@@ -19,7 +19,7 @@
    Or, bleu et rouge restent aux cartes MVP, Défensive et Impact. */
 
 /* ───────────────────────────── Les jetons ───────────────────────────── */
-:root[data-style="18"], :root[data-style="18"].dark, :root[data-style="18"] .surfaces-jour {
+:root[data-style="18"]:not(.dark), :root[data-style="18"] .surfaces-jour {
   --background: #e9f8ef; --foreground: #0e2a1f; --card: #ffffff; --card-foreground: #0e2a1f;
   --popover: #ffffff; --popover-foreground: #0e2a1f; --primary: #0e2a1f; --primary-foreground: #ffffff;
   --secondary: #d7f2e1; --secondary-foreground: #0e2a1f; --muted: #d7f2e1; --muted-foreground: #557566;
@@ -30,7 +30,7 @@
   --b-nuage: rgba(255, 255, 255, 0.6); --b-nuage-ombre: rgba(40, 110, 76, 0.14); --b-vignette: rgba(14, 42, 31, 0.14);
   --toi-onde: rgba(14, 42, 31, 0.5);
 }
-:root[data-style="19"], :root[data-style="19"].dark, :root[data-style="19"] .surfaces-jour {
+:root[data-style="19"], :root[data-style="19"].dark, :root[data-style="19"] .surfaces-jour, :root[data-style="18"].dark {
   --background: #0b1814; --foreground: #effaf3; --card: #13241f; --card-foreground: #effaf3;
   --popover: #172b25; --popover-foreground: #effaf3; --primary: #8fd6a4; --primary-foreground: #0b1814;
   --secondary: #182d27; --secondary-foreground: #effaf3; --muted: #13241f; --muted-foreground: #8fb1a2;
@@ -87,8 +87,8 @@
 }
 
 /* ───────────────────────────── Le fond de page ───────────────────────────── */
-:root[data-style="18"] body { background: radial-gradient(70% 40% at 10% 0%, #ffdcee, transparent 70%), radial-gradient(60% 40% at 100% 35%, #cbf4d9, transparent 70%), var(--background); }
-:root[data-style="19"] body {
+:root[data-style="18"]:not(.dark) body { background: radial-gradient(70% 40% at 10% 0%, #ffdcee, transparent 70%), radial-gradient(60% 40% at 100% 35%, #cbf4d9, transparent 70%), var(--background); }
+:root:is([data-style="19"], [data-style="18"].dark) body {
   background:
     radial-gradient(1.5px 1.5px at 20% 12%, rgba(255, 255, 255, 0.7), transparent),
     radial-gradient(1px 1px at 70% 8%, rgba(255, 255, 255, 0.55), transparent),
@@ -113,8 +113,8 @@
 :root[data-famille="bulle"] .liquid-tabbar { --tabbar-verre: var(--b-verre); --tabbar-plein: var(--b-plein); color: var(--foreground); box-shadow: 0 13px 34px rgba(var(--b-ombre), 0.22), 0 2px 0 rgba(255, 255, 255, 0.9) inset !important; }
 :root[data-famille="bulle"] .liquid-tabbar__onglet { color: var(--foreground) !important; }
 :root[data-famille="bulle"] .liquid-tabbar:not([data-tenu]) .liquid-tabbar__onglet[aria-current="page"] { color: var(--background) !important; }
-:root[data-style="18"] .liquid-tabbar { border: 4px solid #ffffff; }
-:root[data-style="19"] .liquid-tabbar { box-shadow: 0 0 0 1px rgba(143, 214, 164, 0.22) inset, 0 13px 34px rgba(0, 0, 0, 0.5), 0 0 34px rgba(143, 214, 164, 0.14) !important; }
+:root[data-style="18"]:not(.dark) .liquid-tabbar { border: 4px solid #ffffff; }
+:root:is([data-style="19"], [data-style="18"].dark) .liquid-tabbar { box-shadow: 0 0 0 1px rgba(143, 214, 164, 0.22) inset, 0 13px 34px rgba(0, 0, 0, 0.5), 0 0 34px rgba(143, 214, 164, 0.14) !important; }
 :root[data-style="22"] .liquid-tabbar { border: 2.5px solid #1a1714; box-shadow: 0 5px 0 #1a1714 !important; backdrop-filter: none; }
 :root[data-style="23"] .liquid-tabbar { border: 1px solid rgba(255, 255, 255, 0.85); backdrop-filter: blur(24px) saturate(190%); box-shadow: 0 13px 34px rgba(40, 110, 90, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.95) !important; }
 :root[data-style="23"] .liquid-tabbar:not([data-tenu]) .liquid-tabbar__onglet[aria-current="page"] { color: var(--foreground) !important; }
@@ -125,10 +125,10 @@
 :root[data-famille="bulle"] .bouton-principal { background: linear-gradient(180deg, var(--b-haut), var(--b-bas)) !important; color: var(--b-encre) !important; box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.7), 0 5px 0 var(--b-marche), 0 13px 21px rgba(var(--b-ombre), 0.24) !important; }
 :root[data-famille="bulle"] :is(.bouton-secondaire, .bouton-givre) { background: var(--card) !important; color: var(--foreground) !important; }
 :root[data-famille="bulle"] :is(.bouton-principal, .bouton-secondaire, .bouton-encre, .bouton-givre):active { transform: translateY(4px) scale(0.98); }
-:root[data-style="18"] .bouton-principal { box-shadow: inset 0 3px 0 rgba(255, 255, 255, 0.8), inset 0 -3px 0 rgba(0, 0, 0, 0.05), 0 8px 0 var(--b-marche), 0 18px 26px rgba(var(--b-ombre), 0.28) !important; }
-:root[data-style="18"] :is(.bouton-secondaire, .bouton-givre) { box-shadow: 0 0 0 3px #ffffff, 0 6px 0 #c8e9d4, 0 13px 21px rgba(var(--b-ombre), 0.16) !important; }
-:root[data-style="19"] .bouton-principal { box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.55), 0 5px 0 var(--b-marche), 0 0 26px rgba(143, 214, 164, 0.4) !important; }
-:root[data-style="19"] :is(.bouton-secondaire, .bouton-givre, .bouton-encre) { background: rgba(255, 255, 255, 0.07) !important; color: #effaf3 !important; box-shadow: 0 0 0 1px rgba(143, 214, 164, 0.25) inset, 0 5px 0 rgba(0, 0, 0, 0.4) !important; }
+:root[data-style="18"]:not(.dark) .bouton-principal { box-shadow: inset 0 3px 0 rgba(255, 255, 255, 0.8), inset 0 -3px 0 rgba(0, 0, 0, 0.05), 0 8px 0 var(--b-marche), 0 18px 26px rgba(var(--b-ombre), 0.28) !important; }
+:root[data-style="18"]:not(.dark) :is(.bouton-secondaire, .bouton-givre) { box-shadow: 0 0 0 3px #ffffff, 0 6px 0 #c8e9d4, 0 13px 21px rgba(var(--b-ombre), 0.16) !important; }
+:root:is([data-style="19"], [data-style="18"].dark) .bouton-principal { box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.55), 0 5px 0 var(--b-marche), 0 0 26px rgba(143, 214, 164, 0.4) !important; }
+:root:is([data-style="19"], [data-style="18"].dark) :is(.bouton-secondaire, .bouton-givre, .bouton-encre) { background: rgba(255, 255, 255, 0.07) !important; color: #effaf3 !important; box-shadow: 0 0 0 1px rgba(143, 214, 164, 0.25) inset, 0 5px 0 rgba(0, 0, 0, 0.4) !important; }
 :root[data-style="22"] :is(.bouton-principal, .bouton-secondaire, .bouton-encre, .bouton-givre) { border: 2.5px solid #1a1714 !important; box-shadow: 0 5px 0 #1a1714 !important; }
 :root[data-style="22"] .bouton-principal { box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.7), 0 5px 0 #1a1714 !important; }
 :root[data-style="22"] :is(.bouton-principal, .bouton-secondaire, .bouton-encre, .bouton-givre):active { box-shadow: 0 1px 0 #1a1714 !important; }
@@ -139,10 +139,10 @@
 /* ───────────────────────────── Les tuiles et le tiroir ───────────────────────────── */
 :root[data-famille="bulle"] .tuile-match { border-radius: 34px !important; box-shadow: 0 0 0 4px var(--b-bord), 0 13px 26px rgba(var(--b-ombre), 0.22) !important; }
 :root[data-famille="bulle"] .tiroir-map { border-radius: 34px !important; box-shadow: 0 -8px 34px rgba(var(--b-ombre), 0.16) !important; }
-:root[data-style="18"] .tuile-match { border-radius: 42px !important; box-shadow: 0 0 0 6px #ffffff, 0 8px 0 6px #c8e9d4, 0 21px 30px rgba(var(--b-ombre), 0.24) !important; }
-:root[data-style="18"] .tiroir-map { border-radius: 42px !important; }
-:root[data-style="19"] .tuile-match { box-shadow: 0 0 0 2px rgba(143, 214, 164, 0.6), 0 0 26px rgba(143, 214, 164, 0.25), 0 13px 26px rgba(0, 0, 0, 0.5) !important; }
-:root[data-style="19"] .tiroir-map { background: rgba(16, 32, 27, 0.82) !important; backdrop-filter: blur(21px) saturate(160%); box-shadow: 0 0 0 1px rgba(143, 214, 164, 0.12) inset, 0 -13px 40px rgba(0, 0, 0, 0.5) !important; }
+:root[data-style="18"]:not(.dark) .tuile-match { border-radius: 42px !important; box-shadow: 0 0 0 6px #ffffff, 0 8px 0 6px #c8e9d4, 0 21px 30px rgba(var(--b-ombre), 0.24) !important; }
+:root[data-style="18"]:not(.dark) .tiroir-map { border-radius: 42px !important; }
+:root:is([data-style="19"], [data-style="18"].dark) .tuile-match { box-shadow: 0 0 0 2px rgba(143, 214, 164, 0.6), 0 0 26px rgba(143, 214, 164, 0.25), 0 13px 26px rgba(0, 0, 0, 0.5) !important; }
+:root:is([data-style="19"], [data-style="18"].dark) .tiroir-map { background: rgba(16, 32, 27, 0.82) !important; backdrop-filter: blur(21px) saturate(160%); box-shadow: 0 0 0 1px rgba(143, 214, 164, 0.12) inset, 0 -13px 40px rgba(0, 0, 0, 0.5) !important; }
 :root[data-style="22"] .tuile-match { box-shadow: 0 0 0 2.5px #1a1714, 0 6px 0 2.5px #1a1714 !important; }
 :root[data-style="22"] .tiroir-map { box-shadow: 0 0 0 2.5px #1a1714, 0 -6px 0 0 #1a1714 !important; }
 :root[data-style="23"] .tuile-match { box-shadow: 0 0 0 1.5px rgba(255, 255, 255, 0.95), 0 13px 30px rgba(40, 110, 90, 0.22) !important; }
@@ -150,18 +150,18 @@
 
 /* ───────────────────────────── Les titres ───────────────────────────── */
 :root[data-famille="bulle"] :is(h1, h2) { font-weight: 900; letter-spacing: -0.035em; }
-:root[data-style="18"] :is(h1, h2) { letter-spacing: -0.045em; }
-:root[data-style="19"] :is(h1, h2) { text-shadow: 0 0 21px rgba(143, 214, 164, 0.35); }
+:root[data-style="18"]:not(.dark) :is(h1, h2) { letter-spacing: -0.045em; }
+:root:is([data-style="19"], [data-style="18"].dark) :is(h1, h2) { text-shadow: 0 0 21px rgba(143, 214, 164, 0.35); }
 :root[data-style="22"] :is(h1, h2) { text-shadow: 2px 2px 0 #ffc6e2; }
 
 /* ───────────────────────────── Les blocs de l'app ───────────────────────────── */
 :root[data-famille="bulle"] :is(section, a, div)[class*="rounded-[2"]:not(.tuile-match):not([class*="carte"]) { border-radius: 34px; }
 :root[data-famille="bulle"] :is(section, a)[class*="rounded-[2"]:not(.tuile-match):not([class*="carte"]) { box-shadow: 0 13px 30px rgba(var(--b-ombre), 0.12); }
-:root[data-style="18"] :is(section, a, div)[class*="rounded-[2"]:not(.tuile-match):not([class*="carte"]) { border-radius: 42px; }
-:root[data-style="18"] :is(section, a)[class*="rounded-[2"]:not(.tuile-match):not([class*="carte"]) { box-shadow: 0 0 0 4px #ffffff, 0 6px 0 4px #d7f2e1, 0 18px 30px rgba(var(--b-ombre), 0.14); }
-:root[data-style="19"] :is(section, a)[class*="rounded-[2"]:not(.tuile-match):not([class*="carte"]) { box-shadow: 0 0 0 1px rgba(143, 214, 164, 0.14) inset, 0 13px 34px rgba(0, 0, 0, 0.35); }
+:root[data-style="18"]:not(.dark) :is(section, a, div)[class*="rounded-[2"]:not(.tuile-match):not([class*="carte"]) { border-radius: 42px; }
+:root[data-style="18"]:not(.dark) :is(section, a)[class*="rounded-[2"]:not(.tuile-match):not([class*="carte"]) { box-shadow: 0 0 0 4px #ffffff, 0 6px 0 4px #d7f2e1, 0 18px 30px rgba(var(--b-ombre), 0.14); }
+:root:is([data-style="19"], [data-style="18"].dark) :is(section, a)[class*="rounded-[2"]:not(.tuile-match):not([class*="carte"]) { box-shadow: 0 0 0 1px rgba(143, 214, 164, 0.14) inset, 0 13px 34px rgba(0, 0, 0, 0.35); }
 :root[data-style="22"] :is(section, a)[class*="rounded-[2"]:not(.tuile-match):not([class*="carte"]) { box-shadow: 0 0 0 2.5px #1a1714, 0 5px 0 2.5px #1a1714; }
-:root[data-style="23"] :is(section, a)[class*="rounded-[2"]:not(.tuile-match):not([class*="carte"]) { background-color: rgba(255, 255, 255, 0.5) !important; backdrop-filter: blur(21px) saturate(180%); box-shadow: inset 0 1px 0 #ffffff, 0 0 0 1px rgba(255, 255, 255, 0.7), 0 13px 30px rgba(40, 110, 90, 0.12); }
+:root[data-style="23"] :is(section, a)[class*="rounded-[2"]:not(.tuile-match):not([class*="carte"]):not([style*="background"]) { background-color: rgba(255, 255, 255, 0.5) !important; backdrop-filter: blur(21px) saturate(180%); box-shadow: inset 0 1px 0 #ffffff, 0 0 0 1px rgba(255, 255, 255, 0.7), 0 13px 30px rgba(40, 110, 90, 0.12); }
 
 /* ───────────────────────────── La surcouche de la Map ───────────────────────────── */
 :root[data-famille="bulle"] .surcouche-map { display: block; }
@@ -184,7 +184,7 @@
 }
 :root[data-famille="bulle"] .sc--c { background: radial-gradient(120% 70% at 50% 40%, transparent 55%, var(--b-vignette)); }
 /* 19 : des étoiles qui scintillent à la place des nuages. */
-:root[data-style="19"] .sc--a {
+:root:is([data-style="19"], [data-style="18"].dark) .sc--a {
   inset: 0;
   mix-blend-mode: screen;
   background:
@@ -194,7 +194,7 @@
     radial-gradient(1px 1px at 44% 78%, #ffffff, transparent), radial-gradient(1.5px 1.5px at 90% 84%, #ffffff, transparent);
   animation: sc-scintille 3.4s ease-in-out infinite;
 }
-:root[data-style="19"] .sc--b { inset: 0; background: radial-gradient(60% 40% at 50% 45%, rgba(143, 214, 164, 0.12), transparent 70%); animation: sc-respire 5.5s ease-in-out infinite; }
+:root:is([data-style="19"], [data-style="18"].dark) .sc--b { inset: 0; background: radial-gradient(60% 40% at 50% 45%, rgba(143, 214, 164, 0.12), transparent 70%); animation: sc-respire 5.5s ease-in-out infinite; }
 /* 22 : un cadre d'encre autour du plan, comme une vignette dessinée. */
 :root[data-style="22"] .sc--c { box-shadow: inset 0 0 0 3px #1a1714; }
 /* 23 : un reflet qui passe sur le verre. */
@@ -212,12 +212,12 @@
 :root[data-famille="bulle"] .grp__compte { background: var(--b-compte); color: var(--b-encre); border: 2.5px solid var(--b-bord); }
 :root[data-famille="bulle"] .grp__ville { border-radius: 999px; font-weight: 900; }
 :root[data-famille="bulle"] .stk__vignette { border-radius: 26px; }
-:root[data-style="18"] .grp__carte { height: calc(var(--w) * 1.3); width: calc(var(--w) * 1.3); }
-:root[data-style="18"] .grp__pile { height: calc(var(--w) * 1.3 + 6px); }
-:root[data-style="18"] .jc { border-width: 4px; box-shadow: 0 5px 0 rgba(var(--b-ombre), 0.25), 0 10px 16px rgba(var(--b-ombre), 0.3); }
-:root[data-style="19"] .jc { border: 2.5px solid #8fd6a4; box-shadow: 0 0 0 3px rgba(143, 214, 164, 0.22), 0 0 21px rgba(143, 214, 164, 0.6); }
-:root[data-style="19"] .grp__compte { border-color: #0b1814; }
-:root[data-style="19"] :is(.grp__ville, .vil) { background: rgba(19, 36, 31, 0.88); color: #effaf3; box-shadow: 0 0 0 1px rgba(143, 214, 164, 0.35); }
+:root[data-style="18"]:not(.dark) .grp__carte { height: calc(var(--w) * 1.3); width: calc(var(--w) * 1.3); }
+:root[data-style="18"]:not(.dark) .grp__pile { height: calc(var(--w) * 1.3 + 6px); }
+:root[data-style="18"]:not(.dark) .jc { border-width: 4px; box-shadow: 0 5px 0 rgba(var(--b-ombre), 0.25), 0 10px 16px rgba(var(--b-ombre), 0.3); }
+:root:is([data-style="19"], [data-style="18"].dark) .jc { border: 2.5px solid #8fd6a4; box-shadow: 0 0 0 3px rgba(143, 214, 164, 0.22), 0 0 21px rgba(143, 214, 164, 0.6); }
+:root:is([data-style="19"], [data-style="18"].dark) .grp__compte { border-color: #0b1814; }
+:root:is([data-style="19"], [data-style="18"].dark) :is(.grp__ville, .vil) { background: rgba(19, 36, 31, 0.88); color: #effaf3; box-shadow: 0 0 0 1px rgba(143, 214, 164, 0.35); }
 :root[data-style="22"] .jc { border: 2.5px solid #1a1714; box-shadow: 0 0 0 2px #ffffff, 0 4px 0 2px #1a1714; }
 :root[data-style="22"] .grp__compte { border: 2px solid #1a1714; }
 :root[data-style="22"] :is(.grp__ville, .vil) { background: #ffffff; color: #1a1714; box-shadow: 0 0 0 2px #1a1714, 0 3px 0 2px #1a1714; }
@@ -242,3 +242,39 @@
   :root[data-famille="bulle"] .grp,
   :root[data-famille="bulle"] .sc { animation: none !important; }
 }
+
+/* ───────────────────────────── 18 et 23 suivent Apparence (Sabri, 03/11) ─────────────────────────────
+   « J'ai besoin d'un mode clair et d'un mode sombre » : 18 est Gomme en
+   clair et Nuit (19) en sombre, par les sélecteurs plus haut ; 23 Verre a
+   ici sa nuit : le même verre dépoli, posé sur une aurore éteinte. */
+:root[data-style="23"].dark {
+  --background: #0a1613; --foreground: #effaf3; --card: #14231f; --card-foreground: #effaf3;
+  --popover: #172a25; --popover-foreground: #effaf3; --primary: #effaf3; --primary-foreground: #0a1613;
+  --secondary: #1a2d28; --secondary-foreground: #effaf3; --muted: #14231f; --muted-foreground: #95b5a7;
+  --accent: #1a2d28; --accent-foreground: #effaf3; --border: #2a4540; --input: #2a4540; --ring: #effaf3;
+  --contraste: #ffffff; color-scheme: dark;
+  --b-ombre: 0, 0, 0; --b-encre: #effaf3; --b-bord: rgba(255, 255, 255, 0.35); --b-compte: #f5b3d4;
+  --b-verre: rgba(22, 40, 35, 0.5); --b-plein: rgba(255, 255, 255, 0.16);
+  --b-nuage: rgba(255, 255, 255, 0); --b-nuage-ombre: rgba(0, 0, 0, 0); --b-vignette: rgba(0, 0, 0, 0.4);
+  --toi-onde: rgba(191, 245, 210, 0.9);
+}
+:root[data-style="23"].dark body {
+  background:
+    radial-gradient(60% 35% at 0% 5%, rgba(245, 179, 212, 0.22), transparent 70%),
+    radial-gradient(55% 35% at 100% 20%, rgba(127, 217, 154, 0.22), transparent 70%),
+    radial-gradient(60% 40% at 30% 70%, rgba(110, 200, 190, 0.14), transparent 70%),
+    radial-gradient(60% 40% at 100% 95%, rgba(245, 179, 212, 0.14), transparent 70%), var(--background);
+  background-attachment: fixed;
+}
+:root[data-style="23"].dark .liquid-tabbar { border-color: rgba(255, 255, 255, 0.16); box-shadow: 0 13px 34px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.18) !important; }
+:root[data-style="23"].dark .liquid-tabbar__lentille:not([data-verre]) { box-shadow: 0 4px 13px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.3); }
+:root[data-style="23"].dark :is(.bouton-principal, .bouton-secondaire, .bouton-encre, .bouton-givre) { border-color: rgba(255, 255, 255, 0.18) !important; color: #effaf3 !important; }
+:root[data-style="23"].dark .bouton-principal { background: linear-gradient(180deg, rgba(191, 245, 210, 0.95), rgba(127, 217, 154, 0.8)) !important; color: #0a1613 !important; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7), 0 8px 26px rgba(127, 217, 154, 0.28) !important; }
+:root[data-style="23"].dark :is(.bouton-secondaire, .bouton-givre, .bouton-encre) { background: rgba(255, 255, 255, 0.08) !important; }
+:root[data-style="23"].dark .tuile-match { box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.2), 0 13px 30px rgba(0, 0, 0, 0.5) !important; }
+:root[data-style="23"].dark .tiroir-map { background: rgba(14, 28, 24, 0.55) !important; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 -8px 34px rgba(0, 0, 0, 0.45) !important; }
+:root[data-style="23"].dark :is(section, a)[class*="rounded-[2"]:not(.tuile-match):not([class*="carte"]):not([style*="background"]) { background-color: rgba(255, 255, 255, 0.06) !important; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12), 0 0 0 1px rgba(255, 255, 255, 0.08), 0 13px 30px rgba(0, 0, 0, 0.3); }
+:root[data-style="23"].dark .sc--c { background: linear-gradient(115deg, transparent 35%, rgba(255, 255, 255, 0.07) 48%, transparent 60%); }
+:root[data-style="23"].dark .jc { border-color: rgba(255, 255, 255, 0.6); box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.1), 0 0 18px rgba(127, 217, 154, 0.35); }
+:root[data-style="23"].dark .grp__compte { background: rgba(245, 179, 212, 0.85); color: #0a1613; }
+:root[data-style="23"].dark :is(.grp__ville, .vil) { background: rgba(14, 28, 24, 0.6); color: #effaf3; }

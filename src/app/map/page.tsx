@@ -74,6 +74,7 @@ import {
   Users,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useTheme } from "next-themes";
 import { logActivity } from "@/lib/sfl/activity";
 import { dureeLisible, trajetVers, type Trajet } from "@/lib/sfl/trajet";
 import { Button } from "@/components/ui/button";
@@ -228,6 +229,7 @@ const teinteFantome = (): TeinteFantome =>
 const ESSAIS = process.env.NEXT_PUBLIC_BOLA_ENV !== "production";
 const PLAN_DU_STYLE: Record<number, Ambiance> = { 12: "bulle", 13: "nuit-chaleur", 14: "trace", 15: "sticker", 16: "nuit-pelouse", 17: "gravure",
   18: "bulle-gomme", 19: "nuit-bulle", 20: "bulle-peche", 21: "bulle-lilas", 22: "bulle-encre", 23: "bulle-verre" };
+const NUIT_DU_PLAN: Partial<Record<Ambiance, Ambiance>> = { "bulle-gomme": "nuit-bulle", "bulle-verre": "nuit-verre" };
 const ambianceDeLAdresse = (): Ambiance => {
   // Le jour (02/11, Sabri : « le côté dark […] ça fait fuir un peu ») ; la
   // production le prend à la fusion, après son accord.
@@ -1221,7 +1223,10 @@ export default function MapPage() {
   // Les zones Bola (lib/sfl/zones.ts) : là où l'on joue, et d'où viennent
   // ceux qui y jouent. La ligue ouvre la première ; chaque match ouvert ou
   // défi d'équipe loin de tout en ouvre une nouvelle.
-  const ambiance = useSyncExternalStore(rienAEcouter, ambianceDeLAdresse, (): Ambiance => "jour");
+  const ambianceChoisie = useSyncExternalStore(rienAEcouter, ambianceDeLAdresse, (): Ambiance => "jour");
+  // Les styles à deux modes (18, 23) prennent leur plan de nuit quand l'app est en sombre.
+  const { resolvedTheme } = useTheme();
+  const ambiance: Ambiance = resolvedTheme === "dark" ? (NUIT_DU_PLAN[ambianceChoisie] ?? ambianceChoisie) : ambianceChoisie;
   // Midi, aujourd'hui à Paris : l'âge des zones (une zone de moins de trois jours est nouvelle).
   const maintenant = aujourdhui ? Date.parse(`${aujourdhui}T12:00:00`) : 0;
   const demoZones = useZonesDemo();

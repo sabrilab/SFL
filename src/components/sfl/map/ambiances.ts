@@ -50,10 +50,10 @@ import { chaleur, contoursDesZones, FONDU_PAS, voilesEnFondu, type Zone } from "
 export type Ambiance =
   | "jour" | "aube" | "classique" | "territoire" | "nuit" | "encre" | "brume" | "rouge" | "braise" | "nuit-brume" | "nuit-braise" | "nuit-encre"
   | "bulle" | "nuit-chaleur" | "trace" | "sticker" | "nuit-pelouse" | "gravure"
-  | "bulle-gomme" | "nuit-bulle" | "bulle-peche" | "bulle-lilas" | "bulle-encre" | "bulle-verre";
+  | "bulle-gomme" | "nuit-bulle" | "bulle-peche" | "bulle-lilas" | "bulle-encre" | "bulle-verre" | "nuit-verre";
 /** Les essais montrés dans l'aperçu (l'encre reste par l'adresse). */
 export const AMBIANCES: Ambiance[] = ["jour", "aube", "nuit-encre", "brume", "rouge", "braise", "nuit-brume", "nuit-braise", "nuit", "territoire", "classique"];
-export const TOUTES_AMBIANCES: Ambiance[] = [...AMBIANCES, "encre", "bulle", "nuit-chaleur", "trace", "sticker", "nuit-pelouse", "gravure", "bulle-gomme", "nuit-bulle", "bulle-peche", "bulle-lilas", "bulle-encre", "bulle-verre"];
+export const TOUTES_AMBIANCES: Ambiance[] = [...AMBIANCES, "encre", "bulle", "nuit-chaleur", "trace", "sticker", "nuit-pelouse", "gravure", "bulle-gomme", "nuit-bulle", "bulle-peche", "bulle-lilas", "bulle-encre", "bulle-verre", "nuit-verre"];
 /** Les ambiances sur le plan noir. */
 export const estNuit = (a: Ambiance) => a.startsWith("nuit");
 
@@ -296,9 +296,15 @@ const BULLE_VERRE: Palette = {
   bati: "#cfeee0", volume: "#ffffff", rail: "#b9dccb", ombre: "rgba(40, 120, 90, 0.4)",
   texte: "#305848", texteRues: "#4f7767", texteEau: "#1f8496", halo: "#ffffff",
 };
+const NUIT_VERRE: Palette = {
+  terre: "#0e1c18", quartier: "#11201c", parc: "#173a2b", bois: "#153427", terrain: "#265f44",
+  eau: "#0f2a2c", eauBord: "#143436", rue: "#24403a", rueBord: "#172d28", grande: "#4d3346", grandeBord: "#33222f",
+  bati: "#162b25", volume: "#1f3a33", rail: "#1d362f", ombre: "rgba(0, 0, 0, 0.55)",
+  texte: "#a6cfbd", texteRues: "#7ea797", texteEau: "#79b6b0", halo: "#0a1613",
+};
 const PALETTES: Record<Ambiance, Palette> = { jour: JOUR, aube: AUBE, classique: SNAP, territoire: SNAP, nuit: NUIT, encre: ENCRE, brume: SNAP, rouge: SNAP, braise: SNAP, "nuit-brume": NUIT, "nuit-braise": NUIT, "nuit-encre": TABLEAU,
   bulle: BULLE, "nuit-chaleur": CHALEUR, trace: TRACE, sticker: STICKER, "nuit-pelouse": PELOUSE, gravure: GRAVURE,
-  "bulle-gomme": BULLE_GOMME, "nuit-bulle": NUIT_BULLE, "bulle-peche": BULLE_PECHE, "bulle-lilas": BULLE_LILAS, "bulle-encre": BULLE_ENCRE, "bulle-verre": BULLE_VERRE };
+  "bulle-gomme": BULLE_GOMME, "nuit-bulle": NUIT_BULLE, "bulle-peche": BULLE_PECHE, "bulle-lilas": BULLE_LILAS, "bulle-encre": BULLE_ENCRE, "bulle-verre": BULLE_VERRE, "nuit-verre": NUIT_VERRE };
 
 /** Les halos de chaleur des styles 12 à 17, façon Snap Map, sans or, bleu ni rouge (réservés aux cartes). */
 const HALOS: Partial<Record<Ambiance, unknown[]>> = {
@@ -313,6 +319,7 @@ const HALOS: Partial<Record<Ambiance, unknown[]>> = {
   "bulle-lilas": ["interpolate", ["linear"], ["heatmap-density"], 0, "rgba(255,255,255,0)", 0.2, "rgba(220,204,250,0.3)", 0.55, "rgba(205,184,246,0.45)", 0.85, "rgba(196,236,206,0.55)", 1, "rgba(255,255,255,0.75)"],
   "bulle-encre": ["interpolate", ["linear"], ["heatmap-density"], 0, "rgba(255,255,255,0)", 0.2, "rgba(255,217,236,0.35)", 0.6, "rgba(255,200,228,0.55)", 1, "rgba(255,255,255,0.8)"],
   "bulle-verre": ["interpolate", ["linear"], ["heatmap-density"], 0, "rgba(255,255,255,0)", 0.2, "rgba(255,255,255,0.3)", 0.5, "rgba(255,201,230,0.5)", 0.8, "rgba(160,240,200,0.6)", 1, "rgba(255,255,255,0.85)"],
+  "nuit-verre": ["interpolate", ["linear"], ["heatmap-density"], 0, "rgba(127,217,154,0)", 0.15, "rgba(127,217,154,0.14)", 0.45, "rgba(127,217,154,0.34)", 0.75, "rgba(245,179,212,0.5)", 1, "rgba(255,250,240,0.75)"],
   gravure: ["interpolate", ["linear"], ["heatmap-density"], 0, "rgba(61,55,46,0)", 0.2, "rgba(61,55,46,0.04)", 0.6, "rgba(61,55,46,0.1)", 1, "rgba(61,55,46,0.2)"],
 };
 

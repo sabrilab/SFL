@@ -14,8 +14,10 @@ import { useEffect, useState } from "react";
 import { useTheme } from "next-themes";
 
 const CLE = "bola-style-ui";
-export const STYLES_UI = ["Origine", "Galet", "Or", "Vestiaire", "Pelouse", "Velours", "Affiche", "Affiche nuit", "Riso", "Billet", "Pop", "Brutal", "Bulle", "Chaleur", "Trace", "Sticker", "Pelouse", "Gravure", "Bulle gomme", "Bulle nuit", "Bulle pêche", "Bulle lilas", "Bulle encre", "Bulle verre"] as const;
+export const STYLES_UI = ["Origine", "Galet", "Or", "Vestiaire", "Pelouse", "Velours", "Affiche", "Affiche nuit", "Riso", "Billet", "Pop", "Brutal", "Bulle", "Chaleur", "Trace", "Sticker", "Pelouse", "Gravure", "Bulle", "Bulle nuit", "Bulle pêche", "Bulle lilas", "Bulle encre", "Bulle verre"] as const;
 const SOMBRES = new Set([3, 5, 7, 13, 16, 19]);
+/** 18 et 23 suivent le réglage Apparence (clair, sombre, auto) : ils ont leurs deux modes (Sabri, 03/11). */
+const DEUX_MODES = new Set([18, 23]);
 /** La famille Affiche (6 à 11) partage ses règles, réglées par des variables (styles-ui.css). */
 const AFFICHE = 6;
 
@@ -52,7 +54,7 @@ export function EssaiStyleUi() {
     if (style >= AFFICHE && style <= 11) html.dataset.famille = "affiche";
     else if (style >= 18 && style <= 23) html.dataset.famille = "bulle";
     else delete html.dataset.famille;
-    if (style) setTheme(SOMBRES.has(style) ? "dark" : "light");
+    if (style && !DEUX_MODES.has(style)) setTheme(SOMBRES.has(style) ? "dark" : "light");
   }, [style, setTheme]);
 
   if (process.env.NEXT_PUBLIC_BOLA_ENV === "production" || !style) return null;
