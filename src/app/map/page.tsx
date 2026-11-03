@@ -172,6 +172,7 @@ import {
 import { active } from "@/lib/sfl/equipes";
 import type { LieuChoisi } from "@/components/sfl/matchs/choisir-terrain";
 import { useVillesRevision } from "@/hooks/use-villes";
+import { useJoueursDeLaMap } from "@/hooks/use-joueurs-de-la-map";
 import { usePhotoRevision } from "@/hooks/use-player-photo";
 import { useIdentitesRevision } from "@/hooks/use-identites";
 import { cn } from "@/lib/utils";
@@ -1158,18 +1159,20 @@ export default function MapPage() {
   // Un suspendu (carton rouge, lib/sfl/cartons.ts) ne répond pas « Je viens » : sa convocation le dit.
   const repondreIci = !!choisi && !choisi.joue && !choisi.partie && !choisi.team && (!!choisi.convoquee || choisi.cle === "convocation") && p.reponsesOuvertes && !p.suspendu;
 
-  // Les joueurs, ville par ville, du mieux noté au moins bien noté. Ce sont
-  // ceux de la SFL : un joueur Bola ne les voit pas (28/10/2026).
+  // Les joueurs, ville par ville, du mieux noté au moins bien noté : ceux de
+  // la SFL et les comptes de Bola, pour tout le monde (Sabri, 02/11/2026 :
+  // « qu'on puisse les voir sur la map comme si on était dans la SFL »).
+  const joueursMap = useJoueursDeLaMap();
   const revVilles = useVillesRevision();
   const revPhotos = usePhotoRevision();
   const revNoms = useIdentitesRevision();
   const villes = useMemo<VillePlan[]>(() => {
-    if (revVilles < 0 || sansSfl) return [];
+    if (revVilles < 0) return [];
     void revPhotos;
     void revNoms;
     const parVille = new Map<string, VillePlan>();
     // Qui n'a pas donné sa ville est dans celle de la ligue.
-    for (const pl of players) {
+    for (const pl of joueursMap) {
       const v = villeOuLigue(pl.name);
       if (!v) continue;
       const id = cleVille(v.ville);
@@ -1181,7 +1184,7 @@ export default function MapPage() {
     }
     for (const g of parVille.values()) g.joueurs.sort((a, b) => b.note - a.note || a.affiche.localeCompare(b.affiche));
     return [...parVille.values()];
-  }, [players, revVilles, revPhotos, revNoms, sansSfl]);
+  }, [joueursMap, revVilles, revPhotos, revNoms]);
 
   // Les zones Bola (lib/sfl/zones.ts) : là où l'on joue, et d'où viennent
   // ceux qui y jouent. La ligue ouvre la première ; chaque match ouvert ou
@@ -1311,7 +1314,7 @@ export default function MapPage() {
     [enContrats, cibles]
   );
   const rangs = useMemo(() => new Map(rankPlayers(players).map((x) => [x.name, x.rank])), [players]);
-  const profilJoueur = profil ? players.find((x) => x.name === profil) : undefined;
+  const profilJoueur = profil ? joueursMap.find((x) => x.name === profil) : undefined;
   const nomFocus = focusVilles?.length === 1 ? villes.find((v) => v.id === focusVilles[0])?.ville : null;
 
   // La feuille de match du choisi : les équipes de sa journée, chaque match

@@ -115,3 +115,39 @@ export async function noterAccueilFait(nom: string): Promise<void> {
     // Hors ligne : l'appareil s'en souvient.
   }
 }
+
+const cleArrivee = (nom: string) => `bola-arrivee-${nom}`;
+
+/**
+ * Le compte vient de naître sur /inscription (02/11/2026) : l'accueil part
+ * sans la bienvenue, le joueur sort de son parcours et ne veut que la suite
+ * (sa ville, sa carte, la révélation). Le temps de cet onglet seulement.
+ */
+export function marquerArriveeParInscription(nom: string): void {
+  try {
+    window.sessionStorage.setItem(cleArrivee(nom), new Date().toISOString());
+  } catch {}
+}
+
+export function arriveParInscription(nom: string): boolean {
+  try {
+    return window.sessionStorage.getItem(cleArrivee(nom)) !== null;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Le premier accueil s'est fini sur cet appareil il y a moins d'un jour :
+ * le premier jour, rien d'autre ne s'ouvre de soi-même que ce qui fait jouer
+ * (la charte attend le lendemain : sa case était déjà à l'inscription).
+ */
+export function accueilDuJour(nom: string, maintenant = Date.now()): boolean {
+  try {
+    const le = window.localStorage.getItem(cleIci(nom));
+    const t = le ? Date.parse(le) : NaN;
+    return Number.isFinite(t) && maintenant - t < 24 * 3600_000;
+  } catch {
+    return false;
+  }
+}

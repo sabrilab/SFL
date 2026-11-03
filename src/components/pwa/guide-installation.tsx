@@ -24,11 +24,19 @@
 // quelqu'un veut télécharger et qu'il veut se connecter »), le visiteur
 // découvre Bola d'abord ; le guide vient quand il touche « Créer ma carte »
 // ou « Se connecter » (/inscription, /connexion).
+//
+// Depuis le 02/11/2026 (Sabri : la création du compte « la plus fluide
+// possible depuis getbola.app »), dans un vrai navigateur, il ne coupe plus
+// l'inscription : le compte se crée d'abord, d'un trait, et le guide vient
+// quand l'accueil de l'app est fini (sa ville, sa carte, la révélation).
+// Dans une app (Snapchat, Instagram…), il passe toujours devant : il faut en
+// sortir avant de créer son compte.
 
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Check, Copy, Ellipsis, EllipsisVertical, Share, SquarePlus } from "lucide-react";
+import { useEtatAccueil } from "@/hooks/use-accueil";
 import { useIsClient } from "@/hooks/use-is-client";
 import { useSession } from "@/hooks/use-session";
 import { lienSortie, lireEnvironnement, type Environnement } from "@/lib/pwa/environnement";
@@ -64,6 +72,7 @@ export function GuideInstallation() {
   const isClient = useIsClient();
   const pathname = usePathname();
   const session = useSession();
+  const accueil = useEtatAccueil();
   const [invite, setInvite] = useState<BeforeInstallPromptEvent | null>(null);
   const [ferme, setFerme] = useState(false);
   const [copie, setCopie] = useState(false);
@@ -107,6 +116,9 @@ export function GuideInstallation() {
       (pathname?.startsWith("/inscription") && (codeGarde() !== null || /[?&]parrain=/.test(window.location.search))))
   )
     return null;
+  // Dans un vrai navigateur : l'inscription d'un trait, puis l'accueil de l'app, puis le guide.
+  if (!env.appHote && pathname?.startsWith("/inscription")) return null;
+  if (!env.appHote && session && accueil !== "fini") return null;
   if (lire(() => sessionStorage, CLE_PLUS_TARD)) return null;
   // « C'est fait » ne vaut que dans un vrai navigateur : depuis Snapchat,
   // on n'a rien pu installer.

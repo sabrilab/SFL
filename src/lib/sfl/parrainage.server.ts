@@ -49,7 +49,7 @@ export async function noterFilleul(
   sb: SupabaseClient,
   filleul: string,
   parrain: ParrainServeur | null,
-  canal: "lien" | "code" | "equipe",
+  canal: "lien" | "code" | "equipe" | "site",
   equipeId: number | null = null
 ): Promise<{ error: string | null }> {
   try {
