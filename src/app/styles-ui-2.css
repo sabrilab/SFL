@@ -95,9 +95,9 @@
 :root[data-style="16"] .liquid-tabbar__lentille:not([data-verre]) { border-radius: 5px; }
 :root[data-style="17"] .liquid-tabbar { --tabbar-verre: #fbf8f0; --tabbar-plein: #241f18; color: #241f18; border-radius: 6px !important; backdrop-filter: none; box-shadow: 0 0 0 1px #241f18, 0 0 0 4px #fbf8f0, 0 0 0 5px #241f18, 0 10px 24px rgba(60, 50, 35, 0.18) !important; }
 :root[data-style="17"] .liquid-tabbar__lentille:not([data-verre]) { border-radius: 3px; }
-:root:is([data-style="12"], [data-style="14"], [data-style="15"], [data-style="17"]) .liquid-tabbar__onglet { color: var(--foreground) !important; }
+:root:is([data-style="12"], [data-style="13"], [data-style="14"], [data-style="15"], [data-style="16"], [data-style="17"]) .liquid-tabbar__onglet { color: var(--foreground) !important; }
 :root[data-style="14"] .liquid-tabbar__onglet { color: #ffffff !important; }
-:root:is([data-style="12"], [data-style="14"], [data-style="15"], [data-style="17"]) .liquid-tabbar:not([data-tenu]) .liquid-tabbar__onglet[aria-current="page"] { color: var(--background) !important; }
+:root:is([data-style="12"], [data-style="13"], [data-style="14"], [data-style="15"], [data-style="16"], [data-style="17"]) .liquid-tabbar:not([data-tenu]) .liquid-tabbar__onglet[aria-current="page"] { color: var(--background) !important; }
 :root[data-style="14"] .liquid-tabbar:not([data-tenu]) .liquid-tabbar__onglet[aria-current="page"] { color: #000000 !important; }
 
 /* ───────────────────────────── Les boutons ───────────────────────────── */
