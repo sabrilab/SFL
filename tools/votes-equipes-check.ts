@@ -8,15 +8,17 @@
 //
 // Ce que le banc vérifie :
 //   1 · la J4, Match 1 (Noirs 1 contre Blancs 1), avec les comptes de voix
-//       du 1er novembre (les votants sont inventés : jamais qui a voté pour
-//       qui) : l'ancien décompte donnait l'Impact au seul Youss et la
+//       du 1er novembre (les bulletins sont inventés : aucun ne relie deux
+//       vrais joueurs, jamais qui a voté pour qui) : l'ancien décompte
+//       donnait l'Impact au seul Youss et la
 //       Défensive au seul Sidali ; Noirs 1 a désormais Youss en Impact et en
 //       Défensive, Blancs 1 Jouneid en Impact et Sidali en Défensive ;
 //   2 · des ex æquo dans une équipe : tous élus, l'autre garde le sien ;
 //   3 · une équipe sans aucune voix valable pour un titre garde les cases
 //       que l'admin a cochées sur ses lignes, comptées en entier (ni
 //       faibles, ni effacées) ; dès qu'elle a une voix valable, les votes
-//       décident (Ilyes, 03/11/2026 : « Garder » ; la J4, Match 4) ;
+//       décident (Ilyes, 03/11/2026 : « Garder » ; la J4, Match 4) ; une
+//       ligne sans équipe (le compte vitrine) garde aussi les siennes ;
 //   4 · un même joueur Impact et Défensive le même jour (Youss, en 1) ;
 //   5 · une voix pour un coéquipier ne compte pas, ni un bulletin d'une
 //       autre saison ou d'une autre journée ;
@@ -134,10 +136,14 @@ const VOTES_M1: VoteFigure[] = [
   ...voix("def", "n2", ["Sidali"]),
   ...voix("def", "n3", ["Jouneid"]),
   ...voix("def", "n4", ["b3"]),
-  ...voix("def", "Sidali", ["Youss", "n2", "n3"]),
-  ...voix("def", "b3", ["n4"]),
+  ...voix("def", "Sidali", ["n4", "n2", "n3"]),
+  ...voix("def", "b3", ["Youss"]),
 ];
 {
+  // Aucun bulletin du banc ne relie deux vrais joueurs : l'un des deux, au moins, est inventé.
+  const invente = (n: string) => /^[nb]\d$/.test(n);
+  assert.deepEqual(VOTES_M1.filter((v) => !invente(v.votant) && !invente(v.candidat)), [], "un bulletin entre deux vrais joueurs");
+
   const imp = decompte(m1, VOTES_M1, 0, "impact");
   const def = decompte(m1, VOTES_M1, 0, "def");
   // Le défaut du 1er novembre : un seul élu par match.
@@ -246,6 +252,14 @@ const B = ["B1", "B2", "B3", "B4"];
   assert.deepEqual(titres(poser(s, [...votes, ...tard]), "def"), ["A3", "B1"], "voix d'un autre jour : la case reste");
   // Sans aucune voix de Défensive dans la journée, tout ce que l'admin a coché reste.
   assert.deepEqual(titres(poser(s, voix("impact", "B1", ["A1"])), "def"), ["A3", "B3"]);
+  // Une ligne sans équipe (le compte vitrine, compte-vitrine.ts : ses titres à vrai, team: null)
+  // n'est dans aucune élection : les votes des équipes ne lui retirent rien.
+  const vitrine = { ...s, entries: [...s.entries, ligne("Vitrine", "", { team: null, impact: true, def: true, mvp: true })] };
+  const lueVitrine = poser(vitrine, [...votes, ...voix("impact", "B1", ["A1", "A2"]), ...voix("impact", "A1", ["B1"])]);
+  const sienne = lueVitrine.entries.find((e) => e.player === "Vitrine")!;
+  assert.deepEqual([sienne.mvp, sienne.impact, sienne.def], [true, true, true], "la ligne sans équipe garde tous ses titres");
+  assert.deepEqual(titres(lueVitrine, "def"), ["A3", "B1", "Vitrine"]);
+  assert.deepEqual(titres(lueVitrine, "impact"), ["A1", "B1", "Vitrine"]);
 }
 {
   // La J4, Match 4 : Noirs 4 contre Blancs 5, aucune voix ; l'admin avait coché l'Impact de Yanis
@@ -447,5 +461,5 @@ const B = ["B1", "B2", "B3", "B4"];
 }
 
 console.log(
-  "votes-equipes-check : la J4 Match 1 (Youss Impact et Défensive pour Noirs 1, Jouneid et Sidali pour Blancs 1), ex æquo par équipe, équipe sans voix, cumul, coéquipier, extra time, places X, titres faibles par équipe et à la révélation, équipes de tailles différentes (n/N ont voté), bilan de l'admin, textes, MVP et révélation inchangés — ok"
+  "votes-equipes-check : la J4 Match 1 (Youss Impact et Défensive pour Noirs 1, Jouneid et Sidali pour Blancs 1), ex æquo par équipe, équipe sans voix, ligne sans équipe, cumul, coéquipier, extra time, places X, titres faibles par équipe et à la révélation, équipes de tailles différentes (n/N ont voté), bilan de l'admin, textes, MVP et révélation inchangés — ok"
 );
