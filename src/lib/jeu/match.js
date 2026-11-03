@@ -21,13 +21,13 @@
 // le jeu, lui, compte en (x = largeur, z = longueur) : tout le match vit dans un groupe tourné d'un quart de tour
 // (monde), si bien que le but attaqué par les Noirs (z = -15) est le but ouest du plateau, côté mur BOLA.
 //
-// Les visages : ta tête porte ta photo du studio (tete.js). Les autres joueurs sont des statues, d'obsidienne pour tes
-// partenaires et de marbre pour les Blancs, tant que l'accord « Apparaître dans le jeu » n'existe pas.
+// Les joueurs : les dix sont le footballeur Mixamo choisi par Sabri (03/11), en tenue noire ou blanche, avec son
+// propre visage. Les têtes 3D des joueurs (faites depuis leur photo du studio, avec leur accord) viendront après ;
+// l'option photo est gardée pour elles.
 // Les animations sont celles de la bibliothèque Mixamo de Sabri (.pak, personnage.js). Rien n'est enregistré.
 import * as THREE from 'three';
 import { creerPlateau, DIM } from './plateau.js';
 import { creerPersonnage } from './personnage.js';
-import { analyserPhoto, creerTete } from './tete.js';
 import { creerPouce } from './pouce.js';
 
 const G = 9.81;
@@ -85,6 +85,7 @@ function texOmbre() {
  * @param {{ photo?: string | null, surEtat?: (etat: any) => void, reduit?: boolean, duree?: number, surProgres?: (p: number) => void }} [options]
  *   photo : ta photo du studio ; surEtat : le tableau (HUD) ; reduit : « Réduire les animations » ; duree : en secondes.
  */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, reduit = false, duree = 150, surProgres = () => {} } = {}) {
   const pr = Math.min(window.devicePixelRatio || 1, 1.5);
   let echelle = 1; // la définition adaptative
@@ -99,7 +100,7 @@ export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, 
   Object.assign(renderer.domElement.style, { display: 'block', position: 'absolute', inset: '0', width: '100%', height: '100%', touchAction: 'none' });
   conteneur.appendChild(renderer.domElement);
 
-  const pl = await creerPlateau(renderer, { qualite: 'jeu', base: '/jeu/plateau/', largeur: W, hauteur: H });
+  const pl = await creerPlateau(renderer, { qualite: Math.min(cw, ch) >= 600 ? 'jeuPlein' : 'jeuTel', base: '/jeu/plateau/', largeur: W, hauteur: H });
   surProgres(0.4);
   if (pl.lyres && reduit) pl.lyres.visible = false;
   // le halo seulement sur les vraies sources (projecteurs, LED) : pas sur un col blanc ou le ballon sous les projecteurs
@@ -143,8 +144,6 @@ export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, 
   }
 
   // ── les joueurs ──
-  let analyse = null;
-  try { analyse = photo ? await analyserPhoto(photo) : null; } catch { analyse = null; }
   const tomber = texOmbre();
   const matOmbre = new THREE.MeshBasicMaterial({ map: tomber, transparent: true, depthWrite: false, opacity: 1 });
   const geoOmbre = new THREE.PlaneGeometry(1.1, 1.1).rotateX(-Math.PI / 2);
@@ -153,10 +152,10 @@ export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, 
   for (const e of [0, 1]) for (const role of ROLES) specs.push({ e, role, moi: e === 0 && role === 'A' });
   let charges = 0;
   const joueurs = await Promise.all(specs.map(async ({ e, role, moi }) => {
-    const statue = moi ? null : e === 0 ? 0x1a1a1c : 0xe9e6df;
-    const tete = moi ? creerTete(analyse) : creerTete(null, { statue });
+    // tous les joueurs sont le footballeur de Sabri, en tenue de leur camp ; sa propre tête, pas la grosse tête photo
+    // (les têtes 3D des joueurs viendront après, avec leur accord)
     const perso = await creerPersonnage({
-      modele: 'homme', tenue: moi ? 'noirs' : e === 0 ? 'obsidienne' : 'marbre', tete, peau: moi ? analyse?.peau : null,
+      modele: 'footballeur', tenue: e === 0 ? 'noirs' : 'blancs', tete: null, peau: null,
       packs: role === 'G' ? ['keeper', 'celeb'] : ['player', 'celeb'],
     });
     perso.racine.traverse((o) => { o.castShadow = false; });
@@ -167,7 +166,7 @@ export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, 
     return {
       e, role, moi, perso, ombre, gardien: role === 'G',
       pos: new THREE.Vector3(), vel: new THREE.Vector3(), cap: 0,
-      sonne: 0, intouchable: 0, essai: 0, decision: Math.random() * 0.3, geste: 0, but: null, lance: null, finGeste: 0, attente: 0.9,
+      sonne: 0, intouchable: 0, essai: 0, decision: Math.random() * 0.3, geste: 0, toucheT: -9, but: null, lance: null, finGeste: 0, attente: 0.9,
     };
   }));
   const moi = joueurs.find((j) => j.moi);
@@ -570,6 +569,26 @@ export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, 
     k.cap = base + clamp(ecart, -1, 1);
   }
 
+  /** la balle libre : gravité, rebonds amortis, frottement du gazon (et la rotation suit, plus bas) */
+  function rouler(dt) {
+    b.vel.y -= G * dt;
+    b.pos.addScaledVector(b.vel, dt);
+    if (b.pos.y < R) {
+      b.pos.y = R;
+      if (b.vel.y < -1.2) { b.vel.y = -b.vel.y * 0.5; b.vel.x *= 0.88; b.vel.z *= 0.88; }
+      else {
+        b.vel.y = 0;
+        const v = Math.hypot(b.vel.x, b.vel.z);
+        if (v > 0) { const nv = Math.max(0, v - FROT * dt - v * 0.12 * dt); b.vel.x *= nv / v; b.vel.z *= nv / v; }
+      }
+    }
+  }
+  /** les panneaux et les filets : tout rebondit */
+  function bords() {
+    if (Math.abs(b.pos.x) > PX) { b.pos.x = Math.sign(b.pos.x) * PX; b.vel.x *= -0.62; }
+    if (Math.abs(b.pos.z) > PZ) { b.pos.z = Math.sign(b.pos.z) * PZ; b.vel.z *= -0.62; }
+  }
+
   function majBalle(dt) {
     if (b.garde) {
       b.garde.perso.osMonde('RightHand', tmp); b.garde.perso.osMonde('LeftHand', tmp2);
@@ -577,29 +596,52 @@ export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, 
       monde.worldToLocal(tmp);
       b.pos.copy(tmp); b.vel.set(0, 0, 0);
     } else if (b.porteur) {
-      // la conduite : la balle devant le pied, à petites touches au rythme de la course
+      // la conduite : la balle roule pour de vrai (gravité, frottement, rotation) et le porteur la pousse à petites
+      // touches quand son pied la rattrape ; elle n'est jamais collée au pied
       const j = b.porteur;
       const v = Math.hypot(j.vel.x, j.vel.z);
-      const avance = 0.45 + Math.min(1.0, v * 0.12) + Math.sin(temps * (6 + v)) * 0.11 * Math.min(1, v / 3);
-      tmp.set(Math.sin(j.cap), 0, Math.cos(j.cap)).multiplyScalar(avance).add(j.pos);
+      const fx = Math.sin(j.cap), fz = Math.cos(j.cap);
       const nom = j.perso.ponctuelNom;
-      if (nom && /shoot|strike|pass/.test(nom)) tmp.copy(b.pos); // la balle attend le pied
-      tmp.y = R;
-      const avant = tmp2.copy(b.pos);
-      b.pos.lerp(tmp, Math.min(1, dt * 14));
-      b.vel.copy(b.pos).sub(avant).divideScalar(Math.max(dt, 1e-4));
-    } else {
-      b.vel.y -= G * dt;
-      b.pos.addScaledVector(b.vel, dt);
-      if (b.pos.y < R) {
-        b.pos.y = R;
-        if (b.vel.y < -1.2) { b.vel.y = -b.vel.y * 0.5; b.vel.x *= 0.88; b.vel.z *= 0.88; }
-        else {
-          b.vel.y = 0;
-          const v = Math.hypot(b.vel.x, b.vel.z);
-          if (v > 0) { const nv = Math.max(0, v - FROT * dt - v * 0.12 * dt); b.vel.x *= nv / v; b.vel.z *= nv / v; }
+      rouler(dt);
+      const rx = b.pos.x - j.pos.x, rz = b.pos.z - j.pos.z;
+      const avant = rx * fx + rz * fz, cote = rx * fz - rz * fx;
+      if (nom && /shoot|strike|pass/.test(nom)) {
+        // le geste de frappe : la balle vient se placer devant le pied qui frappe et s'y arrête
+        const gauche = /_l$/.test(nom) ? -1 : 1;
+        tmp.set(j.pos.x + fx * 0.42 + fz * 0.12 * gauche, R, j.pos.z + fz * 0.42 - fx * 0.12 * gauche);
+        const k = Math.min(1, dt * 9);
+        b.pos.x = lerp(b.pos.x, tmp.x, k); b.pos.z = lerp(b.pos.z, tmp.z, k);
+        b.vel.x *= 1 - k; b.vel.z *= 1 - k;
+      } else if (v < 0.6) {
+        // arrêté : la semelle ramène la balle devant lui, doucement
+        tmp.set(j.pos.x + fx * 0.42, R, j.pos.z + fz * 0.42);
+        b.vel.x = lerp(b.vel.x, (tmp.x - b.pos.x) * 3, Math.min(1, dt * 8));
+        b.vel.z = lerp(b.vel.z, (tmp.z - b.pos.z) * 3, Math.min(1, dt * 8));
+      } else {
+        const portee = 0.5 + v * 0.04;
+        const vb = (b.vel.x * fx + b.vel.z * fz);
+        if (avant < portee && temps - j.toucheT > 0.16 && b.pos.y < R + 0.15) {
+          // la touche : vers où il court, un peu plus vite que lui, et recentrée devant le pied
+          j.toucheT = temps;
+          const pousse = v * (1.45 + Math.random() * 0.15) + 0.6;
+          b.vel.x = fx * pousse - cote * fz * 3.2 + j.vel.x * 0.1;
+          b.vel.z = fz * pousse + cote * fx * 3.2 + j.vel.z * 0.1;
+          b.vel.y = Math.min(b.vel.y, 0);
+        } else if (avant < -0.1 || Math.abs(cote) > 0.9 || avant > 2.6) {
+          // un virage serré : la balle est ramenée par l'extérieur du pied
+          tmp.set(j.pos.x + fx * 0.55, R, j.pos.z + fz * 0.55);
+          const k = Math.min(1, dt * 7);
+          b.pos.x = lerp(b.pos.x, tmp.x, k); b.pos.z = lerp(b.pos.z, tmp.z, k);
+          b.vel.x = lerp(b.vel.x, j.vel.x, k); b.vel.z = lerp(b.vel.z, j.vel.z, k);
+        } else if (vb > v + 3.5) {
+          b.vel.multiplyScalar((v + 3.5) / vb);
         }
       }
+      bords();
+      // poussée jusque dans la surface du but : elle redevient libre, c'est la ligne qui décide
+      if (Math.abs(b.pos.z) > LB - 0.4 && Math.abs(b.pos.z) < LB + 0.2 && Math.abs(b.pos.x) < BUT.dl + 0.3) { b.porteur = null; b.dernier = j; b.dernierT = temps; }
+    } else {
+      rouler(dt);
       // le but : la balle passe la ligne entre les poteaux, sous la barre
       for (const e of [0, 1]) {
         const zb = butDe(e), s = Math.sign(zb);
@@ -617,9 +659,7 @@ export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, 
           b.pos.z = zb + s * (BUT.p - R); b.vel.z *= -0.15; b.vel.x *= 0.5;
         }
       }
-      // les panneaux et les filets : tout rebondit
-      if (Math.abs(b.pos.x) > PX) { b.pos.x = Math.sign(b.pos.x) * PX; b.vel.x *= -0.62; }
-      if (Math.abs(b.pos.z) > PZ) { b.pos.z = Math.sign(b.pos.z) * PZ; b.vel.z *= -0.62; }
+      bords();
       // le côté extérieur du filet : une balle qui passe derrière le but ne rentre pas par l'arrière
       for (const e of [0, 1]) {
         const zb = butDe(e), s = Math.sign(zb);
@@ -665,6 +705,9 @@ export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, 
       return;
     }
     b.porteur = best; b.recepteur = null; b.tir = null;
+    // le contrôle : le pied amortit, la balle repart à peine plus vite que lui, dans sa course
+    best.toucheT = temps;
+    b.vel.set(best.vel.x * 1.15, Math.min(0, b.vel.y) * 0.3, best.vel.z * 1.15);
     if (best.e === 0) { humain = best; changeT = temps; }
   }
 
@@ -700,7 +743,7 @@ export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, 
       if (j.gardien) {
         const lat = j.vel.x * Math.cos(j.cap) - j.vel.z * Math.sin(j.cap);
         j.perso.loco(0, { force: v < 0.5 ? 'k_idle' : Math.abs(lat) > v * 0.6 ? (lat > 0 ? 'k_side_r' : 'k_side_l') : 'k_idle' });
-      } else j.perso.loco(v);
+      } else j.perso.loco(v, { balle: b.porteur === j });
     }
     // penché dans les virages, un peu en avant au sprint
     if (!j.gardien) j.perso.pencher(lerp(j.perso.corps.rotation.z, 0, dt * 6), lerp(j.perso.corps.rotation.x, v > 5.6 ? 0.08 : 0, dt * 4));
@@ -781,7 +824,7 @@ export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, 
     moyenne = moyenne * 0.92 + d * 0.08;
     if (++compte < 45) return;
     let e = echelle;
-    if (moyenne > 24 && e > 0.55) e = Math.max(0.55, e - 0.1);
+    if (moyenne > 24 && e > 0.7) e = Math.max(0.7, e - 0.1);
     else if (moyenne < 15 && e < 1) e = Math.min(1, e + 0.05);
     if (e !== echelle) { echelle = e; compte = 0; taille(); }
   }

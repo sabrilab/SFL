@@ -11,30 +11,39 @@
   },
   "jog": {
    "loop": true,
-   "dur": 0.833,
+   "dur": 0.733,
    "move": [
     0,
-    2.04
+    2.184
    ],
-   "plant": 0.36
+   "plant": 0.409
   },
   "run": {
    "loop": true,
-   "dur": 0.567,
+   "dur": 0.633,
    "move": [
     0,
-    2.519
+    3.567
    ],
-   "plant": 0.471
+   "plant": 0.368
   },
   "sprint": {
    "loop": true,
-   "dur": 0.567,
+   "dur": 0.633,
    "move": [
     0,
-    3.045
+    3.567
    ],
-   "plant": 0.353
+   "plant": 0.368
+  },
+  "drib": {
+   "loop": true,
+   "dur": 1.733,
+   "move": [
+    0,
+    4.601
+   ],
+   "plant": 0.173
   },
   "back": {
    "loop": true,

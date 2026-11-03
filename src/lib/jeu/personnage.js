@@ -26,7 +26,7 @@ for (const [m, s] of [['Left', 'l'], ['Right', 'r']]) {
 let glbLoader = null;
 const glbCache = new Map();
 function chargerCorps(modele) {
-  if (modele === 'xbot' || modele === 'ybot') return loadPak(`/jeu/chars/${modele}.pak`);
+  if (modele === 'xbot' || modele === 'ybot' || modele === 'footballeur') return loadPak(`/jeu/chars/${modele}.pak`);
   glbLoader ??= new GLTFLoader();
   if (!glbCache.has(modele)) {
     const p = glbLoader.loadAsync(`/jeu/chars/${modele}.glb`).then((g) => {
@@ -189,6 +189,32 @@ function lisser(geo, zones, garder, iterations) {
  */
 const geometriesPeintes = new WeakMap();
 
+// Le footballeur de Sabri (Mixamo « Ch38 », 03/11, public/jeu/chars/footballeur.pak) : un maillage par pièce
+// (Ch38_Shirt, Ch38_Shorts, Ch38_Socks, Ch38_Shoes, Ch38_Body, Ch38_Hair, Ch38_Eyelashes). La tenue blanche de sa
+// texture est teintée par équipe (multipliée : les plis, le tissu et l'écusson restent) ; corps, cheveux et
+// crampons gardent leur texture. Un matériau par pièce et par tenue, partagé par toute l'équipe.
+const TEINTE = {
+  noirs: { maillot: 0x1e1e21, short: 0x1e1e21, chaussettes: 0x1e1e21 },
+  blancs: { maillot: 0xffffff, short: 0xffffff, chaussettes: 0xffffff },
+  marbre: { maillot: 0xffffff, short: 0xffffff, chaussettes: 0xffffff },
+  obsidienne: { maillot: 0x1e1e21, short: 0x1e1e21, chaussettes: 0x1e1e21 },
+};
+const materiauxEquipe = new Map();
+function habiller(o, tenue) {
+  o.castShadow = true; o.receiveShadow = false; o.frustumCulled = false;
+  const nom = o.name.toLowerCase();
+  const piece = /shirt/.test(nom) ? 'maillot' : /short/.test(nom) ? 'short' : /sock/.test(nom) ? 'chaussettes' : null;
+  const cle = `${tenue}:${o.material.name}:${piece ?? 'peau'}`;
+  if (!materiauxEquipe.has(cle)) {
+    const m = o.material.clone();
+    if (piece) m.color.set((TEINTE[tenue] ?? TEINTE.noirs)[piece]);
+    m.metalness = 0; m.roughness = piece ? 0.9 : 0.7;
+    if (m.transparent) { m.alphaTest = 0.4; m.transparent = false; m.depthWrite = true; } // cheveux : pas de tri par image
+    materiauxEquipe.set(cle, m);
+  }
+  o.material = materiauxEquipe.get(cle);
+}
+
 export async function creerPersonnage({ modele = 'homme', tenue = 'noirs', tete = null, peau = null, packs = ['player'], echelleTete = 1.55 }) {
   const gltf = await chargerCorps(modele);
   const corps = cloneSkinned(gltf.scene);
@@ -198,8 +224,10 @@ export async function creerPersonnage({ modele = 'homme', tenue = 'noirs', tete 
     maillot: t.maillot, short: t.short, chaussettes: t.chaussettes, crampons: t.crampons, liseré: t.liseré,
     peau: t.peau ?? (peau ? `#${peau.getHexString()}` : 0xb98a6a),
   };
+  const footballeur = modele === 'footballeur';
   corps.traverse((o) => {
     if (!o.isSkinnedMesh) return;
+    if (footballeur) { habiller(o, tenue); return; }
     o.castShadow = true;
     o.receiveShadow = false;
     o.frustumCulled = false;
@@ -235,7 +263,7 @@ export async function creerPersonnage({ modele = 'homme', tenue = 'noirs', tete 
   // la grosse tête : sur le cou, à l'endroit de l'os de la tête, qui est replié
   const osTete = os.head, cou = os.neck;
   let pivot = null;
-  if (osTete && cou && tete) {
+  if (osTete && cou && tete && !footballeur) {
     pivot = new THREE.Group();
     pivot.position.copy(osTete.position);
     cou.add(pivot);
@@ -263,7 +291,7 @@ export async function creerPersonnage({ modele = 'homme', tenue = 'noirs', tete 
   };
 
   let courant = null, ponctuel = null, locoNom = null;
-  function fondu(name, fade = 0.2, timeScale = 1) {
+  function fondu(name, fade = 0.2, timeScale = 1, sync = false) {
     const next = actions[name];
     if (!next) return null;
     if (courant === next) {
@@ -272,6 +300,13 @@ export async function creerPersonnage({ modele = 'homme', tenue = 'noirs', tete 
       return next;
     }
     next.reset().setEffectiveTimeScale(timeScale).setEffectiveWeight(1).play();
+    // d'un cycle de course à l'autre, on garde la phase du pas : le pied d'appui ne saute pas
+    if (sync && courant && clips[name]?.userData.loop && courant.getClip().userData?.loop) {
+      // la phase se compte depuis l'appui du pied gauche (plant), propre à chaque cycle
+      const cc = courant.getClip(), dc = cc.duration, dn = next.getClip().duration;
+      const pc = cc.userData?.plant ?? 0, pn = clips[name].userData.plant ?? 0;
+      if (dc > 0) next.time = ((((courant.time % dc) / dc - pc + pn) % 1 + 1) % 1) * dn;
+    }
     if (courant) next.crossFadeFrom(courant, fade, false);
     courant = next;
     return next;
@@ -283,15 +318,22 @@ export async function creerPersonnage({ modele = 'homme', tenue = 'noirs', tete 
     get ponctuelNom() { return ponctuel?.name ?? null; },
     vitesseClip,
     /** locomotion : le cycle suit la vitesse (m/s), la cadence des pas aussi. */
-    loco(vitesse, { force = null, fade = 0.25 } = {}) {
+    loco(vitesse, { force = null, fade = 0.25, balle = false } = {}) {
       if (ponctuel) return;
-      let n = 'idle';
-      if (vitesse > 0.35) n = vitesse < 3.4 ? 'jog' : vitesse < 5.6 ? 'run' : 'sprint';
+      // des seuils avec une marge (hystérésis) : à vitesse constante, la foulée ne bascule pas d'un cycle à l'autre
+      const m = (seuil) => (seuil - 0.25);
+      const rangs = ['idle', 'jog', 'run', 'sprint'], seuils = [0.45, 3.5, 5.7];
+      let r = rangs.indexOf(locoNom); if (r < 0) r = vitesse > 0.45 ? 1 : 0;
+      while (r < 3 && vitesse > seuils[r]) r++;
+      while (r > 0 && vitesse < m(seuils[r - 1])) r--;
+      let n = rangs[r];
+      // balle au pied, la conduite (dribble) tant que son pas suit la vitesse ; au-delà, la course de sprint
+      if (balle && actions.drib && r > 0 && vitesse < 4.4) n = 'drib';
       if (force) n = force;
       if (!actions[n]) n = Object.keys(actions).find((k) => /idle/.test(k)) ?? n;
       const cs = vitesseClip(n);
       const ts = /idle/.test(n) || !cs ? 1 : THREE.MathUtils.clamp(vitesse / cs, 0.6, 1.7);
-      if (n !== locoNom) { fondu(n, fade, ts); locoNom = n; }
+      if (n !== locoNom) { fondu(n, /idle/.test(n) || /idle/.test(locoNom ?? 'idle') ? fade : 0.35, ts, true); locoNom = n; }
       else courant?.setEffectiveTimeScale(ts);
     },
     /** clip joué une fois ; surImpact à l'instant d'impact mesuré, surFin à la fin. */

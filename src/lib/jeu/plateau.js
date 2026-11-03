@@ -65,7 +65,11 @@ export const DIM = {
 };
 const QUALITES = {
   telephone: { ombres: true, nOmbres: 2, tailleOmbre: 1024, couches: 5, foule: 0.42, fouleFine: false, texGazon: 2048, bloom: 0.5, msaa: 0, pr: 1, ao: false, sieges: false, fxaa: true, flashs: 260 },
-  // le jeu (SFL /jouer) : dix joueurs animés en plus, donc le décor encore allégé
+  // le jeu (SFL /jouer) sur ordinateur : le plateau entier (sièges, foule fine, gazon épais), sans l'AO ni le MSAA
+  jeuPlein: { ombres: true, nOmbres: 3, tailleOmbre: 2048, couches: 10, foule: 1, fouleFine: true, texGazon: 4096, bloom: 0.8, msaa: 0, pr: 1, ao: false, sieges: true, fxaa: true, flashs: 520 },
+  // le jeu sur téléphone : le plateau du téléphone, avec ses sièges et un gazon plus épais
+  jeuTel: { ombres: true, nOmbres: 2, tailleOmbre: 1024, couches: 7, foule: 0.75, fouleFine: false, texGazon: 2048, bloom: 0.6, msaa: 0, pr: 1, ao: false, sieges: true, fxaa: true, flashs: 300 },
+  // l'ancien réglage du jeu, gardé pour les appareils faibles
   jeu: { ombres: true, nOmbres: 2, tailleOmbre: 1024, couches: 3, foule: 0.3, fouleFine: false, texGazon: 2048, bloom: 0.5, msaa: 0, pr: 1, ao: false, sieges: false, fxaa: true, flashs: 140 },
   film: { ombres: true, nOmbres: 4, tailleOmbre: 2048, couches: 14, foule: 1, fouleFine: true, texGazon: 4096, bloom: 1, msaa: 4, pr: 1, ao: true, sieges: true, fxaa: false, flashs: 700 },
 };
