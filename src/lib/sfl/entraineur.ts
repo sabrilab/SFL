@@ -1,9 +1,11 @@
 // La carte d'entraîneur de Bola Team : ses trois caractéristiques et sa note
-// (étude du 02/11/2026, branche coach-etude, troisième version revue après la
-// relecture ; Ilyes, après les planches : « il y a trop de stats, tu peux en
-// mettre 3 max ». Le modèle, ses sources et ses limites sont dans le compte
-// rendu de l'étude, modele-v3.md). Module pur, sans stockage, comme
-// lib/sfl/saisie/evolution.ts.
+// (Ilyes, 02/11/2026 : « une équipe = 7 joueurs + 1 entraîneur », 3 stats
+// seulement, rés, pré, coh, et la note lente ; le modèle, ses sources et ses
+// limites sont dans le compte rendu de l'étude, modele-v3.md). Module pur,
+// sans stockage, comme lib/sfl/saisie/evolution.ts : le serveur le fait
+// tourner une fois par jour sur les faits de la base
+// (lib/sfl/entraineur-faits.ts, entraineur-serveur.server.ts) et garde la
+// carte (entraineur_cartes) ; le téléphone ne fait que la lire.
 //
 // Trois questions, celles d'un joueur qui regarde un entraîneur : est-ce
 // qu'il gagne ? est-ce qu'on vient ? est-ce qu'on reste ?
@@ -59,9 +61,16 @@
 // qu'il soit venu ou non, et ses forfaits. Le score est lu 24 h après la
 // fermeture de la feuille, quand plus rien ne peut changer ; un litige
 // attend la revue. En rés, une seule rencontre par adversaire et par saison
-// (contre les matchs arrangés), et une saisie restée seule de son propre
-// camp ne compte que contre lui. Le 5 contre 4 n'est compté qu'une fois : en
-// pré ; rés lit le score du terrain, avant le but retiré.
+// (contre les matchs arrangés). Une saisie restée seule de son propre camp
+// ne compte que contre lui, en rés comme en pré : pré ne lit que ce que
+// l'adversaire a vérifié. Le 5 contre 4 n'est compté qu'une fois : en pré ;
+// rés lit le score du terrain, avant le but retiré.
+//
+// Ses places s'enchaînent (evoluerCarrieres) : ses compteurs le suivent d'une
+// équipe à l'autre, la carte aussi. Avant la mise en ligne des feuilles
+// d'avant-match (03/11/2026), on ne sait pas qui jouait : tout joueur compte
+// actif (CarriereEntraineur.feuillesDepuis), ce qui rend la référence plus
+// exigeante, jamais plus douce.
 
 import type { FinitionEntraineur } from "@/components/sfl/skins-entraineur";
 import type { Blason } from "@/lib/sfl/blason";
@@ -184,6 +193,8 @@ export interface RencontreEntraineur {
   saison: number;
   /** L'équipe adverse (rés : une rencontre par adversaire et par saison). */
   adversaire: number;
+  /** Son nom, pour le journal (« victoire contre plus fort · Lambersart Athletic »). */
+  adversaireNom?: string;
   /** Un forfait de son équipe : une annulation à moins de 48 h, ou 3 présents ou moins. */
   forfait: boolean;
   /** Le score du terrain, avant le but retiré du 5 contre 4. */
@@ -230,6 +241,12 @@ export interface CarriereEntraineur {
   rencontres: RencontreEntraineur[];
   membres: MembreEntraineur[];
   equipeAvant?: EquipeAvant;
+  /**
+   * Le premier jour des feuilles d'avant-match dans la ligue : avant, on ne
+   * sait pas qui jouait, et tout joueur compte actif (coh). Absent : la règle
+   * des feuilles vaut pour tous les jours.
+   */
+  feuillesDepuis?: string;
 }
 
 /** Ce qui se passe en moyenne dans la ligue Team, par saison (figé à la fin de la saison). */
@@ -322,6 +339,8 @@ export interface FaitEntraineur {
   /** Au-dessus de ce qu'on attendait (1), dedans (0), en dessous (−1). */
   sens: 1 | 0 | -1;
   texte: string;
+  /** Une rencontre : l'équipe adverse. */
+  adversaireNom?: string;
 }
 
 export interface MiseAJourEntraineur {
@@ -332,6 +351,14 @@ export interface MiseAJourEntraineur {
 
 /** L'avance, son poids (pour la marge du hasard) et l'acquis d'une caractéristique : ce qui suit l'entraîneur d'une équipe à l'autre. */
 export type CompteursEntraineur = Record<CleEntraineur, { avance: number; poids: number; acquis: number }>;
+
+/** Où en est la cadence des mises à jour : ce qu'une place passe à la suivante (evoluerCarrieres). */
+export interface RepriseEntraineur {
+  /** Les rencontres comptées depuis la dernière mise à jour. */
+  fenetre: number;
+  /** Le jour de la dernière mise à jour, AAAA-MM-JJ (jamais deux le même mois). */
+  derniereMaj: string | null;
+}
 
 export interface EvolutionEntraineur {
   depart: StatsEntraineur;
@@ -350,13 +377,75 @@ export interface EvolutionEntraineur {
   /** Les victoires « Exploit » (l'attendu de 0,30 ou moins) : leurs rencontres. */
   exploits: string[];
   compteurs: CompteursEntraineur;
+  reprise: RepriseEntraineur;
 }
 
 const partout = (v: number): StatsEntraineur => ({ RES: v, PRES: v, COH: v });
 const zeroCompteurs = (): CompteursEntraineur =>
   Object.fromEntries(CLES_ENTRAINEUR.map((k) => [k, { avance: 0, poids: 0, acquis: 0 }])) as CompteursEntraineur;
-const jourDe = (iso: string) => Math.floor(Date.parse(iso.slice(0, 10)) / JOUR);
+/** Le numéro d'un jour (AAAA-MM-JJ, ou un instant ISO : sa date), en jours depuis 1970. */
+export const numeroDuJour = (iso: string) => Math.floor(Date.parse(iso.slice(0, 10)) / JOUR);
+const jourDe = numeroDuJour;
 const isoDe = (j: number) => new Date(j * JOUR).toISOString().slice(0, 10);
+
+/** Un départ qui compte contre la cohésion : le départ et l'exclusion ; ni la dissolution, ni un changement de place. */
+export const departCompte = (m: MembreEntraineur) => !!m.depart && (m.depart.motif === "depart" || m.depart.motif === "exclusion");
+
+/**
+ * coh : quand un joueur compte-t-il (est-il actif) ? Ses 60 premiers jours
+ * dans l'équipe, puis les 60 jours qui suivent chaque feuille où il est
+ * inscrit (`feuilles` : par joueur, les jours de ses feuilles). Avant
+ * `depuis` (le premier jour des feuilles dans la ligue), on ne sait pas qui
+ * jouait : tout joueur compte.
+ */
+export function activite(
+  membres: readonly MembreEntraineur[],
+  feuilles: ReadonlyMap<string, readonly number[]>,
+  depuis?: number | null
+): (m: MembreEntraineur, j: number) => boolean {
+  const B = BAREME_ENTRAINEUR;
+  const arrivees = new Map(membres.map((m) => [m.id, jourDe(m.arrivee)]));
+  const triees = new Map([...feuilles].map(([id, t]) => [id, [...t].sort((a, b) => a - b)]));
+  return (m, j) => {
+    if (depuis != null && j < depuis) return true;
+    if (j - (arrivees.get(m.id) ?? jourDe(m.arrivee)) < B.actifJours) return true;
+    const t = triees.get(m.id);
+    if (!t) return false;
+    // La dernière feuille à j ou avant.
+    let lo = 0;
+    let hi = t.length;
+    while (lo < hi) {
+      const mi = (lo + hi) >> 1;
+      if (t[mi] <= j) lo = mi + 1;
+      else hi = mi;
+    }
+    return lo > 0 && j - t[lo - 1] < B.actifJours;
+  };
+}
+
+/**
+ * coh sur les jours [debut, fin) : les jours-joueurs actifs, et les joueurs
+ * actifs partis (départ ou exclusion) pendant ces jours.
+ */
+export function exposition(
+  membres: readonly MembreEntraineur[],
+  actif: (m: MembreEntraineur, j: number) => boolean,
+  debut: number,
+  fin: number
+): { jours: number; partis: MembreEntraineur[] } {
+  let jours = 0;
+  for (const m of membres) {
+    const a = Math.max(debut, jourDe(m.arrivee));
+    const z = Math.min(fin, m.depart ? jourDe(m.depart.le) : fin);
+    for (let j = a; j < z; j++) if (actif(m, j)) jours += 1;
+  }
+  const partis = membres.filter((m) => {
+    if (!departCompte(m)) return false;
+    const j = jourDe(m.depart!.le);
+    return j >= debut && j < fin && actif(m, j);
+  });
+  return { jours, partis };
+}
 
 /** L'acquis possible maintenant : l'avance moins la marge du hasard. */
 const net = (k: CleEntraineur, c: CompteursEntraineur[CleEntraineur]) => c.avance - BAREME_ENTRAINEUR[k].hasard * Math.sqrt(c.poids);
@@ -379,17 +468,22 @@ function resultatEnMots(s: number, e: number): string {
   return issue;
 }
 
-/**
- * Rejoue sa carrière dans une équipe, rencontre par rencontre. Options :
- * `normes`, celles de la ligue par saison (figées) ; `avant`, les compteurs
- * de ses équipes d'avant (ils le suivent) ; `depart`, ses trois au départ
- * (75 partout pour un nouvel entraîneur) ; `plancher`, sa carte officielle
- * gardée en base (la carte ne passe jamais dessous).
- */
-export function evoluerEntraineur(
-  carriere: CarriereEntraineur,
-  options: { normes?: Partial<Record<number, NormesLigue>>; avant?: CompteursEntraineur; depart?: StatsEntraineur; plancher?: StatsEntraineur } = {}
-): EvolutionEntraineur {
+/** Les options d'un calcul de carte. */
+export interface OptionsEntraineur {
+  /** Les normes de la ligue par saison (figées). */
+  normes?: Partial<Record<number, NormesLigue>>;
+  /** Les compteurs de ses équipes d'avant (ils le suivent). */
+  avant?: CompteursEntraineur;
+  /** Ses trois au départ (75 partout pour un nouvel entraîneur). */
+  depart?: StatsEntraineur;
+  /** Sa carte officielle gardée en base : la carte ne passe jamais dessous. */
+  plancher?: StatsEntraineur;
+  /** La cadence des mises à jour de sa place d'avant. */
+  reprise?: RepriseEntraineur;
+}
+
+/** Rejoue sa carrière dans une équipe, rencontre par rencontre. */
+export function evoluerEntraineur(carriere: CarriereEntraineur, options: OptionsEntraineur = {}): EvolutionEntraineur {
   const B = BAREME_ENTRAINEUR;
   const depart = options.depart ?? partout(DEPART_ENTRAINEUR);
   const plancher = options.plancher;
@@ -404,8 +498,8 @@ export function evoluerEntraineur(
   const majs: MiseAJourEntraineur[] = [];
   const exploits: string[] = [];
   const rencontres = [...carriere.rencontres].sort((a, b) => a.le.localeCompare(b.le) || a.id.localeCompare(b.id));
-  const note = (le: string, source: string, cle: CleEntraineur, x: number, texte: string, seuil = 1e-9) =>
-    journal.push({ le, source, cle, sens: x > seuil ? 1 : x < -seuil ? -1 : 0, texte });
+  const note = (le: string, source: string, cle: CleEntraineur, x: number, texte: string, adversaireNom?: string) =>
+    journal.push({ le, source, cle, sens: x > 1e-9 ? 1 : x < -1e-9 ? -1 : 0, texte, ...(adversaireNom ? { adversaireNom } : {}) });
   const essai = (k: CleEntraineur, x: number, poids = 1) => {
     c[k].avance += x;
     c[k].poids += poids;
@@ -423,8 +517,7 @@ export function evoluerEntraineur(
     return av ? (av.departs + P.joursActifs * L) / (av.joursActifs + P.joursActifs) : L;
   };
 
-  // coh : quand un joueur est-il actif ? Ses 60 premiers jours dans l'équipe, puis les 60 jours qui suivent
-  // chaque feuille où il est inscrit (sa dernière feuille d'avant l'arrivée de l'entraîneur comprise).
+  // coh : les jours de ses feuilles (sa dernière d'avant l'arrivée de l'entraîneur comprise).
   const feuilles = new Map<string, number[]>();
   for (const m of carriere.membres) if (m.derniereFeuille) feuilles.set(m.id, [jourDe(m.derniereFeuille)]);
   for (const r of rencontres)
@@ -433,43 +526,18 @@ export function evoluerEntraineur(
       if (t) t.push(jourDe(r.le));
       else feuilles.set(i.id, [jourDe(r.le)]);
     }
-  const arrivees = new Map(carriere.membres.map((m) => [m.id, jourDe(m.arrivee)]));
-  const actif = (m: MembreEntraineur, j: number) => {
-    if (j - arrivees.get(m.id)! < B.actifJours) return true;
-    const t = feuilles.get(m.id);
-    if (!t) return false;
-    // La dernière feuille à j ou avant (les jours des feuilles sont dans l'ordre).
-    let lo = 0;
-    let hi = t.length;
-    while (lo < hi) {
-      const mi = (lo + hi) >> 1;
-      if (t[mi] <= j) lo = mi + 1;
-      else hi = mi;
-    }
-    return lo > 0 && j - t[lo - 1] < B.actifJours;
-  };
+  const actif = activite(carriere.membres, feuilles, carriere.feuillesDepuis ? jourDe(carriere.feuillesDepuis) : null);
 
-  let fenetre = 0;
+  let fenetre = options.reprise?.fenetre ?? 0;
+  let derniereMaj = options.reprise?.derniereMaj ?? null;
   let debut = jourDe(carriere.arrivee);
-  let derniereMaj = null as string | null;
   let saisonCourante = rencontres[0]?.saison ?? 1;
   const deja = new Set<string>();
 
   /** coh sur la fenêtre [debut, fin) : les départs de joueurs actifs, contre ceux qu'on attendait. */
   const fermerCohesion = (fin: number) => {
-    const taux = refDeparts(saisonCourante);
-    let expose = 0;
-    for (const m of carriere.membres) {
-      const a = Math.max(debut, jourDe(m.arrivee));
-      const z = Math.min(fin, m.depart ? jourDe(m.depart.le) : fin);
-      for (let j = a; j < z; j++) if (actif(m, j)) expose += 1;
-    }
-    const attendus = expose * taux;
-    const partis = carriere.membres.filter((m) => {
-      if (!m.depart || (m.depart.motif !== "depart" && m.depart.motif !== "exclusion")) return false;
-      const j = jourDe(m.depart.le);
-      return j >= debut && j < fin && actif(m, j);
-    });
+    const { jours, partis } = exposition(carriere.membres, actif, debut, fin);
+    const attendus = jours * refDeparts(saisonCourante);
     if (attendus > 0 || partis.length) {
       essai("COH", attendus - partis.length, attendus);
       note(
@@ -480,7 +548,7 @@ export function evoluerEntraineur(
         partis.length ? partis.map((m) => `${m.nom} ${m.depart!.motif === "depart" ? "est parti" : "a été exclu"}`).join(", ") : "personne n'est parti"
       );
     }
-    debut = fin;
+    debut = Math.max(debut, fin);
   };
 
   /** À la mise à jour : coh sur la fenêtre, puis chaque acquis garde son meilleur niveau. */
@@ -509,15 +577,18 @@ export function evoluerEntraineur(
       // Sa saisie restée seule ne compte que contre lui.
       if (!r.saisieSeule || s <= e) {
         essai("RES", s - e);
-        note(r.le, r.id, "RES", s - e, resultatEnMots(s, e));
+        note(r.le, r.id, "RES", s - e, resultatEnMots(s, e), r.adversaireNom);
         if (s === 1 && e <= B.exploit) exploits.push(r.id);
       }
     }
-    // pré : toutes, forfaits compris, contre son équipe d'avant.
+    // pré : toutes, forfaits compris, contre son équipe d'avant ; sa saisie restée seule ne compte que contre lui
+    // (un forfait ou un 5 contre 4 qu'il déclare de lui-même compte ; « venue », que l'adversaire n'a pas vérifiée, non).
     const p = valeurPresence(r);
-    const x = p.valeur - refPresence(r.saison);
-    essai("PRES", x);
-    note(r.le, r.id, "PRES", x, p.texte);
+    if (!r.saisieSeule || p.valeur < 0) {
+      const x = p.valeur - refPresence(r.saison);
+      essai("PRES", x);
+      note(r.le, r.id, "PRES", x, p.texte, r.adversaireNom);
+    }
     fenetre += 1;
     if (fenetre >= B.maj.rencontres && derniereMaj?.slice(0, 7) !== r.le.slice(0, 7)) mettreAJour(r.le);
   }
@@ -545,7 +616,32 @@ export function evoluerEntraineur(
     rencontres: rencontres.length,
     exploits,
     compteurs: c,
+    reprise: { fenetre, derniereMaj },
   };
+}
+
+/**
+ * Toute sa carrière d'entraîneur, ses places dans l'ordre (une par équipe
+ * entraînée) : chacune reprend les compteurs et la cadence de la précédente
+ * (ses compteurs le suivent, jamais deux mises à jour le même mois). Sans
+ * place, la carte de départ.
+ */
+export function evoluerCarrieres(carrieres: readonly CarriereEntraineur[], options: Omit<OptionsEntraineur, "avant" | "reprise"> = {}): EvolutionEntraineur {
+  const places = [...carrieres].sort((a, b) => a.arrivee.localeCompare(b.arrivee));
+  if (places.length === 0) return evoluerEntraineur({ arrivee: "1970-01-01", rencontres: [], membres: [] }, options);
+  const journal: FaitEntraineur[] = [];
+  const majs: MiseAJourEntraineur[] = [];
+  const exploits: string[] = [];
+  let rencontres = 0;
+  let ev: EvolutionEntraineur | null = null;
+  for (const place of places) {
+    ev = evoluerEntraineur(place, { ...options, avant: ev?.compteurs, reprise: ev?.reprise });
+    journal.push(...ev.journal);
+    majs.unshift(...ev.majs);
+    exploits.push(...ev.exploits);
+    rencontres += ev.rencontres;
+  }
+  return { ...ev!, journal, majs, exploits, rencontres };
 }
 
 /**

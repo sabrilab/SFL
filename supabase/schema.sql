@@ -5746,6 +5746,157 @@ exception
 end;
 $$;
 
+-- ──────────── Bola Team : la carte d'entraîneur (Ilyes, 02/11/2026) ────────────
+-- Trois caractéristiques, rés (Résultats), pré (Présence), coh (Cohésion), et
+-- leur note, l'arrondi supérieur de leur moyenne : la carte d'un entraîneur
+-- (lib/sfl/entraineur.ts, la note lente). Elle ne se calcule jamais sur un
+-- téléphone : le serveur la rejoue une fois par jour à partir des faits de la
+-- base (/api/entraineurs/calcul, lib/sfl/entraineur-serveur.server.ts) et la
+-- pose ici ; la ligue la lit. Une ligne par personne qui a entraîné : elle le
+-- suit d'une équipe à l'autre (equipe_id : celle qu'il entraîne, sinon la
+-- dernière). Rien ne descend : poser_cartes_entraineur garde la plus haute de
+-- chaque caractéristique (greatest), et la carte gardée sert de plancher au
+-- calcul suivant ; seule la modération la baissera (plus tard). La note se
+-- calcule ici, des trois gardées. Le reste suit le dernier calcul : les
+-- rencontres dirigées, ce qu'une mise à jour donnerait aujourd'hui
+-- (en_attente), les jauges, le journal en mots (jamais l'attendu en
+-- chiffres), les mises à jour passées, les compteurs (ce qui le suit).
+-- maj_le : la dernière fois qu'une caractéristique a monté. Aucune écriture
+-- directe ; la clé secrète seule pose.
+create table if not exists public.entraineur_cartes (
+  joueur      uuid primary key references public.profiles(id) on delete cascade,
+  equipe_id   bigint references public.equipes(id) on delete set null,
+  res         smallint not null default 75 check (res between 75 and 99),
+  pres        smallint not null default 75 check (pres between 75 and 99),
+  coh         smallint not null default 75 check (coh between 75 and 99),
+  note        smallint not null default 75 check (note between 75 and 99),
+  rencontres  int not null default 0 check (rencontres >= 0),
+  en_attente  jsonb not null default '{}'::jsonb,
+  jauges      jsonb not null default '{}'::jsonb,
+  journal     jsonb not null default '[]'::jsonb,
+  majs        jsonb not null default '[]'::jsonb,
+  compteurs   jsonb not null default '{}'::jsonb,
+  maj_le      timestamptz,
+  calcule_le  timestamptz not null default now()
+);
+create index if not exists entraineur_cartes_equipe on public.entraineur_cartes (equipe_id);
+alter table public.entraineur_cartes enable row level security;
+drop policy if exists "entraineur_cartes: lecture" on public.entraineur_cartes;
+create policy "entraineur_cartes: lecture" on public.entraineur_cartes for select to authenticated
+  using ((select public.est_membre()));
+revoke all on public.entraineur_cartes from anon, authenticated;
+grant select on public.entraineur_cartes to authenticated;
+
+-- Poser les cartes calculées par le serveur : [{ joueur, equipe_id, res, pres,
+-- coh, rencontres, en_attente, jauges, journal, majs, compteurs }]. Une
+-- caractéristique ne monte que par greatest() ; une ligne invalide est
+-- ignorée (compte ou équipe inconnus, valeur hors de 75 à 99, journal trop
+-- long). Rend le nombre de lignes écrites. Clé secrète seulement (la route).
+create or replace function public.poser_cartes_entraineur(p_lignes jsonb)
+returns int
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  n int;
+begin
+  if p_lignes is null or jsonb_typeof(p_lignes) <> 'array' then
+    raise exception 'Demande invalide.' using errcode = 'P0001';
+  end if;
+  with lues as (
+    select distinct on (l.joueur)
+           l.joueur, l.equipe_id, l.res, l.pres, l.coh, greatest(0, coalesce(l.rencontres, 0)) as rencontres,
+           coalesce(l.en_attente, '{}'::jsonb) as en_attente, coalesce(l.jauges, '{}'::jsonb) as jauges,
+           coalesce(l.journal, '[]'::jsonb) as journal, coalesce(l.majs, '[]'::jsonb) as majs,
+           coalesce(l.compteurs, '{}'::jsonb) as compteurs
+      from jsonb_to_recordset(p_lignes) as l (joueur uuid, equipe_id bigint, res int, pres int, coh int, rencontres int,
+                                               en_attente jsonb, jauges jsonb, journal jsonb, majs jsonb, compteurs jsonb)
+     where l.joueur is not null
+       and l.res between 75 and 99 and l.pres between 75 and 99 and l.coh between 75 and 99
+       and exists (select 1 from public.profiles p where p.id = l.joueur)
+       and (l.equipe_id is null or exists (select 1 from public.equipes e where e.id = l.equipe_id))
+       and jsonb_typeof(coalesce(l.en_attente, '{}'::jsonb)) = 'object'
+       and jsonb_typeof(coalesce(l.jauges, '{}'::jsonb)) = 'object'
+       and jsonb_typeof(coalesce(l.compteurs, '{}'::jsonb)) = 'object'
+       -- Un journal et des mises à jour en listes, bornées (case : la base n'évalue pas un « and » dans l'ordre).
+       and case when jsonb_typeof(coalesce(l.journal, '[]'::jsonb)) = 'array' then jsonb_array_length(coalesce(l.journal, '[]'::jsonb)) <= 400 else false end
+       and case when jsonb_typeof(coalesce(l.majs, '[]'::jsonb)) = 'array' then jsonb_array_length(coalesce(l.majs, '[]'::jsonb)) <= 400 else false end
+     order by l.joueur, (l.res + l.pres + l.coh) desc
+  ),
+  ecrites as (
+    insert into public.entraineur_cartes as c
+      (joueur, equipe_id, res, pres, coh, note, rencontres, en_attente, jauges, journal, majs, compteurs, maj_le, calcule_le)
+    select joueur, equipe_id, res, pres, coh, ceil((res + pres + coh) / 3.0)::smallint, rencontres,
+           en_attente, jauges, journal, majs, compteurs,
+           case when res > 75 or pres > 75 or coh > 75 then now() end, now()
+      from lues
+    on conflict (joueur) do update
+      set equipe_id = excluded.equipe_id,
+          res = greatest(c.res, excluded.res),
+          pres = greatest(c.pres, excluded.pres),
+          coh = greatest(c.coh, excluded.coh),
+          note = ceil((greatest(c.res, excluded.res) + greatest(c.pres, excluded.pres) + greatest(c.coh, excluded.coh)) / 3.0)::smallint,
+          rencontres = excluded.rencontres,
+          en_attente = excluded.en_attente,
+          jauges = excluded.jauges,
+          journal = excluded.journal,
+          majs = excluded.majs,
+          compteurs = excluded.compteurs,
+          maj_le = case when excluded.res > c.res or excluded.pres > c.pres or excluded.coh > c.coh then now() else c.maj_le end,
+          calcule_le = now()
+    returning 1
+  )
+  select count(*) into n from ecrites;
+  return n;
+end;
+$$;
+revoke execute on function public.poser_cartes_entraineur(jsonb) from public, anon, authenticated;
+grant execute on function public.poser_cartes_entraineur(jsonb) to service_role;
+
+-- Les normes de la ligue Team d'une saison finie : ce que vaut une rencontre
+-- en pré, en moyenne, et les départs par jour-joueur actif (coh). Chaque
+-- rencontre se juge avec celles de sa saison (en attendant qu'elles soient
+-- figées : celles de la saison d'avant, sinon celles de départ de
+-- entraineur.ts) ; figées une fois pour toutes, dès que toutes les
+-- rencontres de la saison ont été lues, pour qu'un rejeu ne fasse jamais
+-- redescendre une carte. La seconde écriture d'une saison ne change rien.
+create table if not exists public.entraineur_normes (
+  saison            int primary key check (saison >= 1),
+  presence          double precision not null check (presence between -3 and 0),
+  departs_par_jour  double precision not null check (departs_par_jour between 0 and 1),
+  figee_le          timestamptz not null default now()
+);
+alter table public.entraineur_normes enable row level security;
+drop policy if exists "entraineur_normes: lecture" on public.entraineur_normes;
+create policy "entraineur_normes: lecture" on public.entraineur_normes for select to authenticated
+  using ((select public.est_membre()));
+revoke all on public.entraineur_normes from anon, authenticated;
+grant select on public.entraineur_normes to authenticated;
+
+create or replace function public.figer_normes_entraineur(p_saison int, p_presence double precision, p_departs double precision)
+returns boolean
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  n int;
+begin
+  if p_saison is null or p_saison < 1 or p_presence is null or p_departs is null
+     or not (p_presence between -3 and 0) or not (p_departs between 0 and 1) then
+    raise exception 'Normes invalides.' using errcode = '22023';
+  end if;
+  insert into public.entraineur_normes (saison, presence, departs_par_jour)
+  values (p_saison, p_presence, p_departs)
+  on conflict (saison) do nothing;
+  get diagnostics n = row_count;
+  return n = 1;
+end;
+$$;
+revoke execute on function public.figer_normes_entraineur(int, double precision, double precision) from public, anon, authenticated;
+grant execute on function public.figer_normes_entraineur(int, double precision, double precision) to service_role;
+
 -- ─────────────────── Confidentialité : les accords ───────────────────
 -- L'accord de chaque joueur à la politique de confidentialité (22/10/2026) :
 -- la case de l'ouverture et celle de l'inscription
@@ -7283,6 +7434,26 @@ as $$
 $$;
 revoke execute on function public.mes_matchs_bola() from public, anon;
 grant execute on function public.mes_matchs_bola() to authenticated;
+
+-- Tous les matchs Bola saisis, au format de ligue_vierge() (match_bola_json),
+-- pour le serveur seul (03/11/2026) : la clé secrète n'a pas de session de
+-- membre, ligue_vierge() ne lui rend rien. La carte d'entraîneur de Bola Team
+-- (lib/sfl/entraineur-serveur.server.ts) y lit la carte de joueur Bola de
+-- chaque inscrit d'une feuille d'avant-match, au coup d'envoi.
+create or replace function public.matchs_bola_serveur()
+returns jsonb
+language sql
+security definer
+set search_path = ''
+stable
+as $$
+  select coalesce(jsonb_agg(public.match_bola_json(m.id) order by m.jour, m.heure, m.id), '[]'::jsonb)
+    from public.matchs m
+   where m.mode = 'bola' and m.saisi_le is not null
+     and m.score_clairs is not null and m.score_fonces is not null;
+$$;
+revoke execute on function public.matchs_bola_serveur() from public, anon, authenticated;
+grant execute on function public.matchs_bola_serveur() to service_role;
 
 -- Le Vestiaire est le salon de la SFL : un joueur Bola (venu par un parrain,
 -- hors de la saison) ne le lit pas et n'y écrit pas. Ses messages privés et

@@ -24,15 +24,25 @@
 //      (D8) ;
 //   8. les trois saisons de Lucien donnent la carte des captures ;
 //   9. les matières : ni or, ni bleu, ni rouge, ni la braise, ni le mauve ;
-//      aucune n'entre dans les finitions d'un joueur.
+//      aucune n'entre dans les finitions d'un joueur ;
+//  10. le barème lent (Ilyes, 02/11 : la note lente), épinglé, et pas le vif ;
+//  11. une saisie restée seule de son camp ne compte que contre lui, en pré
+//      aussi ;
+//  12. ses places s'enchaînent : ses compteurs le suivent, jamais deux mises
+//      à jour le même mois ; avant les feuilles d'avant-match, tout joueur
+//      compte actif.
 //   npx tsx tools/entraineur-check.ts
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
+  activite,
   attenduDe,
+  BAREME_ENTRAINEUR,
   CLES_ENTRAINEUR,
   championDe,
+  evoluerCarrieres,
   evoluerEntraineur,
+  numeroDuJour,
   faceEntraineur,
   forceFeuille,
   LIBELLES_ENTRAINEUR,
@@ -345,6 +355,68 @@ const moy = (v: number[]) => v.reduce((a, b) => a + b, 0) / v.length;
     assert.ok(nom in MATIERES, `${nom} manque dans MATIERES`);
     assert.ok(!(FINITIONS as readonly string[]).includes(nom), `${nom} ne doit pas être une finition de joueur`);
   }
+}
+
+// 10 · Le barème lent (Ilyes, 02/11 : « la note lente ») : les marges et les crans du réglage proposé, pas du vif.
+{
+  const B = BAREME_ENTRAINEUR;
+  assert.deepEqual(
+    { RES: B.RES, PRES: B.PRES, COH: B.COH },
+    { RES: { hasard: 0.62, cran: 0.2 }, PRES: { hasard: 0.7, cran: 1 }, COH: { hasard: 1.4, cran: 0.12 } },
+    "le barème lent, tel que modele-v3.md le propose"
+  );
+  // Le vif de v3/sim4/variantes.out : RES 0,5, PRES 0,55 à 0,75, COH 1,0. Aucune marge du lent n'en est.
+  assert.ok(B.RES.hasard > 0.5 && B.PRES.hasard > 0.55 && B.COH.hasard > 1.0, "pas le réglage vif");
+  assert.equal(B.echelle, 16);
+  assert.deepEqual(B.presence, { venue: 0, cinqContreQuatre: -1, forfait: -3 });
+  assert.equal(B.maj.rencontres, 4);
+  assert.equal(B.actifJours, 60);
+  assert.deepEqual(B.poidsLigue, { rencontres: 16, joursActifs: 840 });
+}
+
+// 11 · Sa saisie restée seule : en pré, « venue » ne compte pas (l'adversaire ne l'a pas vérifiée) ; un 5 contre 4 ou un forfait déclaré, si.
+{
+  const N = { 1: { presence: -0.1, departsParJour: 0 } };
+  const pres = (o: Partial<RencontreEntraineur>) => evoluerEntraineur(carriere(Array.from({ length: 4 }, (_, k) => match(k, o))), { normes: N }).compteurs.PRES;
+  assert.equal(pres({ saisieSeule: true }).poids, 0, "« venue » saisie seule par son camp : rien");
+  assert.equal(pres({ saisieSeule: true, cinqContreQuatre: "eux" }).poids, 0, "le 5 contre 4 de l'adversaire, saisi seul par son camp : rien");
+  assert.equal(pres({ saisieSeule: true, cinqContreQuatre: "nous" }).poids, 4, "son propre 5 contre 4, même saisi seul, compte");
+  assert.ok(Math.abs(pres({ saisieSeule: true, cinqContreQuatre: "nous" }).avance - 4 * (-1 + 0.1)) < 1e-9);
+  assert.equal(pres({ saisieSeule: true, forfait: true }).poids, 4, "son forfait compte");
+  assert.equal(pres({}).poids, 4, "saisies des deux camps : tout compte");
+  // Le journal ne garde que ce qui a compté.
+  const ev = evoluerEntraineur(carriere([match(0, { saisieSeule: true }), match(1)]), { normes: N });
+  assert.equal(ev.journal.filter((f) => f.cle === "PRES").length, 1);
+}
+
+// 12 · Ses places s'enchaînent ; les feuilles d'avant-match et l'activité.
+{
+  const N = { 1: { presence: -0.3, departsParJour: 0 } };
+  // Deux places : la seconde reprend les compteurs et la cadence de la première.
+  const a = carriere(Array.from({ length: 6 }, (_, k) => match(k)), membres(), { fin: jour(6 * 7) });
+  const b = { ...carriere(Array.from({ length: 6 }, (_, k) => match(k + 7)), membres()), arrivee: jour(7 * 7) };
+  const seule = evoluerEntraineur(a, { normes: N });
+  const deux = evoluerCarrieres([b, a], { normes: N });
+  assert.equal(deux.rencontres, 12);
+  assert.ok(Math.abs(deux.compteurs.PRES.avance - 12 * 0.3) < 1e-9, "les compteurs le suivent");
+  assert.ok(deux.majs.length >= seule.majs.length);
+  const mois = deux.majs.map((m) => m.apres.slice(0, 7));
+  assert.equal(new Set(mois).size, mois.length, "jamais deux mises à jour le même mois, d'une place à l'autre");
+  assert.deepEqual(deux.majs, [...deux.majs].sort((x, y) => y.apres.localeCompare(x.apres)), "les mises à jour, de la plus récente à la plus ancienne");
+  // Sans place : la carte de départ.
+  assert.deepEqual(evoluerCarrieres([]).officielles, { RES: 75, PRES: 75, COH: 75 });
+  // Une place qui ne fait que commencer : 75 partout.
+  assert.deepEqual(evoluerCarrieres([carriere([])]).officielles, { RES: 75, PRES: 75, COH: 75 });
+  // Avant la première feuille de la ligue, tout joueur compte actif ; après, ses 60 jours et ses feuilles.
+  const m: MembreEntraineur = { id: "x", nom: "X", arrivee: "2026-01-01" };
+  const sans = activite([m], new Map());
+  const avant = activite([m], new Map(), numeroDuJour("2026-11-03"));
+  assert.equal(sans(m, numeroDuJour("2026-10-01")), false, "arrivé il y a neuf mois, sur aucune feuille : inactif");
+  assert.equal(avant(m, numeroDuJour("2026-10-01")), true, "avant les feuilles : actif");
+  assert.equal(avant(m, numeroDuJour("2026-11-05")), false, "après : la règle des feuilles");
+  const inscrit = activite([m], new Map([["x", [numeroDuJour("2026-11-10")]]]), numeroDuJour("2026-11-03"));
+  assert.equal(inscrit(m, numeroDuJour("2027-01-08")), true, "59 jours après sa feuille");
+  assert.equal(inscrit(m, numeroDuJour("2027-01-09")), false, "60 jours après");
 }
 
 console.log("entraineur-check : ok");
