@@ -14,6 +14,8 @@
 // Ma carte s'en sert aussi : « Mes cartes », et la courbe, ouverte sur le rang.
 // Les cartes d'une saison close qui a son édition d'époque (la saison 0)
 // sont dans les visuels de son temps (finitions-carte.ts, Sabri 24/10).
+// Sur téléphone, la rangée défile, et la carte coupée au bord en laisse
+// toujours voir un peu (RangeeQuiDefile, lib/rangee-qui-defile.ts).
 // Dès la tablette (768 px), où une rangée qui défile se manie mal à la souris,
 // les cartes spéciales passent à la ligne à droite de la carte de la saison ;
 // dès 1024 px, toutes prennent un cran de plus (useFormatCarte).
@@ -22,13 +24,14 @@
 // bleu : teinte-carte.ts, Sabri 22/10). Calcul dans
 // lib/sfl/carriere.ts.
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { MiniCarte } from "@/components/sfl/mini-carte";
 import { BOOST_LABELS } from "@/components/sfl/boost-card";
 import { TEINTES } from "@/components/sfl/teinte-carte";
 import { useFormatCarte } from "@/hooks/use-format-carte";
 import type { CartesDeSaison, PointCourbe } from "@/lib/sfl/carriere";
 import { ordinal } from "@/lib/sfl/fin-de-saison";
+import { decalageQuiDepasse } from "@/lib/rangee-qui-defile";
 import { cn } from "@/lib/utils";
 
 const ANTON = "var(--font-anton), Anton, sans-serif";
@@ -68,8 +71,8 @@ export function CartesCarriere({ saisons, titre = "Ses cartes" }: { saisons: Car
                   </span>
                 </span>
               </div>
-              <div className="flex items-end gap-[var(--fib-13)] overflow-x-auto px-4 pb-1 [scrollbar-width:none] md:overflow-visible">
-                <figure className="flex shrink-0 flex-col items-center">
+              <RangeeQuiDefile cartes={1 + s.speciales.length}>
+                <figure className="flex shrink-0 flex-col items-center [margin-inline-end:var(--apres-saison,0px)]">
                   <MiniCarte
                     player={s.player}
                     size={format.grande}
@@ -98,12 +101,56 @@ export function CartesCarriere({ saisons, titre = "Ses cartes" }: { saisons: Car
                     </figure>
                   ))}
                 </div>
-              </div>
+              </RangeeQuiDefile>
             </div>
           );
         })}
       </div>
     </section>
+  );
+}
+
+/**
+ * La rangée d'une saison, qui défile sur téléphone : la carte coupée au bord
+ * en laisse toujours voir un peu (lib/rangee-qui-defile.ts). Seul l'écart
+ * après la carte de la saison s'ajuste, et seulement quand le bord tombe
+ * entre deux cartes ; dès la tablette, tout tient, rien ne bouge.
+ */
+function RangeeQuiDefile({ cartes, children }: { cartes: number; children: ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [decalage, setDecalage] = useState(0);
+  // Avant la première image : la rangée ne saute pas sous les yeux.
+  useLayoutEffect(() => {
+    const rangee = ref.current;
+    if (!rangee) return;
+    const mesurer = () => {
+      const figures = [...rangee.querySelectorAll<HTMLElement>(":scope figure")];
+      if (!figures.length) return;
+      const r = rangee.getBoundingClientRect();
+      const rtl = getComputedStyle(rangee).direction === "rtl";
+      const defile = Math.abs(rangee.scrollLeft);
+      // Le décalage déjà posé (la marge après la carte de la saison), retiré : on mesure la rangée d'origine.
+      const pose = parseFloat(getComputedStyle(figures[0]).marginInlineEnd) || 0;
+      const bords = figures.map((f, i) => {
+        const c = f.getBoundingClientRect();
+        const debut = (rtl ? r.right - c.right : c.left - r.left) + defile - (i > 0 ? pose : 0);
+        return [debut, debut + c.width] as const;
+      });
+      setDecalage(decalageQuiDepasse(bords, rangee.clientWidth));
+    };
+    mesurer();
+    const ro = new ResizeObserver(mesurer);
+    ro.observe(rangee);
+    return () => ro.disconnect();
+  }, [cartes]);
+  return (
+    <div
+      ref={ref}
+      className="flex items-end gap-[var(--fib-13)] overflow-x-auto px-4 pb-1 [scrollbar-width:none] md:overflow-visible"
+      style={{ "--apres-saison": `${decalage}px` } as CSSProperties}
+    >
+      {children}
+    </div>
   );
 }
 

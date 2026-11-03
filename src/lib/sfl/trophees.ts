@@ -43,7 +43,7 @@ export const TROPHEES: DefTrophee[] = [
   { id: "matchs", nom: "Matchs", inscription: "des dimanches sur le terrain.", paliers: [5, 10, 25, 50], unite: ["match", "matchs"] },
   { id: "victoires", nom: "Victoires", inscription: "des matchs gagnés.", paliers: [5, 10, 25, 50], unite: ["victoire", "victoires"] },
   { id: "mvp", nom: "MVP du match", inscription: "meilleur joueur du match.", paliers: [1, 3, 5, 10], unite: ["fois", "fois"] },
-  { id: "mur", nom: "Le Mur", inscription: "meilleur défenseur du match.", paliers: [1, 3, 5, 10], unite: ["fois", "fois"] },
+  { id: "mur", nom: "Le Mur", inscription: "meilleur défenseur de son équipe.", paliers: [1, 3, 5, 10], unite: ["fois", "fois"] },
   { id: "impact", nom: "Impact", inscription: "le joueur qui change le match.", paliers: [1, 3, 5, 10], unite: ["fois", "fois"] },
 ];
 

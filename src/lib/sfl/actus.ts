@@ -43,6 +43,12 @@ const BADGES_DU_FIL = new Set<TropheeId>(["buts", "passes", "matchs", "victoires
 export interface Titre {
   nom: string;
   types: BoostType[];
+  /**
+   * Son équipe dans ce match : l'Impact et la Défensive sont ceux de chaque
+   * équipe, deux élus de la même équipe sont des ex æquo (titres-ecrans.ts,
+   * texteDesTitres). Absente sur une ligne sans équipe.
+   */
+  equipe?: string;
 }
 
 /** Une place d'un podium du jour : le joueur et son chiffre (ex æquo à la même place). */
@@ -104,6 +110,7 @@ export function titresDuDimanche(
   return groupes
     .map((g) => {
       const parNom = new Map<string, Set<BoostType>>();
+      const equipeDe = new Map<string, string>();
       for (const e of lignes) {
         if (g.noms && !g.noms.has(e.player)) continue;
         const t = parNom.get(e.player) ?? new Set<BoostType>();
@@ -111,9 +118,13 @@ export function titresDuDimanche(
         if (e.impact) t.add("impact");
         if (e.def) t.add("def");
         if (t.size) parNom.set(e.player, t);
+        if (e.team && !equipeDe.has(e.player)) equipeDe.set(e.player, e.team);
       }
       const titres = [...parNom]
-        .map(([nom, t]) => ({ nom, types: [...t].sort((a, b) => RARETE[a] - RARETE[b]) }))
+        .map(([nom, t]) => {
+          const equipe = equipeDe.get(nom);
+          return { nom, types: [...t].sort((a, b) => RARETE[a] - RARETE[b]), ...(equipe ? { equipe } : {}) };
+        })
         .sort((a, b) => RARETE[a.types[0]] - RARETE[b.types[0]] || b.types.length - a.types.length || a.nom.localeCompare(b.nom));
       return { match: g.match, score: g.score, titres };
     })
