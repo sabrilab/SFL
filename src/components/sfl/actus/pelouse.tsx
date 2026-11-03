@@ -951,7 +951,10 @@ function RubriqueTitres({ a, bravo }: { a: Extract<Actu, { type: "titres" }>; br
   const titre = mvp.length
     ? `${enLigne(mvp.map((n) => n.split(" ")[0]))}, ${mvp.length > 1 ? "MVP ex æquo" : "MVP"}`
     : `${enLigne(lignes[0].noms.map((n) => n.split(" ")[0]))}, ${NOM_TITRE[lignes[0].type]}`;
-  const texte = lignes.map((l) => `${NOM_TITRE[l.type]} : ${l.noms.join(", ")}${l.noms.length > 1 ? " (ex æquo)" : ""}`).join(" · ");
+  // Le MVP est unique au match : deux noms, ce sont des ex æquo. L'Impact et la
+  // Défensive sont ceux de chaque équipe (Ilyes, 02/11/2026) : deux noms, c'est
+  // d'abord un élu par équipe, rien d'un ex æquo.
+  const texte = lignes.map((l) => `${NOM_TITRE[l.type]} : ${l.noms.join(", ")}${l.type === "mvp" && l.noms.length > 1 ? " (ex æquo)" : ""}`).join(" · ");
   const sur = `J${a.j} · ${a.match}${a.score ? ` · ${a.score}` : ""}`;
   const partage = { titre: `Les cartes du ${a.match.toLowerCase()}`, j: a.j, lignes: t.map((x) => ({ n: x.nom, v: x.types.map((y) => NOM_TITRE[y]).join(" · ") })) };
 

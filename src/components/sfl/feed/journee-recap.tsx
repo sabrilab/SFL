@@ -32,6 +32,7 @@ import {
   type Player,
 } from "@/lib/sfl/engine";
 import { computeStandings, entryPP } from "@/lib/sfl/saisie/engine";
+import type { MatchEntry } from "@/lib/sfl/saisie/types";
 import { isHidden, publicOnly } from "@/lib/sfl/hidden";
 import {
   AbsentsModule,
@@ -166,6 +167,28 @@ function Avatar({ name }: { name: string; size?: number }) {
  */
 const BIENTOT_DESSUS = "-top-3 right-3";
 
+/** La fin de phrase d'un débutant : « — et repart avec deux titres. » s'il en cumule (MVP, Impact, Mur). */
+function repartAvec(e: MatchEntry): string {
+  const n = [e.mvp, e.impact, e.def].filter(Boolean).length;
+  return n ? ` — et repart avec ${["un titre", "deux titres", "trois titres"][n - 1]}.` : ".";
+}
+
+/**
+ * La ligne d'un top de la journée : ses buts, ses passes, puis tous ses titres
+ * dans l'ordre des puces (un même joueur peut être MVP, Impact et Mur) ; son
+ * résultat s'il n'a rien de tout ça.
+ */
+function motsDuTop(e: MatchEntry): string[] {
+  const mots = [
+    e.buts > 0 && `${e.buts}B`,
+    e.passes > 0 && `${e.passes}P`,
+    e.mvp && "MVP",
+    e.impact && "IMPACT",
+    e.def && "DÉF",
+  ].filter((x): x is string => !!x);
+  return mots.length ? mots : e.result ? [e.result] : [];
+}
+
 /* ------------------------------- Le récap ------------------------------- */
 
 /**
@@ -237,7 +260,8 @@ function JourneeRecapComplet({ j }: { j: number }) {
   )[0];
   const others = matches.filter((m) => m !== big);
 
-  const jBoosts = boostCards.filter((c) => c.date.startsWith(`J${lastJ.j}`));
+  // « J1 · 18 oct. » : l'espace compte, sinon la J1 prenait aussi les cartes des J10 à J19.
+  const jBoosts = boostCards.filter((c) => c.date.startsWith(`J${lastJ.j} `));
   const mvpCard = jBoosts.find((c) => c.type === "mvp") ?? jBoosts[0];
   const unlocked = jBoosts.filter((c) => c !== mvpCard).slice(0, 3);
 
@@ -771,16 +795,16 @@ function JourneeRecapComplet({ j }: { j: number }) {
                   <Avatar name={e.player} size={28} />
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-ligne font-semibold"><Nom n={e.player} /></span>
-                    <span className="mono-label text-muted-foreground">
-                      {[
-                        e.buts > 0 && `${e.buts}B`,
-                        e.passes > 0 && `${e.passes}P`,
-                        e.mvp && "MVP",
-                        e.impact && "IMPACT",
-                        e.def && "DÉF",
-                      ]
-                        .filter(Boolean)
-                        .join(" · ") || e.result}
+                    {/* Tous ses titres, dans l'ordre des puces. Chaque mot porte son point devant lui ;
+                        celui qui ouvre une ligne sort à gauche et se rogne : jamais « · DÉF » en tête. */}
+                    <span className="mono-label block overflow-hidden text-muted-foreground">
+                      <span className="-ml-[1.2em] flex flex-wrap">
+                        {motsDuTop(e).map((x) => (
+                          <span key={x} className="whitespace-nowrap before:inline-block before:w-[1.2em] before:text-center before:content-['·']">
+                            {x}
+                          </span>
+                        ))}
+                      </span>
                     </span>
                   </span>
                   <span className="mono-label rounded-full bg-primary/15 px-2.5 py-1 text-primary">
@@ -886,7 +910,7 @@ function JourneeRecapComplet({ j }: { j: number }) {
                     {e.buts > 0
                       ? `plante ${e.buts} but${e.buts > 1 ? "s" : ""} pour sa première`
                       : "joue son premier match"}
-                    {e.mvp || e.impact || e.def ? " — et repart avec un titre." : "."}
+                    {repartAvec(e)}
                   </p>
                 </div>
               ))}

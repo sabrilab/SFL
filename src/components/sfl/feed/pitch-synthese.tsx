@@ -43,6 +43,10 @@ const MODES: [Mode, string][] = [
   ["titres", "Titres"],
 ];
 
+/** La pastille du mode « Titres » : le titre en entier s'il est seul, sinon chacun en court (« IMP·DÉF »). */
+const LONG = { mvp: "MVP", impact: "IMPACT", def: "DÉF" } as const;
+const COURT = { mvp: "MVP", impact: "IMP", def: "DÉF" } as const;
+
 /** Le joueur, en petite carte (la pastille de la hiérarchie des cartes). */
 function Avatar({ name }: { name: string; size?: number }) {
   return <CarteDe name={name} />;
@@ -99,15 +103,19 @@ export function PitchSynthese({
           .slice(0, 5)
           .map((l, i) => ({ name: l.name, badge: `${l.passes} P`, hot: i === 0, extraTime: l.extraTime }));
       case "titres":
+        // Cinq cartes au plus : les MVP d'abord, puis ceux qui ont le plus de
+        // titres (un même joueur peut être MVP, Impact et Mur), dans l'ordre de
+        // la feuille à égalité. La pastille les dit tous, dans l'ordre des puces.
         return lines
           .filter((l) => !l.extraTime)
           .map((l) => ({ l, t: titresDuJour(l.name) }))
           .filter(({ t }) => t.length > 0)
+          .sort((a, b) => Number(b.t.includes("mvp")) - Number(a.t.includes("mvp")) || b.t.length - a.t.length)
           .slice(0, 5)
           .map(({ l, t }) => ({
             name: l.name,
-            badge: t[0] === "mvp" ? "MVP" : t[0] === "impact" ? "IMPACT" : "DÉF",
-            hot: t[0] === "mvp",
+            badge: t.length > 1 ? t.map((x) => COURT[x]).join("·") : LONG[t[0]],
+            hot: t.includes("mvp"),
           }));
       default:
         return [...lines]

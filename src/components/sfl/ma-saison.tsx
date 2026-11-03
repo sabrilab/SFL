@@ -77,7 +77,11 @@ function Pastille({ r }: { r: Resultat }) {
   );
 }
 
-/** Ses titres du jour, chacun avec le rond de la couleur de sa carte. */
+/**
+ * Ses titres du jour, chacun avec le rond de la couleur de sa carte, dans
+ * l'ordre des puces (dimanchesDe) : le MVP est celui du match, l'Impact et le
+ * Mur ceux de son équipe.
+ */
 function Titres({ titres, taille = "petit" }: { titres: TitreDuJour[]; taille?: "petit" | "grand" }) {
   if (!titres.length) return null;
   return (
@@ -89,7 +93,7 @@ function Titres({ titres, taille = "petit" }: { titres: TitreDuJour[]; taille?: 
             className={cn("shrink-0 rounded-full", taille === "grand" ? "size-2.5" : "size-2")}
             style={{ background: TEINTE_TITRE[t], boxShadow: `0 0 8px ${TEINTE_TITRE[t]}` }}
           />
-          {taille === "grand" ? `${NOM_TITRE[t]} du match` : NOM_TITRE[t]}
+          {taille === "grand" ? `${NOM_TITRE[t]} ${t === "mvp" ? "du match" : "de ton équipe"}` : NOM_TITRE[t]}
         </span>
       ))}
     </span>

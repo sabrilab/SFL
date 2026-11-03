@@ -9,7 +9,11 @@
 // retire son bravo puis le redonne ne le réveille pas deux fois). Les bravos
 // d'un même exploit se comptent dans la même notification, qui remplace la
 // précédente : « Kader et 2 autres t'ont félicité · Pour ton titre d'homme
-// du dimanche · J2 · +10 XP ». Les 10 XP ne s'annoncent que tant qu'ils
+// du dimanche · J2 · +10 XP ». Un même bravo qui touche plusieurs exploits
+// d'un joueur (un joueur peut être MVP, Impact et Défensive le même jour) les
+// dit tous dans une seule notification : « Pour tes titres de Joueur Impact
+// et de meilleur défenseur · J4 · +20 XP » (exploits.ts, quoiDesExploits).
+// Avant, la dernière seule restait. Les 10 XP ne s'annoncent que tant qu'ils
 // comptent : cinq félicitations au plus par exploit, dix par joueur et par
 // journée (les plafonds de lib/sfl/missions.ts). La toucher ouvre l'exploit
 // dans les Actus (/ligue?exploit=…). Elle est suivie comme les autres
@@ -19,14 +23,20 @@ import { NextRequest, NextResponse } from "next/server";
 import { prevenir, type Envoi } from "@/lib/server/push-envoi";
 import { cleVapid } from "@/lib/server/web-push";
 import { appelant, serveur } from "@/lib/sfl/serveur-ligue.server";
-import { exploitsDeLaSaison, lireCle, type Exploit } from "@/lib/sfl/exploits";
+import { exploitsDeLaSaison, lireCle, quoiDesExploits, type Exploit } from "@/lib/sfl/exploits";
 import type { Saison } from "@/lib/sfl/saisie/types";
 import { lireSaisonServeur } from "@/lib/sfl/saison-serveur.server";
 
 export const maxDuration = 30;
 
-/** Au plus, par appel : une rubrique des Actus tient sept joueurs. */
-const MAX = 10;
+/**
+ * Au plus, par appel : les exploits d'une rubrique des Actus, que le Bravo
+ * envoie d'un coup. Celle des titres d'un match en compte un par titre, et un
+ * même joueur peut en avoir trois (J3, Match 1 : 10 exploits pour 7 joueurs) ;
+ * celle des badges, un par joueur du dimanche. À 10, le reste tombait sans un
+ * mot, alors que le téléphone le croyait enregistré.
+ */
+const MAX = 64;
 const XP_RECUE = 10;
 /** Les félicitations comptées pour l'XP : par exploit, et par joueur et par journée. */
 const PAR_EXPLOIT = 5;
@@ -124,32 +134,41 @@ export async function POST(req: NextRequest) {
   const toutes = (recues ?? []) as Ligne[];
   const prenom = (lui.nom_affiche ?? lui.name).split(" ")[0];
 
-  const envois = new Map<string, Envoi>();
-  for (const f of cibles) {
-    const e = exploits.get(f.exploit)!;
-    const duJour = toutes.filter((x) => x.a === f.a && x.saison === e.saison && x.j === e.j);
-    // Les félicitations comptées, dans l'ordre où elles sont arrivées.
+  /** Cette félicitation compte-t-elle pour l'XP ? Dans l'ordre où celles du jour sont arrivées. */
+  const compte = (f: { id: number; a: string }, e: Exploit) => {
     let jour = 0;
     const parExploit = new Map<string, number>();
-    let compte = false;
-    for (const x of duJour) {
+    for (const x of toutes) {
+      if (x.a !== f.a || x.saison !== e.saison || x.j !== e.j) continue;
       const n = parExploit.get(x.exploit) ?? 0;
       const retenue = n < PAR_EXPLOIT && jour < PAR_JOURNEE;
       parExploit.set(x.exploit, n + 1);
       if (retenue) jour++;
-      if (x.id === f.id) compte = retenue;
+      if (x.id === f.id) return retenue;
     }
-    const autres = duJour.filter((x) => x.exploit === f.exploit).length - 1;
-    // Plusieurs exploits du même joueur dans l'appel : la dernière notification reste.
-    envois.set(f.a, {
+    return false;
+  };
+
+  // Une notification par joueur prévenu, avec tous ses exploits de l'appel.
+  const parJoueur = new Map<string, typeof cibles>();
+  for (const f of cibles) parJoueur.set(f.a, [...(parJoueur.get(f.a) ?? []), f]);
+  const envois = new Map<string, Envoi>();
+  for (const [a, fs] of parJoueur) {
+    const es = fs.map((f) => exploits.get(f.exploit)!);
+    const cles = es.map((e) => e.cle);
+    const xp = fs.filter((f, i) => compte(f, es[i])).length * XP_RECUE;
+    // Ceux qui l'ont félicité pour ces exploits (moi compris : je viens de le faire).
+    const autres = new Set(toutes.filter((x) => x.a === a && cles.includes(x.exploit)).map((x) => x.de)).size - 1;
+    const jours = [...new Set(es.map((e) => `J${e.j}`))].join(", ");
+    envois.set(a, {
       notif: {
         titre: couper(autres > 0 ? `${prenom} et ${autres} ${autres > 1 ? "autres" : "autre"} t'ont félicité` : `${prenom} t'a félicité`, 60),
-        texte: couper(`Pour ${e.quoi} · J${e.j}${compte ? ` · +${XP_RECUE} XP` : ""}`, 180),
-        url: `/ligue?exploit=${encodeURIComponent(e.cle)}`,
-        tag: `felicitation-${e.cle}`,
+        texte: couper(`Pour ${quoiDesExploits(es)} · ${jours}${xp ? ` · +${xp} XP` : ""}`, 180),
+        url: `/ligue?exploit=${encodeURIComponent(cles[0])}`,
+        tag: `felicitation-${[...cles].sort().join("+")}`,
       },
       motif: "felicitation",
-      ref: `exploit:${e.cle}`,
+      ref: `exploit:${cles[0]}`,
     });
   }
 
