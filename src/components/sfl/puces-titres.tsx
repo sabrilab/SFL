@@ -12,7 +12,9 @@
 //
 // Elles se posent en absolu sur le coin haut gauche de la carte (le haut à
 // droite et le haut au centre sont déjà pris ailleurs : badges, croix,
-// étiquettes de titres) et ne changent donc aucune mise en page.
+// étiquettes de titres) et ne changent donc aucune mise en page. En arabe
+// aussi, de gauche à droite (dir="ltr") : la carte garde sa mise en page, et
+// ses puces leur ordre.
 
 import type { CSSProperties } from "react";
 import type { BoostType } from "@/lib/sfl/engine";
@@ -50,6 +52,9 @@ export function PucesTitres({
   const d = Math.min(13, Math.max(6, DIAMETRE / (echelle || 1)));
   return (
     <span
+      // Toujours de gauche à droite, même en arabe : les puces se lisent dans
+      // l'ordre MVP, Impact, Défensive, sur une carte qui garde sa mise en page.
+      dir="ltr"
       className={cn(
         "pointer-events-none flex items-center",
         coin && "absolute z-[1]",

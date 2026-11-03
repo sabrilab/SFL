@@ -53,6 +53,7 @@ import type { Actu, Marche, Titre } from "@/lib/sfl/actus";
 import type { BoostType } from "@/lib/sfl/engine";
 import type { Enjeu, Voisins } from "@/lib/sfl/actus-toi";
 import { exploitsDe } from "@/lib/sfl/exploits";
+import { enLigne, NOM_TITRE_ACTUS as NOM_TITRE, texteDesTitres } from "@/lib/sfl/titres-ecrans";
 import { entryPP } from "@/lib/sfl/saisie/engine";
 import { rangPepiteApres } from "@/lib/sfl/rangs";
 import { nomDivision } from "@/lib/sfl/divisions";
@@ -920,13 +921,6 @@ function RubriqueDuDimanche({ a }: { a: Actu }) {
 
 /* ------------------------------ Les cartes à titre ------------------------------ */
 
-const NOM_TITRE: Record<BoostType, string> = { mvp: "MVP", impact: "Impact", def: "Défensive" };
-
-/** « Jouneid », « Jouneid et Zakary », « Abdel, Bilal et Faycal ». */
-function enLigne(noms: string[]): string {
-  return noms.length < 2 ? (noms[0] ?? "") : `${noms.slice(0, -1).join(", ")} et ${noms[noms.length - 1]}`;
-}
-
 type Felicitable = { action: ReactNode; exploits: string[] };
 
 /**
@@ -949,12 +943,12 @@ function RubriqueTitres({ a, bravo }: { a: Extract<Actu, { type: "titres" }>; br
     .map((type) => ({ type, noms: avec(type) }))
     .filter((l) => l.noms.length > 0);
   const titre = mvp.length
-    ? `${enLigne(mvp.map((n) => n.split(" ")[0]))}, ${mvp.length > 1 ? "MVP ex æquo" : "MVP"}`
+    ? `${enLigne(mvp.map((n) => n.split(" ")[0]))}, ${mvp.length > 1 ? "MVP ex\u00a0æquo" : "MVP"}`
     : `${enLigne(lignes[0].noms.map((n) => n.split(" ")[0]))}, ${NOM_TITRE[lignes[0].type]}`;
   // Le MVP est unique au match : deux noms, ce sont des ex æquo. L'Impact et la
   // Défensive sont ceux de chaque équipe (Ilyes, 02/11/2026) : deux noms, c'est
-  // d'abord un élu par équipe, rien d'un ex æquo.
-  const texte = lignes.map((l) => `${NOM_TITRE[l.type]} : ${l.noms.join(", ")}${l.type === "mvp" && l.noms.length > 1 ? " (ex æquo)" : ""}`).join(" · ");
+  // d'abord un élu par équipe ; deux de la même équipe, des ex æquo.
+  const texte = texteDesTitres(t, id.nom);
   const sur = `J${a.j} · ${a.match}${a.score ? ` · ${a.score}` : ""}`;
   const partage = { titre: `Les cartes du ${a.match.toLowerCase()}`, j: a.j, lignes: t.map((x) => ({ n: x.nom, v: x.types.map((y) => NOM_TITRE[y]).join(" · ") })) };
 

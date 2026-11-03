@@ -18,6 +18,7 @@ import type { BoostCardData } from "@/lib/sfl/engine";
 import { cn } from "@/lib/utils";
 import { Nom } from "@/components/sfl/nom";
 import { nomAffiche } from "@/lib/sfl/identites";
+import { etiquetteDuPalmares } from "@/lib/sfl/titres-ecrans";
 
 export interface UneLine {
   player: string;
@@ -200,7 +201,7 @@ export function LaUne({
               {(l.mvp || l.impact || l.def) && (
                 // Tous ses titres du jour, dans l'ordre des puces : hors du nom, qui se coupe, jamais eux.
                 <span className="mono-label shrink-0 text-micro whitespace-nowrap text-primary">
-                  {[l.mvp && "MVP", l.impact && "IMP", l.def && "DÉF"].filter(Boolean).join(" · ")}
+                  {etiquetteDuPalmares(l)}
                 </span>
               )}
               <span className="shrink-0 tabular-nums text-encre-3">

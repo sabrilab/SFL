@@ -441,7 +441,7 @@ const B = ["B1", "B2", "B3", "B4"];
   s.entries = s.entries.map((e) => ({ ...e, ...titre[e.player] }));
   const joueurs = deriveSeason(s).players;
   const faits = (nom: string) => ficheJoueur(s, joueurs.find((p) => p.name === nom)!, joueurs).faits.map((f) => f.quoi);
-  assert.deepEqual(faits("A1"), ["Le Mur de son équipe"]);
+  assert.deepEqual(faits("A1"), ["Le\u00a0Mur de son équipe"]);
   assert.deepEqual(faits("B1"), ["Impact de son équipe"]);
   assert.deepEqual(faits("B2"), ["MVP du match"]);
   // Partout dans l'app (la feuille des trophées de vitrine.tsx comprise) : plus de Défensive, de Mur ni d'Impact « du match ».

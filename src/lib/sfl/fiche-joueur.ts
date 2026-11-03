@@ -248,8 +248,12 @@ const NOM_RESULTAT: Record<Resultat, [string, string]> = {
   D: ["défaite", "défaites"],
 };
 
-/** Ses titres du jour, comme on les dit : MVP, Impact, Le Mur. */
-export const NOM_TITRE: Record<TitreDuJour, string> = { mvp: "MVP", impact: "Impact", def: "Le Mur" };
+/**
+ * Ses titres du jour, comme on les dit : MVP, Impact, Le Mur. « Le Mur » ne se
+ * coupe jamais en fin de ligne (espace insécable) : la bulle de Bola Agent,
+ * la fiche, Ma saison et les notifications le gardent d'un bloc.
+ */
+export const NOM_TITRE: Record<TitreDuJour, string> = { mvp: "MVP", impact: "Impact", def: "Le\u00a0Mur" };
 
 const listeEt = (mots: string[]) => (mots.length > 1 ? `${mots.slice(0, -1).join(", ")} et ${mots[mots.length - 1]}` : mots[0] ?? "");
 

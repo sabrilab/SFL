@@ -32,7 +32,7 @@ import {
   type Player,
 } from "@/lib/sfl/engine";
 import { computeStandings, entryPP } from "@/lib/sfl/saisie/engine";
-import type { MatchEntry } from "@/lib/sfl/saisie/types";
+import { cartesDeLaJournee, motsDuTop, repartAvec } from "@/lib/sfl/titres-ecrans";
 import { isHidden, publicOnly } from "@/lib/sfl/hidden";
 import {
   AbsentsModule,
@@ -167,28 +167,6 @@ function Avatar({ name }: { name: string; size?: number }) {
  */
 const BIENTOT_DESSUS = "-top-3 right-3";
 
-/** La fin de phrase d'un débutant : « — et repart avec deux titres. » s'il en cumule (MVP, Impact, Mur). */
-function repartAvec(e: MatchEntry): string {
-  const n = [e.mvp, e.impact, e.def].filter(Boolean).length;
-  return n ? ` — et repart avec ${["un titre", "deux titres", "trois titres"][n - 1]}.` : ".";
-}
-
-/**
- * La ligne d'un top de la journée : ses buts, ses passes, puis tous ses titres
- * dans l'ordre des puces (un même joueur peut être MVP, Impact et Mur) ; son
- * résultat s'il n'a rien de tout ça.
- */
-function motsDuTop(e: MatchEntry): string[] {
-  const mots = [
-    e.buts > 0 && `${e.buts}B`,
-    e.passes > 0 && `${e.passes}P`,
-    e.mvp && "MVP",
-    e.impact && "IMPACT",
-    e.def && "DÉF",
-  ].filter((x): x is string => !!x);
-  return mots.length ? mots : e.result ? [e.result] : [];
-}
-
 /* ------------------------------- Le récap ------------------------------- */
 
 /**
@@ -260,8 +238,8 @@ function JourneeRecapComplet({ j }: { j: number }) {
   )[0];
   const others = matches.filter((m) => m !== big);
 
-  // « J1 · 18 oct. » : l'espace compte, sinon la J1 prenait aussi les cartes des J10 à J19.
-  const jBoosts = boostCards.filter((c) => c.date.startsWith(`J${lastJ.j} `));
+  // Les cartes de cette journée seule (la J1 ne prend pas celles des J10 à J19).
+  const jBoosts = cartesDeLaJournee(boostCards, lastJ.j);
   const mvpCard = jBoosts.find((c) => c.type === "mvp") ?? jBoosts[0];
   const unlocked = jBoosts.filter((c) => c !== mvpCard).slice(0, 3);
 
@@ -796,9 +774,10 @@ function JourneeRecapComplet({ j }: { j: number }) {
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-ligne font-semibold"><Nom n={e.player} /></span>
                     {/* Tous ses titres, dans l'ordre des puces. Chaque mot porte son point devant lui ;
-                        celui qui ouvre une ligne sort à gauche et se rogne : jamais « · DÉF » en tête. */}
+                        celui qui ouvre une ligne sort du côté où elle commence (à gauche en français,
+                        à droite en arabe : la marge est logique) et se rogne : jamais « · DÉF » en tête. */}
                     <span className="mono-label block overflow-hidden text-muted-foreground">
-                      <span className="-ml-[1.2em] flex flex-wrap">
+                      <span className="-ms-[1.2em] flex flex-wrap">
                         {motsDuTop(e).map((x) => (
                           <span key={x} className="whitespace-nowrap before:inline-block before:w-[1.2em] before:text-center before:content-['·']">
                             {x}

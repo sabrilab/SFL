@@ -9,7 +9,9 @@
 // selon l'onglet. En pied, les trois chiffres de la journée.
 // Rien ne se chevauche (Sabri, 23/10) : trois joueurs au plus par rangée, et
 // d'une rangée à la suivante, de quoi poser une carte, son nom et sa pastille
-// sans que la carte de devant ne cache la pastille de derrière.
+// sans que la carte de devant ne cache la pastille de derrière, ni ses puces
+// ne touchent cette pastille ; la dernière rangée reste au-dessus des lignes
+// de la surface.
 // Dans chaque mode, une carte à titre porte ses puces sur son coin, or MVP,
 // rouge Impact, bleu Défensive (Ilyes, 02/11/2026, puces-titres.tsx), lues
 // au seul point de lecture (hooks/use-titres-du-jour.ts) : rien tant que le
@@ -22,6 +24,7 @@ import { CarteDe } from "@/components/sfl/mini-carte";
 import { Nom } from "@/components/sfl/nom";
 import { PucesTitres } from "@/components/sfl/puces-titres";
 import { useTitresDuJour } from "@/hooks/use-titres-du-jour";
+import { titresDeLaSynthese } from "@/lib/sfl/titres-ecrans";
 
 export interface PitchLine {
   name: string;
@@ -43,19 +46,22 @@ const MODES: [Mode, string][] = [
   ["titres", "Titres"],
 ];
 
-/** La pastille du mode « Titres » : le titre en entier s'il est seul, sinon chacun en court (« IMP·DÉF »). */
-const LONG = { mvp: "MVP", impact: "IMPACT", def: "DÉF" } as const;
-const COURT = { mvp: "MVP", impact: "IMP", def: "DÉF" } as const;
-
 /** Le joueur, en petite carte (la pastille de la hiérarchie des cartes). */
 function Avatar({ name }: { name: string; size?: number }) {
   return <CarteDe name={name} />;
 }
 
-/** Un joueur posé (sa carte, son nom, sa pastille) et l'écart d'une rangée à la suivante, en px. */
+/**
+ * Un joueur posé (sa carte, son nom, sa pastille) et l'écart d'une rangée à
+ * la suivante, en px : de quoi laisser les puces d'une carte (posées un peu
+ * au-dessus d'elle) à distance de la pastille et de son halo, à la rangée de
+ * devant.
+ */
 const BLOC = 90;
-const RANGEE = BLOC + 8;
+const RANGEE = BLOC + 16;
 const HAUT = 26;
+/** La surface de réparation, en bas du terrain (h-12) : la dernière rangée se pose au-dessus, jamais sur ses lignes. */
+const SURFACE = 48;
 /** La place en largeur (en %) des joueurs d'une rangée, selon leur nombre. */
 const LARGEURS: Record<number, number[]> = { 1: [50], 2: [30, 70], 3: [18, 50, 82] };
 
@@ -105,18 +111,9 @@ export function PitchSynthese({
       case "titres":
         // Cinq cartes au plus : les MVP d'abord, puis ceux qui ont le plus de
         // titres (un même joueur peut être MVP, Impact et Mur), dans l'ordre de
-        // la feuille à égalité. La pastille les dit tous, dans l'ordre des puces.
-        return lines
-          .filter((l) => !l.extraTime)
-          .map((l) => ({ l, t: titresDuJour(l.name) }))
-          .filter(({ t }) => t.length > 0)
-          .sort((a, b) => Number(b.t.includes("mvp")) - Number(a.t.includes("mvp")) || b.t.length - a.t.length)
-          .slice(0, 5)
-          .map(({ l, t }) => ({
-            name: l.name,
-            badge: t.length > 1 ? t.map((x) => COURT[x]).join("·") : LONG[t[0]],
-            hot: t.includes("mvp"),
-          }));
+        // la feuille à égalité. La pastille les dit tous, dans l'ordre des puces
+        // (lib/sfl/titres-ecrans.ts).
+        return titresDeLaSynthese(lines, titresDuJour);
       default:
         return [...lines]
           .sort((a, b) => b.buts * 2 + b.passes - (a.buts * 2 + a.passes))
@@ -167,7 +164,7 @@ export function PitchSynthese({
       <div
         className="relative mx-4 rounded-2xl border border-primary/20"
         style={{
-          height: Math.max(250, HAUT + (rows.length - 1) * RANGEE + BLOC + 14),
+          height: Math.max(250, HAUT + (rows.length - 1) * RANGEE + BLOC + 8 + SURFACE),
           background:
             "radial-gradient(120% 90% at 50% 0%, rgba(111,168,255,0.14), transparent 60%), linear-gradient(180deg, rgba(111,168,255,0.05), transparent)",
         }}
