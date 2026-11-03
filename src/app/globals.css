@@ -1936,3 +1936,10 @@ html[lang="ar"] :is([class*="tracking-"], .mono-label, .titre-lettrage) {
 html[lang="ar"] .mono-label {
   font-size: 12px;
 }
+/* Les cartes ne bougent pas en arabe : leur mise en page reste celle de la
+   carte imprimée, de gauche à droite (un nom en arabe s'y écrit quand même
+   dans son sens). */
+html[dir="rtl"] [data-card-part] {
+  direction: ltr;
+  unicode-bidi: isolate;
+}
