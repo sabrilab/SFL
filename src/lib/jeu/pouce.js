@@ -112,10 +112,10 @@ export function creerPouce(el) {
   };
   const haut = (e) => {
     if (e.key === ' ' && espace) {
-      // Espace : maintenu = plus fort ; la direction suit les flèches, sinon droit au but
+      // Espace : maintenu = plus fort ; droit au but, infléchi par les flèches haut et bas
       const f = Math.min(1, (performance.now() - espace) / 700);
       espace = 0;
-      p.surLancer?.(p.stick.x * 0.6, 1, f);
+      p.surLancer?.(1, p.stick.y * 0.6, f); // vers la droite : le but attaqué, vu de la tribune
       return;
     }
     touches.delete(e.key); majClavier();

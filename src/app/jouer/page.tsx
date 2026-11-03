@@ -10,8 +10,8 @@
 // porte ta photo du studio ; les autres sont des statues.
 //
 // Gestes, dans le bas de l'écran : glisser = courir (loin = sprint) ; toucher =
-// passe (ou tacle en défense) ; coup sec vers le haut = frappe ; coup sec de
-// côté = roulette. Pas de texte d'aide : un pouce fantôme montre le geste tant
+// passe (ou tacle en défense) ; coup sec vers la droite = frappe ; coup sec
+// vers le haut ou le bas = roulette. La caméra est sur le côté, comme à la télé. Pas de texte d'aide : un pouce fantôme montre le geste tant
 // qu'on n'a pas touché l'écran.
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
@@ -128,7 +128,7 @@ export default function JouerPage() {
 
       {/* le pouce fantôme : le geste, tant qu'on n'a pas touché */}
       {phase === "jeu" && !touche && (
-        <div className="pointer-events-none absolute bottom-[14%] left-1/2 -translate-x-1/2">
+        <div className="pointer-events-none absolute bottom-[14%] left-[38%] -translate-x-1/2">
           <div className="jeu-fantome h-10 w-10 rounded-full bg-white/80 shadow-[0_2px_14px_rgba(0,0,0,.4)]" />
         </div>
       )}
@@ -175,8 +175,8 @@ export default function JouerPage() {
         @keyframes jeu-fantome {
           0% { transform: translate(0, 0); opacity: 0 }
           12% { opacity: .9 }
-          55% { transform: translate(0, -42px); opacity: .9 }
-          62% { transform: translate(0, -110px); opacity: 0 }
+          55% { transform: translate(42px, 0); opacity: .9 }
+          62% { transform: translate(110px, 0); opacity: 0 }
           100% { opacity: 0 }
         }
         @media (prefers-reduced-motion: reduce) { .jeu-mot, .jeu-fantome { animation: none } }

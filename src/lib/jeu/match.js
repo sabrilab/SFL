@@ -5,12 +5,15 @@
 // Les règles de Bola (un five en salle) : la balle ne sort jamais, elle rebondit sur les panneaux et les filets ; pas
 // de touche, pas de corner, pas de hors-jeu ; après un but, l'équipe qui l'a pris engage au rond central.
 //
-// Ce que fait chaque geste (on joue toujours les Noirs, le but attaqué est en haut de l'écran) :
+// La caméra est celle de la télé (Sabri 03/11 : « vision sur le côté, même vue caméra que dans FIFA ») : en hauteur
+// dans la tribune, le long du terrain ; les Noirs attaquent vers la droite de l'écran.
+//
+// Ce que fait chaque geste (on joue toujours les Noirs) :
 //   glisser          courir dans cette direction ; loin du point de départ, sprinter. Balle au pied, elle suit.
 //   toucher          avec la balle : la passe, vers le partenaire qui est dans la direction où tu cours (sinon
 //                    celui que tu regardes) ; sans la balle, près du porteur adverse : le tacle
-//   coup sec en haut avec la balle : la frappe, vers le côté du but que montre le geste, aussi forte que le geste est vif
-//   coup sec de côté avec la balle : un geste technique (roulette) : tu passes de ce côté, le défenseur trop près reste planté
+//   coup sec vers la droite avec la balle : la frappe, vers le côté du but que montre le geste, aussi forte que le geste est vif
+//   coup sec vers le haut ou le bas avec la balle : un geste technique (roulette) : tu passes de ce côté, le défenseur trop près reste planté
 // Comme à la manette, tu joues le porteur ; en défense, la main passe au Noir le plus près de la balle. Celui que tu
 // joues porte un anneau blanc au pied.
 //
@@ -102,6 +105,10 @@ export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, 
   // le halo seulement sur les vraies sources (projecteurs, LED) : pas sur un col blanc ou le ballon sous les projecteurs
   if (pl.bloom) pl.bloom.threshold = 2.4;
   const camera = pl.camera;
+  // le grillage du côté de la caméra (le côté nord du plateau) masquerait le bas du terrain : on n'en garde que les
+  // panneaux LED, comme la caméra de la télé qui filme par-dessus
+  const coteCamera = pl.emplacements.panneauxN?.ancre?.parent;
+  if (coteCamera) for (const o of coteCamera.children) if (o.position.y > DIM.panneau) o.visible = false;
   const monde = new THREE.Group();
   monde.rotation.y = Math.PI / 2; // jeu (x, z) → plateau (z, -x)
   pl.scene.add(monde);
@@ -355,13 +362,16 @@ export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, 
   }
 
   // ── les gestes du pouce (toujours les Noirs) ──
+  // l'écran vu de la tribune : la droite de l'écran = vers le but attaqué (-z), le haut = vers l'autre côté (-x)
+  const ecranVersJeu = (sx, sy) => ({ x: -sy, z: -sx });
   pouce.surTouche = () => {
     if (etat.phase !== 'jeu') return;
     const j = humain;
     if (b.porteur === j) {
       const st = pouce.stick;
       const a = Math.hypot(st.x, st.y) > 0.3;
-      const dx = a ? st.x : Math.sin(j.cap), dz = a ? -st.y : Math.cos(j.cap);
+      const g = ecranVersJeu(st.x, st.y);
+      const dx = a ? g.x : Math.sin(j.cap), dz = a ? g.z : Math.cos(j.cap);
       const cible = choisirPartenaire(j, dx, dz);
       if (cible) passer(j, cible);
       return;
@@ -372,7 +382,8 @@ export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, 
     if (etat.phase !== 'jeu') return;
     const j = humain;
     const len = Math.hypot(dx, dy) || 1;
-    const ux = dx / len, uz = dy / len; // uz > 0 = vers le haut de l'écran = vers le but attaqué
+    const g = ecranVersJeu(dx / len, dy / len);
+    const ux = g.x, uz = -g.z; // uz > 0 = vers le but attaqué (la droite de l'écran), ux = en travers
     if (b.porteur !== j) {
       if (b.porteur && b.porteur.e !== j.e && b.porteur.pos.distanceTo(j.pos) < 2.6) tacler(j);
       return;
@@ -407,8 +418,9 @@ export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, 
     let vmax = amp > 0.85 ? V_SPRINT : V_TROT * Math.min(1, amp / 0.6);
     if (b.porteur === j) vmax *= 0.93;
     if (j.sonne > 0) vmax = Math.min(vmax, 1.4);
-    const cx = amp > 0.05 ? (st.x / (Math.hypot(st.x, st.y) || 1)) * vmax : 0;
-    const cz = amp > 0.05 ? (-st.y / (Math.hypot(st.x, st.y) || 1)) * vmax : 0;
+    const g = ecranVersJeu(st.x / (Math.hypot(st.x, st.y) || 1), st.y / (Math.hypot(st.x, st.y) || 1));
+    const cx = amp > 0.05 ? g.x * vmax : 0;
+    const cz = amp > 0.05 ? g.z * vmax : 0;
     const occupe = j.perso.occupe && j.perso.ponctuelNom !== 'roulette';
     const k = Math.min(1, dt * (amp > 0.05 ? 9 : 7));
     j.vel.x = lerp(j.vel.x, occupe ? 0 : cx, k);
@@ -745,11 +757,13 @@ export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, 
       voulu = tmp.set(j.pos.x + Math.sin(ang) * d, 1.7, j.pos.z + Math.cos(ang) * d);
       regard = tmp2.copy(j.pos).setY(1.45);
     } else {
-      // plan de télé en vertical : derrière les Noirs, au-dessus, le but attaqué en haut de l'écran ; sous le cube
-      cam.foyer.lerp(tmp2.set(b.pos.x + b.vel.x * 0.25, 0, b.pos.z + b.vel.z * 0.25), Math.min(1, dt * 3));
-      const fx = clamp(cam.foyer.x, -6, 6), fz = clamp(cam.foyer.z, -LB + 3, LB + 1);
-      voulu = tmp.set(fx * 0.55, 8.4, fz + 9.2);
-      regard = tmp2.set(fx * 0.72, 0, fz - 5.2);
+      // le plan de la télé : en hauteur dans la tribune, le long du terrain (côté opposé au commentateur), qui suit
+      // la balle en travelling ; les Noirs attaquent vers la droite de l'écran
+      cam.foyer.lerp(tmp2.set(b.pos.x + b.vel.x * 0.2, 0, b.pos.z + b.vel.z * 0.35), Math.min(1, dt * 2.6));
+      const large = cw > ch;
+      const fx = clamp(cam.foyer.x, -6, 6), fz = clamp(cam.foyer.z, -(large ? 6 : 11), large ? 6 : 11);
+      voulu = tmp.set(large ? 21 : 15.5, large ? 12.5 : 11, fz);
+      regard = tmp2.set(fx * 0.3 + (large ? -1 : 0.6), 0, fz);
     }
     const k = Math.min(1, dt * (face ? 2.2 : 3));
     cam.pos.lerp(voulu, k);
@@ -826,7 +840,7 @@ export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, 
     renderer.setSize(W, H, false);
     pl.composer.setSize(W, H);
     camera.aspect = cw / ch;
-    camera.fov = cw > ch ? 38 : 52;
+    camera.fov = cw > ch ? 34 : 60;
     camera.updateProjectionMatrix();
   }
   const ro = new ResizeObserver(taille);
