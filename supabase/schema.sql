@@ -4115,6 +4115,27 @@ begin
     check (statut in ('propose', 'accepte', 'refuse', 'annule', 'expire', 'forfait'));
 end;
 $$;
+-- L'entraîneur (Ilyes, 02/11/2026 : « une équipe = 7 joueurs + 1
+-- entraîneur ») : un membre qui ne joue jamais pour l'équipe. Une seule
+-- ligne par personne et par équipe (la clé), donc un seul rôle ; une seule
+-- équipe à la fois, joueur ou entraîneur (equipe_membres_une_equipe) ; une
+-- seule place d'entraîneur par équipe, l'invité compris (une invitation
+-- d'entraîneur à la fois, et aucune tant qu'il y en a un). Il ne compte
+-- dans aucun seuil (equipe_effectif) et n'a que les droits que lui donne
+-- equipe_droit, geste par geste.
+do $$
+begin
+  alter table public.equipe_membres drop constraint if exists equipe_membres_role_check;
+  alter table public.equipe_membres add constraint equipe_membres_role_check
+    check (role in ('capitaine', 'vice', 'membre', 'entraineur'));
+end;
+$$;
+create unique index if not exists equipe_membres_un_entraineur on public.equipe_membres (equipe_id) where role = 'entraineur';
+-- Pourquoi chacun est parti, et à quelle place (lus par la carte
+-- d'entraîneur, la cohésion) : un départ, une exclusion arrivée à terme, la
+-- dissolution. Vides pour les départs d'avant le 03/11/2026.
+alter table public.equipe_departs add column if not exists motif text check (motif in ('depart', 'exclusion', 'dissolution'));
+alter table public.equipe_departs add column if not exists role text;
 grant select on public.equipe_departs to authenticated;
 drop policy if exists "equipe_departs: les miens" on public.equipe_departs;
 create policy "equipe_departs: les miens" on public.equipe_departs for select to authenticated
@@ -4217,7 +4238,8 @@ $$;
 revoke execute on function public.joueur_sfl(uuid), public.acces_team(uuid), public.team_sur_invitation(), public.mon_acces_team(), public.essai_team_fin() from public, anon;
 grant execute on function public.joueur_sfl(uuid), public.acces_team(uuid), public.team_sur_invitation(), public.mon_acces_team(), public.essai_team_fin() to authenticated;
 
--- Mon rôle dans une équipe (null : pas membre).
+-- Mon rôle dans une équipe (null : pas membre). Il ne sert plus de droit
+-- (equipe_droit, juste en dessous) : seulement à dire si j'en suis.
 create or replace function public.role_equipe(e bigint)
 returns text
 language sql
@@ -4229,6 +4251,41 @@ as $$
    where m.equipe_id = e and m.joueur = (select auth.uid()) and m.statut = 'membre';
 $$;
 
+-- Les droits dans une équipe, geste par geste (Ilyes, 02/11/2026 : 7
+-- joueurs + 1 entraîneur). Jamais « rôle différent de membre » : un rôle de
+-- plus n'hérite de rien. L'entraîneur recrute, défie et dépose la feuille
+-- d'avant-match ; il n'annule pas un match programmé, ne saisit jamais un
+-- score et ne dirige pas l'équipe (le vice, l'entraîneur, l'exclusion, la
+-- dissolution restent au capitaine). Pendant un préavis d'exclusion, aucun
+-- droit. Un geste inconnu : aucun droit. La même table, en TypeScript :
+-- DROITS (lib/sfl/equipes-droits.ts), vérifiée contre celle-ci
+-- (tools/equipe-droits-check.ts).
+create or replace function public.equipe_droit(e bigint, geste text)
+returns boolean
+language sql
+security definer
+set search_path = ''
+stable
+as $$
+  select coalesce((
+    select m.role = any (case geste
+      when 'inviter'    then array['capitaine', 'vice', 'entraineur']
+      when 'defier'     then array['capitaine', 'vice', 'entraineur']
+      when 'feuille'    then array['capitaine', 'vice', 'entraineur']
+      when 'annuler'    then array['capitaine', 'vice']
+      when 'score'      then array['capitaine', 'vice']
+      when 'ecusson'    then array['capitaine', 'vice']
+      when 'couverture' then array['capitaine', 'vice']
+      when 'direction'  then array['capitaine']
+    end)
+      from public.equipe_membres m
+     where m.equipe_id = e and m.joueur = (select auth.uid())
+       and m.statut = 'membre' and m.depart_le is null
+  ), false);
+$$;
+
+-- L'effectif : les joueurs signataires. L'entraîneur n'y compte jamais (5
+-- pour être active ou défier, 7 au plus, « n / 7 »).
 create or replace function public.equipe_effectif(e bigint)
 returns int
 language sql
@@ -4236,7 +4293,8 @@ security definer
 set search_path = ''
 stable
 as $$
-  select count(*)::int from public.equipe_membres m where m.equipe_id = e and m.statut = 'membre';
+  select count(*)::int from public.equipe_membres m
+   where m.equipe_id = e and m.statut = 'membre' and m.role <> 'entraineur';
 $$;
 
 -- Le coup d'envoi d'un défi, en heure de Paris.
@@ -4258,8 +4316,8 @@ set search_path = ''
 as $$
 begin
   update public.equipes x set dissoute_le = now(), capitaine = null where x.id = e and x.dissoute_le is null;
-  insert into public.equipe_departs (equipe_id, joueur)
-  select e, m.joueur from public.equipe_membres m where m.equipe_id = e and m.statut = 'membre'
+  insert into public.equipe_departs (equipe_id, joueur, motif, role)
+  select e, m.joueur, 'dissolution', m.role from public.equipe_membres m where m.equipe_id = e and m.statut = 'membre'
   on conflict do nothing;
   delete from public.equipe_membres m where m.equipe_id = e;
   delete from public.equipe_liens l where l.equipe_id = e;
@@ -4271,7 +4329,10 @@ $$;
 
 -- Le ménage, au début de chaque geste : exclusions arrivées à terme,
 -- invitations de plus de 72 h, défis sans réponse expirés, défis en
--- attente d'une équipe passée sous 5, brassard orphelin.
+-- attente d'une équipe passée sous 5, brassard orphelin. L'exclusion part
+-- à son heure (depart_le), même relevée plus tard : la carence et la fin
+-- d'une place d'entraîneur se comptent de là. Le brassard ne va jamais à
+-- l'entraîneur, et d'abord à un joueur qui n'est pas lui-même sur le départ.
 create or replace function public.equipe_menage(e bigint)
 returns void
 language plpgsql
@@ -4284,8 +4345,8 @@ begin
   if e is null then
     return;
   end if;
-  insert into public.equipe_departs (equipe_id, joueur)
-  select m.equipe_id, m.joueur from public.equipe_membres m
+  insert into public.equipe_departs (equipe_id, joueur, parti_le, motif, role)
+  select m.equipe_id, m.joueur, m.depart_le, 'exclusion', m.role from public.equipe_membres m
    where m.equipe_id = e and m.statut = 'membre' and m.depart_le is not null and m.depart_le <= now()
   on conflict do nothing;
   delete from public.equipe_membres m
@@ -4308,8 +4369,8 @@ begin
   end if;
   if not exists (select 1 from public.equipe_membres m where m.equipe_id = e and m.statut = 'membre' and m.role = 'capitaine') then
     select m.joueur into suivant from public.equipe_membres m
-     where m.equipe_id = e and m.statut = 'membre'
-     order by (m.role = 'vice') desc, m.signe_le asc limit 1;
+     where m.equipe_id = e and m.statut = 'membre' and m.role <> 'entraineur'
+     order by (m.depart_le is null) desc, (m.role = 'vice') desc, m.signe_le asc limit 1;
     update public.equipe_membres m set role = 'capitaine' where m.equipe_id = e and m.joueur = suivant;
     update public.equipes x set capitaine = suivant where x.id = e;
   end if;
@@ -4364,7 +4425,7 @@ begin
           (select p.ville from public.profiles p where p.id = moi), moi)
   returning id into e;
   insert into public.equipe_membres (equipe_id, joueur, statut, role, signe_le, reglement_version)
-  values (e, moi, 'membre', 'capitaine', now(), 'v2');
+  values (e, moi, 'membre', 'capitaine', now(), 'v3');
   return e;
 end;
 $$;
@@ -4378,7 +4439,9 @@ $$;
 -- en attente au plus, la borne haute de la création (team_invitations_creation).
 -- Inviter quelqu'un de déjà invité ne fait rien. L'invité doit pouvoir
 -- signer : un compte validé, sans équipe, jamais parti de celle-ci, et
--- sorti de sa carence avant que l'invitation tombe.
+-- sorti de sa carence avant que l'invitation tombe. Le capitaine, le vice
+-- et l'entraîneur invitent ; l'invitation de l'entraîneur lui-même ne
+-- prend pas l'une des six (equipe_entraineur_inviter, plus bas).
 create or replace function public.equipe_inviter(e bigint, joueur uuid)
 returns void
 language plpgsql
@@ -4391,7 +4454,7 @@ begin
     raise exception 'Cette équipe n''existe plus.' using errcode = 'P0001';
   end if;
   perform public.equipe_menage(e);
-  if coalesce(public.role_equipe(e), 'membre') = 'membre' then
+  if not public.equipe_droit(e, 'inviter') then
     raise exception 'Réservé au capitaine.' using errcode = '42501';
   end if;
   if public.equipe_effectif(e) >= 7 then
@@ -4418,7 +4481,7 @@ begin
               where d.joueur = equipe_inviter.joueur and d.parti_le > now() - interval '14 days' + interval '72 hours') then
     raise exception 'Ce joueur vient de quitter son équipe : 14 jours avant une autre.' using errcode = 'P0001';
   end if;
-  if (select count(*) from public.equipe_membres m where m.equipe_id = e and m.statut = 'invite') >= 6 then
+  if (select count(*) from public.equipe_membres m where m.equipe_id = e and m.statut = 'invite' and m.role <> 'entraineur') >= 6 then
     raise exception '6 invitations en attente au plus.' using errcode = 'P0001';
   end if;
   insert into public.equipe_membres (equipe_id, joueur, statut, invite_par)
@@ -4433,7 +4496,8 @@ $$;
 -- vient de quitter la sienne (14 jours, et l'invitation tomberait avant) ;
 -- 'attente' : compte pas encore validé ; 'team' : n'a pas Bola Team, et
 -- l'invitation ne vient pas d'un joueur SFL (qui la lui offrirait).
--- Réservé au capitaine et au vice.
+-- Réservé à qui invite (capitaine, vice, entraîneur) ; les mêmes raisons
+-- valent pour l'invitation d'un entraîneur.
 create or replace function public.equipe_indisponibles(e bigint)
 returns table (joueur uuid, raison text)
 language sql
@@ -4452,20 +4516,26 @@ as $$
         when not public.joueur_sfl((select auth.uid())) and not public.acces_team(p.id) then 'team'
       end as raison
     from public.profiles p
-    where coalesce(public.role_equipe(e), 'membre') <> 'membre'
+    where public.equipe_droit(e, 'inviter')
   ) t
   where t.raison is not null;
 $$;
 
--- Retirer une invitation (le capitaine), ou la refuser (l'invité).
+-- Retirer une invitation, ou la refuser (l'invité). Celle d'un joueur, qui
+-- invite la retire ; celle de l'entraîneur, le capitaine seul.
 create or replace function public.equipe_retirer_invitation(e bigint, joueur uuid)
 returns void
 language plpgsql
 security definer
 set search_path = ''
 as $$
+declare
+  r text;
 begin
-  if joueur <> (select auth.uid()) and coalesce(public.role_equipe(e), 'membre') = 'membre' then
+  select m.role into r from public.equipe_membres m
+   where m.equipe_id = e and m.joueur = equipe_retirer_invitation.joueur and m.statut = 'invite';
+  if equipe_retirer_invitation.joueur is distinct from (select auth.uid())
+     and not public.equipe_droit(e, case when r = 'entraineur' then 'direction' else 'inviter' end) then
     raise exception 'Réservé au capitaine.' using errcode = '42501';
   end if;
   delete from public.equipe_membres m
@@ -4473,7 +4543,11 @@ begin
 end;
 $$;
 
--- Accepter, c'est signer le Règlement Team (sa version).
+-- Accepter, c'est signer le Règlement Team (sa version, la 3 depuis le
+-- 03/11/2026). L'entraîneur signe comme un joueur, aux mêmes conditions
+-- d'accès, mais l'équipe au complet ne l'arrête pas (il ne compte pas) ; sa
+-- place commence à sa signature (equipe_entraineurs). À la septième
+-- signature d'un joueur, seules les invitations de joueurs tombent.
 create or replace function public.equipe_signer(e bigint)
 returns void
 language plpgsql
@@ -4483,6 +4557,7 @@ as $$
 declare
   moi uuid := (select auth.uid());
   offert_par uuid;
+  place text;
 begin
   if moi is null or not public.est_membre() then
     raise exception 'Réservé aux joueurs.' using errcode = '42501';
@@ -4492,7 +4567,8 @@ begin
     raise exception 'Cette équipe n''existe plus.' using errcode = 'P0001';
   end if;
   perform public.equipe_menage(e);
-  if not exists (select 1 from public.equipe_membres m where m.equipe_id = e and m.joueur = moi and m.statut = 'invite') then
+  select m.role into place from public.equipe_membres m where m.equipe_id = e and m.joueur = moi and m.statut = 'invite';
+  if not found then
     raise exception 'Invitation introuvable ou expirée.' using errcode = 'P0001';
   end if;
   -- Bola Team (Parrainage, plus bas) : à qui ne l'a pas encore, l'invitation
@@ -4511,26 +4587,37 @@ begin
   if public.equipe_en_carence(moi) then
     raise exception 'Après un départ, 14 jours avant une autre équipe.' using errcode = 'P0001';
   end if;
-  if public.equipe_effectif(e) >= 7 then
+  if place = 'entraineur' then
+    -- Défensif : l'index equipe_membres_un_entraineur le tient déjà.
+    if exists (select 1 from public.equipe_membres m
+                where m.equipe_id = e and m.role = 'entraineur' and m.statut = 'membre') then
+      raise exception 'L''équipe a déjà un entraîneur.' using errcode = 'P0001';
+    end if;
+  elsif public.equipe_effectif(e) >= 7 then
     raise exception 'L''équipe est au complet.' using errcode = 'P0001';
   end if;
   if offert_par is not null then
     insert into public.team_offerts (joueur, par, via) values (moi, offert_par, 'invitation')
     on conflict (joueur) do nothing;
   end if;
-  update public.equipe_membres m set statut = 'membre', signe_le = now(), reglement_version = 'v2'
+  update public.equipe_membres m set statut = 'membre', signe_le = now(), reglement_version = 'v3'
    where m.equipe_id = e and m.joueur = moi;
-  -- À 7, les autres invitations tombent.
+  if place = 'entraineur' then
+    insert into public.equipe_entraineurs (equipe_id, joueur, debut) values (e, moi, now())
+    on conflict (equipe_id, joueur) do nothing;
+  end if;
+  -- À 7 joueurs, les autres invitations de joueurs tombent.
   if public.equipe_effectif(e) >= 7 then
-    delete from public.equipe_membres m where m.equipe_id = e and m.statut = 'invite';
+    delete from public.equipe_membres m where m.equipe_id = e and m.statut = 'invite' and m.role <> 'entraineur';
   end if;
   -- Mes autres invitations n'ont plus lieu d'être.
   delete from public.equipe_membres m where m.joueur = moi and m.statut = 'invite';
 end;
 $$;
 
--- Quitter : pour toujours (art. 17.4). Le brassard passe au vice, sinon au
--- plus ancien ; le dernier qui part dissout l'équipe.
+-- Quitter : pour toujours (art. 17.4), joueur ou entraîneur. Le brassard
+-- passe au vice, sinon au plus ancien joueur ; le dernier joueur qui part
+-- dissout l'équipe (l'entraîneur seul ne la garde pas en vie).
 create or replace function public.equipe_quitter(e bigint)
 returns void
 language plpgsql
@@ -4539,14 +4626,16 @@ set search_path = ''
 as $$
 declare
   moi uuid := (select auth.uid());
+  place text;
 begin
   -- Le verrou : deux départs en même temps se suivent, le brassard ne se perd pas.
   perform 1 from public.equipes x where x.id = e for update;
-  if public.role_equipe(e) is null then
+  place := public.role_equipe(e);
+  if place is null then
     raise exception 'Tu n''es pas dans cette équipe.' using errcode = 'P0001';
   end if;
-  insert into public.equipe_departs (equipe_id, joueur) values (e, moi)
-  on conflict on constraint equipe_departs_pkey do update set parti_le = now();
+  insert into public.equipe_departs (equipe_id, joueur, motif, role) values (e, moi, 'depart', place)
+  on conflict on constraint equipe_departs_pkey do update set parti_le = now(), motif = 'depart', role = excluded.role;
   delete from public.equipe_membres m where m.equipe_id = e and m.joueur = moi;
   perform public.equipe_menage(e);
 end;
@@ -4554,6 +4643,8 @@ $$;
 
 -- Le capitaine exclut un membre, avec 48 h de préavis (art. 17.2) ; jamais
 -- quand un match est programmé dans ces 48 h. Le refaire annule l'exclusion.
+-- Un joueur exclu perd son brassard ; l'entraîneur garde sa place jusqu'au
+-- départ, sans aucun droit pendant les 48 h (equipe_droit).
 create or replace function public.equipe_exclure(e bigint, joueur uuid)
 returns void
 language plpgsql
@@ -4565,7 +4656,7 @@ declare
 begin
   perform 1 from public.equipes x where x.id = e for update;
   perform public.equipe_menage(e);
-  if public.role_equipe(e) is distinct from 'capitaine' then
+  if not public.equipe_droit(e, 'direction') then
     raise exception 'Réservé au capitaine.' using errcode = '42501';
   end if;
   select * into ligne from public.equipe_membres m
@@ -4582,7 +4673,8 @@ begin
                 and public.equipe_defi_heure(f.jour, f.heure) between now() and now() + interval '48 hours') then
     raise exception 'Un match est programmé dans les 48 h : l''exclusion attendra.' using errcode = 'P0001';
   end if;
-  update public.equipe_membres m set depart_le = now() + interval '48 hours', role = 'membre'
+  update public.equipe_membres m
+     set depart_le = now() + interval '48 hours', role = case when m.role = 'entraineur' then 'entraineur' else 'membre' end
    where m.equipe_id = e and m.joueur = equipe_exclure.joueur;
 end;
 $$;
@@ -4596,14 +4688,14 @@ set search_path = ''
 as $$
 begin
   perform 1 from public.equipes x where x.id = e for update;
-  if public.role_equipe(e) is distinct from 'capitaine' then
+  if not public.equipe_droit(e, 'direction') then
     raise exception 'Réservé au capitaine.' using errcode = '42501';
   end if;
   perform public.equipe_dissolution(e);
 end;
 $$;
 
--- Le capitaine nomme (ou retire) son vice-capitaine.
+-- Le capitaine nomme (ou retire) son vice-capitaine, un joueur : jamais l'entraîneur.
 create or replace function public.equipe_vice(e bigint, joueur uuid)
 returns void
 language plpgsql
@@ -4611,7 +4703,7 @@ security definer
 set search_path = ''
 as $$
 begin
-  if public.role_equipe(e) is distinct from 'capitaine' then
+  if not public.equipe_droit(e, 'direction') then
     raise exception 'Réservé au capitaine.' using errcode = '42501';
   end if;
   update public.equipe_membres m set role = 'membre' where m.equipe_id = e and m.role = 'vice';
@@ -4624,7 +4716,8 @@ end;
 $$;
 
 -- Le lien d'invitation de l'équipe : 72 h, comme une invitation, et
--- seulement tant qu'il reste des places.
+-- seulement tant qu'il reste des places. Il fait entrer un joueur, jamais
+-- un entraîneur.
 create or replace function public.equipe_lien(e bigint)
 returns text
 language plpgsql
@@ -4635,7 +4728,7 @@ declare
   j text;
 begin
   perform public.equipe_menage(e);
-  if coalesce(public.role_equipe(e), 'membre') = 'membre' then
+  if not public.equipe_droit(e, 'inviter') then
     raise exception 'Réservé au capitaine.' using errcode = '42501';
   end if;
   if public.equipe_effectif(e) >= 7 then
@@ -4663,7 +4756,7 @@ stable
 as $$
   select jsonb_build_object(
     'id', x.id, 'nom', x.nom, 'initiales', x.initiales, 'fond', x.fond, 'blason', x.blason, 'ville', x.ville,
-    'membres', (select count(*) from public.equipe_membres m where m.equipe_id = x.id and m.statut = 'membre'),
+    'membres', public.equipe_effectif(x.id),
     'capitaine', (select coalesce(p.nom_affiche, p.name) from public.profiles p where p.id = x.capitaine)
   )
   from public.equipe_liens l join public.equipes x on x.id = l.equipe_id
@@ -4729,7 +4822,7 @@ begin
   perform 1 from public.equipes x where x.id in (equipe_defier.de, equipe_defier.a) and x.dissoute_le is null order by x.id for update;
   perform public.equipe_menage(equipe_defier.de);
   perform public.equipe_menage(equipe_defier.a);
-  if coalesce(public.role_equipe(equipe_defier.de), 'membre') = 'membre' then
+  if not public.equipe_droit(equipe_defier.de, 'defier') then
     raise exception 'Réservé au capitaine.' using errcode = '42501';
   end if;
   if exists (select 1 from public.equipes x where x.id in (equipe_defier.de, equipe_defier.a) and x.dissoute_le is not null) then
@@ -4773,7 +4866,9 @@ end;
 $$;
 
 -- Répondre (l'équipe défiée), retirer son défi (le challenger), ou annuler
--- un match programmé : libre jusqu'à 48 h avant, forfait ensuite.
+-- un match programmé : libre jusqu'à 48 h avant, forfait ensuite. Répondre
+-- et retirer : qui défie (capitaine, vice, entraîneur) ; annuler un match
+-- programmé : le capitaine et le vice seulement, jamais l'entraîneur.
 create or replace function public.equipe_defi_statut(d bigint, statut text)
 returns void
 language plpgsql
@@ -4785,6 +4880,8 @@ declare
   coup timestamptz;
   moi_de boolean;
   moi_a boolean;
+  annule_de boolean;
+  annule_a boolean;
 begin
   select * into x from public.equipe_defis f where f.id = d for update;
   if x is null then
@@ -4794,8 +4891,10 @@ begin
   perform public.equipe_menage(x.a);
   select * into x from public.equipe_defis f where f.id = d;
   coup := public.equipe_defi_heure(x.jour, x.heure);
-  moi_de := coalesce(public.role_equipe(x.de), 'membre') <> 'membre';
-  moi_a := coalesce(public.role_equipe(x.a), 'membre') <> 'membre';
+  moi_de := public.equipe_droit(x.de, 'defier');
+  moi_a := public.equipe_droit(x.a, 'defier');
+  annule_de := public.equipe_droit(x.de, 'annuler');
+  annule_a := public.equipe_droit(x.a, 'annuler');
   if statut in ('accepte', 'refuse') then
     if not moi_a then
       raise exception 'Réservé au capitaine défié.' using errcode = '42501';
@@ -4814,13 +4913,13 @@ begin
       end if;
       update public.equipe_defis f set statut = 'annule' where f.id = d;
     elsif x.statut = 'accepte' and coup > now() then
-      if not (moi_de or moi_a) then
+      if not (annule_de or annule_a) then
         raise exception 'Réservé aux capitaines.' using errcode = '42501';
       end if;
       if coup > now() + interval '48 hours' then
         update public.equipe_defis f set statut = 'annule' where f.id = d;
       else
-        update public.equipe_defis f set statut = 'forfait', forfait_de = case when moi_de then x.de else x.a end where f.id = d;
+        update public.equipe_defis f set statut = 'forfait', forfait_de = case when annule_de then x.de else x.a end where f.id = d;
       end if;
     else
       raise exception 'Ce match ne s''annule plus.' using errcode = 'P0001';
@@ -4833,12 +4932,12 @@ $$;
 
 revoke execute on function public.equipe_effectif(bigint), public.equipe_dissolution(bigint), public.equipe_menage(bigint),
   public.equipe_en_carence(uuid) from public, anon, authenticated;
-revoke execute on function public.role_equipe(bigint), public.equipe_creer(text, text, text), public.equipe_inviter(bigint, uuid),
+revoke execute on function public.role_equipe(bigint), public.equipe_droit(bigint, text), public.equipe_creer(text, text, text), public.equipe_inviter(bigint, uuid),
   public.equipe_retirer_invitation(bigint, uuid), public.equipe_signer(bigint), public.equipe_quitter(bigint),
   public.equipe_vice(bigint, uuid), public.equipe_lien(bigint), public.equipe_par_lien(text),
   public.equipe_defier(bigint, bigint, date, text, text), public.equipe_defi_statut(bigint, text),
   public.equipe_exclure(bigint, uuid), public.equipe_dissoudre(bigint), public.equipe_indisponibles(bigint) from public, anon;
-grant execute on function public.role_equipe(bigint), public.equipe_creer(text, text, text), public.equipe_inviter(bigint, uuid),
+grant execute on function public.role_equipe(bigint), public.equipe_droit(bigint, text), public.equipe_creer(text, text, text), public.equipe_inviter(bigint, uuid),
   public.equipe_retirer_invitation(bigint, uuid), public.equipe_signer(bigint), public.equipe_quitter(bigint),
   public.equipe_vice(bigint, uuid), public.equipe_lien(bigint), public.equipe_par_lien(text),
   public.equipe_defier(bigint, bigint, date, text, text), public.equipe_defi_statut(bigint, text),
@@ -4916,7 +5015,7 @@ security definer
 set search_path = ''
 as $$
 begin
-  if coalesce(public.role_equipe(e), 'membre') = 'membre' then
+  if not public.equipe_droit(e, 'ecusson') then
     raise exception 'Réservé au capitaine.' using errcode = '42501';
   end if;
   if b is null or jsonb_typeof(b) <> 'object'
@@ -4986,8 +5085,10 @@ select m.equipe_id, m.joueur, m.reglement_version, coalesce(m.signe_le, m.create
 on conflict do nothing;
 
 -- La version 2 (24/10) : 2 points la victoire, et la Charte de
--- déontologie. Un membre qui avait signé la 1 (ou rien, avant le
--- règlement) signe la nouvelle, depuis l'app (art. 18.2).
+-- déontologie. La version 3 (03/11/2026) : l'entraîneur, et les joueurs
+-- seuls sur le terrain. Un membre qui avait signé une version d'avant (ou
+-- rien, avant le règlement) signe la nouvelle, depuis l'app (art. 18.2),
+-- sans être bloqué en attendant.
 create or replace function public.equipe_signer_charte(e bigint)
 returns void
 language plpgsql
@@ -5002,8 +5103,8 @@ begin
   ) then
     raise exception 'Réservé aux joueurs de l''équipe.' using errcode = '42501';
   end if;
-  update public.equipe_membres m set reglement_version = 'v2'
-   where m.equipe_id = e and m.joueur = moi and m.reglement_version is distinct from 'v2';
+  update public.equipe_membres m set reglement_version = 'v3'
+   where m.equipe_id = e and m.joueur = moi and m.reglement_version is distinct from 'v3';
 end;
 $$;
 
@@ -5067,9 +5168,10 @@ begin
   if x is null or x.statut <> 'accepte' then
     raise exception 'Ce match n''a pas de feuille.' using errcode = 'P0001';
   end if;
-  if coalesce(public.role_equipe(x.de), 'membre') <> 'membre' then
+  -- Le capitaine ou le vice ; jamais l'entraîneur, dont la carte lit ce score.
+  if public.equipe_droit(x.de, 'score') then
     e := x.de;
-  elsif coalesce(public.role_equipe(x.a), 'membre') <> 'membre' then
+  elsif public.equipe_droit(x.a, 'score') then
     e := x.a;
   else
     raise exception 'Réservé aux capitaines.' using errcode = '42501';
@@ -5099,7 +5201,8 @@ begin
     if l.joueur is null or coalesce(l.buts, 0) not between 0 and 99 or coalesce(l.passes, 0) not between 0 and 99 then
       raise exception 'Feuille invalide.' using errcode = '22023';
     end if;
-    if not exists (select 1 from public.equipe_membres m where m.equipe_id = e and m.joueur = l.joueur and m.statut = 'membre') then
+    if not exists (select 1 from public.equipe_membres m
+                    where m.equipe_id = e and m.joueur = l.joueur and m.statut = 'membre' and m.role <> 'entraineur') then
       raise exception 'Seuls les joueurs de l''équipe marquent pour elle.' using errcode = 'P0001';
     end if;
     tb := tb + coalesce(l.buts, 0);
@@ -5157,9 +5260,10 @@ create trigger equipe_resultats_push_effet
 -- version. Sans date, l'app dessine la couverture aux couleurs du maillot.
 -- Le crédit fal est celui de Sabri : 2 créations par équipe et par jour
 -- (heure de Paris), notées avant l'appel dans equipe_couvertures. Sur
--- l'image, seuls les joueurs qui ont signé le Règlement Team version 2, dont
--- le neuvième point le prévoit ; et un joueur qui quitte l'équipe (départ,
--- exclusion) emporte la couverture : sa date retombe.
+-- l'image, seuls les joueurs qui ont signé le Règlement Team version 2 ou 3,
+-- dont le neuvième point le prévoit ; et un joueur qui quitte l'équipe
+-- (départ, exclusion) emporte la couverture : sa date retombe. L'entraîneur
+-- n'y figure pas, et son départ la laisse.
 alter table public.equipes add column if not exists couverture_le timestamptz;
 
 create table if not exists public.equipe_couvertures (
@@ -5175,10 +5279,10 @@ grant select, insert on public.equipe_couvertures to authenticated;
 
 drop policy if exists "equipe_couvertures: les dirigeants lisent" on public.equipe_couvertures;
 create policy "equipe_couvertures: les dirigeants lisent" on public.equipe_couvertures for select to authenticated
-  using (coalesce(public.role_equipe(equipe_id), 'membre') <> 'membre' or (select public.is_league_admin()));
+  using (public.equipe_droit(equipe_id, 'couverture') or (select public.is_league_admin()));
 drop policy if exists "equipe_couvertures: les dirigeants notent" on public.equipe_couvertures;
 create policy "equipe_couvertures: les dirigeants notent" on public.equipe_couvertures for insert to authenticated
-  with check (user_id = (select auth.uid()) and coalesce(public.role_equipe(equipe_id), 'membre') <> 'membre');
+  with check (user_id = (select auth.uid()) and public.equipe_droit(equipe_id, 'couverture'));
 
 create or replace function public.equipe_couverture_credit()
 returns trigger
@@ -5214,7 +5318,7 @@ security definer
 set search_path = ''
 as $$
 begin
-  if coalesce(public.role_equipe(e), 'membre') = 'membre' then
+  if not public.equipe_droit(e, 'couverture') then
     raise exception 'Réservé au capitaine.' using errcode = '42501';
   end if;
   update public.equipes x
@@ -5230,7 +5334,8 @@ security definer
 set search_path = ''
 as $$
 begin
-  if old.statut = 'membre' and (tg_op = 'DELETE' or new.statut is distinct from 'membre') then
+  -- L'entraîneur n'est pas sur la couverture : son départ ne la retire pas.
+  if old.statut = 'membre' and old.role is distinct from 'entraineur' and (tg_op = 'DELETE' or new.statut is distinct from 'membre') then
     update public.equipes x set couverture_le = null
      where x.id = old.equipe_id and x.couverture_le is not null;
   end if;
@@ -5282,7 +5387,7 @@ begin
     to authenticated
     with check (
       bucket_id = 'couvertures'
-      and coalesce(public.role_equipe(public.couverture_cle_equipe(name)), 'membre') <> 'membre'
+      and public.equipe_droit(public.couverture_cle_equipe(name), 'couverture')
     );
 
   drop policy if exists "couvertures: les dirigeants remplacent" on storage.objects;
@@ -5291,11 +5396,11 @@ begin
     to authenticated
     using (
       bucket_id = 'couvertures'
-      and coalesce(public.role_equipe(public.couverture_cle_equipe(name)), 'membre') <> 'membre'
+      and public.equipe_droit(public.couverture_cle_equipe(name), 'couverture')
     )
     with check (
       bucket_id = 'couvertures'
-      and coalesce(public.role_equipe(public.couverture_cle_equipe(name)), 'membre') <> 'membre'
+      and public.equipe_droit(public.couverture_cle_equipe(name), 'couverture')
     );
 exception
   when others then raise warning 'couvertures : règles Storage non posées (%)', sqlerrm;
@@ -5315,6 +5420,113 @@ exception
   when undefined_object then null;
 end;
 $$;
+
+-- ──────────────── Bola Team : l'entraîneur (Ilyes, 02/11/2026) ────────────────
+-- « Une équipe = 7 joueurs + 1 entraîneur. » L'entraîneur est un membre de
+-- l'équipe (equipe_membres, role = 'entraineur') qui ne joue jamais pour
+-- elle : ni sur la feuille, ni buteur, ni passeur, ni capitaine, ni vice.
+-- Il ne compte dans aucun seuil (equipe_effectif). Le capitaine seul
+-- l'invite (equipe_entraineur_inviter), hors des six invitations de joueurs,
+-- et même quand l'équipe est à 7 ; jamais par le lien. Il signe le Règlement
+-- comme un joueur, aux mêmes conditions d'accès ; il part quand il veut, ou
+-- le capitaine l'écarte avec 48 h de préavis (equipe_exclure), et il ne
+-- revient jamais (equipe_departs). Ses droits : equipe_droit, plus haut.
+--
+-- Sa place, de sa signature à son départ (lue par sa carte d'entraîneur) :
+-- une ligne par équipe entraînée, jamais effacée ; la fin et son motif
+-- (départ, exclusion, dissolution, relus dans equipe_departs) se posent
+-- quand sa ligne d'equipe_membres disparaît.
+create table if not exists public.equipe_entraineurs (
+  id         bigint generated always as identity primary key,
+  equipe_id  bigint not null references public.equipes(id) on delete cascade,
+  joueur     uuid   not null references public.profiles(id) on delete cascade,
+  debut      timestamptz not null default now(),
+  fin        timestamptz,
+  motif      text check (motif in ('depart', 'exclusion', 'dissolution')),
+  unique (equipe_id, joueur)
+);
+create index if not exists equipe_entraineurs_joueur on public.equipe_entraineurs (joueur);
+alter table public.equipe_entraineurs enable row level security;
+drop policy if exists "equipe_entraineurs: lecture" on public.equipe_entraineurs;
+create policy "equipe_entraineurs: lecture" on public.equipe_entraineurs for select to authenticated
+  using ((select public.est_membre()));
+revoke all on public.equipe_entraineurs from anon, authenticated;
+grant select on public.equipe_entraineurs to authenticated;
+
+create or replace function public.equipe_entraineur_fin()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  update public.equipe_entraineurs t
+     set fin = coalesce((select d.parti_le from public.equipe_departs d where d.equipe_id = old.equipe_id and d.joueur = old.joueur), now()),
+         motif = (select d.motif from public.equipe_departs d where d.equipe_id = old.equipe_id and d.joueur = old.joueur)
+   where t.equipe_id = old.equipe_id and t.joueur = old.joueur and t.fin is null;
+  return null;
+end;
+$$;
+revoke execute on function public.equipe_entraineur_fin() from public, anon, authenticated;
+drop trigger if exists equipe_membres_entraineur_fin on public.equipe_membres;
+create trigger equipe_membres_entraineur_fin
+  after delete on public.equipe_membres
+  for each row when (old.role = 'entraineur' and old.statut = 'membre')
+  execute function public.equipe_entraineur_fin();
+
+-- Le capitaine invite l'entraîneur : 72 h pour signer, comme un joueur. Les
+-- mêmes refus qu'une invitation de joueur (compte validé, Bola Team ou
+-- l'invitation d'un joueur SFL, jamais parti de cette équipe, sans équipe,
+-- sorti de sa carence avant que l'invitation tombe), et deux de plus : un
+-- membre ou un invité de l'équipe ne devient pas son entraîneur (pas dans
+-- cette version), et une seule place d'entraîneur, invité compris.
+create or replace function public.equipe_entraineur_inviter(e bigint, joueur uuid)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  perform 1 from public.equipes x where x.id = e and x.dissoute_le is null for update;
+  if not found then
+    raise exception 'Cette équipe n''existe plus.' using errcode = 'P0001';
+  end if;
+  perform public.equipe_menage(e);
+  if not public.equipe_droit(e, 'direction') then
+    raise exception 'Réservé au capitaine.' using errcode = '42501';
+  end if;
+  if joueur is null then
+    raise exception 'Choisis un joueur.' using errcode = '22023';
+  end if;
+  if exists (select 1 from public.equipe_membres m where m.equipe_id = e and m.joueur = equipe_entraineur_inviter.joueur) then
+    raise exception 'Déjà dans l''équipe.' using errcode = 'P0001';
+  end if;
+  if exists (select 1 from public.equipe_membres m where m.equipe_id = e and m.role = 'entraineur') then
+    raise exception 'L''équipe a déjà un entraîneur.' using errcode = 'P0001';
+  end if;
+  if not exists (select 1 from public.profiles p where p.id = equipe_entraineur_inviter.joueur and p.valide) then
+    raise exception 'Son compte n''est pas encore validé.' using errcode = 'P0001';
+  end if;
+  if not public.acces_team(equipe_entraineur_inviter.joueur) and not public.joueur_sfl((select auth.uid())) then
+    raise exception 'Ce joueur n''a pas Bola Team : il lui faut le lien d''un joueur SFL.' using errcode = 'P0001';
+  end if;
+  if exists (select 1 from public.equipe_departs d where d.equipe_id = e and d.joueur = equipe_entraineur_inviter.joueur) then
+    raise exception 'Il a quitté l''équipe : il n''y revient pas.' using errcode = 'P0001';
+  end if;
+  if exists (select 1 from public.equipe_membres m where m.joueur = equipe_entraineur_inviter.joueur and m.statut = 'membre') then
+    raise exception 'Ce joueur a déjà une équipe.' using errcode = 'P0001';
+  end if;
+  if exists (select 1 from public.equipe_departs d
+              where d.joueur = equipe_entraineur_inviter.joueur and d.parti_le > now() - interval '14 days' + interval '72 hours') then
+    raise exception 'Ce joueur vient de quitter son équipe : 14 jours avant une autre.' using errcode = 'P0001';
+  end if;
+  insert into public.equipe_membres (equipe_id, joueur, statut, role, invite_par)
+  values (e, equipe_entraineur_inviter.joueur, 'invite', 'entraineur', (select auth.uid()));
+end;
+$$;
+
+revoke execute on function public.equipe_entraineur_inviter(bigint, uuid) from public, anon;
+grant execute on function public.equipe_entraineur_inviter(bigint, uuid) to authenticated;
 
 -- ─────────────────── Confidentialité : les accords ───────────────────
 -- L'accord de chaque joueur à la politique de confidentialité (22/10/2026) :

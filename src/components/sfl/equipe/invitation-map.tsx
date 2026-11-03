@@ -11,7 +11,7 @@
 
 import Link from "next/link";
 import { Ecusson } from "@/components/sfl/equipe/ecusson";
-import { inviteur, signataires, type Equipe, type Membre } from "@/lib/sfl/equipes";
+import { signataires, tInvite, type Equipe, type Membre } from "@/lib/sfl/equipes";
 import { finInvitation, quandTombe } from "@/lib/sfl/equipes-temps";
 
 const ENCRE = "#0A0B0D";
@@ -40,7 +40,7 @@ export function InvitationsEquipe({ invitations, moi }: { invitations: Equipe[];
         </span>
         <span className="flex min-w-0 flex-1 flex-col">
           <span className="truncate text-lecture font-bold tracking-[-0.2px]">
-            {inviteur(e, m)} t&apos;invite · {e.nom}
+            {tInvite(e, m)} · {e.nom}
           </span>
           <span className="truncate text-corps font-medium opacity-60">
             Bola Team · {n} joueur{n > 1 ? "s" : ""}

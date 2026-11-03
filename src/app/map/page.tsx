@@ -169,7 +169,7 @@ import {
   useTerrainsRecenses,
   type TerrainPropose,
 } from "@/lib/sfl/terrains";
-import { active } from "@/lib/sfl/equipes";
+import { active, droitDe, signataires } from "@/lib/sfl/equipes";
 import type { LieuChoisi } from "@/components/sfl/matchs/choisir-terrain";
 import { useVillesRevision } from "@/hooks/use-villes";
 import { useJoueursDeLaMap } from "@/hooks/use-joueurs-de-la-map";
@@ -925,14 +925,15 @@ export default function MapPage() {
   const invitations = useMemo(() => invitationsDe(parties, moi), [parties, moi]);
   // Les équipes du mode Team qui m'invitent : leur carte au-dessus de celles des matchs.
   const { equipe: monEquipe, invitations: invitationsEquipe } = useMonEquipe();
-  // Défier depuis un terrain : le capitaine ou le vice d'une équipe active ;
-  // sans équipe, la monter ; un simple membre laisse le défi à son capitaine.
-  const roleEquipe = monEquipe?.membres.find((x) => x.id === moi && x.statut === "membre")?.role;
+  // Défier depuis un terrain : qui défie dans une équipe active (capitaine,
+  // vice, entraîneur) ; sans équipe, la monter ; un simple membre laisse le
+  // défi à son capitaine.
+  const moiDansLEquipe = monEquipe?.membres.find((x) => x.id === moi && x.statut === "membre") ?? null;
   const defiDepuisTerrain: "defier" | "monter" | null = !partiesActives
     ? null
     : !monEquipe
       ? "monter"
-      : active(monEquipe) && (roleEquipe === "capitaine" || roleEquipe === "vice")
+      : active(monEquipe) && droitDe(moiDansLEquipe, "defier")
         ? "defier"
         : null;
 
@@ -2674,7 +2675,7 @@ function FicheTeam({ t }: { t: MatchTeam }) {
     <div className="flex min-w-0 flex-1 flex-col items-center gap-2 text-center">
       <Ecusson initiales={e.initiales} fond={e.fond} blason={e.blason} taille={72} />
       <p className="w-full truncate text-[15px] font-bold tracking-tight">{e.nom}</p>
-      <p className="mono-label text-muted-foreground">{e.membres.filter((x) => x.statut === "membre").length} joueurs</p>
+      <p className="mono-label text-muted-foreground">{signataires(e).length} joueurs</p>
     </div>
   );
   return (

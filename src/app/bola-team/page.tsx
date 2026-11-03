@@ -70,6 +70,17 @@
 // profil des joueurs et Ma carte le montrent aussi) jusqu'à ?apercu=0 ;
 // ?vitrine=1 la vitrine ; et le championnat de démonstration
 // (lib/sfl/equipes-demo.ts) tant que la vraie saison n'a aucun match validé.
+//
+// Depuis le 03/11/2026 (Ilyes, 02/11 : « une équipe = 7 joueurs + 1
+// entraîneur »), le 7 + 1 : sous le terrain, le banc (equipe/banc-entraineur.tsx),
+// la place de l'entraîneur, à part, sans tirets ; le capitaine seul y invite
+// (la liste des joueurs, un seul, sans lien). Chaque geste suit les droits
+// de la base, geste par geste (peut, lib/sfl/equipes-droits.ts) : jamais
+// « rôle différent de membre ». L'entraîneur invite des joueurs, défie et
+// répond aux défis ; il n'annule pas un match, ne remplit jamais la feuille
+// de match et ne touche ni à l'écusson ni à la couverture. Sa fiche, au
+// capitaine : « Retirer l'entraîneur » (48 h de préavis), ou, invité, le
+// relancer et retirer l'invitation.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
@@ -92,6 +103,7 @@ import { VitrineTeam } from "@/components/sfl/equipe/vitrine-team";
 import { TerrainRetenu } from "@/components/sfl/matchs/choisir-terrain";
 import { TerrainPlaces, type Occupant } from "@/components/sfl/matchs/terrain-places";
 import { ChoisirJoueur } from "@/components/sfl/matchs/choisir-joueur";
+import { BancEntraineur, CarteEntraineurDuMembre } from "@/components/sfl/equipe/banc-entraineur";
 import { useSession } from "@/hooks/use-session";
 import { useAccesTeam, useEssaiTeam } from "@/hooks/use-acces-team";
 import { useApercuTeam } from "@/hooks/use-equipes";
@@ -107,13 +119,17 @@ import {
   annulerSeraitForfait,
   direErreurEquipe,
   dissoudreEquipe,
+  droitDe,
   enCours,
+  entraineurDe,
   etatEquipe,
   exclureMembre,
   indisponibles,
   initialesDe,
   invitationsPossibles,
   invites,
+  invitesJoueurs,
+  inviterEntraineur,
   inviterJoueurs,
   inviteur,
   lienEquipe,
@@ -127,10 +143,12 @@ import {
   repondreDefi,
   retirerInvitation,
   signataires,
+  tInvite,
   urlDuLien,
   type Defi,
   type Equipe,
   type EquipeTeam,
+  type Geste,
   type Indispo,
   type Membre,
 } from "@/lib/sfl/equipes";
@@ -250,7 +268,8 @@ function InvitationRecue({ e, moi, onRefuser, onRejoindre }: { e: Equipe; moi: s
           <span className="truncate text-titre-fort leading-tight font-bold tracking-tight">{e.nom}</span>
           {m && (
             <span className="truncate text-corps text-muted-foreground">
-              {inviteur(e, m)} t&apos;invite{m.depuis && <> · jusqu&apos;à {quandTombe(finInvitation(m.depuis))}</>}
+              {tInvite(e, m)}
+              {m.depuis && <> · jusqu&apos;à {quandTombe(finInvitation(m.depuis))}</>}
             </span>
           )}
         </span>
@@ -306,6 +325,8 @@ export default function BolaTeamPage() {
   const [terrainDefi, setTerrainDefi] = useState<string | null>(null);
   const { terrains: recenses } = useTerrainsRecenses();
   const [choisir, setChoisir] = useState(false);
+  // La liste des joueurs pour la place d'entraîneur : un seul, sans lien.
+  const [choisirEntraineur, setChoisirEntraineur] = useState(false);
   const [indispos, setIndispos] = useState<Map<string, Indispo> | null>(null);
   const [joueur, setJoueur] = useState<Membre | null>(null);
   const [confirmer, setConfirmer] = useState<AConfirmer | null>(null);
@@ -445,7 +466,7 @@ export default function BolaTeamPage() {
         const f = feuilleVoulue.current;
         if (f != null && id) {
           feuilleVoulue.current = null;
-          const mien = e.find((x) => x.membres.some((m) => m.id === id && m.statut === "membre" && m.role !== "membre"));
+          const mien = e.find((x) => x.membres.some((m) => m.id === id && m.statut === "membre" && droitDe(m, "score")));
           const match = c?.matchs.find((m) => m.id === f);
           if (mien && match && (match.de === mien.id || match.a === mien.id)) setFeuille(f);
           else setVue("championnat");
@@ -483,15 +504,16 @@ export default function BolaTeamPage() {
   const moiNom = apercu ? me : (profils.find((p) => p.id === moiId)?.name ?? me);
 
   const mienne = monde.equipes.find((e) => e.membres.some((m) => m.id === moi && m.statut === "membre")) ?? null;
-  const monRole = mienne?.membres.find((m) => m.id === moi)?.role ?? null;
-  const capitaine = monRole === "capitaine" || monRole === "vice";
+  const moiMembre = mienne?.membres.find((m) => m.id === moi) ?? null;
+  const monRole = moiMembre?.role ?? null;
+  // Mes gestes dans mon équipe : ceux que la base me permet (aucun pendant un préavis d'exclusion).
+  const puis = (g: Geste) => droitDe(moiMembre, g);
   const invitations = monde.equipes.filter((e) => invites(e).some((m) => m.id === moi));
   // Une équipe en formation (moins de 5) reste invisible aux autres (doc 04 §6).
   const autres = monde.equipes.filter((e) => e.id !== mienne?.id && active(e));
   const charge = apercu || equipes !== null;
   const nomDe = (id: number) => monde.equipes.find((e) => e.id === id);
   const sansAcces = forceVitrine || acces === false;
-  const moiMembre = mienne?.membres.find((m) => m.id === moi) ?? null;
   const charteASigner = !!moiMembre && aSignerLaCharte(moiMembre);
 
   // Le championnat. En aperçu, et sur une préversion tant que la vraie
@@ -520,7 +542,7 @@ export default function BolaTeamPage() {
   const heureFeuilles = apercu && demoChamp ? demoChamp.maintenant : undefined;
   const equipeDe = (id: number) => miens.equipes.find((e) => e.id === id) ?? monde.equipes.find((e) => e.id === id) ?? null;
   const aRemplir =
-    mienne && capitaine
+    mienne && puis("score")
       ? miens.matchs
           .filter((m) => m.de === mienne.id || m.a === mienne.id)
           .map((m) => ({ m, etat: etatMatch(m, heureFeuilles) }))
@@ -571,6 +593,28 @@ export default function BolaTeamPage() {
     if (!apercu)
       indisponibles(mienne.id).then(setIndispos, () => setIndispos(null));
   };
+  const ouvrirChoixEntraineur = () => {
+    if (!mienne) return;
+    setChoisirEntraineur(true);
+    if (!apercu)
+      indisponibles(mienne.id).then(setIndispos, () => setIndispos(null));
+  };
+
+  async function choisirLEntraineur(p: Profil) {
+    if (!mienne) return;
+    setChoisirEntraineur(false);
+    if (apercu) {
+      toast("Aperçu : rien n'est enregistré.");
+      return;
+    }
+    try {
+      await inviterEntraineur(mienne.id, p.id);
+      toast.success(`Invitation envoyée à ${prenom(p.name)}.`);
+      recharger();
+    } catch (e) {
+      toast.error(`${prenom(p.name)} : ${direErreurEquipe(e)}`);
+    }
+  }
 
   async function inviter(ps: Profil[]) {
     if (!mienne) return;
@@ -611,7 +655,9 @@ export default function BolaTeamPage() {
   }
 
   const signes = mienne ? signataires(mienne) : [];
-  const enAttente = mienne ? invites(mienne) : [];
+  // Sur le terrain, les joueurs invités ; l'entraîneur, invité ou en place, attend sur le banc.
+  const enAttente = mienne ? invitesJoueurs(mienne) : [];
+  const entraineur = mienne ? entraineurDe(mienne) : null;
   const libres = Math.max(0, MAX_EQUIPE - signes.length);
   const occupants: Occupant[] = [
     ...signes.map((m) => ({ cle: m.id, nom: m.name })),
@@ -624,7 +670,7 @@ export default function BolaTeamPage() {
   ];
   // Plus d'invités que de places (permis : les premiers qui signent entrent).
   const deborde = enAttente.slice(libres);
-  const peutInviter = !!mienne && capitaine && invitationsPossibles(mienne) > 0;
+  const peutInviter = !!mienne && puis("inviter") && invitationsPossibles(mienne) > 0;
 
   const recus = mienne ? monde.defis.filter((d) => d.a === mienne.id && d.statut === "propose") : [];
   const envoyes = mienne ? monde.defis.filter((d) => d.de === mienne.id && d.statut === "propose") : [];
@@ -647,7 +693,7 @@ export default function BolaTeamPage() {
   const lesAutres = (className?: string) =>
     autres.length > 0 && (
       <section className={cn("flex flex-col gap-2", className)}>
-        {terrainDuDefi && !!mienne && capitaine && active(mienne) && (
+        {terrainDuDefi && !!mienne && puis("defier") && active(mienne) && (
           <div className="mb-3 flex flex-col gap-2">
             <div className="flex items-center justify-between gap-3">
               <h2 className="mono-label text-muted-foreground">Le terrain du défi</h2>
@@ -668,7 +714,7 @@ export default function BolaTeamPage() {
           const dejaDefie = monde.defis.some(
             (d) => enCours(d) && ((d.de === mienne?.id && d.a === e.id) || (d.a === mienne?.id && d.de === e.id))
           );
-          const peutDefier = !!mienne && capitaine && active(mienne) && active(e) && !dejaDefie;
+          const peutDefier = !!mienne && puis("defier") && active(mienne) && active(e) && !dejaDefie;
           return (
             <LigneEquipe
               key={e.id}
@@ -708,7 +754,7 @@ export default function BolaTeamPage() {
         >
           Quitter l&apos;équipe
         </button>
-        {monRole === "capitaine" && (
+        {puis("direction") && (
           <button
             type="button"
             onClick={() =>
@@ -793,7 +839,7 @@ export default function BolaTeamPage() {
           {/* La grande colonne : l'équipe, sa discussion, son terrain. */}
           <div className="contents md:flex md:min-w-0 md:flex-col md:gap-[var(--fib-21)]">
           <div className="flex items-center gap-4">
-            {capitaine ? (
+            {puis("ecusson") ? (
               <button
                 type="button"
                 onClick={() => setBlasonOuvert(true)}
@@ -882,6 +928,13 @@ export default function BolaTeamPage() {
               }}
             />
           </div>
+          <BancEntraineur
+            equipe={mienne}
+            entraineur={entraineur}
+            moi={moi}
+            onPlus={puis("direction") ? ouvrirChoixEntraineur : undefined}
+            onEntraineur={(m) => m.id !== moi && setJoueur(m)}
+          />
           {deborde.length > 0 && (
             <div className="flex flex-wrap gap-2">
               {deborde.map((m) => (
@@ -916,7 +969,7 @@ export default function BolaTeamPage() {
               <div key={d.id} className="flex flex-col gap-2.5 rounded-[22px] bg-card p-3">
                 <LigneEquipe e={e} droite={<span className="mono-label pr-1 text-foreground">Défi</span>} />
                 <p className="px-1 text-ligne font-semibold">{quand(d)}</p>
-                {capitaine && (
+                {puis("defier") && (
                   <div className="grid grid-cols-2 gap-2">
                     <Pilule plein={false} ton="bouton--rouge" onClick={() => void agir(() => repondreDefi(d.id, "refuse"))}>
                       Refuser
@@ -941,12 +994,12 @@ export default function BolaTeamPage() {
                       <span className="truncate text-corps text-muted-foreground">{quand(d)}</span>
                     </span>
                     {d.statut === "propose" ? (
-                      capitaine && d.de === mienne.id ? (
+                      puis("defier") && d.de === mienne.id ? (
                         <Pilule plein={false} ton="bouton--rouge" onClick={() => void agir(() => repondreDefi(d.id, "annule"), "Défi retiré.")}>
                           Retirer
                         </Pilule>
                       ) : null
-                    ) : capitaine ? (
+                    ) : puis("annuler") ? (
                       <Pilule plein={false} ton="bouton--rouge" onClick={() => annulerMatch(d)}>
                         Annuler
                       </Pilule>
@@ -1000,6 +1053,7 @@ export default function BolaTeamPage() {
       />
       <SignerCharte
         equipe={mienne}
+        role={monRole}
         open={charte}
         onOpenChange={setCharte}
         apercu={apercu}
@@ -1009,7 +1063,7 @@ export default function BolaTeamPage() {
         }}
       />
       <FicheBlason
-        equipe={capitaine ? mienne : null}
+        equipe={puis("ecusson") ? mienne : null}
         open={blasonOuvert}
         onOpenChange={setBlasonOuvert}
         apercu={apercu}
@@ -1053,6 +1107,19 @@ export default function BolaTeamPage() {
           indispos={raisons}
         />
       )}
+      {mienne && puis("direction") && (
+        <ChoisirJoueur
+          open={choisirEntraineur}
+          onOpenChange={setChoisirEntraineur}
+          profils={profils}
+          exclus={new Set([...(moi ? [moi] : []), ...mienne.membres.map((m) => m.id)])}
+          libres={new Set()}
+          moiNom={moiNom}
+          onChoisir={(p) => void choisirLEntraineur(p)}
+          indispos={raisons}
+          titre="Entraîneur"
+        />
+      )}
 
       {/* Un joueur de mon équipe, ou un invité : sa carte, et ce qu'on peut y faire. */}
       <Sheet open={!!joueur} onOpenChange={(o) => !o && setJoueur(null)}>
@@ -1061,7 +1128,7 @@ export default function BolaTeamPage() {
             <FicheJoueur
               equipe={mienne}
               joueur={joueur}
-              monRole={monRole}
+              moi={moiMembre}
               onRelancer={() => {
                 setJoueur(null);
                 void relancer(joueur);
@@ -1084,16 +1151,17 @@ export default function BolaTeamPage() {
               }}
               onExclure={() => {
                 setJoueur(null);
+                const coach = joueur.role === "entraineur";
                 if (joueur.departLe) {
-                  void agir(() => exclureMembre(mienne.id, joueur.id), "Exclusion annulée.");
+                  void agir(() => exclureMembre(mienne.id, joueur.id), coach ? "Retrait annulé." : "Exclusion annulée.");
                   return;
                 }
                 setConfirmer({
-                  titre: `Exclure ${prenom(joueur.name)} ?`,
+                  titre: coach ? `Retirer ${prenom(joueur.name)} ?` : `Exclure ${prenom(joueur.name)} ?`,
                   texte: "Départ dans 48 h, sans retour possible dans l'équipe.",
-                  oui: "Exclure",
+                  oui: coach ? "Retirer l'entraîneur" : "Exclure",
                   non: `Garder ${prenom(joueur.name)}`,
-                  action: () => void agir(() => exclureMembre(mienne.id, joueur.id), "Exclusion dans 48 h."),
+                  action: () => void agir(() => exclureMembre(mienne.id, joueur.id), coach ? "Départ dans 48 h." : "Exclusion dans 48 h."),
                 });
               }}
             />
@@ -1131,13 +1199,13 @@ export default function BolaTeamPage() {
   );
 }
 
-const ROLE = { capitaine: "Capitaine", vice: "Vice-capitaine", membre: "Membre" } as const;
+const ROLE = { capitaine: "Capitaine", vice: "Vice-capitaine", membre: "Membre", entraineur: "Entraîneur" } as const;
 
-/** La fiche d'un joueur touché sur le terrain : sa carte, où il en est, et les gestes du capitaine. */
+/** La fiche d'un joueur touché sur le terrain, ou de l'entraîneur sur le banc : sa carte, où il en est, et les gestes permis. */
 function FicheJoueur({
   equipe,
   joueur,
-  monRole,
+  moi,
   onRelancer,
   onRetirer,
   onVice,
@@ -1145,14 +1213,18 @@ function FicheJoueur({
 }: {
   equipe: Equipe;
   joueur: Membre;
-  monRole: Membre["role"] | null;
+  /** Ma ligne dans l'équipe : mes droits. */
+  moi: Membre | null;
   onRelancer: () => void;
   onRetirer: () => void;
   onVice: () => void;
   onExclure: () => void;
 }) {
-  const capitaine = monRole === "capitaine" || monRole === "vice";
   const invite = joueur.statut === "invite";
+  const coach = joueur.role === "entraineur";
+  // L'invitation d'un joueur : qui invite ; celle de l'entraîneur, et son retrait : le capitaine.
+  const gereInvitation = droitDe(moi, coach ? "direction" : "inviter");
+  const dirige = droitDe(moi, "direction");
   const date = (iso: string, avecHeure = false) =>
     new Intl.DateTimeFormat("fr-FR", {
       timeZone: "Europe/Paris",
@@ -1165,7 +1237,7 @@ function FicheJoueur({
     <>
       <SheetHeader className="flex-row items-center gap-4 px-5 pt-5 pb-0">
         <span className={cn("shrink-0", invite && "opacity-60")}>
-          <CarteDe name={joueur.name} size={FORMAT_CARTE.moyenne} />
+          {coach ? <CarteEntraineurDuMembre equipe={equipe} nom={joueur.name} /> : <CarteDe name={joueur.name} size={FORMAT_CARTE.moyenne} />}
         </span>
         <span className="flex min-w-0 flex-col gap-1 pr-8">
           <SheetTitle className="text-titre-g leading-tight font-bold tracking-tight">{joueur.name}</SheetTitle>
@@ -1173,7 +1245,7 @@ function FicheJoueur({
           {joueur.departLe && <span className="text-ligne font-semibold text-foreground">Part {date(joueur.departLe, true)}</span>}
         </span>
       </SheetHeader>
-      {invite && capitaine ? (
+      {invite && gereInvitation ? (
         <div className="flex flex-col gap-2 px-4">
           <Button variant="mauve" className="h-12 rounded-full text-lecture font-semibold" onClick={onRelancer}>
             Relancer {prenom(joueur.name)}
@@ -1182,9 +1254,9 @@ function FicheJoueur({
             Retirer l&apos;invitation
           </Button>
         </div>
-      ) : !invite && monRole === "capitaine" && joueur.role !== "capitaine" ? (
+      ) : !invite && dirige && joueur.role !== "capitaine" ? (
         <div className="flex flex-col gap-2 px-4">
-          {!joueur.departLe && (
+          {!joueur.departLe && !coach && (
             <Button
               variant="secondary"
               className={cn(joueur.role === "vice" ? "bouton--rouge" : "bouton--or", "h-12 rounded-full text-lecture font-semibold")}
@@ -1194,7 +1266,13 @@ function FicheJoueur({
             </Button>
           )}
           <Button variant={joueur.departLe ? "secondary" : "ghost"} className={cn("h-12 rounded-full text-lecture font-semibold", !joueur.departLe && "bouton--rouge")} onClick={onExclure}>
-            {joueur.departLe ? "Annuler l'exclusion" : "Exclure (48 h de préavis)"}
+            {coach
+              ? joueur.departLe
+                ? "Annuler le retrait"
+                : "Retirer l'entraîneur (48 h de préavis)"
+              : joueur.departLe
+                ? "Annuler l'exclusion"
+                : "Exclure (48 h de préavis)"}
           </Button>
         </div>
       ) : (

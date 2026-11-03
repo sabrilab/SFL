@@ -12,6 +12,10 @@
 // confirmer (le Racing Wazemmes a déjà saisi). Les résultats sont tirés
 // d'une graine fixe : la même démonstration à chaque ouverture.
 //
+// Depuis le 03/11/2026, Sunday Five a un entraîneur, Lucien (un nom de
+// démonstration, hors de la ligue) : le 7 + 1 se voit sans base, sa carte
+// d'entraîneur sur le banc.
+//
 // Le monde de démonstration se demande une fois par appareil (?apercu=1 sur
 // la page Team, ?apercu=0 pour revenir à la base) : la page Team, la page de
 // chaque équipe (/bola-team/[id]), le profil des joueurs et Ma carte le
@@ -19,10 +23,13 @@
 
 import { blasonParDefaut, PALETTE, type Blason, type Embleme, type Forme, type Motif } from "@/lib/sfl/blason";
 import type { ButeurTeam, MatchTeam } from "@/lib/sfl/championnat-team";
-import { initialesDe, type Defi, type Equipe, type EquipeTeam } from "@/lib/sfl/equipes";
+import { initialesDe, joue, type Defi, type Equipe, type EquipeTeam, type Role } from "@/lib/sfl/equipes";
 import { aujourdhuiIso } from "@/lib/sfl/matchs";
 
 export const DEMO_EQUIPES = process.env.NEXT_PUBLIC_BOLA_ENV !== "production";
+
+/** L'entraîneur de Sunday Five dans la démonstration : un nom hors de la ligue. */
+export const ENTRAINEUR_DEMO = "Lucien";
 
 const CLE_APERCU = "bola-apercu-team";
 const EVT_APERCU = "bola-apercu-team";
@@ -105,7 +112,7 @@ const AUTRES: [string, Blason][] = [
 export function demoEquipes(noms: string[], moi: string): { equipes: Equipe[]; defis: Defi[] } {
   const autres = noms.filter((n) => n !== moi);
   const pris = (i: number, n: number) => autres.slice(i, i + n);
-  const m = (name: string, role: "capitaine" | "vice" | "membre" = "membre", statut: "membre" | "invite" = "membre") => ({
+  const m = (name: string, role: Role = "membre", statut: "membre" | "invite" = "membre") => ({
     id: `demo-${name}`,
     name,
     role,
@@ -132,6 +139,12 @@ export function demoEquipes(noms: string[], moi: string): { equipes: Equipe[]; d
     ...m(autres[4] ?? "Invité", "membre", "invite"),
     depuis: new Date(Date.now() - 5 * 3600_000).toISOString(),
     invitePar: `demo-${moi}`,
+  });
+  // L'entraîneur, sur le banc depuis dix jours (Règlement version 3).
+  mienne.membres.push({
+    ...m(ENTRAINEUR_DEMO, "entraineur"),
+    reglement: "v3",
+    signeLe: new Date(Date.now() - 10 * 86_400_000).toISOString(),
   });
   const [a, j, d] = aujourdhuiIso().split("-").map(Number);
   const dans = (n: number) => new Date(Date.UTC(a, j - 1, d + n)).toISOString().slice(0, 10);
@@ -195,7 +208,11 @@ export function demoChampionnat(
     // Mon équipe, FC Belleville et le Racing se glissent parmi les premières nées.
     if (i === 2) {
       const e = dePage(1);
-      ajouter({ id: 1, nom: e.nom, initiales: e.initiales, fond: e.fond, blason: e.blason, ville: "Lille" }, e.membres.filter((x) => x.statut === "membre").map((x) => x.name), 1.3);
+      ajouter(
+        { id: 1, nom: e.nom, initiales: e.initiales, fond: e.fond, blason: e.blason, ville: "Lille" },
+        e.membres.filter((x) => x.statut === "membre" && joue(x.role)).map((x) => x.name),
+        1.3
+      );
     }
     if (i === 4) {
       const e = dePage(2);

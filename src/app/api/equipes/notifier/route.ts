@@ -13,6 +13,13 @@
 //     le capitaine et le vice de l'autre équipe l'apprennent, avec le score,
 //     pour confirmer (sans réponse, il vaut 24 h plus tard). Une fois par
 //     saisie (equipe_resultats.notifie_le).
+// Depuis le 03/11/2026, l'entraîneur (Ilyes : 7 joueurs + 1 entraîneur) :
+// son invitation s'annonce « Ilyes t'invite à entraîner · Sunday Five », le
+// capitaine et le vice apprennent sa signature, et les comptes (« 3 / 5 »,
+// le cinquième qui rend l'équipe active) ne comptent que les joueurs. Les
+// droits suivent la base, geste par geste (peut, lib/sfl/equipes-droits.ts) :
+// l'entraîneur invite et relance des joueurs, mais ne saisit ni ne confirme
+// jamais une feuille de match.
 // Toucher une invitation ouvre la signature (/bola-team?invitation=id) ;
 // sur Android, elle porte aussi ses deux réponses, Oui et Non (Sabri,
 // 24/10 : « qu'ils soient quand même contraints de répondre à cette notif :
@@ -31,6 +38,7 @@ import { cleVapid } from "@/lib/server/web-push";
 import { prevenir, type Envoi } from "@/lib/server/push-envoi";
 import { appelant, serveur } from "@/lib/sfl/serveur-ligue.server";
 import { finInvitation, quandTombe } from "@/lib/sfl/equipes-temps";
+import { joue, peut, type Role } from "@/lib/sfl/equipes-droits";
 
 export const maxDuration = 30;
 
@@ -46,12 +54,17 @@ const ACTIVE = 5;
 interface Ligne {
   joueur: string;
   statut: "invite" | "membre";
-  role: "capitaine" | "vice" | "membre";
+  role: Role;
   invite_par: string | null;
   created_at: string;
   signe_le: string | null;
+  depart_le?: string | null;
   notifie_le?: string | null;
 }
+
+/** Ses droits : son rôle, et rien pendant un préavis d'exclusion (comme equipe_droit). */
+const droit = (l: Pick<Ligne, "statut" | "role" | "depart_le"> | undefined, geste: Parameters<typeof peut>[1]) =>
+  !!l && l.statut === "membre" && !l.depart_le && peut(l.role, geste);
 
 const couper = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
 
@@ -77,6 +90,8 @@ export async function POST(req: NextRequest) {
   const maintenant = Date.now();
   const ici = lignes.find((l) => l.joueur === moi.id);
   const membres = lignes.filter((l) => l.statut === "membre");
+  // Les joueurs seuls font l'effectif : l'entraîneur n'y compte pas.
+  const joueurs = membres.filter((l) => joue(l.role));
 
   const { data: profils } = await sb
     .from("profiles")
@@ -93,9 +108,11 @@ export async function POST(req: NextRequest) {
   let marquer: string[] = [];
 
   if (type === "invitation" || type === "relance") {
-    if (!ici || ici.statut !== "membre" || ici.role === "membre")
-      return NextResponse.json({ error: "Réservé au capitaine." }, { status: 403 });
-    const vivantes = lignes.filter((l) => l.statut === "invite" && finInvitation(l.created_at).getTime() > maintenant);
+    if (!droit(ici, "inviter")) return NextResponse.json({ error: "Réservé au capitaine." }, { status: 403 });
+    // L'invitation de l'entraîneur est au capitaine seul : la relancer aussi.
+    const vivantes = lignes.filter(
+      (l) => l.statut === "invite" && finInvitation(l.created_at).getTime() > maintenant && (joue(l.role) || droit(ici, "direction"))
+    );
     let cibles: Ligne[];
     if (type === "invitation") {
       cibles = vivantes.filter((l) =>
@@ -108,12 +125,13 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ envoyes: 0, tropTot: true });
       cibles = [l];
     }
-    const effectif = `${membres.length} joueur${membres.length > 1 ? "s" : ""}`;
+    const effectif = `${joueurs.length} joueur${joueurs.length > 1 ? "s" : ""}`;
     for (const l of cibles) {
       const qui = prenom(l.invite_par ?? moi.id);
+      const coach = l.role === "entraineur";
       envois.set(l.joueur, {
         notif: {
-          titre: couper(`${qui} ${type === "relance" ? "t'attend" : "t'invite"} · ${equipe.nom}`, 60),
+          titre: couper(`${qui} ${type === "relance" ? "t'attend" : coach ? "t'invite à entraîner" : "t'invite"} · ${equipe.nom}`, 60),
           texte: couper(`Bola Team · ${effectif} · jusqu'à ${quandTombe(finInvitation(l.created_at), new Date(maintenant))}`, 180),
           url: `/bola-team?invitation=${id}`,
           tag: `equipe-invitation-${id}`,
@@ -135,8 +153,8 @@ export async function POST(req: NextRequest) {
     if (ici.notifie_le && new Date(ici.notifie_le).getTime() >= new Date(ici.signe_le).getTime())
       return NextResponse.json({ envoyes: 0 });
     const qui = prenom(moi.id);
-    // Mon rang parmi les signataires : le cinquième rend l'équipe active.
-    const rang = membres.filter((l) => l.signe_le && l.signe_le <= ici.signe_le!).length;
+    // Mon rang parmi les joueurs signataires : le cinquième rend l'équipe active. L'entraîneur n'a pas de rang.
+    const rang = joue(ici.role) ? joueurs.filter((l) => l.signe_le && l.signe_le <= ici.signe_le!).length : 0;
     const tag = `equipe-${id}-effectif`;
     if (rang === ACTIVE) {
       for (const l of membres)
@@ -152,13 +170,14 @@ export async function POST(req: NextRequest) {
             ref,
           });
     } else {
-      const n = membres.length;
+      const n = joueurs.length;
+      // Prévenus : qui invite (le capitaine, le vice, l'entraîneur).
       for (const l of membres)
-        if (l.joueur !== moi.id && l.role !== "membre")
+        if (l.joueur !== moi.id && droit(l, "inviter"))
           envois.set(l.joueur, {
             notif: {
               titre: couper(`${qui} a signé · ${equipe.nom}`, 60),
-              texte: n < ACTIVE ? `${n} / ${ACTIVE} · Il manque ${ACTIVE - n}` : `${n} / 7`,
+              texte: !joue(ici.role) ? "Entraîneur" : n < ACTIVE ? `${n} / ${ACTIVE} · Il manque ${ACTIVE - n}` : `${n} / 7`,
               url: "/bola-team",
               tag,
             },
@@ -195,11 +214,12 @@ async function resultat(sb: NonNullable<ReturnType<typeof serveur>>, moi: string
   if (!defi || defi.statut !== "accepte") return NextResponse.json({ error: "Match inconnu." }, { status: 404 });
   const { data: roles } = await sb
     .from("equipe_membres")
-    .select("equipe_id, joueur, role")
+    .select("equipe_id, joueur, statut, role, depart_le")
     .in("equipe_id", [defi.de, defi.a])
     .eq("statut", "membre");
-  const lignes = (roles ?? []) as { equipe_id: number; joueur: string; role: Ligne["role"] }[];
-  const ici = lignes.find((l) => l.joueur === moi && l.role !== "membre");
+  const lignes = (roles ?? []) as (Pick<Ligne, "joueur" | "statut" | "role" | "depart_le"> & { equipe_id: number })[];
+  // La feuille de match : le capitaine et le vice, jamais l'entraîneur.
+  const ici = lignes.find((l) => l.joueur === moi && droit(l, "score"));
   if (!ici) return NextResponse.json({ error: "Réservé aux capitaines." }, { status: 403 });
   const mienne = ici.equipe_id;
   const autre = mienne === defi.de ? defi.a : defi.de;
@@ -221,7 +241,7 @@ async function resultat(sb: NonNullable<ReturnType<typeof serveur>>, moi: string
   const nom = (id: number) => ((noms ?? []) as { id: number; nom: string }[]).find((x) => x.id === id)?.nom ?? "";
   const envois = new Map<string, Envoi>();
   for (const l of lignes)
-    if (l.equipe_id === autre && l.role !== "membre")
+    if (l.equipe_id === autre && droit(l, "score"))
       envois.set(l.joueur, {
         notif: {
           titre: couper(`${nom(mienne)} ${saisie.pour} – ${saisie.contre} ${nom(autre)}`, 60),

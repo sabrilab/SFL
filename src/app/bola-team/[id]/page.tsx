@@ -24,7 +24,8 @@
 //   · le prochain match, les derniers matchs, les buteurs et les passeurs
 //     de l'équipe.
 // Une équipe en formation reste cachée aux autres (doc 04 §6) ; ses joueurs
-// voient sa page. Sur tablette et ordinateur, la couverture sur toute la
+// voient sa page. L'effectif compte les joueurs (« n / 7 ») : l'entraîneur
+// n'en est pas (03/11/2026), et ne touche ni à la couverture ni au maillot. Sur tablette et ordinateur, la couverture sur toute la
 // largeur, puis deux colonnes au nombre d'or. En aperçu, le monde de
 // démonstration quand il est demandé (?apercu=1 sur la page Team).
 
@@ -49,7 +50,7 @@ import { signalerEquipe } from "@/hooks/use-mon-equipe";
 import { useSession } from "@/hooks/use-session";
 import { EMBLEMES, FORMES, MOTIFS, blasonParDefaut, libelleCouleur } from "@/lib/sfl/blason";
 import { championnat, periodeSaison, saisonEnCours, type MatchTeam, type Res } from "@/lib/sfl/championnat-team";
-import { MAX_EQUIPE, MIN_EQUIPE, active, enCours, lireChampionnat, listerDefis, signataires, type Defi, type EquipeTeam } from "@/lib/sfl/equipes";
+import { MAX_EQUIPE, MIN_EQUIPE, active, brassard, droitDe, enCours, lireChampionnat, listerDefis, signataires, type Defi, type EquipeTeam } from "@/lib/sfl/equipes";
 import { demoChampionnat } from "@/lib/sfl/equipes-demo";
 import { libelleJour } from "@/lib/sfl/matchs";
 import { cn } from "@/lib/utils";
@@ -114,7 +115,8 @@ export default function PageEquipe() {
   const e = equipes.find((x) => x.id === id) ?? null;
   const montree = e && visible(e, me, demo) ? e : null;
   const moiDedans = montree?.membres.find((m) => m.statut === "membre" && meme(m.name, me)) ?? null;
-  const dirigeant = !!moiDedans && moiDedans.role !== "membre";
+  // La couverture et le maillot : le capitaine et le vice (equipe_droit, dans la base).
+  const dirigeant = droitDe(moiDedans, "couverture");
 
   // La saison de l'équipe : sa ligne du classement, ses matchs, ses buteurs.
   const saison = useMemo(() => {
@@ -248,7 +250,7 @@ export default function PageEquipe() {
                       <Nom n={m.name} />
                     </span>
                     <span className="mono-label -mt-1 text-micro text-encre-3">
-                      {m.role !== "membre" ? NOM_ROLE[m.role] : s ? `${s.buts} b · ${s.passes} pd` : NOM_ROLE.membre}
+                      {brassard(m.role) ? NOM_ROLE[m.role] : s ? `${s.buts} b · ${s.passes} pd` : NOM_ROLE.membre}
                     </span>
                   </div>
                 );

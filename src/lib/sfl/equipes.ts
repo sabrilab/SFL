@@ -12,7 +12,14 @@
 //     calcule (lib/sfl/championnat-team.ts) ;
 //   · depuis le 24/10, chaque équipe dessine son écusson et choisit ses
 //     couleurs (lib/sfl/blason.ts), et le Règlement passe en version 2 :
-//     2 points la victoire, et la Charte de déontologie à signer avec.
+//     2 points la victoire, et la Charte de déontologie à signer avec ;
+//   · depuis le 03/11/2026 (Ilyes, 02/11 : « une équipe = 7 joueurs + 1
+//     entraîneur »), une place d'entraîneur à part : un membre qui ne joue
+//     jamais pour l'équipe et ne compte dans aucun seuil (signataires ne
+//     rend que les joueurs, entraineurDe le rend lui), invité par le
+//     capitaine seul (inviterEntraineur). Ses droits, geste par geste :
+//     equipes-droits.ts (peut), la même table que la base. Le Règlement
+//     passe en version 3, avec sa formule à lui (acceptationEntraineur).
 // Les délais (invitation 72 h, carence 14 jours, préavis d'exclusion 48 h,
 // créneau d'un défi entre +48 h et +21 jours, réponse sous 48 h, forfait à
 // moins de 48 h) sont gardés par la base ; l'app les montre.
@@ -30,10 +37,12 @@
 import { SUPABASE_URL, supabase } from "@/lib/supabase";
 import { finInvitation } from "@/lib/sfl/equipes-temps";
 import { lireBlason, type Blason } from "@/lib/sfl/blason";
+import { joue, type Role } from "@/lib/sfl/equipes-droits";
 import type { ButeurTeam, EquipeChampionnat, MatchTeam, SaisieTeam } from "@/lib/sfl/championnat-team";
 
+export { DROITS, brassard, droitDe, joue, peut, type Geste, type Role } from "@/lib/sfl/equipes-droits";
+
 export type Fond = "noir" | "blanc";
-export type Role = "capitaine" | "vice" | "membre";
 
 export const MIN_EQUIPE = 5;
 export const MAX_EQUIPE = 7;
@@ -51,7 +60,7 @@ export interface Membre {
   signeLe?: string | null;
   /** Exclu par le capitaine : son départ, 48 h après. */
   departLe?: string | null;
-  /** Membre : la version du Règlement qu'il a signée (« v1 », « v2 »), null avant le règlement. */
+  /** Membre : la version du Règlement qu'il a signée (« v1 », « v2 », « v3 »), null avant le règlement. */
   reglement?: string | null;
 }
 
@@ -103,32 +112,42 @@ export function annulerSeraitForfait(d: Defi): boolean {
   return coupDEnvoi(d).getTime() - Date.now() < 48 * 3600_000;
 }
 
-export const VERSION_REGLEMENT = "v2";
+export const VERSION_REGLEMENT = "v3";
 
-/** Un membre qui n'a pas encore signé la version en cours (la Charte, le 24/10). */
+/** Un membre qui n'a pas encore signé la version en cours (la Charte le 24/10, l'entraîneur le 03/11). */
 export const aSignerLaCharte = (m: Membre) => m.statut === "membre" && m.reglement !== VERSION_REGLEMENT;
 
-/** Les signataires, capitaine d'abord, puis le vice. */
+/** Les joueurs signataires, capitaine d'abord, puis le vice : jamais l'entraîneur, qui ne compte ni ne joue. */
 export function signataires(e: Equipe): Membre[] {
-  const rang = { capitaine: 0, vice: 1, membre: 2 } as const;
-  return e.membres.filter((m) => m.statut === "membre").sort((a, b) => rang[a.role] - rang[b.role]);
+  const rang: Record<Role, number> = { capitaine: 0, vice: 1, membre: 2, entraineur: 3 };
+  return e.membres.filter((m) => m.statut === "membre" && joue(m.role)).sort((a, b) => rang[a.role] - rang[b.role]);
 }
 
-/** Les invitations encore valables (72 h), de la plus ancienne à la plus récente. */
+const valable = (m: Membre, maintenant = Date.now()) => !m.depuis || finInvitation(m.depuis).getTime() > maintenant;
+
+/** L'entraîneur de l'équipe, en place ou invité (son invitation encore valable) ; null sans entraîneur. */
+export function entraineurDe(e: Equipe): Membre | null {
+  return e.membres.find((m) => m.role === "entraineur" && (m.statut === "membre" || valable(m))) ?? null;
+}
+
+/** Les invitations encore valables (72 h), de la plus ancienne à la plus récente : celles des joueurs et celle de l'entraîneur. */
 export function invites(e: Equipe): Membre[] {
   const maintenant = Date.now();
   return e.membres
-    .filter((m) => m.statut === "invite" && (!m.depuis || finInvitation(m.depuis).getTime() > maintenant))
+    .filter((m) => m.statut === "invite" && valable(m, maintenant))
     .sort((a, b) => (a.depuis ?? "").localeCompare(b.depuis ?? ""));
 }
 
-/** Six invitations en attente au plus (la base le garde, equipe_inviter). */
+/** Les invitations de joueurs seules : elles attendent sur le terrain, six au plus. */
+export const invitesJoueurs = (e: Equipe): Membre[] => invites(e).filter((m) => joue(m.role));
+
+/** Six invitations de joueurs en attente au plus (la base le garde, equipe_inviter). */
 export const INVITATIONS_MAX = 6;
 
-/** Combien de joueurs le capitaine peut encore inviter. */
+/** Combien de joueurs on peut encore inviter (l'entraîneur ne prend aucune place). */
 export function invitationsPossibles(e: Equipe): number {
   if (signataires(e).length >= MAX_EQUIPE) return 0;
-  return Math.max(0, INVITATIONS_MAX - invites(e).length);
+  return Math.max(0, INVITATIONS_MAX - invitesJoueurs(e).length);
 }
 
 /** Qui a invité ce joueur : son prénom, sinon celui du capitaine. */
@@ -136,6 +155,9 @@ export function inviteur(e: Equipe, m: Membre): string {
   const par = e.membres.find((x) => x.id === m.invitePar) ?? e.membres.find((x) => x.role === "capitaine");
   return (par?.name ?? "").split(" ")[0];
 }
+
+/** « Ilyes t'invite », ou « Ilyes t'invite à entraîner » : ce que dit une invitation reçue. */
+export const tInvite = (e: Equipe, m: Membre): string => `${inviteur(e, m)} t'invite${m.role === "entraineur" ? " à entraîner" : ""}`;
 
 /** Une équipe joue (et se défie) à 5 signataires. */
 export function active(e: Equipe): boolean {
@@ -298,6 +320,12 @@ async function rpc<T = void>(fn: string, args: Record<string, unknown>): Promise
 export const creerEquipe = (nom: string, initiales: string, fond: Fond) => rpc<number>("equipe_creer", { nom: nom.trim(), initiales, fond });
 export const inviterEquipe = (e: number, joueur: string) => rpc("equipe_inviter", { e, joueur });
 
+/** Le capitaine invite l'entraîneur (hors des six invitations de joueurs), puis il est prévenu. */
+export async function inviterEntraineur(e: number, joueur: string): Promise<void> {
+  await rpc("equipe_entraineur_inviter", { e, joueur });
+  void notifierEquipe(e, "invitation");
+}
+
 /**
  * Inviter plusieurs joueurs d'un coup : chacun à son tour (la base garde les
  * règles de chacun), puis une notification à tous les nouveaux invités.
@@ -334,7 +362,7 @@ export const RAISON_INDISPO: Record<Indispo, string> = {
   team: "Pas de Bola Team",
 };
 
-/** Ceux que mon équipe ne peut pas inviter, et pourquoi (capitaine et vice). */
+/** Ceux que mon équipe ne peut pas inviter, et pourquoi (capitaine, vice et entraîneur). */
 export async function indisponibles(e: number): Promise<Map<string, Indispo>> {
   const { data, error } = await supabase().rpc("equipe_indisponibles", { e });
   if (error) throw error;
@@ -454,7 +482,7 @@ export async function saisirResultat(
 export async function lireChampionnat(): Promise<{ equipes: EquipeTeam[]; matchs: MatchTeam[] }> {
   const sb = supabase();
   const lireEquipes = (blason: boolean) =>
-    sb.from("equipes").select(`id, nom, initiales, fond, ville, ${blason ? "blason, " : ""}created_at, dissoute_le, equipe_membres(statut)`);
+    sb.from("equipes").select(`id, nom, initiales, fond, ville, ${blason ? "blason, " : ""}created_at, dissoute_le, equipe_membres(statut, role)`);
   const [avecBlason, df, rs, bt] = await Promise.all([
     lireEquipes(true),
     sb.from("equipe_defis").select("id, de, a, jour, heure, lieu, statut, forfait_de").in("statut", ["accepte", "forfait"]),
@@ -480,7 +508,7 @@ export async function lireChampionnat(): Promise<{ equipes: EquipeTeam[]; matchs
     blason?: unknown;
     created_at: string;
     dissoute_le: string | null;
-    equipe_membres: { statut: Membre["statut"] }[];
+    equipe_membres: { statut: Membre["statut"]; role: Role }[];
   }[]).map(
     (r): EquipeTeam => ({
       id: r.id,
@@ -491,7 +519,8 @@ export async function lireChampionnat(): Promise<{ equipes: EquipeTeam[]; matchs
       blason: lireBlason(r.blason),
       creeLe: r.created_at,
       dissoute: !!r.dissoute_le,
-      active: !r.dissoute_le && r.equipe_membres.filter((m) => m.statut === "membre").length >= MIN_EQUIPE,
+      // Les joueurs seuls : l'entraîneur ne fait pas une équipe active.
+      active: !r.dissoute_le && r.equipe_membres.filter((m) => m.statut === "membre" && joue(m.role)).length >= MIN_EQUIPE,
     })
   );
   const matchs = ((df.data ?? []) as { id: number; de: number; a: number; jour: string; heure: string; lieu: string; statut: "accepte" | "forfait"; forfait_de: number | null }[]).map(
@@ -569,17 +598,19 @@ export function urlDuLien(j: string): string {
  * la saison à 4 mois, avec ses montées et ses descentes ; et un neuvième
  * point, la couverture de la page de l'équipe faite avec les photos de
  * carte (Sabri, 24/10 : « une couverture faite justement en IA, avec les
- * joueurs présents de cette équipe ») : signer, c'est l'accepter.
+ * joueurs présents de cette équipe ») : signer, c'est l'accepter. Version 3
+ * (03/11/2026, Ilyes : 7 joueurs + 1 entraîneur) : les points 1, 2 et 8 ne
+ * parlent plus de « membres » mais de joueurs, et de l'entraîneur.
  */
 export const REGLEMENT = [
-  "Vous ne jouez qu'avec les membres de votre équipe. Aucun joueur extérieur, même en match amical.",
-  "Une équipe compte 5 à 7 membres, tous signataires de ce règlement. À 7, plus personne ne peut entrer.",
+  "Vous ne jouez qu'avec les joueurs de votre équipe. Aucun joueur extérieur, même en match amical.",
+  "Une équipe compte 5 à 7 joueurs, et un entraîneur si elle le veut, tous signataires de ce règlement. À 7 joueurs, plus aucun joueur ne peut entrer. L'entraîneur ne joue jamais pour l'équipe.",
   "Une victoire rapporte 2 points à l'équipe, un nul 1, une défaite 0. Ces points vont à l'équipe, pas au joueur. Le championnat dure 4 mois ; à la fin, les 3 premiers de chaque division montent, les 3 derniers descendent.",
   "Vous gagnez des Points Perso par votre présence, vos buts, vos passes décisives et les distinctions votées après le match : Meilleur Joueur +1, Meilleur Défenseur +1, MVP +2.",
   "Faites votre check-in à chaque match. À 5 présents ou plus : aucune pénalité. À 4 face à une équipe de 5 ou plus : votre équipe perd 1 but au score final et chaque absent perd 2 Points Perso. Si les deux équipes sont à 4 : le match est compté comme un amical.",
   "Si 6 joueurs ou plus signalent un match, il est annulé avec ses statistiques.",
   "Au-delà de 2 rencontres contre la même équipe dans la saison, le match est amical : ni points ni stats comptabilisés.",
-  "Si vous quittez l'équipe, vous ne pourrez plus jamais y revenir.",
+  "Si vous quittez l'équipe, joueur ou entraîneur, vous ne pourrez plus jamais y revenir.",
   "La photo de votre carte peut figurer sur la couverture de la page de l'équipe, que le capitaine ou son vice crée avec le studio de Bola. Si un joueur quitte l'équipe, la couverture est retirée.",
 ];
 
@@ -602,7 +633,11 @@ export const CHARTE = [
 
 /** La case à cocher (Formule d'acceptation, docs/gameplay/11). */
 export const ACCEPTATION =
-  "J'ai lu et j'accepte le Règlement Team et la Charte de déontologie (version 2). Je m'engage à ne jouer qu'avec les membres de mon équipe, matchs amicaux compris, à faire mon check-in à chaque match où je suis inscrit, à saisir et à voter honnêtement, et à respecter mes adversaires, mes coéquipiers et le terrain. J'accepte que la photo de ma carte figure sur la couverture de l'équipe. Je sais que si je quitte cette équipe, je ne pourrai plus jamais la réintégrer.";
+  "J'ai lu et j'accepte le Règlement Team et la Charte de déontologie (version 3). Je m'engage à ne jouer qu'avec les joueurs de mon équipe, matchs amicaux compris, à faire mon check-in à chaque match où je suis inscrit, à saisir et à voter honnêtement, et à respecter mes adversaires, mes coéquipiers et le terrain. J'accepte que la photo de ma carte figure sur la couverture de l'équipe. Je sais que si je quitte cette équipe, je ne pourrai plus jamais la réintégrer.";
+
+/** La case de l'entraîneur, qui ne joue jamais pour l'équipe ni ne saisit son score. */
+export const acceptationEntraineur = (equipe: string) =>
+  `J'ai lu et j'accepte le Règlement Team et la Charte de déontologie (version 3). Entraîneur de ${equipe}, je ne joue jamais pour elle en match Team, matchs amicaux compris. Je ne saisis ni le score ni les buteurs, et je respecte les joueurs, les adversaires et le terrain. Je sais que si je quitte cette équipe, je ne pourrai plus jamais la réintégrer.`;
 
 /** « Règlement Team v2 signé le 04/02/2027 à 21:17 (heure de Paris). Bienvenue chez … ! » */
 export function confirmationSignature(nom: string): string {
@@ -617,6 +652,7 @@ export function direErreurEquipe(e: unknown): string {
   const msg = e instanceof Error ? e.message : typeof e === "object" && e && "message" in e ? String((e as { message: unknown }).message) : "";
   if (/equipes_nom_unique|déjà pris/i.test(msg)) return "Ce nom est déjà pris.";
   if (/equipe_membres_une_equipe/i.test(msg)) return "Tu as déjà une équipe.";
+  if (/equipe_membres_un_entraineur/i.test(msg)) return "L'équipe a déjà un entraîneur.";
   if (/duplicate|23505/i.test(msg)) return "Déjà dans l'équipe.";
   if (/does not exist|42P01|PGRST20/i.test(msg)) return "Le mode Team arrive avec la mise en ligne.";
   return msg || "Impossible pour l'instant. Réessaie dans un instant.";

@@ -32,12 +32,12 @@ import {
   VERSION_REGLEMENT,
   aSignerLaCharte,
   direErreurEquipe,
-  inviteur,
   invites,
   mesInvitations,
   monEquipe,
   retirerInvitation,
   signataires,
+  tInvite,
   type Equipe,
 } from "@/lib/sfl/equipes";
 import { finInvitation, quandTombe } from "@/lib/sfl/equipes-temps";
@@ -120,7 +120,7 @@ export function ReponseEquipe({ a, onFini, onPlusTard }: { a: EquipeAOuvrir; onF
         </h2>
         <p className="text-lecture text-white/70">
           {a.quoi === "invitation"
-            ? [invitation && `${inviteur(e, invitation)} t'invite`, invitation?.depuis && `jusqu'à ${quandTombe(finInvitation(invitation.depuis))}`]
+            ? [invitation && tInvite(e, invitation), invitation?.depuis && `jusqu'à ${quandTombe(finInvitation(invitation.depuis))}`]
                 .filter(Boolean)
                 .join(" · ")
             : `${e.nom} · Règlement Team et Charte à signer`}
