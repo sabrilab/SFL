@@ -315,6 +315,16 @@ export function TextePolitique() {
           </P>
         </Sous>
 
+        <Sous titre="La page d&apos;accueil">
+          <P>
+            Sur getbola.app, avant que tu aies un compte, l&apos;app compte les visites et les écrans de
+            l&apos;inscription atteints, pour savoir combien de visiteurs vont jusqu&apos;à créer leur carte. Comme
+            pour les liens d&apos;invitation, ton navigateur tire un identifiant au hasard : ni adresse IP, ni nom,
+            et rien de ce que tu tapes. Seul le nom du site qui t&apos;a envoyé est gardé (instagram.com, par
+            exemple). Les administrateurs ne voient que des totaux.
+          </P>
+        </Sous>
+
         <Sous titre="Sur ton téléphone">
           <P>
             L&apos;app y garde ta session, tes réglages et des copies (photos, noms, villes) pour s&apos;ouvrir vite,
@@ -433,7 +443,7 @@ export function TextePolitique() {
             <>Ta photo de carte : jusqu&apos;à ce que tu la retires, ou que ton compte soit supprimé.</>,
             <>
               Le journal d&apos;usage (les vidéos vues comprises), le suivi des notifications et les ouvertures de liens
-              d&apos;invitation ou de vidéo : 13 mois
+              d&apos;invitation ou de vidéo, les visites de la page d&apos;accueil : 13 mois
               au plus. Qui a fait venir qui : tant que les deux comptes existent.
             </>,
             <>Ton accord (la case cochée, sa date, sa version) : tant que ton compte existe, pour pouvoir le prouver.</>,

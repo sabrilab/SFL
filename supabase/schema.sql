@@ -9024,6 +9024,57 @@ $$;
 revoke execute on function public.ouvrir_pack_xp(uuid, text, text, int, int, text[], uuid) from public, anon, authenticated;
 grant execute on function public.ouvrir_pack_xp(uuid, text, text, int, int, text[], uuid) to service_role;
 
+-- ─────────────── La page d'accueil de getbola.app : l'entonnoir (03/11/2026) ───────────────
+-- Sabri, 03/11 : « surtout les gens qui arrivent sur getbola.app et qui
+-- s'inscrivent ». Le haut de l'entonnoir d'acquisition, avant qu'un compte
+-- existe : le site vu (le cadre de la page d'accueil, components/sfl/auth/
+-- landing-site.tsx), l'inscription ouverte, chacun de ses écrans atteint, le
+-- compte créé ; et, à part, la connexion ouverte (un joueur qui revient).
+-- Comme les liens de parrainage ouverts : un identifiant tiré au hasard par
+-- le navigateur (lib/sfl/site-visites.ts), ni adresse IP, ni nom ; une ligne
+-- par navigateur et par étape ; le site d'où il vient, réduit à son nom
+-- (instagram.com, google.com, ou la source d'un lien « ?utm_source= »).
+-- Écrit par la seule fonction site_vu() (anon compris), lu par l'admin seul
+-- (Admin → Analytics → Acquisition), gardé 13 mois.
+create table if not exists public.site_visites (
+  id          bigint generated always as identity primary key,
+  visiteur    text not null check (visiteur ~ '^[0-9a-f-]{8,40}$'),
+  etape       text not null check (etape in ('site', 'inscription', 'identite', 'jeu', 'gabarit', 'angles', 'compte', 'cree', 'connexion')),
+  source      text check (source is null or source ~ '^[a-z0-9._-]{1,60}$'),
+  jour        date not null default ((now() at time zone 'Europe/Paris')::date),
+  created_at  timestamptz not null default now(),
+  constraint site_visites_une_fois unique (visiteur, etape)
+);
+create index if not exists site_visites_jour on public.site_visites (jour);
+delete from public.site_visites where created_at < now() - interval '13 months';
+
+alter table public.site_visites enable row level security;
+drop policy if exists "site_visites: l'admin" on public.site_visites;
+create policy "site_visites: l'admin" on public.site_visites for select to authenticated
+  using ((select public.is_league_admin()));
+revoke all on public.site_visites from anon, authenticated;
+grant select on public.site_visites to authenticated;
+
+create or replace function public.site_vu(visiteur text, etape text, source text default null)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  s text := lower(btrim(coalesce(site_vu.source, '')));
+begin
+  -- Une source mal formée ne fait pas perdre l'étape : elle est oubliée.
+  insert into public.site_visites (visiteur, etape, source)
+  values (site_vu.visiteur, site_vu.etape, case when s ~ '^[a-z0-9._-]{1,60}$' then s end)
+  on conflict on constraint site_visites_une_fois do nothing;
+exception when check_violation then
+  return;
+end;
+$$;
+revoke execute on function public.site_vu(text, text, text) from public;
+grant execute on function public.site_vu(text, text, text) to anon, authenticated;
+
 -- ─────────────── Droits de table : pas plus que ce que l'API sert (03/11/2026) ───────────────
 -- Supabase donne d'office tous les droits de table à anon et authenticated, et
 -- la RLS filtre ensuite. Trois d'entre eux ne servent à rien ici : TRUNCATE,

@@ -48,6 +48,7 @@
 // Page publique (hors de la porte de connexion, voir AuthGate).
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { noterSite } from "@/lib/sfl/site-visites";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Check, ChevronLeft, Eye, EyeOff, Loader2, Minus, Plus, RotateCcw } from "lucide-react";
@@ -341,6 +342,15 @@ export default function InscriptionPage() {
   const parcours = etapes.slice(1, -1);
   /** L'étape qui crée le compte. */
   const derniere = etapes[etapes.length - 2];
+
+  // L'entonnoir de getbola.app : chaque écran atteint, puis le compte créé
+  // (lib/sfl/site-visites.ts ; Admin → Analytics → Acquisition).
+  useEffect(() => {
+    if (etape !== "fini") noterSite(etape === "accueil" ? "inscription" : etape);
+  }, [etape]);
+  useEffect(() => {
+    if (nomFinal) noterSite("cree");
+  }, [nomFinal]);
 
   // Un membre déjà connecté n'a rien à faire ici. Pas pendant la création :
   // un compte qui entre aussitôt est connecté avant d'avoir fini.

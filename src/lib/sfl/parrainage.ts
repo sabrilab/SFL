@@ -141,7 +141,8 @@ export function oublierCode(): void {
   } catch {}
 }
 
-function visiteur(): string | null {
+/** L'identifiant tiré au hasard de ce navigateur (aussi pour la page d'accueil : lib/sfl/site-visites.ts). */
+export function visiteur(): string | null {
   try {
     let v = localStorage.getItem(CLE_VISITEUR);
     if (!v) {
