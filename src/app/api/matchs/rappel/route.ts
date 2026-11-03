@@ -15,6 +15,9 @@
 // que le soir, à l'heure de Paris : sans CRON_SECRET (pas posé dans Vercel),
 // n'importe qui peut l'appeler, mais au pire le rappel part un peu plus tôt,
 // jamais en pleine nuit ni deux fois.
+//
+// Une erreur de la base ne sort pas telle quelle (audit de sécurité du
+// 03/11/2026, T13) : un message générique à l'appelant, le détail au journal.
 
 import { NextRequest, NextResponse } from "next/server";
 import { cleVapid } from "@/lib/server/web-push";
@@ -72,7 +75,10 @@ export async function GET(req: NextRequest) {
     .from("matchs")
     .select("id, organisateur, heure, lieu, places")
     .eq("jour", demain);
-  if (error) return NextResponse.json({ status: "error", message: error.message }, { status: 500 });
+  if (error) {
+    console.error("[rappel] matchs :", error.code, error.message);
+    return NextResponse.json({ status: "error", message: "Les rappels n'ont pas pu partir." }, { status: 500 });
+  }
 
   let envoyes = 0;
   let morts = 0;
