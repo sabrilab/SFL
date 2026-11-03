@@ -21,10 +21,12 @@ import { useIdentites } from "@/hooks/use-identites";
 import { cn } from "@/lib/utils";
 import { PseudoCard } from "./pseudo-card";
 import { BoutonDeconnexion } from "./bouton-deconnexion";
+import { useT } from "@/lib/i18n/langue";
 
 export function AccountCard() {
   const session = useSession();
   const identite = useIdentites();
+  const t = useT();
   const [open, setOpen] = useState(false);
   const [current, setCurrent] = useState("");
   const [next, setNext] = useState("");
@@ -62,7 +64,7 @@ export function AccountCard() {
     e.preventDefault();
     const value = emailInput.trim();
     if (!/^\S+@\S+\.\S+$/.test(value)) {
-      toast.error("Cet email n'a pas l'air valide.");
+      toast.error(t("Cet email n'a pas l'air valide."));
       return;
     }
     setEmailBusy(true);
@@ -71,9 +73,9 @@ export function AccountCard() {
     if (ok) {
       setEmail(value.toLowerCase());
       setEmailInput("");
-      toast.success("Email enregistré 📬");
+      toast.success(t("Email enregistré 📬"));
     } else {
-      toast.error("Impossible d'enregistrer — reconnecte-toi et réessaie.");
+      toast.error(t("Impossible d'enregistrer — reconnecte-toi et réessaie."));
     }
   }
 
@@ -86,12 +88,12 @@ export function AccountCard() {
       if (error) {
         toast.error(
           /manual linking/i.test(error.message)
-            ? "La liaison de comptes n'est pas encore activée par l'admin."
-            : `Liaison ${provider === "google" ? "Google" : "Apple"} pas encore disponible.`
+            ? t("La liaison de comptes n'est pas encore activée par l'admin.")
+            : t("Liaison {nom} pas encore disponible.", { nom: provider === "google" ? "Google" : "Apple" })
         );
       }
     } catch {
-      toast.error("Liaison impossible pour l'instant.");
+      toast.error(t("Liaison impossible pour l'instant."));
     }
   }
 
@@ -104,13 +106,13 @@ export function AccountCard() {
     const res = await changePassword(current, next);
     setBusy(false);
     if (res.ok) {
-      toast.success("Mot de passe modifié");
+      toast.success(t("Mot de passe modifié"));
       setOpen(false);
       setCurrent("");
       setNext("");
     } else {
       const messages: Record<RefusMotDePasse, string> = {
-        "too-short": `${BORNES.motDePasse} caractères minimum.`,
+        "too-short": t("{n} caractères minimum.", { n: BORNES.motDePasse }),
         weak: "Trop facile à deviner. Choisis-en un autre.",
         "same-password": "C'est déjà ton mot de passe.",
         "bad-password": "Mot de passe actuel incorrect.",
@@ -119,13 +121,13 @@ export function AccountCard() {
           ? "Serveur injoignable — réessaie dans un instant."
           : "Reconnecte-toi d'abord : le mot de passe ne se change qu'avec une connexion vérifiée.",
       };
-      toast.error(messages[res.reason]);
+      toast.error(t(messages[res.reason]));
     }
   }
 
   return (
     <section>
-      <h2 className="mb-3 px-1 text-sm font-semibold text-foreground/45">Mon compte</h2>
+      <h2 className="mb-3 px-1 text-sm font-semibold text-foreground/45">{t("Mon compte")}</h2>
 
       <div className="glass rounded-[22px] p-4">
         <div className="flex items-center gap-3">
@@ -157,7 +159,8 @@ export function AccountCard() {
                   type="email"
                   inputMode="email"
                   autoComplete="email"
-                  placeholder="Ton email (pour Google)"
+                  placeholder={t("Ton email (pour Google)")}
+                  dir="ltr"
                   value={emailInput}
                   onChange={(e) => setEmailInput(e.target.value)}
                   className="glass-soft min-w-0 flex-1 rounded-full px-4 py-2.5 text-[13.5px] font-medium outline-none placeholder:text-foreground/30"
@@ -179,7 +182,7 @@ export function AccountCard() {
                     onClick={() => linkProvider(p)}
                     className="bouton-secondaire bouton--vert mono-label flex flex-1 items-center justify-center gap-1.5 py-2.5"
                   >
-                    <Link2 className="size-3" /> Lier {p === "google" ? "Google" : "Apple"}
+                    <Link2 className="size-3" /> {t("Lier {nom}", { nom: p === "google" ? "Google" : "Apple" })}
                   </button>
                 ))}
               </div>
@@ -192,7 +195,7 @@ export function AccountCard() {
             <input
               type="password"
               autoComplete="current-password"
-              placeholder="Mot de passe actuel"
+              placeholder={t("Mot de passe actuel")}
               value={current}
               onChange={(e) => setCurrent(e.target.value)}
               className="glass-soft rounded-full px-4 py-3 text-[14px] font-medium outline-none placeholder:text-foreground/30"
@@ -200,7 +203,7 @@ export function AccountCard() {
             <input
               type="password"
               autoComplete="new-password"
-              placeholder={`Nouveau mot de passe (${BORNES.motDePasse} caractères min.)`}
+              placeholder={t("Nouveau mot de passe ({n} caractères min.)", { n: BORNES.motDePasse })}
               value={next}
               onChange={(e) => setNext(e.target.value)}
               className="glass-soft rounded-full px-4 py-3 text-[14px] font-medium outline-none placeholder:text-foreground/30"
@@ -214,14 +217,14 @@ export function AccountCard() {
                   (busy || !current || !next) && "opacity-40"
                 )}
               >
-                Enregistrer
+                {t("Enregistrer")}
               </button>
               <button
                 type="button"
                 onClick={() => setOpen(false)}
                 className="bouton-secondaire px-5 py-3 text-[14px] font-semibold"
               >
-                Annuler
+                {t("Annuler")}
               </button>
             </div>
           </form>
@@ -232,7 +235,7 @@ export function AccountCard() {
               className="bouton-secondaire flex items-center justify-center gap-2 py-3 text-[14px] font-semibold"
             >
               <KeyRound className="size-4" />
-              Changer mon mot de passe
+              {t("Changer mon mot de passe")}
             </button>
             <BoutonDeconnexion className="py-3 text-[14px]" />
           </div>
