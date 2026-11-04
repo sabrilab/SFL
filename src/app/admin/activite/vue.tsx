@@ -1,43 +1,39 @@
 "use client";
 
-// Ce que la page Activité & rétention affiche, une fois le journal lu.
+// Analytics (Admin → Activité) : ce que la page affiche, une fois le journal lu.
 //
-// L'ordre suit les questions qu'on se pose en arrivant :
-//   1. les chiffres de la période et leur évolution ;
-//   2. la croissance — une courbe qu'on parcourt du doigt, au choix de la
-//      mesure, avec la période d'avant en pointillé ; dessous, ce que l'app
-//      a fait chaque jour (les journées et les matchs, les notifications,
-//      les mises en ligne : lib/sfl/reperes.ts), le détail du jour touché et
-//      les pics de la période (./reperes.tsx). Sabri, 24/10 : « voir
-//      rapidement les actions qui ont été faites à ce moment-là de la part
-//      de l'application, pour qu'on comprenne encore la relation entre les
-//      choses » ;
-//   3. ce qu'il faut retenir — les conclusions, calculées sur les vraies
-//      données (lib/sfl/retention.ts), chacune avec la chose à faire, en
-//      une rangée qu'on fait glisser et qu'on peut masquer ; puis les
-//      nouveaux venus à suivre de près (lib/sfl/suivi-joueur.ts), et tous
-//      les nouveaux arrivants, SFL et Bola à part (./nouveaux.tsx, 31/10) ;
-//   4. qui est là aujourd'hui (nouveaux, fidèles, à risque, décrochés…) ;
-//   5. la rétention — combien reviennent, cohorte par cohorte ;
-//   6. ce qui fait revenir — les gestes de la première semaine ; puis qui
-//      fait revenir : les joueurs dont un geste fait venir ou revenir les
-//      autres, en schéma (./rassembleurs.tsx, demandé le 24/10) ;
-//   6 bis. les notifications — qui les a activées, et ce que chaque motif
-//      leur fait faire (./notifications.tsx, demandé le 23/10) ;
-//   7. quand la ligue ouvre l'app ;
-//   8. ce qu'ils y font, les pays choisis pour la carte, les joueurs à
-//      relancer, le détail par joueur.
+// Rangée selon le funnel AARRR (Sabri, 03/11/2026 : « fais une refonte
+// globale de l'onglet analytics, pour mieux s'y retrouver, c'est un peu le
+// foutoir, et range selon le funnel AARRR, pour qu'on puisse check les
+// métriques importantes » ; puis « surtout les gens qui arrivent sur
+// getbola.app et qui s'inscrivent ») :
 //
-// Sabri, le 22/10 : « les conseils que tu donnes, ils peuvent pas être
-// skipés. Ça veut dire qu'on voit pas directement les courbes ». Les
-// conseils passent donc sous la courbe, en une seule rangée, et une rangée de
-// raccourcis, collée en haut, mène à chaque partie.
+//   0. L'essentiel — une métrique clé par étape, sa variation, et la
+//      courbe de croissance (avec, dessous, ce que l'app a fait chaque jour :
+//      ./reperes.tsx, demandé le 24/10) ;
+//   1. Acquisition — de getbola.app au compte créé, écran par écran, d'où
+//      viennent les visiteurs, par où sont entrés les comptes
+//      (./acquisition.tsx), les pays choisis pour la carte ;
+//   2. Activation — du compte au joueur (ville, carte, notifications, un
+//      match, revenu un autre jour : ./activation.tsx), les nouveaux à suivre
+//      de près, les nouveaux arrivants (./nouveaux.tsx), les gestes de la
+//      première semaine qui font revenir ;
+//   3. Rétention — cohorte par cohorte, qui est là, qui relancer, les
+//      notifications (./notifications.tsx), quand et ce qu'ils font, les
+//      vidéos, Bola Agent ;
+//   4. Revenu — rien encore en euros, les packs ouverts en XP (./revenu.tsx) ;
+//   5. Recommandation — le parrainage (./parrainage.tsx) et qui ramène du
+//      monde (./rassembleurs.tsx) ;
+//   puis, en annexes, le détail par joueur, les emails, les accords.
 //
-// Chaque nom (à suivre, à relancer, par joueur) ouvre la fiche du joueur
-// (./fiche.tsx), demandée le 22/10 pour comprendre un nouveau très engagé.
+// Les conseils calculés (lib/sfl/retention.ts) se rangent dans leur étape,
+// en tête de celle-ci ; on peut tous les masquer d'un geste (Sabri, 22/10 :
+// « les conseils […] ne peuvent pas être skipés »). Une rangée de raccourcis,
+// collée en haut, mène à chaque étape.
 //
-// Les données arrivent toutes faites (`page.tsx` lit le journal) : cette vue
-// ne fait que les analyser et les montrer.
+// Chaque nom ouvre la fiche du joueur (./fiche.tsx, 22/10). Les données
+// arrivent toutes faites (`page.tsx` lit le journal) : cette vue ne fait que
+// les analyser et les montrer.
 
 import { useMemo, useState, useSyncExternalStore } from "react";
 import { ChevronDown, ChevronRight, ChevronUp, Lightbulb, Loader2, Mail, RefreshCw, TrendingDown, TrendingUp, TriangleAlert } from "lucide-react";
@@ -52,6 +48,7 @@ import {
   pct,
   type Chiffre,
   type Conclusion,
+  type EtapeAarrr,
   type Evenement,
   type FamilleId,
   type MetriqueId,
@@ -80,6 +77,9 @@ import { QuiRamene } from "./rassembleurs";
 import { CeJourLa, Pics } from "./reperes";
 import { cn } from "@/lib/utils";
 import { BoutonRetour } from "@/components/layout/bouton-retour";
+import { Acquisition, chiffresAcquisition, type Canal, type SiteVisite } from "./acquisition";
+import { ActivationEntonnoir, analyserActivation } from "./activation";
+import { Chapitre, Section } from "./cadre";
 import { Barres, CarteHoraire, Cohortes, Comparaison, Courbe, encre } from "./graphiques";
 
 /** Une photo du studio (studio, drapeau, manga) ; `pays`, celui du drapeau, manque avant le 22/10. */
@@ -99,6 +99,14 @@ export interface DonneesActivite {
   reperes: DonneesReperes | null;
   /** Le parrain de chaque filleul, par nom (table parrainages), ou null si la lecture a échoué. */
   parrains: ReadonlyMap<string, string> | null;
+  /** Par où chaque compte est entré, par nom (table parrainages), ou null si la lecture a échoué. */
+  canaux: ReadonlyMap<string, Canal> | null;
+  /** Les filleuls (venus par un parrain ou une équipe), datés, ou null. */
+  filleuls: { name: string; at: number }[] | null;
+  /** L'entonnoir de getbola.app (table site_visites), ou null si la lecture a échoué. */
+  site: SiteVisite[] | null;
+  /** Les identifiants des comptes admins (les tables rangées par id). */
+  idsAdmins: ReadonlySet<string>;
   /** Le parcours de chaque nouvel arrivant, par nom (./parcours.ts), ou null si la lecture a échoué. */
   parcours: ReadonlyMap<string, Parcours> | null;
   /** Instant de la lecture — figé pour garder le rendu pur. */
@@ -149,16 +157,6 @@ function relative(ts: number, now: number): string {
 
 /* ------------------------------- briques UI ------------------------------ */
 
-function Section({ id, titre, sous, children }: { id?: string; titre: string; sous?: string; children: React.ReactNode }) {
-  return (
-    <section id={id ? `activite-${id}` : undefined} className="glass scroll-mt-16 rounded-3xl p-5">
-      <h2 className="text-titre font-bold tracking-tight">{titre}</h2>
-      {sous && <p className="mt-0.5 text-petit leading-snug text-encre-3">{sous}</p>}
-      <div className="mt-4">{children}</div>
-    </section>
-  );
-}
-
 function Delta({ c, suffixe = "" }: { c: Chiffre; suffixe?: string }) {
   const e = evolution(c);
   if (e === null) {
@@ -174,19 +172,6 @@ function Delta({ c, suffixe = "" }: { c: Chiffre; suffixe?: string }) {
     </span>
   );
 }
-
-function Tuile({ label, valeur, c }: { label: string; valeur: string; c: Chiffre }) {
-  return (
-    <div className="glass rounded-2xl px-3.5 py-3">
-      <p className="mono-label text-micro text-encre-3">{label}</p>
-      <div className="mt-1.5 text-titre-g leading-none font-extrabold tabular-nums">{valeur}</div>
-      <div className="mt-1.5 min-h-[15px]">
-        <Delta c={c} />
-      </div>
-    </div>
-  );
-}
-
 
 /** Une conclusion, dans la rangée : le titre et la chose à faire ; le détail en touchant. */
 function CarteConclusion({ c }: { c: Conclusion }) {
@@ -242,21 +227,49 @@ function abonneConseils(f: () => void) {
   return () => window.removeEventListener(EVT_CONSEILS, f);
 }
 
-/** Les raccourcis, dans l'ordre de la page. */
+/** Les raccourcis, dans l'ordre de la page : les cinq étapes du funnel. */
 const PARTIES = [
-  { id: "courbes", label: "Courbes" },
-  { id: "conseils", label: "Conseils" },
-  { id: "suivre", label: "À suivre" },
-  { id: "nouveaux", label: "Nouveaux" },
-  { id: "qui", label: "Qui est là" },
+  { id: "essentiel", label: "L'essentiel" },
+  { id: "acquisition", label: "Acquisition" },
+  { id: "activation", label: "Activation" },
   { id: "retention", label: "Rétention" },
-  { id: "ramene", label: "Qui ramène" },
-  { id: "notifs", label: "Notifs" },
-  { id: "quand", label: "Quand" },
-  { id: "pays", label: "Pays" },
-  { id: "joueurs", label: "Joueurs" },
-  { id: "videos", label: "Vidéos" },
+  { id: "revenu", label: "Revenu" },
+  { id: "recommandation", label: "Recommandation" },
+  { id: "joueurs", label: "Par joueur" },
 ] as const;
+
+/** Les conseils d'une étape, en une rangée qu'on fait glisser ; rien s'il n'y en a pas. */
+function Conseils({ liste, masques }: { liste: Conclusion[]; masques: boolean }) {
+  if (liste.length === 0) return null;
+  return (
+    <section>
+      <div className="mb-2 flex items-center justify-between px-1">
+        <p className="mono-label text-micro text-encre-3">À retenir · {liste.length}</p>
+        <button onClick={() => ecrireMasques(!masques)} className="mono-label flex items-center gap-1 text-micro text-encre-3">
+          {masques ? "Afficher" : "Masquer"}
+          {masques ? <ChevronDown className="size-3" /> : <ChevronUp className="size-3" />}
+        </button>
+      </div>
+      {!masques && (
+        <div className="-mx-4 flex snap-x snap-mandatory scroll-px-4 items-start gap-2.5 overflow-x-auto px-4 pb-1 [scrollbar-width:none]">
+          {liste.map((c) => (
+            <CarteConclusion key={c.titre} c={c} />
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+/** Les blocs qui lisent leurs propres tables (./page.tsx), rangés chacun dans son étape. */
+export interface BlocsActivite {
+  videos: (public_: PublicId, admins: ReadonlySet<string>) => React.ReactNode;
+  agent: (public_: PublicId, admins: ReadonlySet<string>) => React.ReactNode;
+  parrainage: () => React.ReactNode;
+  revenu: (depuis: number, actifs: number, garde: (id: string) => boolean) => React.ReactNode;
+  accords: (public_: PublicId, admins: ReadonlySet<string>) => React.ReactNode;
+}
+
 function allerA(id: string) {
   document.getElementById(`activite-${id}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
 }
@@ -268,14 +281,14 @@ export function ActiviteVue({
   loading,
   onRefresh,
   error,
-  pied,
+  blocs,
 }: {
   data: DonneesActivite | null;
   loading: boolean;
   onRefresh: () => void;
   error: string | null;
-  /** Ce qui suit la page (Bola Agent), filtré sur le même public. */
-  pied?: (public_: PublicId, admins: ReadonlySet<string>) => React.ReactNode;
+  /** Les blocs qui lisent leurs propres tables, filtrés sur le même public. */
+  blocs?: BlocsActivite;
 }) {
   const [periode, setPeriode] = useState<PeriodeId>("30");
   const [public_, setPublic] = useState<PublicId>("joueurs");
@@ -441,14 +454,109 @@ export function ActiviteVue({
   const totalFamilles = a ? a.familles.reduce((s, f) => s + f.noms.length, 0) : 0;
   const emails = vu?.profiles.filter((p) => p.contact_email) ?? [];
 
+  /* ------------------------------ les étapes ---------------------------- */
+  const conseilsDe = (etape: EtapeAarrr) => a?.conclusions.filter((c) => c.etape === etape) ?? [];
+  const gardeId = useMemo(() => {
+    const ids = data?.idsAdmins ?? new Set<string>();
+    return (id: string) => (public_ === "tous" ? true : public_ === "admins" ? ids.has(id) : !ids.has(id));
+  }, [data, public_]);
+  const activation = useMemo(
+    () =>
+      a && vu && data
+        ? analyserActivation({
+            profiles: vu.profiles,
+            evenements: vu.evenements,
+            studio: vu.studio,
+            parcours: data.parcours,
+            depuis: a.depuis,
+            now: data.now,
+          })
+        : null,
+    [a, vu, data]
+  );
+
+  /* ---------------------------- l'essentiel ------------------------------ */
+  // Une métrique clé par étape du funnel, et sa variation sur la période d'avant.
+  const essentiel = useMemo(() => {
+    if (!a || !vu || !data || !activation) return [];
+    const fin = data.now + DAY;
+    const avantDe = jours === null ? null : a.depuis - jours * DAY;
+    const comptes = (de: number, a_: number) =>
+      vu.profiles.filter((p) => p.created_at != null && p.created_at >= de && p.created_at < a_).length;
+    const nComptes = comptes(a.depuis, fin);
+    const acq = chiffresAcquisition(data.site, a.depuis, fin);
+    const ligneAcq =
+      acq && acq.visiteurs > 0
+        ? `${acq.visiteurs} visiteurs sur getbola.app · ${pct(acq.crees / acq.visiteurs)} créent leur compte`
+        : acq
+          ? "Les visites de getbola.app se comptent depuis le 03/11"
+          : null;
+    const act = activation.lignes;
+    const nCohorte = activation.cohorte.length;
+    const part = (id: string) => (act.find((l) => l.id === id)?.oui.length ?? 0) / Math.max(1, nCohorte);
+    const r7 = a.retention.find((r) => r.jours === 7);
+    const hebdo = a.serie.at(-1)?.hebdo ?? 0;
+    const filleuls = (de: number, a_: number) => (data.filleuls ?? []).filter((f) => vu.garde(f.name) && f.at >= de && f.at < a_).length;
+    const il30 = data.now - 30 * DAY;
+    const base30 = vu.profiles.filter((p) => p.created_at == null || p.created_at < il30).length;
+    const k = base30 ? filleuls(il30, fin) / base30 : 0;
+    const nFilleuls = filleuls(a.depuis, fin);
+    return [
+      {
+        id: "acquisition",
+        etape: "Acquisition",
+        valeur: String(nComptes),
+        label: nComptes > 1 ? "comptes créés" : "compte créé",
+        ligne: ligneAcq,
+        c: { valeur: nComptes, avant: avantDe === null ? null : comptes(avantDe, a.depuis) } as Chiffre,
+      },
+      {
+        id: "activation",
+        etape: "Activation",
+        valeur: nCohorte ? pct(part("match")) : "—",
+        label: "des nouveaux dans un match",
+        ligne: nCohorte
+          ? `${pct(part("carte"))} font leur carte · ${pct(part("notifs"))} activent les notifications`
+          : "Aucun nouveau compte sur la période",
+        c: null,
+      },
+      {
+        id: "retention",
+        etape: "Rétention",
+        valeur: String(a.chiffres.actifs.valeur),
+        label: "joueurs actifs",
+        ligne: `${hebdo} sur les 7 derniers jours${r7 && r7.eligibles > 0 ? ` · ${pct(r7.revenus / r7.eligibles)} reviennent après 7 jours` : ""}`,
+        c: a.chiffres.actifs,
+      },
+      {
+        id: "revenu",
+        etape: "Revenu",
+        valeur: "0 €",
+        label: "encaissés",
+        ligne: "Aucun paiement en place",
+        c: null,
+      },
+      {
+        id: "recommandation",
+        etape: "Recommandation",
+        valeur: String(nFilleuls),
+        label: nFilleuls > 1 ? "filleuls" : "filleul",
+        ligne: data.filleuls
+          ? `Coefficient viral sur 30 jours : ${k.toFixed(2).replace(".", ",")}`
+          : "Les parrainages n'ont pas pu être lus",
+        c: { valeur: nFilleuls, avant: avantDe === null ? null : filleuls(avantDe, a.depuis) } as Chiffre,
+      },
+    ];
+  }, [a, vu, data, activation, jours]);
+
   return (
     <div className="shell flex flex-col gap-4 py-4 sm:py-8">
       <div className="flex items-end justify-between">
         <div className="flex items-center gap-3">
           <BoutonRetour />
           <div>
-            <h1 className="text-titre-l font-bold tracking-tight">Activité</h1>
-            <p className="mt-1 text-corps text-encre-3">Croissance, rétention, et ce qu&apos;on en tire</p>
+            <h1 className="text-titre-l font-bold tracking-tight">Analytics</h1>
+            <p className="mt-1 text-corps text-encre-3">Le funnel AARRR</p>
           </div>
         </div>
         <button
@@ -505,7 +613,7 @@ export function ActiviteVue({
           aria-label="Parties de la page"
           className="sticky top-0 z-20 -mx-4 -my-1 flex gap-1.5 overflow-x-auto bg-background/80 px-4 py-2 backdrop-blur-xl [scrollbar-width:none]"
         >
-          {PARTIES.filter((p) => p.id !== "suivre" || suivre.length > 0).map((p) => (
+          {PARTIES.map((p) => (
             <button
               key={p.id}
               onClick={() => allerA(p.id)}
@@ -529,21 +637,38 @@ export function ActiviteVue({
         </div>
       )}
 
-      {a && courbe && (
+      {a && courbe && vu && data && (
         <>
-          {/* 1. Les chiffres de la période */}
-          <div>
+          {/* L'essentiel : une métrique clé par étape du funnel, puis la courbe */}
+          <section id="activite-essentiel" className="scroll-mt-16">
             <p className="mono-label mb-2 px-1 text-micro text-encre-3">
               {libellePeriode}
               {comparaison}
             </p>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-              <Tuile label="Joueurs actifs" valeur={String(a.chiffres.actifs.valeur)} c={a.chiffres.actifs} />
-              <Tuile label="Nouveaux joueurs" valeur={String(a.chiffres.nouveaux.valeur)} c={a.chiffres.nouveaux} />
-              <Tuile label="Jours actifs / joueur" valeur={String(a.chiffres.joursParJoueur.valeur).replace(".", ",")} c={a.chiffres.joursParJoueur} />
-              <Tuile label="Temps passé" valeur={duree(a.chiffres.temps.valeur)} c={a.chiffres.temps} />
+            <div className="glass-soft overflow-hidden rounded-[24px]">
+              {essentiel.map((e, i) => (
+                <button
+                  key={e.id}
+                  onClick={() => allerA(e.id)}
+                  className="flex w-full items-center gap-3.5 border-b border-foreground/6 px-4 py-3.5 text-left last:border-0"
+                >
+                  <span className="mono-label w-4 shrink-0 text-micro text-encre-4">{i + 1}</span>
+                  <span className="min-w-0 flex-1">
+                    <span className="mono-label block text-micro text-encre-3">{e.etape}</span>
+                    <span className="mt-1 flex items-baseline gap-2">
+                      <span className="text-titre-m leading-none font-extrabold tracking-tight tabular-nums">{e.valeur}</span>
+                      <span className="min-w-0 truncate text-corps font-semibold">{e.label}</span>
+                    </span>
+                    {e.ligne && <span className="mt-1 block text-petit leading-snug text-encre-3">{e.ligne}</span>}
+                  </span>
+                  <span className="flex shrink-0 flex-col items-end gap-1">
+                    {e.c && <Delta c={e.c} />}
+                    <ChevronRight className="size-4 text-encre-4" />
+                  </span>
+                </button>
+              ))}
             </div>
-          </div>
+          </section>
 
           {/* 2. La croissance */}
           <section id="activite-courbes" className="glass scroll-mt-16 rounded-3xl p-5">
@@ -609,38 +734,56 @@ export function ActiviteVue({
             )}
           </section>
 
-          {/* 3. Ce qu'il faut retenir : une rangée qu'on fait glisser, qu'on peut masquer */}
-          <section id="activite-conseils" className="scroll-mt-16">
-            <div className="mb-2.5 flex items-center justify-between px-1">
-              <h2 className="text-titre font-bold tracking-tight">
-                Ce qu&apos;il faut retenir
-                {a.conclusions.length > 0 && (
-                  <span className="ml-1.5 text-corps font-semibold text-encre-3">{a.conclusions.length}</span>
-                )}
-              </h2>
-              {a.conclusions.length > 0 && (
-                <button
-                  onClick={() => ecrireMasques(!masques)}
-                  className="mono-label flex items-center gap-1 text-encre-3"
-                >
-                  {masques ? "Afficher" : "Masquer"}
-                  {masques ? <ChevronDown className="size-3" /> : <ChevronUp className="size-3" />}
-                </button>
-              )}
-            </div>
-            {a.conclusions.length === 0 ? (
-              <p className="px-1 text-corps text-encre-3">Pas encore assez de données pour conclure.</p>
+          <Chapitre id="acquisition" rang={1} titre="Acquisition" question="Qui arrive, et par où ?" />
+          <Conseils liste={conseilsDe("acquisition")} masques={masques} />
+          <Acquisition
+            site={data.site}
+            profiles={vu.profiles}
+            canaux={data.canaux}
+            jours={courbe.points.map((p) => p.t)}
+            depuis={a.depuis}
+          />
+          {/* 8 bis. Les pays choisis pour la carte */}
+          <Section
+            id="pays"
+            titre="Pays choisis pour la carte"
+            sous={
+              pays && pays.joueurs > 0
+                ? `Le dernier drapeau de chaque joueur au studio photo · ${pays.joueurs} ${pays.joueurs > 1 ? "joueurs" : "joueur"}, ${pays.cartes} ${pays.cartes > 1 ? "cartes" : "carte"}.`
+                : "Le dernier drapeau de chaque joueur au studio photo."
+            }
+          >
+            {pays && pays.lignes.length > 0 ? (
+              <div className="flex flex-col gap-2.5">
+                {pays.lignes.map((l) => (
+                  <div key={l.id} className="flex items-center gap-3">
+                    <span className="w-[44%] shrink-0 truncate text-corps font-medium">
+                      <span className="mr-1.5">{l.drapeau}</span>
+                      {l.nom}
+                    </span>
+                    <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-foreground/8">
+                      <span className="block h-full rounded-full bg-foreground/70" style={{ width: `${(l.n / pays.joueurs) * 100}%` }} />
+                    </span>
+                    <span className="w-10 shrink-0 text-right text-petit font-bold tabular-nums">{pct(l.n / pays.joueurs)}</span>
+                    <span className="w-6 shrink-0 text-right text-legende text-encre-3 tabular-nums">{l.n}</span>
+                  </div>
+                ))}
+              </div>
             ) : (
-              !masques && (
-                <div className="-mx-4 flex snap-x snap-mandatory scroll-px-4 items-start gap-2.5 overflow-x-auto px-4 pb-1 [scrollbar-width:none]">
-                  {a.conclusions.map((c) => (
-                    <CarteConclusion key={c.titre} c={c} />
-                  ))}
-                </div>
-              )
+              <p className="text-corps text-encre-3">
+                Aucun pays enregistré pour l&apos;instant : ils s&apos;enregistrent depuis le 22/10, à chaque carte au drapeau.
+              </p>
             )}
-          </section>
+            {pays && pays.sansPays > 0 && (
+              <p className="mt-3 text-legende leading-snug text-encre-3">
+                {pays.sansPays} {pays.sansPays > 1 ? "cartes au drapeau faites" : "carte au drapeau faite"} avant le 22/10, sans pays enregistré.
+              </p>
+            )}
+          </Section>
 
+          <Chapitre id="activation" rang={2} titre="Activation" question="Un compte créé devient-il un joueur ?" />
+          <Conseils liste={conseilsDe("activation")} masques={masques} />
+          <ActivationEntonnoir a={activation!} onFiche={setFiche} />
           {/* 3 bis. À suivre de près : les nouveaux venus très engagés */}
           {suivre.length > 0 && (
             <Section
@@ -682,6 +825,57 @@ export function ActiviteVue({
             </Section>
           )}
 
+          {/* 6. Ce qui fait revenir */}
+          {a.leviers.length > 0 && (
+            <Section
+              titre="Ce qui fait revenir"
+              sous="Pendant leur première semaine, l'ont-ils fait ? Puis : sont-ils revenus après 7 jours ? Joueurs arrivés il y a 14 jours ou plus."
+            >
+              <div className="flex flex-col gap-4">
+                {a.leviers.map((l) => (
+                  <Comparaison
+                    key={l.id}
+                    label={l.label}
+                    avec={l.avecRevenus / l.avec}
+                    sans={l.sansRevenus / l.sans}
+                    nAvec={l.avec}
+                    nSans={l.sans}
+                  />
+                ))}
+              </div>
+            </Section>
+          )}
+
+          <Chapitre id="retention" rang={3} titre="Rétention" question="Reviennent-ils ?" />
+          <Conseils liste={conseilsDe("retention")} masques={masques} />
+          {/* 5. La rétention */}
+          <Section id="cohortes" titre="Combien reviennent" sous="Sur tout l'historique. Revenu après N jours : rouvert l'app N jours ou plus après sa première venue.">
+            <div className="flex flex-col gap-2.5">
+              {a.retention
+                .filter((r) => r.eligibles > 0)
+                .map((r) => (
+                  <div key={r.jours} className="flex items-center gap-3">
+                    <span className="w-[104px] shrink-0 text-corps font-medium whitespace-nowrap">
+                      Après {r.jours} {r.jours === 1 ? "jour" : "jours"}
+                    </span>
+                    <span className="h-2 flex-1 overflow-hidden rounded-full bg-foreground/8">
+                      <span className="block h-full rounded-full bg-foreground/80" style={{ width: `${(r.revenus / r.eligibles) * 100}%` }} />
+                    </span>
+                    <span className="w-10 shrink-0 text-right text-petit font-bold tabular-nums">{pct(r.revenus / r.eligibles)}</span>
+                    <span className="w-11 shrink-0 text-right text-legende text-encre-3 tabular-nums">
+                      {r.revenus}/{r.eligibles}
+                    </span>
+                  </div>
+                ))}
+            </div>
+            <p className="mono-label mt-6 mb-2 text-micro text-encre-3">Par semaine d&apos;arrivée · % encore actifs</p>
+            <Cohortes cohortes={a.cohortes} />
+            <p className="mt-2 text-legende leading-snug text-encre-3">
+              Chaque ligne : les joueurs arrivés la semaine du lundi indiqué (et combien). S0 = leur première semaine,
+              +1 la suivante, etc. Plus la case est foncée, plus ils sont restés.
+            </p>
+          </Section>
+
           {/* 4. Qui est là */}
           <Section id="qui" titre="Qui est là aujourd'hui" sous={`${totalFamilles} comptes, rangés selon leur dernière venue.`}>
             <div className="flex h-3 overflow-hidden rounded-full">
@@ -720,65 +914,24 @@ export function ActiviteVue({
             </div>
           </Section>
 
-          {/* 5. La rétention */}
-          <Section id="retention" titre="Rétention" sous="Sur tout l'historique. Revenu après N jours : rouvert l'app N jours ou plus après sa première venue.">
-            <div className="flex flex-col gap-2.5">
-              {a.retention
-                .filter((r) => r.eligibles > 0)
-                .map((r) => (
-                  <div key={r.jours} className="flex items-center gap-3">
-                    <span className="w-[104px] shrink-0 text-corps font-medium whitespace-nowrap">
-                      Après {r.jours} {r.jours === 1 ? "jour" : "jours"}
-                    </span>
-                    <span className="h-2 flex-1 overflow-hidden rounded-full bg-foreground/8">
-                      <span className="block h-full rounded-full bg-foreground/80" style={{ width: `${(r.revenus / r.eligibles) * 100}%` }} />
-                    </span>
-                    <span className="w-10 shrink-0 text-right text-petit font-bold tabular-nums">{pct(r.revenus / r.eligibles)}</span>
-                    <span className="w-11 shrink-0 text-right text-legende text-encre-3 tabular-nums">
-                      {r.revenus}/{r.eligibles}
-                    </span>
-                  </div>
-                ))}
-            </div>
-            <p className="mono-label mt-6 mb-2 text-micro text-encre-3">Par semaine d&apos;arrivée · % encore actifs</p>
-            <Cohortes cohortes={a.cohortes} />
-            <p className="mt-2 text-legende leading-snug text-encre-3">
-              Chaque ligne : les joueurs arrivés la semaine du lundi indiqué (et combien). S0 = leur première semaine,
-              +1 la suivante, etc. Plus la case est foncée, plus ils sont restés.
-            </p>
-          </Section>
-
-          {/* 6. Ce qui fait revenir */}
-          {a.leviers.length > 0 && (
-            <Section
-              titre="Ce qui fait revenir"
-              sous="Pendant leur première semaine, l'ont-ils fait ? Puis : sont-ils revenus après 7 jours ? Joueurs arrivés il y a 14 jours ou plus."
-            >
-              <div className="flex flex-col gap-4">
-                {a.leviers.map((l) => (
-                  <Comparaison
-                    key={l.id}
-                    label={l.label}
-                    avec={l.avecRevenus / l.avec}
-                    sans={l.sansRevenus / l.sans}
-                    nAvec={l.avec}
-                    nSans={l.sans}
-                  />
+          {/* 9. À relancer */}
+          {a.aRelancer.length > 0 && (
+            <Section titre="À relancer" sous="Venus plusieurs jours, plus vus depuis une semaine ou plus.">
+              <div className="flex flex-col">
+                {a.aRelancer.map((j) => (
+                  <button
+                    key={j.name}
+                    onClick={() => setFiche(j.name)}
+                    className="flex items-center gap-3 border-b border-foreground/6 py-2.5 text-left last:border-0"
+                  >
+                    <span className="min-w-0 flex-1 truncate text-ligne font-semibold">{j.name}</span>
+                    <span className="mono-label text-micro whitespace-nowrap text-encre-3">{j.jours} j venus</span>
+                    <span className="mono-label text-right text-micro whitespace-nowrap text-encre-3">{relative(j.last, a.now)}</span>
+                    <Mail className={cn("size-3.5", j.email ? "text-foreground" : "text-foreground/15")} />
+                  </button>
                 ))}
               </div>
             </Section>
-          )}
-
-          {/* 6 bis. Qui ramène du monde */}
-          {liens && data?.reperes && vu && (
-            <QuiRamene
-              analyse={liens}
-              tousLiens={data.reperes.liens}
-              deduites={data.reperes.deduites}
-              libellePeriode={libellePeriode}
-              admins={vu.ensembleAdmins}
-              onFiche={setFiche}
-            />
           )}
 
           {/* 6 ter. Les notifications */}
@@ -807,64 +960,29 @@ export function ActiviteVue({
             <Barres lignes={a.pages} />
           </Section>
 
-          {/* 8 bis. Les pays choisis pour la carte */}
-          <Section
-            id="pays"
-            titre="Pays choisis pour la carte"
-            sous={
-              pays && pays.joueurs > 0
-                ? `Le dernier drapeau de chaque joueur au studio photo · ${pays.joueurs} ${pays.joueurs > 1 ? "joueurs" : "joueur"}, ${pays.cartes} ${pays.cartes > 1 ? "cartes" : "carte"}.`
-                : "Le dernier drapeau de chaque joueur au studio photo."
-            }
-          >
-            {pays && pays.lignes.length > 0 ? (
-              <div className="flex flex-col gap-2.5">
-                {pays.lignes.map((l) => (
-                  <div key={l.id} className="flex items-center gap-3">
-                    <span className="w-[44%] shrink-0 truncate text-corps font-medium">
-                      <span className="mr-1.5">{l.drapeau}</span>
-                      {l.nom}
-                    </span>
-                    <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-foreground/8">
-                      <span className="block h-full rounded-full bg-foreground/70" style={{ width: `${(l.n / pays.joueurs) * 100}%` }} />
-                    </span>
-                    <span className="w-10 shrink-0 text-right text-petit font-bold tabular-nums">{pct(l.n / pays.joueurs)}</span>
-                    <span className="w-6 shrink-0 text-right text-legende text-encre-3 tabular-nums">{l.n}</span>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-corps text-encre-3">
-                Aucun pays enregistré pour l&apos;instant : ils s&apos;enregistrent depuis le 22/10, à chaque carte au drapeau.
-              </p>
-            )}
-            {pays && pays.sansPays > 0 && (
-              <p className="mt-3 text-legende leading-snug text-encre-3">
-                {pays.sansPays} {pays.sansPays > 1 ? "cartes au drapeau faites" : "carte au drapeau faite"} avant le 22/10, sans pays enregistré.
-              </p>
-            )}
-          </Section>
+          {blocs?.videos(public_, vu.ensembleAdmins)}
+          {blocs?.agent(public_, vu.ensembleAdmins)}
 
-          {/* 9. À relancer */}
-          {a.aRelancer.length > 0 && (
-            <Section titre="À relancer" sous="Venus plusieurs jours, plus vus depuis une semaine ou plus.">
-              <div className="flex flex-col">
-                {a.aRelancer.map((j) => (
-                  <button
-                    key={j.name}
-                    onClick={() => setFiche(j.name)}
-                    className="flex items-center gap-3 border-b border-foreground/6 py-2.5 text-left last:border-0"
-                  >
-                    <span className="min-w-0 flex-1 truncate text-ligne font-semibold">{j.name}</span>
-                    <span className="mono-label text-micro whitespace-nowrap text-encre-3">{j.jours} j venus</span>
-                    <span className="mono-label text-right text-micro whitespace-nowrap text-encre-3">{relative(j.last, a.now)}</span>
-                    <Mail className={cn("size-3.5", j.email ? "text-foreground" : "text-foreground/15")} />
-                  </button>
-                ))}
-              </div>
-            </Section>
+          <Chapitre id="revenu" rang={4} titre="Revenu" question="Qu'est-ce que Bola gagne ?" />
+          {blocs?.revenu(a.depuis, a.chiffres.actifs.valeur, gardeId)}
+
+          <Chapitre id="recommandation" rang={5} titre="Recommandation" question="Font-ils venir les autres ?" />
+          {blocs?.parrainage()}
+          {/* 6 bis. Qui ramène du monde */}
+          {liens && data?.reperes && vu && (
+            <QuiRamene
+              analyse={liens}
+              tousLiens={data.reperes.liens}
+              deduites={data.reperes.deduites}
+              libellePeriode={libellePeriode}
+              admins={vu.ensembleAdmins}
+              onFiche={setFiche}
+            />
           )}
 
+          <div className="px-1 pt-6">
+            <h2 className="text-titre-l leading-none font-extrabold tracking-tight">Annexes</h2>
+          </div>
           {/* 10. Par joueur */}
           <section id="activite-joueurs" className="scroll-mt-16">
             <div className="mb-2.5 flex items-center justify-between px-1">
@@ -938,16 +1056,17 @@ export function ActiviteVue({
             )}
           </section>
 
+          {blocs?.accords(public_, vu.ensembleAdmins)}
+
           <p className="px-1 pb-2 text-legende leading-relaxed text-encre-4">
             {milliers(a.evenementsLus)} événements lus, depuis le {a.serie[0] ? jjmm(a.serie[0].t) : "—"}. Une session,
             c&apos;est un onglet ouvert ; sa durée, c&apos;est le temps passé au premier plan, mesuré par ses signes de vie
             (l&apos;app en émet un toutes les 90 secondes tant qu&apos;elle est au premier plan) ; un silence de plus de
             5 minutes n&apos;est pas compté. Les visites de moins de 30 secondes ne comptent pas dans les durées.
           </p>
+
         </>
       )}
-
-      {pied && vu && pied(public_, vu.ensembleAdmins)}
 
       {fiche && vu && data && (
         <FicheJoueur

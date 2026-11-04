@@ -108,7 +108,10 @@ export async function GET(req: NextRequest) {
         .catch((e) => console.error("[cron] suivi des notifications :", e instanceof Error ? e.message : e));
       // Les liens de parrainage ouverts : 13 mois au plus, eux aussi.
       await client
-        .query("delete from public.parrainage_visites where created_at < now() - interval '13 months'")
+        .query(
+          `delete from public.parrainage_visites where created_at < now() - interval '13 months';
+           delete from public.site_visites where created_at < now() - interval '13 months'`
+        )
         .catch((e) => console.error("[cron] liens de parrainage ouverts :", e instanceof Error ? e.message : e));
       // Les Fondateurs : ceux qui ont passé 10 recrues actives cette semaine
       // reçoivent leur numéro sur 500 (l'app le fait aussi à l'ouverture).

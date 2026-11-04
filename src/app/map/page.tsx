@@ -1580,7 +1580,7 @@ export default function MapPage() {
             admin={
               admin
                 ? [
-                    { id: "activite", libelle: "Activité et rétention", icone: <ChartSpline className="size-[18px]" strokeWidth={2.2} />, href: "/admin/activite" },
+                    { id: "activite", libelle: "Analytics", icone: <ChartSpline className="size-[18px]" strokeWidth={2.2} />, href: "/admin/activite" },
                     { id: "matchs", libelle: "Matchs et terrains", icone: <Settings2 className="size-[18px]" strokeWidth={2.2} />, onClick: () => ouvrirFiche(true) },
                     { id: "journee", libelle: "La journée", icone: <ClipboardPen className="size-[18px]" strokeWidth={2.2} />, href: "/admin" },
                   ]

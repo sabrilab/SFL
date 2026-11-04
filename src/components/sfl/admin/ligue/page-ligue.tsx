@@ -79,7 +79,7 @@ export function PageLigue() {
         lignes={[
           { titre: "Terrains", href: "/map", compteur: String((saison.terrains ?? []).length) },
           { titre: "Notifications", href: "/admin/notifications" },
-          { titre: "Activité", href: "/admin/activite" },
+          { titre: "Analytics", href: "/admin/activite" },
           { titre: "Installation", href: "/admin/setup" },
           { titre: "Tableau complet", href: "/admin/tableau" },
         ]}
