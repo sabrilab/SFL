@@ -482,6 +482,7 @@ function LigueVue({ piece, onOuvrirJournee }: { piece: PieceLigue; onOuvrirJourn
         <span className="flex flex-col items-center gap-1.5 pt-1">
           <CarteDe name={joueurs[0].n!} size={format.grande} detail={piece.titre} inerte />
           <span className="text-center text-corps font-semibold text-encre-2">{joueurs[0].v}</span>
+          {joueurs[0].l && <span className="mono-label -mt-1 text-encre-3">{joueurs[0].l}</span>}
         </span>
       ) : joueurs.length === 2 ? (
         <span className="flex justify-center gap-4 pt-1">
@@ -489,6 +490,7 @@ function LigueVue({ piece, onOuvrirJournee }: { piece: PieceLigue; onOuvrirJourn
             <span key={l.n} className="flex flex-col items-center gap-1.5">
               <CarteDe name={l.n!} size={format.moyenne} detail={piece.titre} inerte />
               <span className="max-w-[110px] text-center text-corps leading-tight font-semibold text-encre-2">{l.v}</span>
+              {l.l && <span className="mono-label text-encre-3">{l.l}</span>}
             </span>
           ))}
         </span>
@@ -500,7 +502,14 @@ function LigueVue({ piece, onOuvrirJournee }: { piece: PieceLigue; onOuvrirJourn
             <span className="min-w-0 flex-1 truncate text-ligne font-semibold">
               <Nom n={l.n!} />
             </span>
-            <span className="shrink-0 text-right text-corps font-bold tabular-nums">{l.v}</span>
+            {l.l ? (
+              <span className="flex shrink-0 flex-col items-end gap-0.5">
+                <span className="text-right text-corps leading-tight font-bold tabular-nums">{l.v}</span>
+                <span className="mono-label text-encre-3">{l.l}</span>
+              </span>
+            ) : (
+              <span className="shrink-0 text-right text-corps font-bold tabular-nums">{l.v}</span>
+            )}
           </span>
         ))
       )}

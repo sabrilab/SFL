@@ -15,7 +15,7 @@ import type { Player } from "./engine";
 import { ordinal } from "./fin-de-saison";
 import { ORDRE_TITRES } from "./puces-titres";
 import { entryPP } from "./saisie/engine";
-import { rangDans } from "./rangs";
+import { classables, rangDans } from "./rangs";
 import { journeeJouee } from "./saisie/mutations";
 import type { MatchEntry, PlayerStatutSaisie, Saison } from "./saisie/types";
 
@@ -51,11 +51,14 @@ const pluriel = (n: number, un: string, plusieurs: string) => `${n} ${n > 1 ? pl
 
 /**
  * Le rang d'un joueur dans la ligue, null s'il est à zéro : la règle des
- * classements (rangs.ts) — les joueurs masqués ne comptent pas, sauf lui.
+ * classements (rangs.ts) — les joueurs masqués ne comptent pas, sauf lui —,
+ * et le nombre de joueurs qui le partagent (lui compris).
  */
-function rangDe(players: Player[], moi: Player, valeur: (p: Player) => number): number | null {
+function rangDe(players: Player[], moi: Player, valeur: (p: Player) => number): { rang: number; egaux: number } | null {
   const liste = players.some((p) => p.name === moi.name) ? players : [...players, moi];
-  return rangDans(liste, moi.name, valeur, false)?.rang ?? null;
+  const r = rangDans(liste, moi.name, valeur, false);
+  if (!r) return null;
+  return { rang: r.rang, egaux: classables(liste, moi.name).filter((p) => valeur(p) === r.valeur).length };
 }
 
 interface Mesure {
@@ -76,7 +79,7 @@ const MESURES: Mesure[] = [
   // Le Joueur Impact de son équipe, élu à chaque match (Ilyes, 03/11 : « pour
   // les Impact dans les points forts de la fiche joueur, tu peux les ajouter »).
   // Entre le MVP et Le Mur, l'ordre des puces : à rang égal, il passe devant Le Mur.
-  { id: "impact", valeur: (p) => p.impact, quoi: () => "fois Impact", titre: "en Impact", premier: "Le joueur Impact de la ligue.", podium: "Sur le podium des joueurs Impact." },
+  { id: "impact", valeur: (p) => p.impact, quoi: () => "fois Impact", titre: "en Impact", premier: "Le Joueur Impact de la ligue.", podium: "Sur le podium des Joueurs Impact." },
   { id: "def", valeur: (p) => p.def, quoi: () => "fois le Mur", titre: "défenseur", premier: "Le mur de la ligue.", podium: "Sur le podium des défenseurs." },
   { id: "pp", valeur: (p) => p.pp, quoi: () => "pts Pépite", titre: "au Pépite d'Or", premier: "En tête du Pépite d'Or.", podium: "Sur le podium du Pépite d'Or." },
 ];
@@ -126,16 +129,20 @@ export function ficheJoueur(saison: Saison, moi: Player, players: Player[]): Fic
   if (!p) return { synthese: "Pas encore de match cette saison.", forts: [], faits: [] };
 
   // Les points forts : ses meilleurs rangs ; la présence compte quand elle est entière.
-  const candidats: { score: number; fort: PointFort; mesure?: Mesure; rang?: number }[] = [];
+  // Une place partagée vaut la dernière du groupe (rang + ex æquo − 1) : un
+  // seul titre Impact, que 17 joueurs ont aussi, fait d'eux des « 2e en
+  // Impact », mais ne passe pas devant un vrai 3e buteur.
+  const candidats: { score: number; fort: PointFort; mesure?: Mesure; rang?: number; egaux?: number }[] = [];
   for (const m of MESURES) {
     const r = rangDe(players, moi, m.valeur);
     if (r == null) continue;
     const v = m.valeur(moi);
     candidats.push({
-      score: r,
+      score: r.rang + r.egaux - 1,
       mesure: m,
-      rang: r,
-      fort: { chiffre: String(v), quoi: m.quoi(v), rang: `${ordinal(r)} ${m.titre}`, classement: m.id, place: r, titre: m.titre },
+      rang: r.rang,
+      egaux: r.egaux,
+      fort: { chiffre: String(v), quoi: m.quoi(v), rang: `${ordinal(r.rang)} ${m.titre}`, classement: m.id, place: r.rang, titre: m.titre },
     });
   }
   const toujours = p === n && n >= 3;
@@ -144,12 +151,16 @@ export function ficheJoueur(saison: Saison, moi: Player, players: Player[]): Fic
     score: toujours ? 2.5 : 10 + (1 - p / n) * 10,
     fort: { chiffre: `${p}/${n}`, quoi: n > 1 ? "dimanches" : "dimanche", rang: presence, classement: "presences", place: null, titre: presence },
   });
-  candidats.sort((a, b) => a.score - b.score);
+  // À place égale, le meilleur rang affiché (« 1er » devant « 2e »), puis l'ordre des puces.
+  candidats.sort((a, b) => a.score - b.score || (a.rang ?? a.score) - (b.rang ?? b.score));
   const forts = candidats.slice(0, 3).map((c) => c.fort);
 
   // La synthèse : son meilleur rang, puis ce qu'il fait d'un dimanche à l'autre.
-  const meilleur = candidats.find((c) => c.mesure && c.rang! <= 3);
-  const debut = meilleur ? (meilleur.rang === 1 ? meilleur.mesure!.premier : meilleur.mesure!.podium) : null;
+  // « Le buteur de la ligue. » : seul en tête ; « Sur le podium » : dans les
+  // trois premiers, à trois au plus (deux 3es buteurs y sont tous deux ; dix-sept
+  // « 2es en Impact » pour un seul titre, non).
+  const meilleur = candidats.find((c) => c.mesure && c.rang! <= 3 && c.egaux! <= 3);
+  const debut = meilleur ? (meilleur.rang === 1 && meilleur.egaux === 1 ? meilleur.mesure!.premier : meilleur.mesure!.podium) : null;
   const rythme: string[] = [];
   const parMatch = (x: number) => x / p;
   if (parMatch(moi.buts) > 1) rythme.push("plus d'un but par match");

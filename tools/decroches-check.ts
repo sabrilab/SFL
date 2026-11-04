@@ -7,19 +7,23 @@
 //     mais elle montre tous ses paliers du jour : le plus beau en grand, les
 //     autres (`aussi`) en petit ;
 //   · le partage « Ils ont décroché » garde une ligne par joueur (le
-//     Vestiaire pose une carte par ligne) : « MVP du match · Bronze +2 ».
+//     Vestiaire pose une carte par ligne) : « MVP du match · Bronze », et
+//     « +2 badges » en petit dessous (l).
 //
 // Les cas réels de la saison 1, rejoués sur des lignes inventées fidèles :
 //   · Anas, J4 : il franchit Passes (5), MVP et Le Mur ; on ne voyait que
 //     « MVP bronze » ;
 //   · Youss, J3 : il franchit MVP, Buts (5), Passes (5) et Le Mur ; on ne
 //     voyait que « MVP bronze ».
+// Et deux gardes : le palier passe avant l'ordre des badges (un Buts argent
+// devant un MVP bronze, Ilyes à la vraie J3), et les joueurs masqués (Sabri,
+// les places X, les arbitres) ne décrochent rien en public.
 //   npx tsx tools/decroches-check.ts
 import assert from "node:assert/strict";
 import { honneurDe, ligneDecroche } from "../src/lib/sfl/a-l-honneur";
 import { filDeSaison, type Actu } from "../src/lib/sfl/actus";
 import { exploitsDe } from "../src/lib/sfl/exploits";
-import { definirArbitres } from "../src/lib/sfl/hidden";
+import { definirArbitres, isHidden } from "../src/lib/sfl/hidden";
 import { computeJournees } from "../src/lib/sfl/saisie/engine";
 import type { MatchEntry, Saison } from "../src/lib/sfl/saisie/types";
 
@@ -102,10 +106,45 @@ assert.deepEqual(
 
 // Le partage « Ils ont décroché » : une ligne par joueur, ses autres paliers comptés.
 assert.deepEqual(honneurDe(saison, 4).decroches.map(ligneDecroche), [
-  { n: "Anas", v: "MVP du match · Bronze +2" },
+  { n: "Anas", v: "MVP du match · Bronze", l: "+2 badges" },
   { n: "Selim", v: "Buts · Bronze" },
   { n: "Youss", v: "Impact · Bronze" },
 ]);
-assert.deepEqual(ligneDecroche(honneurDe(saison, 3).decroches[0]), { n: "Youss", v: "MVP du match · Bronze +3" });
+assert.deepEqual(ligneDecroche(honneurDe(saison, 3).decroches[0]), { n: "Youss", v: "MVP du match · Bronze", l: "+3 badges" });
+
+/* --------------------- Le palier avant l'ordre des badges --------------------- */
+// Kader, le même dimanche, passe Buts argent (10 buts) et MVP bronze : à palier
+// plus haut, Buts passe devant le MVP, plus rare à palier égal. Avec lui, des
+// masqués qui franchissent aussi des paliers : Sabri (non-joueur), X1 (une
+// place pour compléter une équipe) et Arbi (un arbitre).
+{
+  definirArbitres(["Arbi"]);
+  const masques = ["Sabri", "X1", "Arbi"];
+  for (const nom of masques) assert.ok(isHidden(nom), `${nom} : masqué`);
+  const s2: Saison = {
+    ...saison,
+    entries: [
+      ligne(1, "Kader", { buts: 5 }),
+      ligne(2, "Kader", { buts: 4 }),
+      ligne(3, "Kader", { buts: 1, mvp: true }),
+      ...masques.flatMap((nom) => [
+        ligne(1, nom, { buts: 5, passes: 5 }),
+        ligne(2, nom, { buts: 4, passes: 4 }),
+        ligne(3, nom, { buts: 1, passes: 1, mvp: true, def: true, impact: true }),
+      ]),
+    ],
+  };
+  const vue2 = (j: number) =>
+    honneurDe(s2, j).decroches.map((d) => ({ nom: d.nom, badge: `${d.id}:${d.palier}`, aussi: d.aussi.map((a) => `${a.id}:${a.palier}`) }));
+  assert.deepEqual(vue2(3), [{ nom: "Kader", badge: "buts:2", aussi: ["mvp:1"] }]);
+  assert.deepEqual(ligneDecroche(honneurDe(s2, 3).decroches[0]), { n: "Kader", v: "Buts · Argent", l: "+1 badge" });
+  // Les masqués : ni en vitrine ni dans « aussi », aucun dimanche.
+  for (const j of [1, 2, 3]) {
+    const h = honneurDe(s2, j);
+    for (const d of h.decroches) assert.ok(!masques.includes(d.nom), `J${j} : ${d.nom} masqué en vitrine`);
+  }
+  assert.deepEqual(vue2(1), [{ nom: "Kader", badge: "buts:1", aussi: [] }]);
+  definirArbitres([]);
+}
 
 console.log("decroches-check: ok");

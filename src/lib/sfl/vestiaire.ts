@@ -72,6 +72,8 @@ export interface PieceVideo {
  * Un élément de la Ligue (19/10) : l'homme du dimanche, l'équipe type, les
  * badges décrochés, la course… figé tel qu'il était au partage, comme le
  * podium d'un classement. Chaque ligne est un joueur (n) ou un chiffre (l).
+ * Une ligne de joueur peut porter aussi `l` : une précision, en petit sous sa
+ * valeur (« +2 badges » sous « MVP du match · Bronze »).
  */
 export interface PieceLigue {
   type: "ligue";

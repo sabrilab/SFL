@@ -6,11 +6,16 @@
 //
 // Ce que le banc vérifie, sur une ligue inventée de six joueurs :
 //   1 · le 1er en Impact voit « 3 fois Impact · 1er en Impact », et sa phrase
-//       commence par « Le joueur Impact de la ligue. » ;
-//   2 · sur le podium : « 2e en Impact », « Sur le podium des joueurs Impact. » ;
-//   3 · ex æquo : deux joueurs à égalité sont tous deux « 1er en Impact » ; à
-//       rang égal avec le MVP, le MVP passe devant (l'ordre des puces), comme
-//       Anas sur la vraie saison (1er en MVP et en Impact) ;
+//       commence par « Le Joueur Impact de la ligue. » ;
+//   2 · sur le podium : « 2e en Impact », « Sur le podium des Joueurs Impact. » ;
+//   3 · ex æquo : deux joueurs à égalité sont tous deux « 1er en Impact » ;
+//       une place partagée vaut la dernière du groupe (rang + ex æquo − 1) :
+//       un MVP que trois joueurs partagent passe derrière un 2e passeur seul,
+//       « Le … de la ligue. » ne se dit que seul en tête, et « Sur le
+//       podium » qu'à trois ex æquo au plus (deux 3es buteurs y sont) ;
+//   3 bis · la vraie saison au 04/11 : un seul titre Impact, que 17 joueurs
+//       partagent, ne passe pas devant un vrai 3e buteur, ni dans ses points
+//       forts ni dans sa phrase ;
 //   4 · un joueur sans Impact n'a pas ce point fort ;
 //   5 · l'ordre et le nombre : trois points forts au plus, les meilleurs rangs
 //       d'abord, la présence entière (« toujours là ») garde sa place ;
@@ -82,7 +87,7 @@ const A = [
     { ...f.forts[0] },
     { chiffre: "3", quoi: "fois Impact", rang: "1er en Impact", classement: "impact", place: 1, titre: "en Impact" }
   );
-  assert.equal(f.synthese, "Le joueur Impact de la ligue. Un but tous les deux matchs, et jamais absent un dimanche.");
+  assert.equal(f.synthese, "Le Joueur Impact de la ligue. Un but tous les deux matchs, et jamais absent un dimanche.");
 }
 
 // 5 · L'ordre et le nombre : Youss est 1er buteur, en MVP et au Pépite d'Or ;
@@ -105,15 +110,16 @@ for (const nom of ["Ilyes", "Karim", "Nolan"]) {
     joueur("Ilyes", { buts: 4, pp: 25 }),
   ];
   assert.deepEqual(forts("Mehdi", B), ["2 fois Impact · 2e en Impact", "5 pts Pépite · 4e au Pépite d'Or", "2/4 dimanches · 50 % présent"]);
-  assert.match(fiche("Mehdi", B).synthese, /^Sur le podium des joueurs Impact\. /);
-  // 3e, toujours sur le podium.
+  assert.match(fiche("Mehdi", B).synthese, /^Sur le podium des Joueurs Impact\. /);
+  // Selim, 3e en Impact : ses trois meilleurs rangs passent devant.
   assert.equal(fiche("Selim", B).forts.find((f) => f.classement === "impact")?.rang, undefined, "Selim : 3e en Impact, mais trois meilleurs rangs devant");
 }
 
 /* ------------------------------ Les ex æquo ------------------------------ */
-// 3 · Anas et Youss, deux fois Impact chacun : tous deux 1ers. Anas est aussi
-// 1er en MVP, à égalité avec d'autres (la vraie saison au 04/11) : le MVP
-// passe devant l'Impact, et c'est lui qui fait la phrase.
+// 3 · Anas et Youss, deux fois Impact chacun : tous deux 1ers, à deux. Anas
+// est aussi 1er en MVP, mais à trois : ce MVP vaut une 3e place, derrière son
+// Impact (1er à deux), sa 2e place de passeur et de défenseur, seul. Sa phrase
+// : « Sur le podium », pas « Le Joueur Impact de la ligue. » (ils sont deux).
 {
   const C = [
     joueur("Anas", { buts: 5, passes: 4, mvp: 1, impact: 2, def: 1, pp: 20 }),
@@ -124,8 +130,43 @@ for (const nom of ["Ilyes", "Karim", "Nolan"]) {
   for (const nom of ["Anas", "Youss"]) {
     assert.equal(fiche(nom, C).forts.find((f) => f.classement === "impact")?.rang, "1er en Impact", `${nom} : 1er ex æquo`);
   }
-  assert.deepEqual(forts("Anas", C), ["1 MVP · 1er en MVP", "2 fois Impact · 1er en Impact", "4 passes · 2e passeur"]);
-  assert.match(fiche("Anas", C).synthese, /^Le MVP de la ligue\. /);
+  assert.deepEqual(forts("Anas", C), ["2 fois Impact · 1er en Impact", "4 passes · 2e passeur", "1 fois le Mur · 2e défenseur"]);
+  assert.match(fiche("Anas", C).synthese, /^Sur le podium des Joueurs Impact\. /);
+  // Seul en tête : « Le … de la ligue. »
+  assert.match(fiche("Selim", C).synthese, /^Le buteur de la ligue\. /);
+}
+
+// 3 bis · Dix joueurs à un Impact, Tarik en a deux ; Abdel est 3e buteur, seul.
+// Les dix sont « 2e en Impact », à dix : une 11e place. Abdel garde son 3e
+// rang de buteur devant (après sa présence entière, comme avant), et sa
+// phrase de buteur.
+{
+  const D = [
+    joueur("Tarik", { buts: 2, impact: 2, pp: 12 }),
+    joueur("Rayan", { buts: 15, pp: 40 }),
+    joueur("Yanis", { buts: 13, pp: 35 }),
+    joueur("Abdel", { buts: 12, impact: 1, pp: 30 }),
+    ...["Adel", "Bilal", "Driss", "Farid", "Hakim", "Malik", "Nassim", "Omar", "Samir"].map((n, i) =>
+      joueur(n, { buts: 1 + (i % 3), impact: 1, pp: 10 + i, presences: 1 + (i % 4) })
+    ),
+  ];
+  const f = fiche("Abdel", D);
+  assert.deepEqual(forts("Abdel", D), ["4/4 dimanches · toujours là", "12 buts · 3e buteur", "30 pts Pépite · 3e au Pépite d'Or"]);
+  assert.match(f.synthese, /^Sur le podium des buteurs\. /);
+  assert.equal(f.forts.find((x) => x.classement === "impact")?.rang, undefined, "Abdel : son Impact partagé à dix passe derrière");
+  // Aucun des dix n'a de phrase « Impact » : ni « Le Joueur Impact », ni le podium.
+  for (const p of D.filter((x) => x.impact === 1)) {
+    assert.ok(!/Impact/.test(fiche(p.name, D).synthese), `${p.name} : ${fiche(p.name, D).synthese}`);
+  }
+  // Tarik, seul à deux : « Le Joueur Impact de la ligue. »
+  assert.match(fiche("Tarik", D).synthese, /^Le Joueur Impact de la ligue\. /);
+  // Abdel et Zakaria, 3es à égalité (la vraie saison au 04/11) : tous deux sur
+  // le podium des buteurs. À quatre au 3e rang, plus personne.
+  const E = [...D, joueur("Zakaria", { buts: 12, pp: 5 })];
+  assert.match(fiche("Zakaria", E).synthese, /^Sur le podium des buteurs\. /);
+  assert.ok(forts("Abdel", E).includes("12 buts · 3e buteur"));
+  const F = [...E, joueur("Ryad", { buts: 12, pp: 2 }), joueur("Souley", { buts: 12, pp: 3 })];
+  assert.ok(!/podium/.test(fiche("Zakaria", F).synthese), fiche("Zakaria", F).synthese);
 }
 
 /* ------------------------------ Bola Agent ------------------------------ */

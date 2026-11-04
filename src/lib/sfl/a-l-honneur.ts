@@ -63,14 +63,16 @@ export interface Honneur {
 
 /**
  * La ligne d'un joueur dans le partage « Ils ont décroché » (au Vestiaire) :
- * son plus beau badge, « MVP du match · Bronze », et le nombre de ses autres
- * paliers du jour, « MVP du match · Bronze +2 ». Une ligne par joueur : le
- * Vestiaire pose une carte par ligne.
+ * son plus beau badge, « MVP du match · Bronze », et, dessous, le nombre de
+ * ses autres badges du jour, « +2 badges » (« Bronze +2 », collé au métal, se
+ * lisait comme deux paliers de plus ; et sur la même ligne, il écrasait le
+ * nom du joueur). Une ligne par joueur : le Vestiaire pose une carte par ligne.
  */
-export function ligneDecroche(d: Decroche): { n: string; v: string } {
+export function ligneDecroche(d: Decroche): { n: string; v: string; l?: string } {
   const nom = TROPHEES.find((t) => t.id === d.id)?.nom ?? d.id;
-  const base = `${nom} · ${NOM_METAL[metal(d.palier)!]}`;
-  return { n: d.nom, v: d.aussi.length ? `${base} +${d.aussi.length}` : base };
+  const v = `${nom} · ${NOM_METAL[metal(d.palier)!]}`;
+  const n = d.aussi.length;
+  return n ? { n: d.nom, v, l: `+${n} ${n > 1 ? "badges" : "badge"}` } : { n: d.nom, v };
 }
 
 const jusqua = (s: Saison, j: number): Saison => ({
