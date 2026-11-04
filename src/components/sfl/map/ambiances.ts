@@ -32,6 +32,13 @@
 //     volumes noirs, les noms à peine ; la braise seule luit, à la frontière
 //     de la zone et sur le trajet jusqu'au match.
 //
+//   · « jour » et « aube » (02/11, Sabri : « le côté dark […] ça fait fuir
+//     un peu ») : le plan revient à la lumière. « jour » prend la charte
+//     (parcs et terrains au vert sauge, grands axes au mauve, eau bleu
+//     ciel, sol crème) ; « aube » est le plan clair et neutre d'une app de
+//     plans, les grands axes en jaune pâle. Les zones y gardent le voile
+//     gris clair du dehors.
+//
 // « classique » : le plan d'avant, sans zones. Seul l'essai « rouge »
 // prend une couleur réservée (Impact), pour que Sabri tranche.
 // Les zones en attente (des joueurs, pas encore de match) sont en
@@ -40,10 +47,13 @@
 import type { Map as PlanMap } from "maplibre-gl";
 import { chaleur, contoursDesZones, FONDU_PAS, voilesEnFondu, type Zone } from "@/lib/sfl/zones";
 
-export type Ambiance = "classique" | "territoire" | "nuit" | "encre" | "brume" | "rouge" | "braise" | "nuit-brume" | "nuit-braise" | "nuit-encre";
+export type Ambiance =
+  | "jour" | "aube" | "classique" | "territoire" | "nuit" | "encre" | "brume" | "rouge" | "braise" | "nuit-brume" | "nuit-braise" | "nuit-encre"
+  | "bulle" | "nuit-chaleur" | "trace" | "sticker" | "nuit-pelouse" | "gravure"
+  | "bulle-gomme" | "nuit-bulle" | "bulle-peche" | "bulle-lilas" | "bulle-encre" | "bulle-verre" | "nuit-verre";
 /** Les essais montrés dans l'aperçu (l'encre reste par l'adresse). */
-export const AMBIANCES: Ambiance[] = ["nuit-encre", "brume", "rouge", "braise", "nuit-brume", "nuit-braise", "nuit", "territoire", "classique"];
-export const TOUTES_AMBIANCES: Ambiance[] = [...AMBIANCES, "encre"];
+export const AMBIANCES: Ambiance[] = ["jour", "aube", "nuit-encre", "brume", "rouge", "braise", "nuit-brume", "nuit-braise", "nuit", "territoire", "classique"];
+export const TOUTES_AMBIANCES: Ambiance[] = [...AMBIANCES, "encre", "bulle", "nuit-chaleur", "trace", "sticker", "nuit-pelouse", "gravure", "bulle-gomme", "nuit-bulle", "bulle-peche", "bulle-lilas", "bulle-encre", "bulle-verre", "nuit-verre"];
 /** Les ambiances sur le plan noir. */
 export const estNuit = (a: Ambiance) => a.startsWith("nuit");
 
@@ -89,6 +99,52 @@ const SNAP: Palette = {
   texte: "#6b6d72",
   texteRues: "#6d6a64",
   texteEau: "#3d8fbf",
+  halo: "#ffffff",
+};
+
+/** Le jour de la charte : sauge, mauve, crème, bleu ciel (02/11). */
+const JOUR: Palette = {
+  terre: "#f5f2ea",
+  quartier: "#f0ece2",
+  parc: "#d3e7cc",
+  bois: "#c3dfba",
+  terrain: "#a9cba9",
+  eau: "#b7dcef",
+  eauBord: "#a3d0e8",
+  rue: "#ffffff",
+  rueBord: "#e6dfd3",
+  grande: "#f6dbe8",
+  grandeBord: "#e0b3cb",
+  bati: "#ebe6dc",
+  volume: "#fbf8f3",
+  rail: "#d9d2c6",
+  ombre: "rgba(92, 84, 70, 0.45)",
+  texte: "#55575c",
+  texteRues: "#7a776f",
+  texteEau: "#3f87b0",
+  halo: "#ffffff",
+};
+
+/** L'aube : le plan clair et neutre d'une app de plans (02/11). */
+const AUBE: Palette = {
+  terre: "#f4f4f1",
+  quartier: "#efefeb",
+  parc: "#d7ebcf",
+  bois: "#cde4c4",
+  terrain: "#b9dcae",
+  eau: "#aed6f1",
+  eauBord: "#9ccbea",
+  rue: "#ffffff",
+  rueBord: "#dedcd6",
+  grande: "#ffe9b0",
+  grandeBord: "#ecd08a",
+  bati: "#e9e8e4",
+  volume: "#f9f9f7",
+  rail: "#d4d2cc",
+  ombre: "rgba(60, 60, 60, 0.35)",
+  texte: "#4b4d52",
+  texteRues: "#6f7075",
+  texteEau: "#3a82b5",
   halo: "#ffffff",
 };
 
@@ -162,7 +218,110 @@ const TABLEAU: Palette = {
   halo: "#0a0a0b",
 };
 
-const PALETTES: Record<Ambiance, Palette> = { classique: SNAP, territoire: SNAP, nuit: NUIT, encre: ENCRE, brume: SNAP, rouge: SNAP, braise: SNAP, "nuit-brume": NUIT, "nuit-braise": NUIT, "nuit-encre": TABLEAU };
+/* Les plans des styles 12 à 17 (02/11 au soir, Sabri : « inspire-toi de la
+   carte de Snap, d'Uber, de Zenly […] une surcouche qui la rend plus belle et
+   plus dynamique »). Chaque style d'interface à l'essai a son plan
+   (styles-ui.css pour la surcouche animée, app/map/page.tsx pour le lien). */
+const BULLE: Palette = {
+  terre: "#eaf6f0", quartier: "#e3f2ea", parc: "#b9ecc4", bois: "#a6e3b4", terrain: "#8fdc9f",
+  eau: "#a6def2", eauBord: "#8dd2ec", rue: "#ffffff", rueBord: "#d3e7dc", grande: "#ffe1ef", grandeBord: "#f3bfd8",
+  bati: "#dff0e6", volume: "#ffffff", rail: "#cfe0d6", ombre: "rgba(60, 96, 84, 0.42)",
+  texte: "#4c6a5e", texteRues: "#6b8479", texteEau: "#3a8db3", halo: "#ffffff",
+};
+const CHALEUR: Palette = {
+  terre: "#16111b", quartier: "#1a1420", parc: "#1d2820", bois: "#1a251d", terrain: "#2a4630",
+  eau: "#0f141c", eauBord: "#131a24", rue: "#2b2432", rueBord: "#1f1925", grande: "#47313f", grandeBord: "#2d212c",
+  bati: "#211a27", volume: "#2a2231", rail: "#2a2330", ombre: "rgba(0, 0, 0, 0.6)",
+  texte: "#9a8fa3", texteRues: "#786d80", texteEau: "#6c7a8c", halo: "#120e16",
+};
+const TRACE: Palette = {
+  terre: "#f2f2f1", quartier: "#eeeeed", parc: "#e0e6de", bois: "#dbe1d9", terrain: "#cdd7ca",
+  eau: "#d8dde2", eauBord: "#ccd2d8", rue: "#ffffff", rueBord: "#dedede", grande: "#ffffff", grandeBord: "#c4c4c4",
+  bati: "#e5e5e4", volume: "#fafafa", rail: "#cfcfcf", ombre: "rgba(0, 0, 0, 0.32)",
+  texte: "#666666", texteRues: "#8a8a8a", texteEau: "#7a8590", halo: "#ffffff",
+};
+const STICKER: Palette = {
+  terre: "#fff6e5", quartier: "#fff0d9", parc: "#b8f0a8", bois: "#a2e692", terrain: "#7fdc72",
+  eau: "#97dcff", eauBord: "#76cdf6", rue: "#ffffff", rueBord: "#efdbbe", grande: "#ffd6ec", grandeBord: "#f1a8ce",
+  bati: "#ffe8ca", volume: "#fff9ee", rail: "#e8d4b8", ombre: "rgba(120, 80, 40, 0.38)",
+  texte: "#6b5a48", texteRues: "#8a7660", texteEau: "#2f8fc0", halo: "#ffffff",
+};
+const PELOUSE: Palette = {
+  terre: "#2d6a3b", quartier: "#2a6337", parc: "#377a45", bois: "#317140", terrain: "#4a9858",
+  eau: "#20493a", eauBord: "#1c4233", rue: "#4f8d5a", rueBord: "#275a32", grande: "#6fae78", grandeBord: "#285c33",
+  bati: "#285b34", volume: "#3a7746", rail: "#3c7547", ombre: "rgba(0, 20, 5, 0.5)",
+  texte: "#e8f3e6", texteRues: "#cfe6cc", texteEau: "#bfe0d0", halo: "#1b4626",
+};
+const GRAVURE: Palette = {
+  terre: "#f6f1e6", quartier: "#f2ecdf", parc: "#e5e8d5", bois: "#dee2cc", terrain: "#cdd8bd",
+  eau: "#e3e5e2", eauBord: "#c7cac2", rue: "#fffdf7", rueBord: "#cdc4b2", grande: "#fffdf7", grandeBord: "#8c8270",
+  bati: "#ebe4d5", volume: "#fbf8f0", rail: "#b7ae9e", ombre: "rgba(60, 50, 35, 0.4)",
+  texte: "#3d372e", texteRues: "#6f6656", texteEau: "#6f7670", halo: "#fbf8f0",
+};
+
+/* Les variations de Bulle, styles 18 à 23 (Sabri, 03/11 : « j'aime le style 12, fais des variations »). */
+const BULLE_GOMME: Palette = {
+  terre: "#e6f7ee", quartier: "#ddf3e7", parc: "#a9ecba", bois: "#94e3a8", terrain: "#78d98f",
+  eau: "#9fe3ee", eauBord: "#83d6e4", rue: "#ffffff", rueBord: "#c6e6d3", grande: "#ffd9ec", grandeBord: "#f5b3d4",
+  bati: "#d6efe0", volume: "#ffffff", rail: "#c4dccd", ombre: "rgba(50, 110, 80, 0.45)",
+  texte: "#3f6455", texteRues: "#5f8173", texteEau: "#2e8b9c", halo: "#ffffff",
+};
+const NUIT_BULLE: Palette = {
+  terre: "#10221d", quartier: "#132722", parc: "#1a3a2c", bois: "#183428", terrain: "#2b6046",
+  eau: "#0d1a1c", eauBord: "#112224", rue: "#20403a", rueBord: "#16302a", grande: "#5a3550", grandeBord: "#3a2436",
+  bati: "#183029", volume: "#21413a", rail: "#1f3a33", ombre: "rgba(0, 0, 0, 0.55)",
+  texte: "#9cc9b5", texteRues: "#76a291", texteEau: "#6aa7a5", halo: "#0c1a16",
+};
+const BULLE_PECHE: Palette = {
+  terre: "#fff3ea", quartier: "#ffeee2", parc: "#c9efc4", bois: "#b6e7b0", terrain: "#9fdf98",
+  eau: "#bfe9ec", eauBord: "#a6dfe3", rue: "#ffffff", rueBord: "#f3dccb", grande: "#ffd5c4", grandeBord: "#f7b9a4",
+  bati: "#fde6d6", volume: "#fffaf5", rail: "#ead6c7", ombre: "rgba(150, 90, 60, 0.38)",
+  texte: "#7a5a4a", texteRues: "#977a6a", texteEau: "#3f969c", halo: "#ffffff",
+};
+const BULLE_LILAS: Palette = {
+  terre: "#f3effc", quartier: "#eee9fa", parc: "#cdeccf", bois: "#bce4c0", terrain: "#a7dcae",
+  eau: "#cfe3f3", eauBord: "#bcd6ec", rue: "#ffffff", rueBord: "#ddd5ef", grande: "#e4d5fa", grandeBord: "#c9b4f2",
+  bati: "#e8e2f7", volume: "#ffffff", rail: "#d7cfea", ombre: "rgba(90, 70, 140, 0.36)",
+  texte: "#5d5379", texteRues: "#7d7398", texteEau: "#5a86a8", halo: "#ffffff",
+};
+const BULLE_ENCRE: Palette = {
+  terre: "#fff8ec", quartier: "#fff3e2", parc: "#b4ecc0", bois: "#a0e3af", terrain: "#86da9a",
+  eau: "#b4e6ef", eauBord: "#1a1714", rue: "#ffffff", rueBord: "#1a1714", grande: "#ffd9ec", grandeBord: "#1a1714",
+  bati: "#fbe9d2", volume: "#ffffff", rail: "#1a1714", ombre: "rgba(26, 23, 20, 0.5)",
+  texte: "#1a1714", texteRues: "#3d362f", texteEau: "#1a1714", halo: "#ffffff",
+};
+const BULLE_VERRE: Palette = {
+  terre: "#dff5ec", quartier: "#d7f1e6", parc: "#99e8b1", bois: "#86e0a2", terrain: "#62d585",
+  eau: "#8fe0f0", eauBord: "#72d4e8", rue: "#ffffff", rueBord: "#bfe4d3", grande: "#ffc9e6", grandeBord: "#f3a6cf",
+  bati: "#cfeee0", volume: "#ffffff", rail: "#b9dccb", ombre: "rgba(40, 120, 90, 0.4)",
+  texte: "#305848", texteRues: "#4f7767", texteEau: "#1f8496", halo: "#ffffff",
+};
+const NUIT_VERRE: Palette = {
+  terre: "#0e1c18", quartier: "#11201c", parc: "#173a2b", bois: "#153427", terrain: "#265f44",
+  eau: "#0f2a2c", eauBord: "#143436", rue: "#24403a", rueBord: "#172d28", grande: "#4d3346", grandeBord: "#33222f",
+  bati: "#162b25", volume: "#1f3a33", rail: "#1d362f", ombre: "rgba(0, 0, 0, 0.55)",
+  texte: "#a6cfbd", texteRues: "#7ea797", texteEau: "#79b6b0", halo: "#0a1613",
+};
+const PALETTES: Record<Ambiance, Palette> = { jour: JOUR, aube: AUBE, classique: SNAP, territoire: SNAP, nuit: NUIT, encre: ENCRE, brume: SNAP, rouge: SNAP, braise: SNAP, "nuit-brume": NUIT, "nuit-braise": NUIT, "nuit-encre": TABLEAU,
+  bulle: BULLE, "nuit-chaleur": CHALEUR, trace: TRACE, sticker: STICKER, "nuit-pelouse": PELOUSE, gravure: GRAVURE,
+  "bulle-gomme": BULLE_GOMME, "nuit-bulle": NUIT_BULLE, "bulle-peche": BULLE_PECHE, "bulle-lilas": BULLE_LILAS, "bulle-encre": BULLE_ENCRE, "bulle-verre": BULLE_VERRE, "nuit-verre": NUIT_VERRE };
+
+/** Les halos de chaleur des styles 12 à 17, façon Snap Map, sans or, bleu ni rouge (réservés aux cartes). */
+const HALOS: Partial<Record<Ambiance, unknown[]>> = {
+  bulle: ["interpolate", ["linear"], ["heatmap-density"], 0, "rgba(255,255,255,0)", 0.2, "rgba(255,214,234,0.25)", 0.55, "rgba(255,190,222,0.42)", 0.85, "rgba(190,240,200,0.55)", 1, "rgba(255,255,255,0.7)"],
+  "nuit-chaleur": ["interpolate", ["linear"], ["heatmap-density"], 0, "rgba(224,179,203,0)", 0.15, "rgba(224,179,203,0.16)", 0.45, "rgba(224,179,203,0.42)", 0.75, "rgba(169,203,169,0.6)", 1, "rgba(255,250,235,0.78)"],
+  trace: ["interpolate", ["linear"], ["heatmap-density"], 0, "rgba(0,0,0,0)", 0.3, "rgba(0,0,0,0.03)", 1, "rgba(0,0,0,0.08)"],
+  sticker: ["interpolate", ["linear"], ["heatmap-density"], 0, "rgba(255,255,255,0)", 0.2, "rgba(255,255,255,0.35)", 0.6, "rgba(255,214,236,0.5)", 1, "rgba(255,255,255,0.8)"],
+  "nuit-pelouse": ["interpolate", ["linear"], ["heatmap-density"], 0, "rgba(255,255,255,0)", 0.2, "rgba(240,255,236,0.08)", 0.6, "rgba(240,255,236,0.2)", 1, "rgba(250,255,248,0.4)"],
+  "bulle-gomme": ["interpolate", ["linear"], ["heatmap-density"], 0, "rgba(255,255,255,0)", 0.2, "rgba(255,206,230,0.3)", 0.55, "rgba(255,180,216,0.5)", 0.85, "rgba(170,240,190,0.6)", 1, "rgba(255,255,255,0.75)"],
+  "nuit-bulle": ["interpolate", ["linear"], ["heatmap-density"], 0, "rgba(143,214,164,0)", 0.15, "rgba(143,214,164,0.14)", 0.45, "rgba(143,214,164,0.38)", 0.75, "rgba(243,191,216,0.55)", 1, "rgba(255,250,240,0.8)"],
+  "bulle-peche": ["interpolate", ["linear"], ["heatmap-density"], 0, "rgba(255,255,255,0)", 0.2, "rgba(255,214,196,0.3)", 0.55, "rgba(255,196,176,0.45)", 0.85, "rgba(255,226,236,0.6)", 1, "rgba(255,255,255,0.75)"],
+  "bulle-lilas": ["interpolate", ["linear"], ["heatmap-density"], 0, "rgba(255,255,255,0)", 0.2, "rgba(220,204,250,0.3)", 0.55, "rgba(205,184,246,0.45)", 0.85, "rgba(196,236,206,0.55)", 1, "rgba(255,255,255,0.75)"],
+  "bulle-encre": ["interpolate", ["linear"], ["heatmap-density"], 0, "rgba(255,255,255,0)", 0.2, "rgba(255,217,236,0.35)", 0.6, "rgba(255,200,228,0.55)", 1, "rgba(255,255,255,0.8)"],
+  "bulle-verre": ["interpolate", ["linear"], ["heatmap-density"], 0, "rgba(255,255,255,0)", 0.2, "rgba(255,255,255,0.3)", 0.5, "rgba(255,201,230,0.5)", 0.8, "rgba(160,240,200,0.6)", 1, "rgba(255,255,255,0.85)"],
+  "nuit-verre": ["interpolate", ["linear"], ["heatmap-density"], 0, "rgba(127,217,154,0)", 0.15, "rgba(127,217,154,0.14)", 0.45, "rgba(127,217,154,0.34)", 0.75, "rgba(245,179,212,0.5)", 1, "rgba(255,250,240,0.75)"],
+  gravure: ["interpolate", ["linear"], ["heatmap-density"], 0, "rgba(61,55,46,0)", 0.2, "rgba(61,55,46,0.04)", 0.6, "rgba(61,55,46,0.1)", 1, "rgba(61,55,46,0.2)"],
+};
 
 /** La couleur de frontière des essais « rouge » et « braise ». */
 const FRONTIERE: Partial<Record<Ambiance, string>> = { rouge: "#E3262E", braise: "#FF6A1A", "nuit-braise": "#FF6A1A", "nuit-encre": "#FF6A1A" };
@@ -411,11 +570,12 @@ export function teinterZones(map: PlanMap, ambiance: Ambiance, satellite: boolea
   set(
     "zones-chaleur",
     "heatmap-color",
-    ambiance === "encre"
+    HALOS[ambiance] ??
+    (ambiance === "encre"
       ? ["interpolate", ["linear"], ["heatmap-density"], 0, "rgba(10,11,13,0)", 0.15, "rgba(10,11,13,0.04)", 0.5, "rgba(10,11,13,0.1)", 1, "rgba(10,11,13,0.22)"]
       : nuit
         ? ["interpolate", ["linear"], ["heatmap-density"], 0, "rgba(255,255,255,0)", 0.15, "rgba(255,255,255,0.06)", 0.5, "rgba(246,247,242,0.2)", 1, "rgba(246,247,242,0.42)"]
-        : ["interpolate", ["linear"], ["heatmap-density"], 0, "rgba(255,255,255,0)", 0.15, "rgba(255,255,253,0.18)", 0.5, "rgba(255,255,253,0.38)", 1, "rgba(255,255,253,0.6)"]
+        : ["interpolate", ["linear"], ["heatmap-density"], 0, "rgba(255,255,255,0)", 0.15, "rgba(255,255,253,0.18)", 0.5, "rgba(255,255,253,0.38)", 1, "rgba(255,255,253,0.6)"])
   );
   for (const id of ["zones-trait", "zones-lisere", "zones-attente", "zones-lueur"]) set(id, "line-opacity", 0);
   // La frontière (« rouge », « braise ») : un trait franc sur une lueur
