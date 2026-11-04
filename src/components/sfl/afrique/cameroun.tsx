@@ -21,6 +21,17 @@
 //     coupole vue d'en haut, ses rangs montés en anneaux et ses reliefs qui
 //     rayonnent, la lune dans l'oculus ; en haut et en bas, une bande de
 //     velours brodé.
+//   · le totem (totems/cameroun.tsx, 02/11/2026) : le lion qui rugit, en
+//     buste de profil, taillé dans l'argile au milieu à gauche du dos, la
+//     crinière qui frôle le bord ; la coupole et la lune montent en haut à
+//     droite (LUNE_CAMEROUN), vers où il rugit ; la bande de velours
+//     du haut laisse la place, celle du bas reste ; l'enduit a séché (de la
+//     graine : quelques fentes de retrait larges à la racine et effilées,
+//     leur lèvre claire, qui naissent loin du lion et de la coupole et les
+//     contournent ; un peu de paille et de sable, les passes de la main) ; à la
+//     face, le sable sous le portrait, et le lion pressé en sceau d'argile
+//     dans le coin du portrait. (Le lion n'est pas un « animal-emblème » de
+//     cour comme ceux du toghu : c'est le totem de la sélection.)
 // Ce qu'on évite : le ndop (toile royale des Grassfields) et tout objet de
 // cour (sièges, masques, coiffes bamoun ou bamiléké) ; les animaux-emblèmes
 // (araignée, grenouille, léopard) et les figures du soleil, de la lune ou des
@@ -28,7 +39,13 @@
 // couleurs du drapeau. Rien que des reliefs et une broderie géométrique.
 
 import type { PropsMotifNation, SkinNation } from "./types";
-import { alea, BANDE, CENTRE_DOS, f, H, LOGOTYPE_DOS, W } from "./outils";
+import { alea, BANDE, f, H, LOGOTYPE_DOS, W } from "./outils";
+import { LUNE_CAMEROUN } from "./totems/cameroun";
+
+/** Le centre de la coupole et de la lune au dos : montés en haut à droite, vers où le lion rugit (totems/cameroun.tsx). */
+const CENTRE_DOS = { cx: LUNE_CAMEROUN.cx, cy: LUNE_CAMEROUN.cy } as const;
+/** L'échelle de la coupole : la lune passe de 300 à LUNE_CAMEROUN.d. */
+const K = LUNE_CAMEROUN.d / 300;
 
 type Rnd = () => number;
 
@@ -254,9 +271,19 @@ function face(graine: number) {
   });
 }
 
+/** Le sable de l'enduit sous le portrait (la graine). */
+function grainsFace(graine: number): string {
+  return memo(`grains-${graine}`, () => {
+    const rnd = alea(graine ^ 0x6772);
+    let d = "";
+    for (let i = 0; i < 110; i++) d += `M${f(rnd() * W)} ${f(BANDE + 20 + rnd() * (H - BANDE - 40))}h.1`;
+    return d;
+  });
+}
+
 /* --------------------------------- Le dos --------------------------------- */
 
-const COUPOLE = { r: 408, oculus: 352 };
+const COUPOLE = { r: 408 * K, oculus: 352 * K };
 const LISSE = { y0: LOGOTYPE_DOS.cy - 92, y1: LOGOTYPE_DOS.cy + 96 };
 const VEL = { haut: 44, bas: H - 194, h: 150 };
 
@@ -279,25 +306,72 @@ function dos(graine: number) {
     }
     let rayons = "";
     let nervures = "";
-    const N = 40;
+    const N = 32;
     for (let i = 0; i < N; i++) {
       const a0 = (i / N) * Math.PI * 2;
       const da = (Math.PI * 2) / N;
       // Une nervure droite entre deux rangées.
       const an = a0 + da / 2;
-      nervures += `M${f(cx + (COUPOLE.oculus + 10) * Math.cos(an))} ${f(cy + (COUPOLE.oculus + 10) * Math.sin(an))}L${f(cx + (COUPOLE.r - 12) * Math.cos(an))} ${f(cy + (COUPOLE.r - 12) * Math.sin(an))}`;
+      nervures += `M${f(cx + (COUPOLE.oculus + 10 * K) * Math.cos(an))} ${f(cy + (COUPOLE.oculus + 10 * K) * Math.sin(an))}L${f(cx + (COUPOLE.r - 12 * K) * Math.cos(an))} ${f(cy + (COUPOLE.r - 12 * K) * Math.sin(an))}`;
       // Deux V par rangée, pointe vers le centre.
-      for (const rr of [COUPOLE.oculus + 14, COUPOLE.oculus + 32]) {
+      for (const rr of [COUPOLE.oculus + 14 * K, COUPOLE.oculus + 32 * K]) {
         const j = () => (rnd() - 0.5) * 1.8;
         const demi = da * 0.36;
-        const h = 13;
+        const h = 13 * K;
         const p = (r: number, a: number) => `${f(cx + r * Math.cos(a) + j())} ${f(cy + r * Math.sin(a) + j())}`;
         rayons += `M${p(rr + h, a0 - demi)}L${p(rr, a0)}L${p(rr + h, a0 + demi)}`;
       }
     }
     // Les bandes de velours, en haut et en bas.
     const brode = [bandeLarge(W, rnd), bandeLarge(W, rnd)];
-    return { mur, anneaux, rayons, nervures, brode };
+    // L'enduit qui a séché au soleil : quelques fentes de retrait, larges à la racine et effilées, qui contournent le lion
+    // et la coupole (elles naissent loin d'eux et tournent quand elles s'en approchent) ; le sable et la paille, à peine.
+    const ru = alea(graine ^ 0x7365);
+    const libre = (x: number, y: number) =>
+      Math.hypot(x - cx, y - cy) > COUPOLE.r + 26 && !(x < 700 && y > 310 && y < 1130) && y < LISSE.y0 - 10 && x > 20 && x < W - 20;
+    let fentes = "";
+    let levres = "";
+    for (let i = 0, essais = 0; i < 6 && essais < 80; essais++) {
+      let [x, y] = [ru() * W, ru() * (LISSE.y0 - 40)];
+      if (!libre(x, y)) continue;
+      i++;
+      let a = ru() * Math.PI * 2;
+      const n = 5 + Math.floor(ru() * 4);
+      const gauche: [number, number][] = [];
+      const droite: [number, number][] = [];
+      for (let k = 0; k <= n; k++) {
+        const e = 2.6 * (1 - k / n) + 0.2;
+        gauche.push([x - Math.sin(a) * e, y + Math.cos(a) * e]);
+        droite.push([x + Math.sin(a) * e, y - Math.cos(a) * e]);
+        const l = 10 + ru() * 12;
+        let [nx, ny] = [x + l * Math.cos(a), y + l * Math.sin(a)];
+        // Contourner : tourner tant que le pas suivant entre dans le lion ou la coupole.
+        for (let t = 0; t < 6 && !libre(nx, ny); t++) {
+          a += 0.6;
+          [nx, ny] = [x + l * Math.cos(a), y + l * Math.sin(a)];
+        }
+        if (!libre(nx, ny)) break;
+        [x, y] = [nx, ny];
+        a += (ru() - 0.5) * 0.9;
+      }
+      const pts = [...gauche, ...droite.reverse()];
+      fentes += `M${pts.map(([px, py]) => `${f(px)} ${f(py)}`).join("L")}Z`;
+      levres += `M${gauche.map(([px, py]) => `${f(px)} ${f(py)}`).join("L")}`;
+    }
+    let grains = "";
+    let pailles = "";
+    for (let i = 0; i < 120; i++) grains += `M${f(ru() * W)} ${f(ru() * H)}h.1`;
+    for (let i = 0; i < 10; i++) {
+      const [x, y, a] = [ru() * W, ru() * H, ru() * Math.PI];
+      pailles += `M${f(x)} ${f(y)}l${f(7 * Math.cos(a))} ${f(7 * Math.sin(a))}`;
+    }
+    let passes = "";
+    for (let i = 0; i < 30; i++) {
+      const [x, y] = [ru() * W, ru() * H];
+      const l = 40 + ru() * 60;
+      passes += `M${f(x)} ${f(y)}q${f(l / 2)} ${f(-10 - ru() * 8)} ${f(l)} ${f((ru() - 0.5) * 6)}`;
+    }
+    return { mur, anneaux, rayons, nervures, brode, fentes, levres, grains, pailles, passes };
   });
 }
 
@@ -325,6 +399,8 @@ function Teleuk({ cote, graine, id }: PropsMotifNation) {
         <rect width={W} height={H} fill={`url(#tk-g-${id})`} />
         <Modele d={fc.bas.v} l={3.4} force={0.24} />
         <Modele d={fc.bas.nervures} l={2.6} force={0.18} />
+        {/* Sous le portrait, le sable et la paille pris dans l'enduit, à peine. */}
+        <path d={grainsFace(graine)} stroke="rgba(70,46,26,0.35)" strokeWidth={2.6} strokeLinecap="round" />
         {/* Le velours : un anneau, du bord à la marge du portrait. */}
         <path
           d={rectArrondi(x0, y0, x1, y1, r) + rectArrondi(x0 + ep, y0 + ep, x1 - ep, y1 - ep, r - ep)}
@@ -364,6 +440,13 @@ function Teleuk({ cote, graine, id }: PropsMotifNation) {
       {/* La paroi : ses V et ses nervures, modelés. */}
       <Modele d={t.mur.v} l={4.2} force={0.62} />
       <Modele d={t.mur.nervures} l={3.4} force={0.5} />
+      {/* L'enduit séché : les passes de la main, les fentes de retrait, la paille et le sable pris dans l'argile. */}
+      <path d={t.passes} fill="none" stroke={LUMIERE} strokeWidth={5} strokeLinecap="round" opacity={0.35} />
+      <path d={t.passes} fill="none" stroke={OMBRE} strokeWidth={1.4} strokeLinecap="round" opacity={0.22} transform="translate(0 4)" />
+      <path d={t.levres} fill="none" stroke={LUMIERE} strokeWidth={1.8} strokeLinejoin="round" strokeLinecap="round" opacity={0.75} transform="translate(1.2 1.6)" />
+      <path d={t.fentes} fill="rgba(62,40,22,0.62)" />
+      <path d={t.pailles} stroke="#e8d6b2" strokeWidth={1.8} strokeLinecap="round" opacity={0.45} />
+      <path d={t.grains} stroke="rgba(70,46,26,0.32)" strokeWidth={2.6} strokeLinecap="round" />
       {/* L'enduit lissé derrière le logotype. */}
       <rect x={0} y={LISSE.y0} width={W} height={LISSE.y1 - LISSE.y0} fill={`url(#tk-l-${id})`} />
       <rect x={0} y={LISSE.y0} width={W} height={LISSE.y1 - LISSE.y0} fill={`url(#tk-g-${id})`} />
@@ -379,7 +462,7 @@ function Teleuk({ cote, graine, id }: PropsMotifNation) {
       <circle cx={cx} cy={cy} r={COUPOLE.oculus - 4} fill="#e4d3b6" />
       <circle cx={cx} cy={cy} r={COUPOLE.oculus - 4} fill="none" stroke="rgba(78,52,30,0.28)" strokeWidth={8} transform="translate(-2 -3)" />
       {/* Les deux bandes de velours brodé. */}
-      {[VEL.haut, VEL.bas].map((y, i) => (
+      {[VEL.bas].map((y, i) => (
         <g key={i}>
           <rect x={0} y={y} width={W} height={VEL.h} fill={`url(#tk-v-${id})`} />
           <path d={`M0 ${y}H${W}M0 ${y + VEL.h}H${W}`} stroke="rgba(255,240,220,0.16)" strokeWidth={1.4} />

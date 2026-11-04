@@ -12,7 +12,19 @@
 //     calcule (lib/sfl/championnat-team.ts) ;
 //   · depuis le 24/10, chaque équipe dessine son écusson et choisit ses
 //     couleurs (lib/sfl/blason.ts), et le Règlement passe en version 2 :
-//     2 points la victoire, et la Charte de déontologie à signer avec.
+//     2 points la victoire, et la Charte de déontologie à signer avec ;
+//   · depuis le 03/11/2026 (Ilyes, 02/11 : « une équipe = 7 joueurs + 1
+//     entraîneur »), une place d'entraîneur à part : un membre qui ne joue
+//     jamais pour l'équipe et ne compte dans aucun seuil (signataires ne
+//     rend que les joueurs, entraineurDe le rend lui), invité par le
+//     capitaine seul (inviterEntraineur). Ses droits, geste par geste :
+//     equipes-droits.ts (peut), la même table que la base. Le Règlement
+//     passe en version 3, avec sa formule à lui (acceptationEntraineur) ;
+//   · la feuille d'avant-match (même jour) : l'entraîneur dépose de 5 à 7
+//     joueurs pour un match programmé (deposerFeuille ; le capitaine ou le
+//     vice sans entraîneur, ou dès H-2 : peutDeposer), figée au coup
+//     d'envoi ; on la lit avec le match (lireFeuilles : la base ne montre
+//     que celle de son équipe avant le coup d'envoi, les deux ensuite).
 // Les délais (invitation 72 h, carence 14 jours, préavis d'exclusion 48 h,
 // créneau d'un défi entre +48 h et +21 jours, réponse sous 48 h, forfait à
 // moins de 48 h) sont gardés par la base ; l'app les montre.
@@ -30,10 +42,12 @@
 import { SUPABASE_URL, supabase } from "@/lib/supabase";
 import { finInvitation } from "@/lib/sfl/equipes-temps";
 import { lireBlason, type Blason } from "@/lib/sfl/blason";
-import type { ButeurTeam, EquipeChampionnat, MatchTeam, SaisieTeam } from "@/lib/sfl/championnat-team";
+import { joue, type Role } from "@/lib/sfl/equipes-droits";
+import type { ButeurTeam, EquipeChampionnat, FeuilleTeam, MatchTeam, Presents, SaisieTeam } from "@/lib/sfl/championnat-team";
+
+export { DROITS, FEUILLE_AVANT_MATCH, brassard, droitDe, joue, peut, peutDeposer, type Geste, type Role } from "@/lib/sfl/equipes-droits";
 
 export type Fond = "noir" | "blanc";
-export type Role = "capitaine" | "vice" | "membre";
 
 export const MIN_EQUIPE = 5;
 export const MAX_EQUIPE = 7;
@@ -51,7 +65,7 @@ export interface Membre {
   signeLe?: string | null;
   /** Exclu par le capitaine : son départ, 48 h après. */
   departLe?: string | null;
-  /** Membre : la version du Règlement qu'il a signée (« v1 », « v2 »), null avant le règlement. */
+  /** Membre : la version du Règlement qu'il a signée (« v1 », « v2 », « v3 »), null avant le règlement. */
   reglement?: string | null;
 }
 
@@ -80,6 +94,10 @@ export interface Defi {
   forfaitDe?: number | null;
   /** Envoyé quand : sans réponse sous 48 h, il expire. */
   le?: string;
+  /** Un match programmé : les feuilles d'avant-match qu'on peut lire (celle de mon équipe, avant le coup d'envoi). */
+  feuilles?: FeuilleTeam[];
+  /** Les équipes qui ont déposé leur feuille, sans les noms (l'adversaire sait seulement qu'elle est déposée). */
+  deposees?: number[];
 }
 
 /** Le coup d'envoi d'un défi (heure de Paris, à la minute près l'hiver comme l'été). */
@@ -103,32 +121,42 @@ export function annulerSeraitForfait(d: Defi): boolean {
   return coupDEnvoi(d).getTime() - Date.now() < 48 * 3600_000;
 }
 
-export const VERSION_REGLEMENT = "v2";
+export const VERSION_REGLEMENT = "v3";
 
-/** Un membre qui n'a pas encore signé la version en cours (la Charte, le 24/10). */
+/** Un membre qui n'a pas encore signé la version en cours (la Charte le 24/10, l'entraîneur le 03/11). */
 export const aSignerLaCharte = (m: Membre) => m.statut === "membre" && m.reglement !== VERSION_REGLEMENT;
 
-/** Les signataires, capitaine d'abord, puis le vice. */
+/** Les joueurs signataires, capitaine d'abord, puis le vice : jamais l'entraîneur, qui ne compte ni ne joue. */
 export function signataires(e: Equipe): Membre[] {
-  const rang = { capitaine: 0, vice: 1, membre: 2 } as const;
-  return e.membres.filter((m) => m.statut === "membre").sort((a, b) => rang[a.role] - rang[b.role]);
+  const rang: Record<Role, number> = { capitaine: 0, vice: 1, membre: 2, entraineur: 3 };
+  return e.membres.filter((m) => m.statut === "membre" && joue(m.role)).sort((a, b) => rang[a.role] - rang[b.role]);
 }
 
-/** Les invitations encore valables (72 h), de la plus ancienne à la plus récente. */
+const valable = (m: Membre, maintenant = Date.now()) => !m.depuis || finInvitation(m.depuis).getTime() > maintenant;
+
+/** L'entraîneur de l'équipe, en place ou invité (son invitation encore valable) ; null sans entraîneur. */
+export function entraineurDe(e: Equipe): Membre | null {
+  return e.membres.find((m) => m.role === "entraineur" && (m.statut === "membre" || valable(m))) ?? null;
+}
+
+/** Les invitations encore valables (72 h), de la plus ancienne à la plus récente : celles des joueurs et celle de l'entraîneur. */
 export function invites(e: Equipe): Membre[] {
   const maintenant = Date.now();
   return e.membres
-    .filter((m) => m.statut === "invite" && (!m.depuis || finInvitation(m.depuis).getTime() > maintenant))
+    .filter((m) => m.statut === "invite" && valable(m, maintenant))
     .sort((a, b) => (a.depuis ?? "").localeCompare(b.depuis ?? ""));
 }
 
-/** Six invitations en attente au plus (la base le garde, equipe_inviter). */
+/** Les invitations de joueurs seules : elles attendent sur le terrain, six au plus. */
+export const invitesJoueurs = (e: Equipe): Membre[] => invites(e).filter((m) => joue(m.role));
+
+/** Six invitations de joueurs en attente au plus (la base le garde, equipe_inviter). */
 export const INVITATIONS_MAX = 6;
 
-/** Combien de joueurs le capitaine peut encore inviter. */
+/** Combien de joueurs on peut encore inviter (l'entraîneur ne prend aucune place). */
 export function invitationsPossibles(e: Equipe): number {
   if (signataires(e).length >= MAX_EQUIPE) return 0;
-  return Math.max(0, INVITATIONS_MAX - invites(e).length);
+  return Math.max(0, INVITATIONS_MAX - invitesJoueurs(e).length);
 }
 
 /** Qui a invité ce joueur : son prénom, sinon celui du capitaine. */
@@ -136,6 +164,9 @@ export function inviteur(e: Equipe, m: Membre): string {
   const par = e.membres.find((x) => x.id === m.invitePar) ?? e.membres.find((x) => x.role === "capitaine");
   return (par?.name ?? "").split(" ")[0];
 }
+
+/** « Ilyes t'invite », ou « Ilyes t'invite à entraîner » : ce que dit une invitation reçue. */
+export const tInvite = (e: Equipe, m: Membre): string => `${inviteur(e, m)} t'invite${m.role === "entraineur" ? " à entraîner" : ""}`;
 
 /** Une équipe joue (et se défie) à 5 signataires. */
 export function active(e: Equipe): boolean {
@@ -271,7 +302,7 @@ export async function mesInvitations(moi: string): Promise<Equipe[]> {
   return ((data ?? []) as unknown as LigneEquipe[]).map(versEquipe);
 }
 
-/** Les défis en jeu (un défi sans réponse depuis 48 h, ou à moins de 36 h du match, a expiré). */
+/** Les défis en jeu (un défi sans réponse depuis 48 h, ou à moins de 36 h du match, a expiré), et les feuilles des matchs programmés. */
 export async function listerDefis(): Promise<Defi[]> {
   const { data, error } = await supabase()
     .from("equipe_defis")
@@ -280,13 +311,65 @@ export async function listerDefis(): Promise<Defi[]> {
     .order("jour");
   if (error) throw error;
   const maintenant = Date.now();
-  return ((data ?? []) as (Defi & { created_at: string })[])
+  const defis = ((data ?? []) as (Defi & { created_at: string })[])
     .map(({ created_at, ...d }) => ({ ...d, le: created_at }))
     .filter((d) => {
       if (d.statut === "accepte") return true;
       const coup = coupDEnvoi(d).getTime();
       return new Date(d.le).getTime() > maintenant - 48 * 3600_000 && coup > maintenant + 36 * 3600_000;
     });
+  const programmes = defis.filter((d) => d.statut === "accepte").map((d) => d.id);
+  const [feuilles, deposees] = await Promise.all([lireFeuilles(programmes), feuillesDeposees(programmes)]);
+  return defis.map((d) => ({
+    ...d,
+    ...(feuilles.has(d.id) ? { feuilles: feuilles.get(d.id) } : {}),
+    ...(deposees.has(d.id) ? { deposees: deposees.get(d.id) } : {}),
+  }));
+}
+
+/** Qui a déposé sa feuille, par match, sans les noms (equipe_feuilles_deposees) ; sans la migration, personne. */
+export async function feuillesDeposees(defis: number[]): Promise<Map<number, number[]>> {
+  const par = new Map<number, number[]>();
+  if (defis.length === 0) return par;
+  const { data, error } = await supabase().rpc("equipe_feuilles_deposees", { d: defis });
+  if (error) return par;
+  for (const r of (data ?? []) as { defi_id: number; equipe_id: number }[]) par.set(r.defi_id, [...(par.get(r.defi_id) ?? []), r.equipe_id]);
+  return par;
+}
+
+interface LigneFeuille {
+  defi_id: number;
+  equipe_id: number;
+  deposee_par: string | null;
+  deposee_le: string;
+  equipe_feuille_joueurs: { joueur: string; p: Un<{ name: string }> }[] | null;
+}
+
+/**
+ * Les feuilles d'avant-match que je peux lire, par match : la base ne montre
+ * que celle de mon équipe avant le coup d'envoi, les deux ensuite. Sans la
+ * migration (une préversion), aucune.
+ */
+export async function lireFeuilles(defis?: number[]): Promise<Map<number, FeuilleTeam[]>> {
+  const par = new Map<number, FeuilleTeam[]>();
+  if (defis && defis.length === 0) return par;
+  const lire = supabase()
+    .from("equipe_feuilles")
+    .select("defi_id, equipe_id, deposee_par, deposee_le, equipe_feuille_joueurs(joueur, p:profiles!equipe_feuille_joueurs_joueur_fkey(name))");
+  const { data, error } = await (defis ? lire.in("defi_id", defis) : lire);
+  if (error) return par;
+  for (const r of (data ?? []) as unknown as LigneFeuille[]) {
+    const lignes = r.equipe_feuille_joueurs ?? [];
+    const f: FeuilleTeam = {
+      equipe: r.equipe_id,
+      joueurs: lignes.map((j) => j.joueur),
+      noms: lignes.map((j) => un(j.p)?.name ?? "?"),
+      par: r.deposee_par,
+      le: r.deposee_le,
+    };
+    par.set(r.defi_id, [...(par.get(r.defi_id) ?? []), f]);
+  }
+  return par;
 }
 
 async function rpc<T = void>(fn: string, args: Record<string, unknown>): Promise<T> {
@@ -297,6 +380,12 @@ async function rpc<T = void>(fn: string, args: Record<string, unknown>): Promise
 
 export const creerEquipe = (nom: string, initiales: string, fond: Fond) => rpc<number>("equipe_creer", { nom: nom.trim(), initiales, fond });
 export const inviterEquipe = (e: number, joueur: string) => rpc("equipe_inviter", { e, joueur });
+
+/** Le capitaine invite l'entraîneur (hors des six invitations de joueurs), puis il est prévenu. */
+export async function inviterEntraineur(e: number, joueur: string): Promise<void> {
+  await rpc("equipe_entraineur_inviter", { e, joueur });
+  void notifierEquipe(e, "invitation");
+}
 
 /**
  * Inviter plusieurs joueurs d'un coup : chacun à son tour (la base garde les
@@ -334,7 +423,7 @@ export const RAISON_INDISPO: Record<Indispo, string> = {
   team: "Pas de Bola Team",
 };
 
-/** Ceux que mon équipe ne peut pas inviter, et pourquoi (capitaine et vice). */
+/** Ceux que mon équipe ne peut pas inviter, et pourquoi (capitaine, vice et entraîneur). */
 export async function indisponibles(e: number): Promise<Map<string, Indispo>> {
   const { data, error } = await supabase().rpc("equipe_indisponibles", { e });
   if (error) throw error;
@@ -385,6 +474,31 @@ export const repondreDefi = (d: number, statut: "accepte" | "refuse" | "annule")
 export const dessinerBlason = (e: number, b: Blason) => rpc("equipe_blason", { e, b });
 /** Un membre signe la version en cours (le Règlement et la Charte). */
 export const signerCharte = (e: number) => rpc("equipe_signer_charte", { e });
+
+/**
+ * Déposer (ou redéposer) la feuille d'avant-match de mon équipe : de 5 à 7
+ * de ses joueurs, jusqu'au coup d'envoi (la base garde qui peut, et quand) ;
+ * puis ceux qui viennent d'y entrer sont prévenus.
+ */
+export async function deposerFeuille(d: number, joueurs: string[]): Promise<void> {
+  await rpc("equipe_feuille", { d, joueurs });
+  void notifierFeuille(d);
+}
+
+/** Prévenir les joueurs mis sur la feuille (une notification perdue ne bloque rien). */
+async function notifierFeuille(defi: number): Promise<void> {
+  try {
+    const { data } = await supabase().auth.getSession();
+    const jeton = data.session?.access_token;
+    if (!jeton) return;
+    await fetch("/api/equipes/notifier", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${jeton}` },
+      body: JSON.stringify({ type: "feuille", defi }),
+      keepalive: true,
+    });
+  } catch {}
+}
 
 /** Le bucket public des couvertures : une image par équipe, « <id>.jpg ». */
 const COUVERTURES = "couvertures";
@@ -437,16 +551,20 @@ export async function poserCouverture(e: number, image: string): Promise<void> {
 export const retirerCouverture = (e: number) => rpc("equipe_couverture", { e, posee: false });
 
 /**
- * La feuille d'un match : le score vu de mon équipe, ses buteurs et ses
- * passeurs ; puis l'autre capitaine est prévenu qu'il confirme.
+ * La feuille d'un match : le score du terrain vu de mon équipe, ses buteurs
+ * et ses passeurs, et les présents des deux équipes (5 : cinq ou plus ; 4 ;
+ * 3 : trois ou moins, le forfait) ; puis l'autre capitaine est prévenu qu'il
+ * confirme.
  */
 export async function saisirResultat(
   d: number,
   pour: number,
   contre: number,
-  lignes: { joueur: string; buts: number; passes: number }[]
+  lignes: { joueur: string; buts: number; passes: number }[],
+  presents: Presents = 5,
+  presentsAdverses: Presents = 5
 ): Promise<void> {
-  await rpc("equipe_resultat", { d, pour, contre, lignes });
+  await rpc("equipe_resultat", { d, pour, contre, lignes, presents, presents_adverses: presentsAdverses });
   void notifierResultat(d);
 }
 
@@ -454,20 +572,35 @@ export async function saisirResultat(
 export async function lireChampionnat(): Promise<{ equipes: EquipeTeam[]; matchs: MatchTeam[] }> {
   const sb = supabase();
   const lireEquipes = (blason: boolean) =>
-    sb.from("equipes").select(`id, nom, initiales, fond, ville, ${blason ? "blason, " : ""}created_at, dissoute_le, equipe_membres(statut)`);
-  const [avecBlason, df, rs, bt] = await Promise.all([
+    sb.from("equipes").select(`id, nom, initiales, fond, ville, ${blason ? "blason, " : ""}created_at, dissoute_le, equipe_membres(statut, role)`);
+  // Les présents (le 5 contre 4, 03/11/2026) : une préversion sur la base d'avant ne les a pas (42703), on relit sans.
+  const lireSaisies = (presents: boolean) =>
+    sb.from("equipe_resultats").select(`defi_id, equipe_id, pour, contre, saisi_le${presents ? ", presents, presents_adverses" : ""}`);
+  const [avecBlason, df, avecPresents, bt, feuilles] = await Promise.all([
     lireEquipes(true),
     sb.from("equipe_defis").select("id, de, a, jour, heure, lieu, statut, forfait_de").in("statut", ["accepte", "forfait"]),
-    sb.from("equipe_resultats").select("defi_id, equipe_id, pour, contre, saisi_le"),
+    lireSaisies(true),
     sb
       .from("equipe_resultat_joueurs")
       .select("defi_id, equipe_id, joueur, buts, passes, p:profiles!equipe_resultat_joueurs_joueur_fkey(name)"),
+    lireFeuilles(),
   ]);
   const eq = sansColonne(avecBlason.error) ? await lireEquipes(false) : avecBlason;
   if (eq.error) throw eq.error;
   if (df.error) throw df.error;
+  const rs = sansColonne(avecPresents.error) ? await lireSaisies(false) : avecPresents;
   // Sans la migration (une préversion), pas encore de feuilles : le championnat reste vide.
-  const saisies = rs.error ? [] : ((rs.data ?? []) as { defi_id: number; equipe_id: number; pour: number; contre: number; saisi_le: string }[]);
+  const saisies = rs.error
+    ? []
+    : ((rs.data ?? []) as unknown as {
+        defi_id: number;
+        equipe_id: number;
+        pour: number;
+        contre: number;
+        saisi_le: string;
+        presents?: Presents | null;
+        presents_adverses?: Presents | null;
+      }[]);
   const buteurs = bt.error
     ? []
     : ((bt.data ?? []) as unknown as { defi_id: number; equipe_id: number; joueur: string; buts: number; passes: number; p: Un<{ name: string }> }[]);
@@ -480,7 +613,7 @@ export async function lireChampionnat(): Promise<{ equipes: EquipeTeam[]; matchs
     blason?: unknown;
     created_at: string;
     dissoute_le: string | null;
-    equipe_membres: { statut: Membre["statut"] }[];
+    equipe_membres: { statut: Membre["statut"]; role: Role }[];
   }[]).map(
     (r): EquipeTeam => ({
       id: r.id,
@@ -491,7 +624,8 @@ export async function lireChampionnat(): Promise<{ equipes: EquipeTeam[]; matchs
       blason: lireBlason(r.blason),
       creeLe: r.created_at,
       dissoute: !!r.dissoute_le,
-      active: !r.dissoute_le && r.equipe_membres.filter((m) => m.statut === "membre").length >= MIN_EQUIPE,
+      // Les joueurs seuls : l'entraîneur ne fait pas une équipe active.
+      active: !r.dissoute_le && r.equipe_membres.filter((m) => m.statut === "membre" && joue(m.role)).length >= MIN_EQUIPE,
     })
   );
   const matchs = ((df.data ?? []) as { id: number; de: number; a: number; jour: string; heure: string; lieu: string; statut: "accepte" | "forfait"; forfait_de: number | null }[]).map(
@@ -506,10 +640,20 @@ export async function lireChampionnat(): Promise<{ equipes: EquipeTeam[]; matchs
       forfaitDe: d.forfait_de,
       saisies: saisies
         .filter((s) => s.defi_id === d.id)
-        .map((s): SaisieTeam => ({ equipe: s.equipe_id, pour: s.pour, contre: s.contre, le: s.saisi_le })),
+        .map(
+          (s): SaisieTeam => ({
+            equipe: s.equipe_id,
+            pour: s.pour,
+            contre: s.contre,
+            le: s.saisi_le,
+            ...(s.presents ? { presents: s.presents } : {}),
+            ...(s.presents_adverses ? { presentsAdverses: s.presents_adverses } : {}),
+          })
+        ),
       buteurs: buteurs
         .filter((b) => b.defi_id === d.id)
         .map((b): ButeurTeam => ({ equipe: b.equipe_id, joueur: b.joueur, name: un(b.p)?.name ?? "?", buts: b.buts, passes: b.passes })),
+      ...(feuilles.has(d.id) ? { feuilles: feuilles.get(d.id) } : {}),
     })
   );
   return { equipes, matchs };
@@ -569,17 +713,21 @@ export function urlDuLien(j: string): string {
  * la saison à 4 mois, avec ses montées et ses descentes ; et un neuvième
  * point, la couverture de la page de l'équipe faite avec les photos de
  * carte (Sabri, 24/10 : « une couverture faite justement en IA, avec les
- * joueurs présents de cette équipe ») : signer, c'est l'accepter.
+ * joueurs présents de cette équipe ») : signer, c'est l'accepter. Version 3
+ * (03/11/2026, Ilyes : 7 joueurs + 1 entraîneur) : les points 1, 2 et 8 ne
+ * parlent plus de « membres » mais de joueurs, et de l'entraîneur ; le
+ * point 5 dit le 5 contre 4 tel que la feuille l'applique (championnat-team.ts,
+ * scoreFinal), sans le check-in ni les Points Perso, qui n'existent pas encore.
  */
 export const REGLEMENT = [
-  "Vous ne jouez qu'avec les membres de votre équipe. Aucun joueur extérieur, même en match amical.",
-  "Une équipe compte 5 à 7 membres, tous signataires de ce règlement. À 7, plus personne ne peut entrer.",
+  "Vous ne jouez qu'avec les joueurs de votre équipe. Aucun joueur extérieur, même en match amical.",
+  "Une équipe compte 5 à 7 joueurs, et un entraîneur si elle le veut, tous signataires de ce règlement. À 7 joueurs, plus aucun joueur ne peut entrer. L'entraîneur ne joue jamais pour l'équipe.",
   "Une victoire rapporte 2 points à l'équipe, un nul 1, une défaite 0. Ces points vont à l'équipe, pas au joueur. Le championnat dure 4 mois ; à la fin, les 3 premiers de chaque division montent, les 3 derniers descendent.",
   "Vous gagnez des Points Perso par votre présence, vos buts, vos passes décisives et les distinctions votées après le match : Meilleur Joueur +1, Meilleur Défenseur +1, MVP +2.",
-  "Faites votre check-in à chaque match. À 5 présents ou plus : aucune pénalité. À 4 face à une équipe de 5 ou plus : votre équipe perd 1 but au score final et chaque absent perd 2 Points Perso. Si les deux équipes sont à 4 : le match est compté comme un amical.",
+  "Avec le score, chaque capitaine déclare les présents des deux équipes. À 4 face à 5 ou plus : votre équipe perd 1 but au score final, ou l'adversaire en gagne 1 si elle n'a pas marqué. Deux équipes à 4 : le match est un amical. À 3 ou moins : forfait, 0 – 3.",
   "Si 6 joueurs ou plus signalent un match, il est annulé avec ses statistiques.",
   "Au-delà de 2 rencontres contre la même équipe dans la saison, le match est amical : ni points ni stats comptabilisés.",
-  "Si vous quittez l'équipe, vous ne pourrez plus jamais y revenir.",
+  "Si vous quittez l'équipe, joueur ou entraîneur, vous ne pourrez plus jamais y revenir.",
   "La photo de votre carte peut figurer sur la couverture de la page de l'équipe, que le capitaine ou son vice crée avec le studio de Bola. Si un joueur quitte l'équipe, la couverture est retirée.",
 ];
 
@@ -587,14 +735,16 @@ export const REGLEMENT = [
  * La Charte de déontologie de Bola Team (Sabri, 24/10 : « faire un règlement
  * déontologique aussi, qu'ils doivent signer »), d'après les articles 14 et
  * 15 du Règlement Team : ce qu'on promet sur le terrain et autour. Elle se
- * signe avec le Règlement, par la même case (version 2).
+ * signe avec le Règlement, par la même case (version 2). Version 3 : le point
+ * 5 tient pour tous, l'entraîneur compris, qui ne saisit rien (« les scores
+ * saisis pour mon équipe sont les vrais »).
  */
 export const CHARTE = [
   "Je respecte mes coéquipiers, mes adversaires, le terrain et le personnel du complexe.",
   "Aucune insulte, aucune menace, aucun propos sur l'origine, la religion, le genre, l'orientation ou le handicap de quelqu'un.",
   "Aucune violence. Pas de tacle glissé. Un geste violent, c'est la suspension, et l'exclusion s'il se répète.",
   "Pas d'arbitre : les capitaines tranchent sur le terrain, de bonne foi. Je reconnais mes fautes.",
-  "Je saisis le vrai score, les vrais buteurs, les vrais passeurs. Aucune entente sur un résultat, aucun match arrangé.",
+  "Les scores, les buteurs et les passeurs saisis pour mon équipe sont les vrais. Aucune entente sur un résultat, aucun match arrangé.",
   "J'arrive à l'heure. Si je ne peux pas venir, je préviens mon équipe le plus tôt possible.",
   "Dans la discussion, sur le nom et sur l'écusson de l'équipe : rien d'injurieux ni de déplacé.",
   "Un manquement peut valoir un avertissement, le gel des points du match, une suspension ou l'exclusion de Bola Team.",
@@ -602,7 +752,11 @@ export const CHARTE = [
 
 /** La case à cocher (Formule d'acceptation, docs/gameplay/11). */
 export const ACCEPTATION =
-  "J'ai lu et j'accepte le Règlement Team et la Charte de déontologie (version 2). Je m'engage à ne jouer qu'avec les membres de mon équipe, matchs amicaux compris, à faire mon check-in à chaque match où je suis inscrit, à saisir et à voter honnêtement, et à respecter mes adversaires, mes coéquipiers et le terrain. J'accepte que la photo de ma carte figure sur la couverture de l'équipe. Je sais que si je quitte cette équipe, je ne pourrai plus jamais la réintégrer.";
+  "J'ai lu et j'accepte le Règlement Team et la Charte de déontologie (version 3). Je m'engage à ne jouer qu'avec les joueurs de mon équipe, matchs amicaux compris, à faire mon check-in à chaque match où je suis inscrit, à saisir et à voter honnêtement, et à respecter mes adversaires, mes coéquipiers et le terrain. J'accepte que la photo de ma carte figure sur la couverture de l'équipe. Je sais que si je quitte cette équipe, je ne pourrai plus jamais la réintégrer.";
+
+/** La case de l'entraîneur, qui ne joue jamais pour l'équipe ni ne saisit son score. */
+export const acceptationEntraineur = (equipe: string) =>
+  `J'ai lu et j'accepte le Règlement Team et la Charte de déontologie (version 3). Entraîneur de ${equipe}, je ne joue jamais pour elle en match Team, matchs amicaux compris. Je ne saisis ni le score ni les buteurs, et je respecte les joueurs, les adversaires et le terrain. Je sais que si je quitte cette équipe, je ne pourrai plus jamais la réintégrer.`;
 
 /** « Règlement Team v2 signé le 04/02/2027 à 21:17 (heure de Paris). Bienvenue chez … ! » */
 export function confirmationSignature(nom: string): string {
@@ -617,6 +771,7 @@ export function direErreurEquipe(e: unknown): string {
   const msg = e instanceof Error ? e.message : typeof e === "object" && e && "message" in e ? String((e as { message: unknown }).message) : "";
   if (/equipes_nom_unique|déjà pris/i.test(msg)) return "Ce nom est déjà pris.";
   if (/equipe_membres_une_equipe/i.test(msg)) return "Tu as déjà une équipe.";
+  if (/equipe_membres_un_entraineur/i.test(msg)) return "L'équipe a déjà un entraîneur.";
   if (/duplicate|23505/i.test(msg)) return "Déjà dans l'équipe.";
   if (/does not exist|42P01|PGRST20/i.test(msg)) return "Le mode Team arrive avec la mise en ligne.";
   return msg || "Impossible pour l'instant. Réessaie dans un instant.";

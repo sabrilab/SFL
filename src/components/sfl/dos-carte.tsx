@@ -154,14 +154,16 @@ export function DosCarte({
             )
           : microtexte(seed ^ 0x5f3759df, 2600)}
       </div>
-      <div
-        aria-hidden
-        style={{
-          position: "absolute",
-          inset: 0,
-          background: `repeating-linear-gradient(0deg, ${encre(0.022)} 0 ${u(3)}px, transparent ${u(3)}px ${u(9)}px)`,
-        }}
-      />
+      {(p.trame ?? 0.022) > 0 && (
+        <div
+          aria-hidden
+          style={{
+            position: "absolute",
+            inset: 0,
+            background: `repeating-linear-gradient(0deg, ${encre(p.trame ?? 0.022)} 0 ${u(3)}px, transparent ${u(3)}px ${u(9)}px)`,
+          }}
+        />
+      )}
       {/* Le reflet, en miroir de la face ; sur la finition animée, la lumière qui passe. */}
       {p.anime ? (
         <div

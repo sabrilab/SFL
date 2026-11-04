@@ -16,6 +16,8 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { MotifAfriqueSvg } from "../src/components/sfl/afrique/motifs-afrique";
 import { SKINS_AFRIQUE } from "../src/components/sfl/afrique/registre";
+import { TotemPortrait } from "../src/components/sfl/afrique/totem";
+import { TOTEMS } from "../src/components/sfl/afrique/totems";
 import { MATIERES } from "../src/components/sfl/finitions-carte";
 import {
   etatOuverture,
@@ -111,12 +113,28 @@ const ecrans = [
     .filter((x) => /\.tsx?$/.test(x))
     .map((x) => `../src/components/sfl/afrique/${x}`),
 ];
+// Les fiches des totems (TotemNation : animal, quoi, sources ; types.ts) sont à l'équipe
+// seulement : l'animal y est admis, puisqu'il est le totem (Ilyes, 02/11/2026), et rien
+// de la fiche ne s'écrit sur la carte. Leurs chaînes, dans totems/, ne passent pas par
+// les mots interdits ; ce qui se dessine, si (3, plus bas : aucun texte, aucune fiche).
+const ficheTotem = new Set<string>();
+for (const t of Object.values(TOTEMS)) {
+  ficheTotem.add(t.animal).add(t.quoi);
+  for (const src of t.sources) {
+    ficheTotem.add(src.titre);
+    if (src.url) ficheTotem.add(src.url);
+  }
+}
 for (const f of ecrans) {
+  const totem = f.startsWith("../src/components/sfl/afrique/totems/");
   const code = readFileSync(new URL(f, import.meta.url), "utf8")
     .replace(/\/\*[\s\S]*?\*\//g, "")
     .replace(/^\s*\/\/.*$/gm, "")
     .replace(/MOTS_INTERDITS[\s\S]*?\];/, "");
-  for (const m of code.matchAll(/"([^"\n]*)"|`([^`]*)`|>([^<>{}\n]+)</g)) textes.push([f, m[1] ?? m[2] ?? m[3]]);
+  for (const m of code.matchAll(/"([^"\n]*)"|`([^`]*)`|>([^<>{}\n]+)</g)) {
+    const t = m[1] ?? m[2] ?? m[3];
+    if (!(totem && ficheTotem.has(t))) textes.push([f, t]);
+  }
 }
 for (const [ou, t] of textes) {
   const m = interdit(t);
@@ -138,6 +156,9 @@ for (const n of NATIONS) {
     assert.ok(!/<image\b/i.test(svg), `${n.id} sans <image>`);
     assert.ok(!/<filter\b|filter=/i.test(svg), `${n.id} sans filtre`);
     assert.ok(!/href="http/i.test(svg), `${n.id} sans adresse`);
+    // Le seul texte dessiné est celui du skin (le nom du joueur sur le kanga, par exemple) : jamais un mot interdit.
+    for (const m of svg.matchAll(/<(?:text|tspan|textPath)\b[^>]*>([^<]*)/gi)) assert.equal(interdit(m[1]), undefined, `${n.id} : « ${m[1]} » dessiné`);
+    for (const x of ficheTotem) assert.ok(!svg.includes(x), `${n.id} ${dos ? "dos" : "face"} : la fiche du totem (« ${x.slice(0, 40)} ») ne se dessine pas`);
     const elements = (svg.match(/<[a-zA-Z]/g) ?? []).length;
     assert.ok(elements <= 4000, `${n.id} ${dos ? "dos" : "face"} : ${elements} éléments`);
     // Stable pour une même graine.
@@ -146,6 +167,18 @@ for (const n of NATIONS) {
       svg.replace(/id="[^"]*"|url\(#[^)]*\)|href="#[^"]*"/g, ""),
       `${n.id} stable`
     );
+  }
+}
+
+// Le totem gaufré dans le coin du portrait (bola-card.tsx) : du SVG pur, sans texte ni fiche.
+for (const n of NATIONS) {
+  for (const photo of [false, true]) {
+    const svg = renderToStaticMarkup(
+      createElement("svg", null, createElement(TotemPortrait, { nation: n.id as CodeNation, graine: 12345, photo, id: "t" }))
+    );
+    assert.ok(!/<image\b|<filter\b|filter=|href="http/i.test(svg), `${n.id} portrait : SVG pur`);
+    assert.ok(!/<(text|tspan|textPath)\b/i.test(svg), `${n.id} portrait sans texte`);
+    for (const x of ficheTotem) assert.ok(!svg.includes(x), `${n.id} portrait : la fiche du totem ne se dessine pas`);
   }
 }
 

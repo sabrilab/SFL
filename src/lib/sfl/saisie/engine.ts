@@ -55,7 +55,8 @@ const BAREME = {
 const STAT_CAP = 99;
 const DEFAULT_BASE = [75, 75, 75, 75, 75, 75];
 
-function toStats(base: number[] | null | undefined): Stats {
+/** La carte de base d'une fiche : 75 partout sans évaluation. */
+export function toStats(base: number[] | null | undefined): Stats {
   const b = base && base.length === 6 ? base : DEFAULT_BASE;
   return { VIT: b[0], TIR: b[1], PAS: b[2], DRI: b[3], DEF: b[4], PHY: b[5] };
 }

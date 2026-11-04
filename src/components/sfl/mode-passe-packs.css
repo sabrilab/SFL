@@ -208,7 +208,9 @@
   color: rgb(255 255 255 / 0.45);
 }
 
-/* La confirmation et la nation en grand : posées sur le mode. */
+/* La confirmation et la nation en grand : posées sur le mode. Rendues par portail
+   dans document.body, hors de .mode-passe : elles reprennent sa couleur de texte,
+   sinon le thème clair écrit le nom de la nation en noir sur ce voile noir. */
 .pk-voile {
   position: fixed;
   inset: 0;
@@ -217,6 +219,7 @@
   place-items: center;
   padding: 24px 20px calc(env(safe-area-inset-bottom, 0px) + 24px);
   overflow-y: auto;
+  color: #f4f5f2;
   background: radial-gradient(90% 60% at 50% 40%, rgb(255 255 255 / 0.06), transparent 70%), rgb(5 5 8 / 0.97);
 }
 .pk-confirmer,

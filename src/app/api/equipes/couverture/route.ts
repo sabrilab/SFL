@@ -10,8 +10,10 @@
 // (bucket « couvertures », equipe_couverture : supabase/schema.sql).
 //
 // Sur l'image : les joueurs de l'équipe qui ont signé le Règlement Team
-// version 2 (son neuvième point le prévoit, et sa case l'accepte) et qui ont
-// une photo de carte ; deux au moins, sept au plus. Le demandeur, lui, doit
+// version 2 ou 3 (son neuvième point le prévoit, et sa case l'accepte) et qui
+// ont une photo de carte ; deux au moins, sept au plus. Jamais l'entraîneur
+// (03/11/2026), qui ne la crée pas non plus : le capitaine et le vice
+// (equipe_droit, « couverture »). Le demandeur, lui, doit
 // avoir accepté la politique de confidentialité en vigueur. fal est prié de
 // ne garder ni les photos ni l'image (en-tête X-Fal-Store-IO: 0).
 //
@@ -27,6 +29,7 @@ import { createClient } from "@supabase/supabase-js";
 import { SANS_ACCORD, accordEnregistre } from "@/lib/sfl/confidentialite.server";
 import { dansCombien, jourDeParis } from "@/lib/sfl/photo-studio";
 import { libelleCouleur, lireBlason } from "@/lib/sfl/blason";
+import { joue, peut, type Role } from "@/lib/sfl/equipes-droits";
 
 export const maxDuration = 120;
 
@@ -106,7 +109,7 @@ export async function POST(req: NextRequest) {
     sb.from("equipes").select("nom, ville, blason, dissoute_le").eq("id", e).maybeSingle(),
     sb
       .from("equipe_membres")
-      .select("joueur, role, reglement_version, p:profiles!equipe_membres_joueur_fkey(name)")
+      .select("joueur, role, reglement_version, depart_le, p:profiles!equipe_membres_joueur_fkey(name)")
       .eq("equipe_id", e)
       .eq("statut", "membre"),
   ]);
@@ -114,16 +117,18 @@ export async function POST(req: NextRequest) {
   if (lignesError) return erreur("Couverture indisponible pour l'instant.", 503);
   const membres = (lignes ?? []) as unknown as {
     joueur: string;
-    role: "capitaine" | "vice" | "membre";
+    role: Role;
     reglement_version: string | null;
+    depart_le: string | null;
     p: { name: string } | { name: string }[] | null;
   }[];
-  if (!membres.some((m) => m.joueur === moi && m.role !== "membre")) return erreur("Réservé au capitaine et au vice.", 403);
+  if (!membres.some((m) => m.joueur === moi && !m.depart_le && peut(m.role, "couverture"))) return erreur("Réservé au capitaine et au vice.", 403);
 
-  // Les joueurs sur l'image : signataires de la version 2, avec une photo de carte ; le capitaine d'abord.
-  const rang = { capitaine: 0, vice: 1, membre: 2 } as const;
+  // Les joueurs sur l'image : signataires de la version 2 ou 3 (le neuvième
+  // point), avec une photo de carte ; le capitaine d'abord ; jamais l'entraîneur.
+  const rang: Record<Role, number> = { capitaine: 0, vice: 1, membre: 2, entraineur: 3 };
   const candidats = membres
-    .filter((m) => m.reglement_version === "v2")
+    .filter((m) => joue(m.role) && (m.reglement_version === "v2" || m.reglement_version === "v3"))
     .sort((a, b) => rang[a.role] - rang[b.role])
     .map((m) => (Array.isArray(m.p) ? m.p[0]?.name : m.p?.name) ?? "")
     .filter(Boolean);

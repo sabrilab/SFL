@@ -14,10 +14,17 @@
 //   · le papier : la chaux ; l'encre : le noir de suie ;
 //   · la face : autour du portrait, une bande murale de champs cernés de noir,
 //     des gradins et des ocres ; sous le portrait, le shweshwe, à peine ;
-//   · le dos : le mur. Une frise de gradins en haut et en bas (leurs couleurs
-//     tirées de la graine, un mur par joueur), deux colonnes de champs sur
-//     les côtés ; au centre, le couvercle d'un panier d'ilala vu d'en haut,
-//     ses rangs enroulés et sa couronne de triangles, la lune au milieu.
+//   · le dos : le mur. Une frise de gradins en bas, réduite en haut à ses
+//     bandeaux de losanges (leurs couleurs tirées de la graine, un mur par
+//     joueur), deux colonnes de champs sur les côtés ; en haut, le couvercle
+//     d'un panier d'ilala vu d'en haut, ses rangs enroulés et sa couronne de
+//     triangles, la lune au milieu (LUNE_AFRIQUE_DU_SUD, à 150, montée sous
+//     la frise du haut) ; dessous, le totem (totems/afrique-du-sud.tsx,
+//     02/11/2026) : le springbok peint en plein pronk, le héros, son ombre un
+//     aplat loin sous les sabots, qui ne touche pas le bandeau du logotype ;
+//   · l'enduit a vécu : les traces des soies de la brosse dans le lait de
+//     chaux, quelques fissures fines qui se ramifient, et des éclats où la
+//     peinture a sauté sur la chaux ; tirés de la graine.
 // Ce qu'on évite : copier ou évoquer l'œuvre d'une artiste vivante (Esther
 // Mahlangu et d'autres) ; les maisons, lampes, avions et lettres de certaines
 // peintures ; les codes et messages du perlage zoulou (couleurs, triangles
@@ -25,7 +32,13 @@
 // du drapeau. Rien que des gradins, des cernes et des champs.
 
 import type { PropsMotifNation, SkinNation } from "./types";
-import { alea, BANDE, CENTRE_DOS, f, H, LOGOTYPE_DOS, W } from "./outils";
+import { alea, BANDE, f, H, LOGOTYPE_DOS, W } from "./outils";
+import { LUNE_AFRIQUE_DU_SUD } from "./totems/afrique-du-sud";
+
+/** La lune et le panier d'ilala au dos : montés au-dessus du springbok qui bondit, plus petits (totems/afrique-du-sud.tsx). */
+const CENTRE_DOS = { cx: LUNE_AFRIQUE_DU_SUD.cx, cy: LUNE_AFRIQUE_DU_SUD.cy } as const;
+/** L'échelle du panier : la lune passe de 300 à LUNE_AFRIQUE_DU_SUD.d. */
+const K = LUNE_AFRIQUE_DU_SUD.d / 300;
 
 type Rnd = () => number;
 
@@ -127,6 +140,25 @@ function caseFrise(x0: number, y0: number, l: number, h: number, sens: 1 | -1, t
   }
 }
 
+/** Un bandeau de la frise du haut, réduite : le cadre noir, un champ de couleur cerné, trois losanges de chaux au cœur noir. */
+function bandeauFrise(x0: number, y0: number, l: number, h: number, t: Teinte, p: Peinture) {
+  p.cerne += rect(x0, y0, l, h);
+  const m = 16;
+  const hb = h - 26;
+  const yb = y0 + 13;
+  p[t] += rect(x0 + m, yb, l - 2 * m, hb);
+  p.cerne += rect(x0 + m, yb, l - 2 * m, hb);
+  const lb = (l - 2 * m) / 3;
+  for (let k = 0; k < 3; k++) {
+    const cx2 = x0 + m + lb * k + lb / 2;
+    const cy2 = yb + hb / 2;
+    const d = `M${f(cx2)} ${f(cy2 - 15)}L${f(cx2 + 22)} ${f(cy2)}L${f(cx2)} ${f(cy2 + 15)}L${f(cx2 - 22)} ${f(cy2)}Z`;
+    p.chaux += d;
+    p.cerne += d;
+    p.noir += `M${f(cx2)} ${f(cy2 - 5)}L${f(cx2 + 7)} ${f(cy2)}L${f(cx2)} ${f(cy2 + 5)}L${f(cx2 - 7)} ${f(cy2)}Z`;
+  }
+}
+
 /* --------------------------------- La face -------------------------------- */
 
 const CADRE = { x0: 7, y0: 7, x1: W - 7, y1: BANDE - 5, ep: 32, r: 85 };
@@ -193,7 +225,9 @@ function face(graine: number) {
 /* --------------------------------- Le dos --------------------------------- */
 
 const MUR = { m: 26, frise: 268, haut: 52, bas: H - 52 - 268 };
-const PANIER = { r: 382, couronne: 338 };
+/** En haut, la frise se réduit à ses bandeaux de losanges : le springbok bondit sous la lune, au-dessus. */
+const HAUT = { y: 52, h: 74 };
+const PANIER = { r: 382 * K, couronne: 338 * K };
 const LOGO = { y0: LOGOTYPE_DOS.cy - 66, y1: LOGOTYPE_DOS.cy + 66, x0: MUR.m + 34 + 46 + 18 };
 
 function mur(graine: number) {
@@ -205,15 +239,15 @@ function mur(graine: number) {
     const x0 = MUR.m + 34;
     const l = (W - 2 * x0) / 4;
     for (let i = 0; i < 4; i++) {
-      caseFrise(x0 + i * l, MUR.haut, l, MUR.frise, 1, teintes[i], p);
+      bandeauFrise(x0 + i * l, HAUT.y, l, HAUT.h, teintes[i], p);
       caseFrise(x0 + i * l, MUR.bas, l, MUR.frise, -1, teintes[3 - i], p);
     }
     // Les colonnes des côtés, entre les frises : des champs empilés, cernés.
-    const ya = MUR.haut + MUR.frise + 22;
+    const ya = HAUT.y + HAUT.h + 22;
     const yb = MUR.bas - 22;
     const lc = 46;
     for (const xc of [x0, W - x0 - lc]) {
-      const n = 7;
+      const n = 11;
       const hc = (yb - ya) / n;
       for (let k = 0; k < n; k++) {
         const y = ya + k * hc;
@@ -233,7 +267,7 @@ function mur(graine: number) {
     // Le panier : les rangs enroulés, de plus en plus serrés vers le bord ; la couronne de triangles.
     const { cx, cy } = CENTRE_DOS;
     const rangs: number[] = [];
-    for (let r = 26; r < PANIER.r - 6; r += 10.5) rangs.push(r);
+    for (let r = 26 * K; r < PANIER.r - 6 * K; r += 10.5 * K) rangs.push(r);
     let tri = "";
     let triClair = "";
     const N = 44;
@@ -242,11 +276,11 @@ function mur(graine: number) {
       const da = (Math.PI * 2) / N;
       const pt = (r: number, a: number) => `${f(cx + r * Math.cos(a))} ${f(cy + r * Math.sin(a))}`;
       const ri = PANIER.couronne;
-      const re = PANIER.r - 10;
+      const re = PANIER.r - 10 * K;
       // Un triangle sombre, pointe vers le bord, et dans son creux un triangle plus petit, pointe vers le centre.
       tri += `M${pt(ri, a0)}L${pt(re, a0 + da / 2)}L${pt(ri, a0 + da)}Z`;
       const rm = (ri + re) / 2;
-      triClair += `M${pt(rm + 4, a0 + da * 0.82)}L${pt(re, a0 + da * 0.62)}L${pt(re, a0 + da * 1.02)}Z`;
+      triClair += `M${pt(rm + 4 * K, a0 + da * 0.82)}L${pt(re, a0 + da * 0.62)}L${pt(re, a0 + da * 1.02)}Z`;
     }
     return { p, rangs, tri, triClair };
   });
@@ -281,6 +315,86 @@ function Shweshwe({ id }: { id: string }) {
   );
 }
 
+/**
+ * L'enduit du mur, passé à la main : les coups de brosse du lait de chaux
+ * (des bandes un peu plus blanches ou plus grises), quelques fissures fines
+ * qui se ramifient, et des éclats où la peinture des champs a sauté et
+ * laisse voir la chaux. Tiré de la graine : chaque mur a vécu à sa façon.
+ */
+function enduit(seed: number, dos: boolean): { blancs: string; gris: string; fissures: string; eclats: string } {
+  return memo(`enduit-${seed}-${dos ? 1 : 0}`, () => {
+    const rnd = alea(seed ^ 0x3e6d17);
+    let blancs = "";
+    let gris = "";
+    // Un coup de brosse : quatre à sept traces de soies, serrées, qui s'effilent.
+    for (let i = 0; i < 30; i++) {
+      const y = rnd() * H;
+      const x0 = -40 + rnd() * W * 0.75;
+      const l = 160 + rnd() * 380;
+      const a = (rnd() - 0.5) * 0.08;
+      const b = (rnd() - 0.5) * 16;
+      const blanc = rnd() < 0.62;
+      const n = 4 + Math.floor(rnd() * 4);
+      for (let k = 0; k < n; k++) {
+        const dy = k * (2.2 + rnd() * 1.6);
+        const dx = rnd() * 30;
+        const ll = l * (0.55 + rnd() * 0.45);
+        const d = `M${f(x0 + dx)} ${f(y + dy)}q${f(ll / 2)} ${f(b + Math.sin(a) * ll * 0.5)} ${f(ll)} ${f(Math.sin(a) * ll)}`;
+        if (blanc) blancs += d;
+        else gris += d;
+      }
+    }
+    let fissures = "";
+    for (let i = 0; i < (dos ? 6 : 4); i++) {
+      let x = 60 + rnd() * (W - 120);
+      let y = 60 + rnd() * (H - 120);
+      let a = rnd() * Math.PI * 2;
+      fissures += `M${f(x)} ${f(y)}`;
+      const n = 6 + Math.floor(rnd() * 8);
+      for (let k = 0; k < n; k++) {
+        a += (rnd() - 0.5) * 1.1;
+        const l = 8 + rnd() * 16;
+        x += Math.cos(a) * l;
+        y += Math.sin(a) * l;
+        fissures += `L${f(x)} ${f(y)}`;
+        if (rnd() < 0.18) {
+          const b = a + (rnd() < 0.5 ? -1 : 1) * (0.6 + rnd() * 0.6);
+          const lb = 6 + rnd() * 14;
+          fissures += `M${f(x)} ${f(y)}l${f(Math.cos(b) * lb)} ${f(Math.sin(b) * lb)}M${f(x)} ${f(y)}`;
+        }
+      }
+    }
+    let eclats = "";
+    for (let i = 0; i < (dos ? 70 : 34); i++) {
+      const cx = 30 + rnd() * (W - 60);
+      const cy = 30 + rnd() * (H - 60);
+      const r = 1.6 + rnd() * 3.6;
+      const n = 4 + Math.floor(rnd() * 3);
+      for (let k = 0; k < n; k++) {
+        const t = (k / n) * Math.PI * 2 + rnd() * 0.6;
+        const rr = r * (0.6 + rnd() * 0.6);
+        eclats += `${k ? "L" : "M"}${f(cx + Math.cos(t) * rr)} ${f(cy + Math.sin(t) * rr)}`;
+      }
+      eclats += "Z";
+    }
+    return { blancs, gris, fissures, eclats };
+  });
+}
+
+function Enduit({ e, sous }: { e: ReturnType<typeof enduit>; sous: boolean }) {
+  // sous : les coups de brosse et les fissures, sous la peinture ; sinon les éclats, par-dessus.
+  if (sous)
+    return (
+      <g fill="none" strokeLinecap="round">
+        <path d={e.blancs} stroke="rgba(255,253,247,0.5)" strokeWidth={1.6} />
+        <path d={e.gris} stroke="rgba(130,112,86,0.07)" strokeWidth={1.4} />
+        <path d={e.fissures} stroke="rgba(70,58,44,0.22)" strokeWidth={0.9} strokeLinejoin="round" />
+        <path d={e.fissures} stroke="rgba(255,253,247,0.5)" strokeWidth={0.7} transform="translate(0.8 0.9)" />
+      </g>
+    );
+  return <path d={e.eclats} fill={CHAUX} opacity={0.92} />;
+}
+
 function Chaux({ id }: { id: string }) {
   return (
     <pattern id={id} width={12} height={9} patternUnits="userSpaceOnUse">
@@ -292,6 +406,7 @@ function Chaux({ id }: { id: string }) {
 function Ndebele({ cote, graine, id }: PropsMotifNation) {
   if (cote === "face") {
     const fc = face(graine);
+    const en = enduit(graine, false);
     const { x0, y0, x1, y1, ep, r } = CADRE;
     return (
       <>
@@ -300,6 +415,7 @@ function Ndebele({ cote, graine, id }: PropsMotifNation) {
           <Shweshwe id={`nd-s-${id}`} />
         </defs>
         <rect width={W} height={H} fill={`url(#nd-x-${id})`} />
+        <Enduit e={en} sous />
         {/* Sous le portrait : le shweshwe brun, à peine. */}
         <rect x={0} y={BANDE + 8} width={W} height={H - BANDE - 8} fill={`url(#nd-s-${id})`} opacity={0.16} />
         {/* La bande murale : la chaux entre deux cernes noirs, des champs. */}
@@ -315,11 +431,13 @@ function Ndebele({ cote, graine, id }: PropsMotifNation) {
         ))}
         <path d={fc.coins} fill={SUIE} />
         <path d={fc.coeurs} fill={OCRE} />
+        <Enduit e={en} sous={false} />
       </>
     );
   }
 
   const t = mur(graine);
+  const en = enduit(graine, true);
   const { cx, cy } = CENTRE_DOS;
   const { m } = MUR;
   return (
@@ -334,32 +452,34 @@ function Ndebele({ cote, graine, id }: PropsMotifNation) {
         </radialGradient>
       </defs>
       <rect width={W} height={H} fill={`url(#nd-x-${id})`} />
+      <Enduit e={en} sous />
       {/* Le cadre du mur : un cerne noir épais, un filet. */}
       <rect x={m} y={m} width={W - 2 * m} height={H - 2 * m} rx={64} fill="none" stroke={SUIE} strokeWidth={12} />
       <rect x={m + 18} y={m + 18} width={W - 2 * m - 36} height={H - 2 * m - 36} rx={48} fill="none" stroke={SUIE} strokeWidth={3} />
       <Peint p={t.p} />
+      <Enduit e={en} sous={false} />
       {/* Le bandeau du logotype, entre les deux colonnes : le shweshwe brun, à peine, entre deux cernes. */}
       <rect x={LOGO.x0} y={LOGO.y0} width={W - 2 * LOGO.x0} height={LOGO.y1 - LOGO.y0} fill={`url(#nd-s-${id})`} opacity={0.2} />
       <path d={`M${LOGO.x0} ${LOGO.y0}H${W - LOGO.x0}M${LOGO.x0} ${LOGO.y1}H${W - LOGO.x0}`} stroke={SUIE} strokeWidth={6} />
       <path d={`M${LOGO.x0} ${LOGO.y0 + 11}H${W - LOGO.x0}M${LOGO.x0} ${LOGO.y1 - 11}H${W - LOGO.x0}`} stroke={SUIE} strokeWidth={2} />
       {/* Le panier d'ilala vu d'en haut : la paille, les rangs enroulés, la couronne, un cerne noir. */}
-      <circle cx={cx} cy={cy} r={PANIER.r + 16} fill={CHAUX} />
+      <circle cx={cx} cy={cy} r={PANIER.r + 16 * K} fill={CHAUX} />
       <circle cx={cx} cy={cy} r={PANIER.r} fill={`url(#nd-p-${id})`} />
-      <g fill="none" stroke="rgba(110,80,40,0.38)" strokeWidth={6.5} strokeDasharray="2.2 4.6">
+      <g fill="none" stroke="rgba(110,80,40,0.38)" strokeWidth={6.5 * K} strokeDasharray={`${f(2.2 * K)} ${f(4.6 * K)}`}>
         {t.rangs.map((r) => (
           <circle key={r} cx={cx} cy={cy} r={r} />
         ))}
       </g>
       <g fill="none" stroke="rgba(110,80,40,0.16)" strokeWidth={1}>
         {t.rangs.map((r) => (
-          <circle key={r} cx={cx} cy={cy} r={r + 5.2} />
+          <circle key={r} cx={cx} cy={cy} r={r + 5.2 * K} />
         ))}
       </g>
       <path d={t.tri} fill={BRIN} />
       <path d={t.triClair} fill={TERRE} opacity={0.9} />
-      <circle cx={cx} cy={cy} r={PANIER.couronne - 6} fill="none" stroke={BRIN} strokeWidth={4} />
-      <circle cx={cx} cy={cy} r={PANIER.r} fill="none" stroke={SUIE} strokeWidth={12} />
-      <circle cx={cx} cy={cy} r={PANIER.r + 16} fill="none" stroke={SUIE} strokeWidth={3} />
+      <circle cx={cx} cy={cy} r={PANIER.couronne - 6 * K} fill="none" stroke={BRIN} strokeWidth={4 * K} />
+      <circle cx={cx} cy={cy} r={PANIER.r} fill="none" stroke={SUIE} strokeWidth={12 * K} />
+      <circle cx={cx} cy={cy} r={PANIER.r + 16 * K} fill="none" stroke={SUIE} strokeWidth={3} />
     </>
   );
 }

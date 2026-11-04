@@ -4,10 +4,11 @@
 // invitation qu'on ne voyait que sur la page Team restait sans réponse).
 // La même carte que celle d'un match (matchs/invitations.tsx), l'écusson de
 // l'équipe à la place de la carte de l'organisateur : qui m'invite, où,
-// l'effectif et jusqu'à quand. La toucher ouvre la signature sur la page
-// Team (/bola-team?invitation=id). Plusieurs : la plus ancienne (elle tombe
-// la première), et le nombre des autres. La pastille de l'onglet Map les
-// compte aussi (bottom-nav.tsx).
+// l'effectif (« Entraîneur » pour la place à part), et jusqu'à quand sur sa
+// propre ligne (le délai ne se coupe jamais, même à 375 px avec « +2 »). La
+// toucher ouvre la signature sur la page Team (/bola-team?invitation=id).
+// Plusieurs : la plus ancienne (elle tombe la première), et le nombre des
+// autres. La pastille de l'onglet Map les compte aussi (bottom-nav.tsx).
 
 import Link from "next/link";
 import { Ecusson } from "@/components/sfl/equipe/ecusson";
@@ -43,9 +44,9 @@ export function InvitationsEquipe({ invitations, moi }: { invitations: Equipe[];
             {inviteur(e, m)} t&apos;invite · {e.nom}
           </span>
           <span className="truncate text-corps font-medium opacity-60">
-            Bola Team · {n} joueur{n > 1 ? "s" : ""}
-            {m.depuis && <> · jusqu&apos;à {quandTombe(finInvitation(m.depuis))}</>}
+            {m.role === "entraineur" ? "Entraîneur" : `Bola Team · ${n} joueur${n > 1 ? "s" : ""}`}
           </span>
+          {m.depuis && <span className="truncate text-corps font-medium opacity-60">jusqu&apos;à {quandTombe(finInvitation(m.depuis))}</span>}
         </span>
         {autres > 0 && (
           <span className="shrink-0 rounded-full px-2 py-0.5 text-petit font-bold tabular-nums" style={{ background: ENCRE, color: BLANC }}>

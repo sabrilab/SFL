@@ -16,13 +16,32 @@
 //     de rosettes ; autour de la lune, la spirale tressée du kiondo (le panier
 //     de sisal), ses rangs de torsades qui changent de sens d'un rang à
 //     l'autre, une couronne de triangles teints ; sous le logotype, la lisière
-//     rayée d'un kikoi et sa frange nouée.
+//     rayée d'un kikoi et sa frange nouée ;
+//   · le totem (totems/kenya.tsx, 02/11/2026) : le rhinocéros noir au pas,
+//     la tête haute, taillé en relief dans le bois de la porte comme la
+//     chaîne et les rosettes (trois plans nets, un biseau à facettes, plis
+//     et peau craquelée taillés en V), sur une moulure en chaîne, au-dessus du
+//     logotype ; la lune et le kiondo montent au-dessus de son dos
+//     (LUNE_KENYA), la lune à 240 au lieu de 300, la spirale resserrée autour
+//     d'elle (elle commence à LUNE_KENYA.kiondo) et sans rosace guillochée,
+//     pour que la corne et les oreilles restent à distance de l'anneau ; au
+//     dos, pas de microtexte : dos-carte.tsx l'imprimerait sur le relief ;
+//   · le bois vit : le fil s'écarte autour de deux ou trois nœuds (sur les
+//     bords), des pores courent dans son sens, les lés des planches sont un
+//     peu plus clairs ou plus sombres, et la porte porte ses rayures et ses
+//     coups ; tout est tiré de la graine.
 // Ce qu'on évite : les inscriptions (souvent religieuses) de certaines portes,
 // le poisson des montants, et tout perlage, dont celui des Maasaï (la Maasai
 // Intellectual Property Initiative en revendique l'usage).
 
 import type { PropsMotifNation, SkinNation } from "./types";
-import { alea, BANDE, CENTRE_DOS, f, H, W } from "./outils";
+import { alea, BANDE, f, H, W } from "./outils";
+import { LUNE_KENYA } from "./totems/kenya";
+
+/** La lune et le kiondo au dos : montés au-dessus du dos du rhinocéros (totems/kenya.tsx). */
+const CENTRE_DOS = { cx: LUNE_KENYA.cx, cy: LUNE_KENYA.cy } as const;
+/** L'échelle des rangs du kiondo : la lune passe de 300 à LUNE_KENYA.d. */
+const K = LUNE_KENYA.d / 300;
 
 type Pt = [number, number];
 
@@ -162,9 +181,45 @@ function rosette([cx, cy]: Pt, r: number): { petales: string; anneau: string; bo
 
 /* ------------------------------- Le bois ------------------------------- */
 
-/** Le fil du bois : des veines verticales, ondulées à peine, propres à la graine. */
-function fil(seed: number): { clair: string; fonce: string } {
+/** Le bois d'une porte : le fil, ses nœuds, ses pores, son usure ; tout est tiré de la graine (une planche par joueur). */
+interface Bois {
+  clair: string;
+  fonce: string;
+  /** Les pores : de courts traits sombres dans le sens du fil. */
+  pores: string;
+  /** Les nœuds : leurs cernes, et leur cœur. */
+  cernes: string;
+  coeurs: string;
+  /** Les planches : des lés de bois un peu plus clairs ou plus sombres. */
+  les: { x: number; l: number; clair: boolean; a: number }[];
+  /** L'usure : des rayures claires, des coups sombres. */
+  rayures: string;
+  coups: string;
+}
+
+/**
+ * Le fil du bois : des veines verticales, ondulées à peine, qui s'écartent
+ * autour des nœuds (deux ou trois par porte, sur les bords), des pores dans
+ * le sens du fil, des lés de planches, des rayures et des coups.
+ */
+function fil(seed: number): Bois {
   const rnd = alea(seed ^ 0x51a7c0de);
+  const noeuds: { x: number; y: number; r: number }[] = [];
+  const n = 2 + Math.floor(rnd() * 2);
+  for (let i = 0; i < n; i++) {
+    const gauche = i % 2 === 0;
+    noeuds.push({ x: gauche ? 70 + rnd() * 120 : W - 70 - rnd() * 120, y: 180 + rnd() * (H - 360), r: 14 + rnd() * 16 });
+  }
+  const ecart = (x0: number, y: number) => {
+    let dx = 0;
+    for (const k of noeuds) {
+      const u = (x0 - k.x) / (k.r * 3.2);
+      if (Math.abs(u) >= 1) continue;
+      const v = (y - k.y) / (k.r * 2.6);
+      dx += Math.sign(u || 1) * (1 - Math.abs(u)) * Math.exp(-v * v) * k.r * 1.25;
+    }
+    return dx;
+  };
   let clair = "";
   let fonce = "";
   let x = -10 + rnd() * 8;
@@ -174,15 +229,56 @@ function fil(seed: number): { clair: string; fonce: string } {
     const ph = rnd() * Math.PI * 2;
     const derive = (rnd() - 0.5) * 30;
     let d = "";
-    for (let y = -20; y <= H + 20; y += 24) {
-      const xx = x + amp * Math.sin((y / per) * Math.PI * 2 + ph) + (derive * y) / H;
+    for (let y = -20; y <= H + 20; y += 16) {
+      const xx = x + amp * Math.sin((y / per) * Math.PI * 2 + ph) + (derive * y) / H + ecart(x, y);
       d += `${y === -20 ? "M" : "L"}${f(xx)} ${y}`;
     }
     if (rnd() < 0.62) fonce += d;
     else clair += d;
     x += 5 + rnd() * 16;
   }
-  return { clair, fonce };
+  let pores = "";
+  for (let i = 0; i < 520; i++) {
+    const px = rnd() * W;
+    const py = rnd() * H;
+    const l = 2.5 + rnd() * 6;
+    const xx = px + ecart(px, py);
+    pores += `M${f(xx)} ${f(py)}l${f((rnd() - 0.5) * 0.8)} ${f(l)}`;
+  }
+  let cernes = "";
+  let coeurs = "";
+  for (const k of noeuds) {
+    for (let j = 1; j <= 4; j++) {
+      const rx = k.r * (0.32 + j * 0.2);
+      const ry = k.r * (0.5 + j * 0.42);
+      cernes += `M${f(k.x - rx)} ${f(k.y)}a${f(rx)} ${f(ry)} 0 1 0 ${f(2 * rx)} 0a${f(rx)} ${f(ry)} 0 1 0 ${f(-2 * rx)} 0`;
+    }
+    const rx = k.r * 0.34;
+    const ry = k.r * 0.5;
+    coeurs += `M${f(k.x - rx)} ${f(k.y)}a${f(rx)} ${f(ry)} 0 1 0 ${f(2 * rx)} 0a${f(rx)} ${f(ry)} 0 1 0 ${f(-2 * rx)} 0`;
+  }
+  const les: Bois["les"] = [];
+  for (let xl = 0; xl < W; ) {
+    const l = 150 + rnd() * 110;
+    les.push({ x: xl, l, clair: rnd() < 0.5, a: 0.025 + rnd() * 0.035 });
+    xl += l;
+  }
+  let rayures = "";
+  for (let i = 0; i < 16; i++) {
+    const rx = 60 + rnd() * (W - 120);
+    const ry = 60 + rnd() * (H - 120);
+    const a = -0.6 + rnd() * 1.2 + (rnd() < 0.5 ? Math.PI / 2 : 0);
+    const l = 14 + rnd() * 48;
+    rayures += `M${f(rx)} ${f(ry)}q${f((Math.cos(a) * l) / 2 + 2)} ${f((Math.sin(a) * l) / 2 - 2)} ${f(Math.cos(a) * l)} ${f(Math.sin(a) * l)}`;
+  }
+  let coups = "";
+  for (let i = 0; i < 22; i++) {
+    const cx = 50 + rnd() * (W - 100);
+    const cy = 50 + rnd() * (H - 100);
+    const r = 1.2 + rnd() * 2.6;
+    coups += `M${f(cx - r)} ${f(cy)}a${f(r)} ${f(r * 0.7)} 0 1 0 ${f(2 * r)} 0a${f(r)} ${f(r * 0.7)} 0 1 0 ${f(-2 * r)} 0`;
+  }
+  return { clair, fonce, pores, cernes, coeurs, les, rayures, coups };
 }
 
 /* ------------------------------- Le kiondo ------------------------------- */
@@ -195,9 +291,10 @@ function fil(seed: number): { clair: string; fonce: string } {
  */
 function kiondo(): { nature: string; teint: string; ombre: string; filets: string } {
   const { cx, cy } = CENTRE_DOS;
-  const r0 = 330;
+  // La spirale commence près de la lune (LUNE_KENYA.kiondo) : resserrée, sans rosace entre elles.
+  const r0 = LUNE_KENYA.kiondo;
   const rangs = 9;
-  const h = 10.5;
+  const h = 10.5 * K;
   const pointes = 20;
   let nature = "";
   let teint = "";
@@ -205,15 +302,15 @@ function kiondo(): { nature: string; teint: string; ombre: string; filets: strin
   let filets = "";
   for (let i = 0; i < rangs; i++) {
     const rm = r0 + i * h + h / 2;
-    const n = Math.round((2 * Math.PI * rm) / 7.2);
+    const n = Math.round((2 * Math.PI * rm) / (7.2 * K));
     const sens = i % 2 === 0 ? 1 : -1;
     for (let k = 0; k < n; k++) {
       const a = (k / n) * Math.PI * 2;
-      const da = (sens * 2.6) / rm;
+      const da = (sens * 2.6 * K) / rm;
       const p0: Pt = [cx + Math.cos(a - da) * (rm - h * 0.42), cy + Math.sin(a - da) * (rm - h * 0.42)];
       const p1: Pt = [cx + Math.cos(a + da) * (rm + h * 0.42), cy + Math.sin(a + da) * (rm + h * 0.42)];
       const s = `M${f(p0[0])} ${f(p0[1])}L${f(p1[0])} ${f(p1[1])}`;
-      ombre += `M${f(p0[0] + 1.2)} ${f(p0[1] + 1.6)}L${f(p1[0] + 1.2)} ${f(p1[1] + 1.6)}`;
+      ombre += `M${f(p0[0] + 1.1)} ${f(p0[1] + 1.5)}L${f(p1[0] + 1.1)} ${f(p1[1] + 1.5)}`;
       // La couronne de triangles : rangs 2 à 5, pointes vers l'extérieur.
       const u = ((a / (Math.PI * 2)) * pointes) % 1;
       const largeur = 0.78 * (1 - (i - 2) / 5);
@@ -286,9 +383,20 @@ function Lamu({ cote, m, graine, id }: PropsMotifNation) {
         </mask>
       </defs>
 
-      {/* Le fil du bois */}
+      {/* Les lés des planches, un peu plus clairs ou plus sombres */}
+      {bois.les.map((l, i) => (
+        <rect key={`l${i}`} x={f(l.x)} y={0} width={f(l.l)} height={H} fill={l.clair ? `rgba(${SISAL},${f(l.a * 100) / 100})` : `rgba(0,0,0,${f(l.a * 160) / 100})`} />
+      ))}
+      {/* Le fil du bois, qui s'écarte autour des nœuds ; les pores dans son sens */}
       <path d={bois.fonce} fill="none" stroke={m.fonce} strokeWidth={1.6} />
       <path d={bois.clair} fill="none" stroke={m.clair} strokeWidth={1.1} />
+      <path d={bois.pores} fill="none" stroke="rgba(0,0,0,0.3)" strokeWidth={1.2} strokeLinecap="round" />
+      <path d={bois.cernes} fill="none" stroke="rgba(0,0,0,0.32)" strokeWidth={1.4} />
+      <path d={bois.cernes} fill="none" stroke={`rgba(${SISAL},0.06)`} strokeWidth={1} transform="translate(-1.5 -1.5)" />
+      <path d={bois.coeurs} fill="rgba(8,4,2,0.55)" />
+      {/* L'usure : les rayures claires, les coups sombres */}
+      <path d={bois.rayures} fill="none" stroke={`rgba(${SISAL},0.09)`} strokeWidth={1} strokeLinecap="round" />
+      <path d={bois.coups} fill="rgba(0,0,0,0.3)" />
 
       {dos ? (
         <>
@@ -297,9 +405,9 @@ function Lamu({ cote, m, graine, id }: PropsMotifNation) {
           <path d="M96 92H928M96 192H928" stroke={`rgba(${SISAL},0.3)`} strokeWidth={1.6} />
           {linteau.map(fleur)}
           {/* Le kiondo autour de la lune */}
-          <path d={k.ombre} stroke="rgba(0,0,0,0.5)" strokeWidth={3.2} strokeLinecap="round" />
-          <path d={k.nature} stroke={`rgba(${SISAL},0.5)`} strokeWidth={2.9} strokeLinecap="round" />
-          <path d={k.teint} stroke={`rgba(${TEINT},0.95)`} strokeWidth={2.9} strokeLinecap="round" />
+          <path d={k.ombre} stroke="rgba(0,0,0,0.5)" strokeWidth={3.2 * K} strokeLinecap="round" />
+          <path d={k.nature} stroke={`rgba(${SISAL},0.5)`} strokeWidth={2.9 * K} strokeLinecap="round" />
+          <path d={k.teint} stroke={`rgba(${TEINT},0.95)`} strokeWidth={2.9 * K} strokeLinecap="round" />
           <path d={k.filets} fill="none" stroke="rgba(0,0,0,0.35)" strokeWidth={1} />
           {/* La lisière d'un kikoi sous le logotype, et sa frange */}
           <rect x={64} y={1400} width={W - 128} height={64} fill={`url(#kd-${id})`} />
@@ -402,6 +510,8 @@ const lamu: SkinNation = {
     voile: "rgba(10,6,4,0.82)",
     onglet: { fond: "#efe7da", encre: "#1a120c" },
     vive: "#d4c6a6",
+    // Au dos, pas de microtexte : dos-carte.tsx l'imprime par-dessus le motif, donc sur le relief du rhinocéros.
+    dos: { micro: 0 },
     tranche: { couleur: "#22170f", metal: 0.08, rugosite: 0.62 },
     holo: { force: 0.22, teinte: [1, 0.9, 0.76] },
   },

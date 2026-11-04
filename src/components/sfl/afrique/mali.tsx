@@ -16,18 +16,25 @@
 //   · la face : autour du portrait, une bordure réservée, entre deux traits,
 //     des rangs de points et des barreaux ; sous le portrait, les bandes
 //     cousues et des cases, à peine ;
-//   · le dos : la pièce entière. Six bandes cousues, leurs cases un peu
-//     décalées d'une bande à l'autre comme sur un vrai pagne (une pièce par
-//     joueur, tirée de la graine) ; au centre, la lune sur un champ de boue
-//     pleine, cernée de points ; en haut et en bas, les bouts de laine
-//     rayés ; sur les deux bords, le banco et ses toron.
+//   · le dos : la pièce entière. Six bandes cousues ; le grand champ de boue
+//     pleine, où plane le totem, l'aigle réservé dans la boue (totems/mali.tsx),
+//     vu de dessous, incliné vers la lune, montée en haut à droite dans son
+//     médaillon cerné de points (LUNE_ML) ; autour de l'oiseau, le champ reste
+//     uni (sousAigleML : aucun point ne le touche) ; sous le logotype, un rang de
+//     cases un peu décalées d'une bande à l'autre comme sur un vrai pagne
+//     (une pièce par joueur, tirée de la graine) ; en haut et en bas, les
+//     bouts de laine rayés ; sur les deux bords, le banco et ses toron ;
+//   · la terre, partout : la boue reprise deux ou trois fois ne fonce pas
+//     égal (des nuées plus sombres, d'autres où le coton remonte), le jaune
+//     de n'gallama qui reste par endroits, les grosseurs du fil filé main.
 // Ce qu'on évite : la silhouette de la Grande Mosquée de Djenné et de tout
-// édifice ; les objets, masques et sanctuaires dogon ; les motifs nommés du
+// édifice ; tout animal autre que le totem ; les objets, masques et sanctuaires dogon ; les motifs nommés du
 // bògòlan (on garde une géométrie élémentaire : points, barreaux, carrés,
 // traits) ; les couleurs du drapeau.
 
 import type { PropsMotifNation, SkinNation } from "./types";
-import { alea, BANDE, CENTRE_DOS, f, H, LOGOTYPE_DOS, W } from "./outils";
+import { alea, BANDE, f, H, LOGOTYPE_DOS, W } from "./outils";
+import { LUNE_ML, sousAigleML } from "./totems/mali";
 
 type Pt = [number, number];
 type Rnd = () => number;
@@ -185,7 +192,9 @@ const CASES: Case[] = [
 /* --------------------------------- La pièce -------------------------------- */
 
 /** Le dos : les rangs de cases, en haut et en bas du champ de la lune (y). */
-const PIECE = { haut: 182, champ: 366, bandeau: LOGOTYPE_DOS.cy - 96, bas: LOGOTYPE_DOS.cy + 92, fin: H - 182 };
+const PIECE = { champ: 166, bandeau: LOGOTYPE_DOS.cy - 96, bas: LOGOTYPE_DOS.cy + 92, fin: H - 182 };
+/** Le médaillon de la lune, à l'échelle de LUNE_ML (346 pour une lune de 300). */
+const KM = LUNE_ML.d / 300;
 const KAASA = 150;
 const BORD = 30;
 
@@ -210,10 +219,7 @@ function piece(graine: number) {
       [ordre[i], ordre[j]] = [ordre[j], ordre[i]];
     }
     let n = 0;
-    const rangs: [number, number][] = [
-      [PIECE.haut, PIECE.champ],
-      [PIECE.bas, PIECE.fin],
-    ];
+    const rangs: [number, number][] = [[PIECE.bas, PIECE.fin]];
     for (const [ya, yb] of rangs)
       for (let b = BORD > 0 ? 0 : 0; b < BANDES; b++) {
         const xa = b * LB + (b === 0 ? BORD : 6);
@@ -223,8 +229,8 @@ function piece(graine: number) {
         cadres += ligne([[xa, y0], [xb, y0], [xb, y1], [xa, y1], [xa, y0]], rnd, 2.2);
         CASES[ordre[n++ % ordre.length]](xa + 4, y0 + 4, xb - 4, y1 - 4, rnd, r);
       }
-    // Le champ de la lune : de la boue pleine, et sur les bandes des bords, des rangs de points.
-    const { cx, cy } = CENTRE_DOS;
+    // Le champ : de la boue pleine, et sur chaque bande, des rangs de points, hors du médaillon de la lune.
+    const { cx, cy } = LUNE_ML;
     for (let b = 0; b < BANDES; b++) {
       const xa = b * LB + (b === 0 ? BORD : 6);
       const xb = (b + 1) * LB - (b === BANDES - 1 ? BORD : 6);
@@ -233,7 +239,9 @@ function piece(graine: number) {
       for (let y = y0 + 10; y < y1 - 6; y += 22)
         for (let x = xa + 10 + ((((y - y0) / 22) | 0) % 2) * 9; x < xb - 6; x += 18) {
           const d = Math.hypot(x - cx, y - cy);
-          if (d > 392) r.plein += point(x, y, 2.4, rnd);
+          // hors du médaillon, et le champ uni autour de l'aigle (le totem)
+          const p = point(x, y, 2.4, rnd);
+          if (d > 392 * KM && !sousAigleML(x, y)) r.plein += p;
         }
     }
     // Les cernes du médaillon : deux traits, un rang de points, un peigne de rayons.
@@ -242,12 +250,13 @@ function piece(graine: number) {
       for (let k = 0; k <= 48; k++) pts.push([cx + rr * Math.cos((k / 48) * Math.PI * 2), cy + rr * Math.sin((k / 48) * Math.PI * 2)]);
       return ligne(pts, rnd, 2);
     };
-    let medaillon = cercle(372) + cercle(352);
+    let medaillon = cercle(372 * KM) + cercle(352 * KM);
     let rond = "";
-    for (let k = 0; k < 80; k++) {
-      const a = (k / 80) * Math.PI * 2;
-      rond += point(cx + 384 * Math.cos(a), cy + 384 * Math.sin(a), 3.4, rnd);
-      if (k % 2 === 0) medaillon += trait(cx + 356 * Math.cos(a), cy + 356 * Math.sin(a), cx + 368 * Math.cos(a), cy + 368 * Math.sin(a), rnd, 0.6);
+    const nr = Math.round(80 * KM);
+    for (let k = 0; k < nr; k++) {
+      const a = (k / nr) * Math.PI * 2;
+      rond += point(cx + 384 * KM * Math.cos(a), cy + 384 * KM * Math.sin(a), 3.4, rnd);
+      if (k % 2 === 0) medaillon += trait(cx + 356 * KM * Math.cos(a), cy + 356 * KM * Math.sin(a), cx + 368 * KM * Math.cos(a), cy + 368 * KM * Math.sin(a), rnd, 0.6);
     }
     // Le banco des bords : l'enduit, et les toron qui en sortent, réguliers, un peu inégaux.
     let toron = "";
@@ -407,6 +416,45 @@ function Reserves({ r, force = 1 }: { r: Reserve; force?: number }) {
   );
 }
 
+/**
+ * La terre : la boue reprise deux ou trois fois ne fonce pas égal (des nuées
+ * plus sombres, d'autres où le coton remonte), le jaune de n'gallama reste par
+ * endroits, et le fil filé main a ses grosseurs. Stable pour une même graine.
+ */
+function Terre({ graine, id, face }: { graine: number; id: string; face: boolean }) {
+  const t = memo(`terre-${face ? "f" : "d"}-${graine}`, () => {
+    const rnd = alea(graine ^ 0x7e77e);
+    const y0 = face ? BANDE : 0;
+    const nuees = Array.from({ length: face ? 4 : 8 }, (_, i) => ({ x: rnd() * W, y: y0 + rnd() * (H - y0), r: 110 + rnd() * 190, ton: i % 3 }));
+    let fils = "";
+    for (let i = 0, n = face ? 80 : 200; i < n; i++) fils += `M${f(rnd() * W)} ${f(y0 + rnd() * (H - y0))}h${f(5 + rnd() * 18)}`;
+    return { nuees, fils };
+  });
+  const tons = [`tm-${id}`, `tc-${id}`, `tj-${id}`];
+  return (
+    <>
+      <defs>
+        <radialGradient id={tons[0]}>
+          <stop offset="0" stopColor="#0d0907" stopOpacity={0.4} />
+          <stop offset="1" stopColor="#0d0907" stopOpacity={0} />
+        </radialGradient>
+        <radialGradient id={tons[1]}>
+          <stop offset="0" stopColor="#6e5238" stopOpacity={0.28} />
+          <stop offset="1" stopColor="#6e5238" stopOpacity={0} />
+        </radialGradient>
+        <radialGradient id={tons[2]}>
+          <stop offset="0" stopColor={NGALLAMA} stopOpacity={0.12} />
+          <stop offset="1" stopColor={NGALLAMA} stopOpacity={0} />
+        </radialGradient>
+      </defs>
+      {t.nuees.map((n, i) => (
+        <ellipse key={i} cx={f(n.x)} cy={f(n.y)} rx={f(n.r)} ry={f(n.r * 0.75)} fill={`url(#${tons[n.ton]})`} />
+      ))}
+      <path d={t.fils} stroke="rgba(234,223,198,0.08)" strokeWidth={1.5} strokeLinecap="round" />
+    </>
+  );
+}
+
 function Bogolan({ cote, m, graine, id }: PropsMotifNation) {
   if (cote === "face") {
     const fc = face(graine);
@@ -415,6 +463,7 @@ function Bogolan({ cote, m, graine, id }: PropsMotifNation) {
         <defs>
           <Coton id={`bg-c-${id}`} />
         </defs>
+        <Terre graine={graine} id={id} face />
         <rect width={W} height={H} fill={`url(#bg-c-${id})`} />
         <path d={fc.coutures} stroke={m.fonce} strokeWidth={2.4} />
         <path d={fc.points} stroke={COTON} strokeWidth={1.4} opacity={0.18} strokeLinecap="round" />
@@ -428,7 +477,7 @@ function Bogolan({ cote, m, graine, id }: PropsMotifNation) {
   const rnd = alea(graine ^ 0x6b61);
   const k1 = kaasa(0, 1, rnd);
   const k2 = kaasa(H, -1, rnd);
-  const { cx, cy } = CENTRE_DOS;
+  const { cx, cy } = LUNE_ML;
   return (
     <>
       <defs>
@@ -439,14 +488,15 @@ function Bogolan({ cote, m, graine, id }: PropsMotifNation) {
           <stop offset="1" stopColor="#7d5532" />
         </linearGradient>
       </defs>
+      <Terre graine={graine} id={id} face={false} />
       <rect width={W} height={H} fill={`url(#bg-c-${id})`} />
       <path d={t.coutures} stroke={m.fonce} strokeWidth={2.6} />
       <path d={t.points} stroke={COTON} strokeWidth={1.5} opacity={0.22} strokeLinecap="round" />
       <path d={t.cadres} stroke={COTON} strokeWidth={4} fill="none" opacity={0.9} strokeLinecap="round" />
       <Reserves r={t.r} />
-      {/* Le champ de la lune : la boue pleine, deux cernes, le peigne, un rang de points. */}
-      <circle cx={cx} cy={cy} r={346} fill={BOUE} />
-      <circle cx={cx} cy={cy} r={346} fill={`url(#bg-c-${id})`} />
+      {/* Le médaillon de la lune : la boue pleine, deux cernes, le peigne, un rang de points. */}
+      <circle cx={cx} cy={cy} r={346 * KM} fill={BOUE} />
+      <circle cx={cx} cy={cy} r={346 * KM} fill={`url(#bg-c-${id})`} />
       <path d={t.medaillon} stroke={COTON} strokeWidth={3.6} fill="none" opacity={0.9} strokeLinecap="round" />
       <path d={t.rond} fill={NGALLAMA} opacity={0.95} />
       {/* Le bandeau du logotype : la boue pleine, entre deux traits. */}
