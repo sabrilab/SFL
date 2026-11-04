@@ -12,16 +12,24 @@
 //     des triangles, des losanges et des filets brun-noir sur un engobe
 //     clair, avec des touches d'ocre rouge (ni cercle ni spirale).
 // La carte est un mur passé à la chaux :
-//   · le papier : la chaux, ses passes de brosse ; l'encre : le brun-noir
-//     de la peinture des potières ;
+//   · le papier : la chaux, ses passes de brosse, et de plus près son grain
+//     (chaux claire et sable), les stries des poils de la brosse et quelques
+//     fissures fines (le faïençage) ; la frise peinte s'use par endroits ;
+//     tout tiré de la graine ; l'encre : le brun-noir de la peinture des
+//     potières ; la peinture de la frise s'écaille aux pointes des dents et
+//     sur leurs arêtes, en petites écailles rondes ;
 //   · la face : autour du portrait, une frise de poterie, des dents brunes et
 //     d'ocre entre deux filets, et aux quatre coins un petit médaillon
 //     d'argent, d'émail et de corail ; dans la bande du bas, à peine, les
 //     maisons du M'zab en gradins, tirées de la graine (un ksar par joueur) ;
-//   · le dos : la frise tout autour, une chaîne de losanges ; autour de la
-//     lune, une grande fibule d'Aït Yenni, quatre rosaces d'émail et quatre
-//     cabochons de corail sur un anneau cloisonné, entre deux grènetis ; sous
-//     le logotype, le ksar, ses terrasses et ses ombres.
+//   · le dos : la frise tout autour, une chaîne de losanges ; une grande
+//     fibule d'Aït Yenni, un anneau cloisonné entre deux grènetis, et dedans
+//     le totem, le fennec d'argent (totems/algerie.tsx), assis dans le creux
+//     de l'anneau : la lune est sertie en haut de l'anneau, entre ses
+//     oreilles, à la place de la rosace du haut ; restent trois rosaces
+//     d'émail (les flancs, le bas) et deux cabochons de corail (en bas, de
+//     biais) ; sous le logotype, le ksar, ses terrasses et ses ombres ;
+//     pas de microtexte au dos : il s'imprimerait sur le fennec d'argent.
 // Ce qu'on évite : tout emprunt au zellige marocain (ni étoile à huit
 // branches, ni tesselles) ; les figures du Tassili ; les minarets et toute
 // silhouette de mosquée ; l'émail bleu des bijoux (bleu cobalt : la DA le
@@ -44,13 +52,16 @@ function memo<T>(cle: string, calcul: () => T): T {
 
 // La palette : la chaux, l'enduit pâle, le brun-noir des potières, l'ocre
 // rouge, l'argent, l'émail vert ; le jaune et le corail (à valider → Q2).
+// Le jaune est un citron (teinte 65°, ΔE2000 ≥ 10 de tout l'or du MVP), cerné
+// de brun ; le corail est celui du fennec (totems/algerie.tsx) : un seul
+// corail sur la carte, orangé, à ΔE2000 ≥ 10 du rouge d'Impact.
 const CHAUX = { haut: "#f4efe5", milieu: "#ece4d5", bas: "#e2d7c3" };
 const BRUN = "46,36,30";
 const OCRE_ROUGE = "156,82,52";
 const SABLE = "214,190,150";
 const VERT = { clair: "#5d9a7c", fonce: "#245a45" };
-const JAUNE = { clair: "#e3c766", fonce: "#b08a2c" };
-const CORAIL = { clair: "#d47a62", fonce: "#8e3524" };
+const JAUNE = { clair: "#ccd37a", trait: `rgba(${BRUN},0.5)` };
+const CORAIL = { clair: "#e8a184", moyen: "#c8704f", fonce: "#7e4130" };
 
 /* --------------------------- Le pourtour arrondi --------------------------- */
 
@@ -98,6 +109,9 @@ interface Frise {
   points: string;
   losanges: string;
   coins: Pt[];
+  /** Les pointes des dents, puis des points sur leurs arêtes : là où la peinture s'use d'abord. */
+  pointes: Pt[];
+  aretes: Pt[];
 }
 
 /**
@@ -124,7 +138,13 @@ function frise(seed: number, d: number, larg: number, bas: number, r: number, pa
   let ocres = "";
   let points = "";
   let losanges = "";
-  const seg = (a: Pt, b: Pt, c: Pt) => `M${f(a[0])} ${f(a[1])}L${f(b[0])} ${f(b[1])}L${f(c[0])} ${f(c[1])}Z`;
+  const pointes: Pt[] = [];
+  const aretes: Pt[] = [];
+  const seg = (a: Pt, b: Pt, c: Pt) => {
+    pointes.push(c);
+    for (const [p, q] of [[a, c], [b, c], [a, b]] as [Pt, Pt][]) aretes.push([(p[0] + q[0]) / 2, (p[1] + q[1]) / 2]);
+    return `M${f(a[0])} ${f(a[1])}L${f(b[0])} ${f(b[1])}L${f(c[0])} ${f(c[1])}Z`;
+  };
   for (let k = 0; k < n; k++) {
     const s = k * pas;
     if (libre(s) || libre(s + pas)) continue;
@@ -152,7 +172,7 @@ function frise(seed: number, d: number, larg: number, bas: number, r: number, pa
     return dd;
   };
   const filets = filet(larg / 2) + filet(-larg / 2) + (chaine ? filet(-larg / 2 - 28) : "");
-  return { filets, dents, ocres, points, losanges, coins: p.coins.map((c) => p.en(c)[0]) };
+  return { filets, dents, ocres, points, losanges, coins: p.coins.map((c) => p.en(c)[0]), pointes, aretes };
 }
 
 /* ------------------------------- Les médaillons ------------------------------- */
@@ -223,7 +243,10 @@ function fibule(): Fibule {
   const n = 64;
   const pos = (a: number, r: number): Pt => [cx + Math.cos(a) * r, cy + Math.sin(a) * r];
   const centres = Array.from({ length: 8 }, (_, i) => -Math.PI / 2 + (i * Math.PI) / 4);
-  const pres = (a: number) => centres.some((c) => Math.abs(Math.atan2(Math.sin(a - c), Math.cos(a - c))) < 0.15);
+  // Les places tenues : la lune en haut (0, sertie par le totem), les rosaces (2, 4, 6) et les
+  // cabochons du bas (3, 5) ; en haut, de biais (1, 7), l'émail continue sous les oreilles du fennec.
+  const tenues = centres.filter((_, i) => i !== 1 && i !== 7);
+  const pres = (a: number) => tenues.some((c) => Math.abs(Math.atan2(Math.sin(a - c), Math.cos(a - c))) < 0.15);
   for (let k = 0; k < n; k++) {
     const a0 = (k / n) * Math.PI * 2 - Math.PI / 2;
     const a1 = ((k + 1) / n) * Math.PI * 2 - Math.PI / 2;
@@ -265,8 +288,12 @@ function fibule(): Fibule {
     alveoles,
     jaunes,
     grenetis,
-    rosaces: centres.filter((_, i) => i % 2 === 0).map((a) => pos(a, rm).map(f) as Pt),
-    cabochons: centres.filter((_, i) => i % 2 === 1).map((a) => pos(a, rm).map(f) as Pt),
+    // La rosace du haut laisse sa place à la lune, sertie dans l'anneau entre les oreilles du fennec
+    // (totems/algerie.tsx) ; restent celles des flancs et celle du bas.
+    rosaces: centres.filter((_, i) => i === 2 || i === 4 || i === 6).map((a) => pos(a, rm).map(f) as Pt),
+    // Les cabochons de corail du bas, de part et d'autre de la queue ; ceux du haut laisseraient
+    // passer les oreilles de trop près.
+    cabochons: centres.filter((_, i) => i === 3 || i === 5).map((a) => pos(a, rm).map(f) as Pt),
   };
 }
 
@@ -370,6 +397,68 @@ function brosse(seed: number): { clair: string; fonce: string } {
   return { clair, fonce };
 }
 
+/**
+ * La matière de la chaux, plus près : le grain (des points de chaux plus
+ * claire et de sable, serrés), les stries des poils de la brosse dans chaque
+ * passe, et quelques fissures fines, le faïençage d'un enduit qui a séché au
+ * soleil. Tout est tiré de la graine (un mur par joueur), rien n'est flouté.
+ */
+function chaux(seed: number): { grainClair: string; grainSable: string; stries: string; fissures: string } {
+  const rnd = alea(seed ^ 0x9a1e);
+  let grainClair = "";
+  let grainSable = "";
+  for (let i = 0; i < 1300; i++) {
+    const x = rnd() * W, y = rnd() * H, r = 0.7 + rnd() * rnd() * 2.2;
+    if (rnd() < 0.62) grainClair += rond(x, y, r);
+    else grainSable += rond(x, y, r * 0.8);
+  }
+  let stries = "";
+  for (let i = 0; i < 70; i++) {
+    const y = rnd() * H, x0 = -40 + rnd() * W * 0.7, l = 120 + rnd() * 420, pente = (rnd() - 0.5) * 0.06, ph = rnd() * 6;
+    let d = "";
+    for (let k = 0; k <= 10; k++) {
+      const t = k / 10;
+      d += `${k ? "L" : "M"}${f(x0 + l * t)} ${f(y + pente * l * t + Math.sin(t * 5 + ph) * 2)}`;
+    }
+    stries += d;
+  }
+  let fissures = "";
+  const fissure = (x: number, y: number, a: number, n: number, prof: number) => {
+    let d = `M${f(x)} ${f(y)}`;
+    for (let k = 0; k < n; k++) {
+      a += (rnd() - 0.5) * 1.1;
+      const l = 8 + rnd() * 16;
+      x += Math.cos(a) * l;
+      y += Math.sin(a) * l;
+      d += `L${f(x)} ${f(y)}`;
+      if (prof < 2 && rnd() < 0.16) fissure(x, y, a + (rnd() < 0.5 ? 1 : -1) * (0.7 + rnd() * 0.6), 3 + Math.floor(rnd() * 5), prof + 1);
+    }
+    fissures += d;
+  };
+  for (let i = 0; i < 9; i++) fissure(rnd() * W, rnd() * H, rnd() * Math.PI * 2, 6 + Math.floor(rnd() * 8), 0);
+  return { grainClair, grainSable, stries, fissures };
+}
+
+/**
+ * L'usure de la frise : la peinture des potières, passée au doigt et au
+ * soleil, s'écaille d'abord aux pointes des dents, puis le long de leurs
+ * arêtes : de petites écailles rondes et lissées (rayon 1,5 à 4), qui
+ * laissent voir la chaux ; tirées de la graine.
+ */
+function usure(seed: number, fr: Frise): string {
+  const rnd = alea(seed ^ 0x05e1);
+  let u = "";
+  for (let i = 0; i < 70; i++) {
+    const surPointe = rnd() < 0.6;
+    const liste = surPointe ? fr.pointes : fr.aretes;
+    const [x, y] = liste[Math.floor(rnd() * liste.length)];
+    const rr = surPointe ? 1.8 + rnd() * 2.2 : 1.5 + rnd() * 1.6;
+    // l'écaille entame la pointe : un peu en retrait, vers le dedans de la dent
+    u += rond(x + (rnd() - 0.5) * 2.4, y + (rnd() - 0.5) * 2.4, rr);
+  }
+  return u;
+}
+
 /* --------------------------------- Le motif --------------------------------- */
 
 function AitYenni({ cote, m, graine, id }: PropsMotifNation) {
@@ -390,6 +479,7 @@ function AitYenni({ cote, m, graine, id }: PropsMotifNation) {
       </linearGradient>
       <radialGradient id={`yc-${id}`} cx="0.4" cy="0.35" r="0.7">
         <stop offset="0" stopColor={CORAIL.clair} />
+        <stop offset="0.55" stopColor={CORAIL.moyen} />
         <stop offset="1" stopColor={CORAIL.fonce} />
       </radialGradient>
     </defs>
@@ -417,8 +507,19 @@ function AitYenni({ cote, m, graine, id }: PropsMotifNation) {
     </>
   );
 
+  const ch = memo(`chaux:${graine}`, () => chaux(graine));
+  const matiere = (force: number) => (
+    <g>
+      <path d={ch.stries} fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth={1.1} opacity={force} />
+      <path d={ch.grainClair} fill="rgba(255,255,255,0.75)" opacity={force} />
+      <path d={ch.grainSable} fill={`rgba(${SABLE},0.55)`} opacity={force} />
+      <path d={ch.fissures} fill="none" stroke={`rgba(${BRUN},0.13)`} strokeWidth={0.9} strokeLinejoin="round" opacity={force} />
+    </g>
+  );
+
   if (!dos) {
     const fr = memo("frise-face", () => frise(0xa17, 8, 25, BANDE - 20.5, 71.5, 30, false));
+    const us = memo(`usure-face:${graine}`, () => usure(graine, fr));
     const k = memo(`ksar-face:${graine}`, () => ksar(graine, 20, W - 20, BANDE + 330, H - 24, 5));
     return (
       <>
@@ -435,8 +536,10 @@ function AitYenni({ cote, m, graine, id }: PropsMotifNation) {
             <rect x={0} y={BANDE} width={W} height={H - BANDE} fill={`url(#yf-${id})`} />
           </mask>
         </defs>
+        {matiere(0.8)}
         <g mask={`url(#ym-${id})`}>{ksarDe(k, 0.17)}</g>
         {peint(fr, 2.2)}
+        <path d={us} fill="rgba(244,239,229,0.42)" />
         {fr.coins.map((c, i) => (
           <Medaillon key={i} c={c} r={19} id={id} />
         ))}
@@ -445,6 +548,7 @@ function AitYenni({ cote, m, graine, id }: PropsMotifNation) {
   }
 
   const fr = memo("frise-dos", () => frise(0xa18, 36, 34, 1540, 64, 40, true));
+  const us = memo(`usure-dos:${graine}`, () => usure(graine, fr));
   const fb = memo("fibule", fibule);
   const k = memo(`ksar-dos:${graine}`, () => ksar(graine, 112, W - 112, 1330, 1508, 4));
   return (
@@ -452,6 +556,7 @@ function AitYenni({ cote, m, graine, id }: PropsMotifNation) {
       {defs}
       <path d={br.clair} fill={m.clair} />
       <path d={br.fonce} fill={m.fonce} />
+      {matiere(1)}
       {/* Le ksar, sous le logotype, dans la frise */}
       <defs>
         <clipPath id={`yk-${id}`}>
@@ -460,6 +565,7 @@ function AitYenni({ cote, m, graine, id }: PropsMotifNation) {
       </defs>
       <g clipPath={`url(#yk-${id})`}>{ksarDe(k, 0.78)}</g>
       {peint(fr, 2.6)}
+      <path d={us} fill="rgba(244,239,229,0.42)" />
       {fr.coins.map((c, i) => (
         <Medaillon key={i} c={c} r={30} id={id} />
       ))}
@@ -471,7 +577,7 @@ function AitYenni({ cote, m, graine, id }: PropsMotifNation) {
       <path d={fb.alveoles} fill={`url(#yv-${id})`} stroke="#d9dadb" strokeWidth={2.2} strokeLinejoin="round" />
       <path d={fb.alveoles} fill="none" stroke="rgba(70,74,78,0.55)" strokeWidth={0.8} strokeLinejoin="round" />
       <path d={fb.glacis} fill="none" stroke="rgba(255,255,255,0.42)" strokeWidth={2} strokeLinecap="round" />
-      <path d={fb.jaunes} fill={JAUNE.clair} stroke={JAUNE.fonce} strokeWidth={0.6} />
+      <path d={fb.jaunes} fill={JAUNE.clair} stroke={JAUNE.trait} strokeWidth={0.6} />
       <path d={fb.grenetis} fill="#e9eaeb" stroke="#7d8084" strokeWidth={0.8} />
       {fb.rosaces.map((c, i) => (
         <Medaillon key={`r${i}`} c={c} r={36} id={id} />
@@ -515,7 +621,9 @@ const aitYenni: SkinNation = {
     lueur: "rgba(255,255,255,0.9)",
     rayures: 0.05,
     micro: 0.04,
-    dos: { micro: 0.016 },
+    // Au dos, pas de microtexte : dos-carte.tsx l'imprime par-dessus le motif, donc sur le fennec d'argent,
+    // le héros (le totem passe sous lui) ; la face garde le sien.
+    dos: { micro: 0 },
     reflet: 0.3,
     coins: 0.55,
     etiquette: { fond: "transparent", bord: `rgba(${BRUN},0.5)`, texte: `rgba(${BRUN},0.8)` },

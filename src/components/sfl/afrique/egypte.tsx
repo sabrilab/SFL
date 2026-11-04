@@ -13,17 +13,26 @@
 //     fuseaux de bois tourné croisés à 45°, leurs perles et leurs nœuds,
 //     entre deux traverses ; dans la bande du bas, à peine, un treillis de
 //     losanges en lamelles ;
-//   · le dos : le châle entier. Une bordure de dents et de chevrons, un champ
-//     de losanges dont chaque cœur est plein, et autour de la lune un soleil
-//     de triangles, comme on en brode au telli ; sous le logotype, une
-//     lisière rayée tissée à la main ; tout en lamelles, chacune posée sur le
-//     filet, qui prennent le reflet quand la carte tourne.
+//   · le dos : le châle entier. Une bordure de dents et de chevrons ; un champ
+//     de filet nu semé de losanges pleins, en quinconce, comme sur les châles
+//     d'Assiout, chacun gardé ou écarté entier (jamais un losange coupé) : le
+//     champ s'ouvre autour du faucon en lamelles (totems/egypte.tsx), grand, à
+//     gauche sur sa pierre, et autour de la lune, en haut à droite, au-dessus
+//     de son regard (LUNE_EG), que cerne seule la rosace guillochée de la
+//     carte (ni rais ni couronne : avec un faucon, un disque rayonnant serait
+//     celui d'un dieu) ; sous le logotype, une lisière rayée tissée à la
+//     main ; tout en lamelles, chacune posée sur le filet, qui prennent le
+//     reflet quand la carte tourne ;
+//   · le filet : ses mailles ont du jeu (le tulle se tend inégal), et le noir
+//     se moire d'un reflet plus doux là où l'étoffe a été roulée.
 // Ce qu'on évite : toute image pharaonique (hiéroglyphes, pyramides, Sphinx,
-// ankh, œil d'Horus), toute calligraphie, et les figures (personnages,
-// animaux, objets) qu'on trouve aussi sur le telli ; l'or, le laiton.
+// ankh, œil d'Horus dessiné comme signe, disque sur une tête), toute
+// calligraphie, et les figures (personnages, animaux autres que le totem,
+// objets) qu'on trouve aussi sur le telli ; l'or, le laiton.
 
 import type { PropsMotifNation, SkinNation } from "./types";
-import { alea, BANDE, CENTRE_DOS, f, H, W } from "./outils";
+import { alea, BANDE, f, H, W } from "./outils";
+import { distanceFauconEG, LUNE_EG, POSE_DOS_EG } from "./totems/egypte";
 
 type Pt = [number, number];
 
@@ -78,10 +87,42 @@ const BORD = 44;
 const CHAMP = { x0: 122, y0: 124, x1: W - 122, y1: 1120 };
 const LISIERE = { y0: 1330, y1: 1500 };
 
-/** Le châle du dos : toutes les formes, en une fonction « ici, du métal ? ». */
-function chale(seed: number) {
-  const { cx, cy } = CENTRE_DOS;
+/** La marge autour du faucon : aucun motif du champ n'en approche (le faucon se lit d'abord). */
+const MARGE = 44;
+/**
+ * Derrière le faucon, sous son œil (dans le repère de sa boîte : x < 300,
+ * y > 118), le champ reste nu : son dos se lit sur le filet, sans losange
+ * isolé entre lui et la bordure.
+ */
+const DOS_NU = { x: 300, y: 118 };
+
+/**
+ * Le châle du dos, en une fonction « ici, du métal ? » : la bordure, ses coins
+ * et la lisière (« bord »), ou le semis de losanges du champ (« champ »), posé
+ * plus bas de ton pour que le faucon reste le plus brillant.
+ */
+function chale(seed: number, quoi: "bord" | "champ") {
+  const { cx, cy } = LUNE_EG;
+  // Le cercle de la lune, à l'échelle de LUNE_EG (pour une lune de 300) : la rosace guillochée y tourne seule.
+  const K = LUNE_EG.d / 300;
+  const RESERVE_LUNE = 344 * K + 30;
+  // Les losanges du champ, gardés ou écartés entiers : jamais un losange coupé par le faucon ou la lune.
+  const garde = new Map<string, boolean>();
+  const libre = (mx: number, my: number) => {
+    const cle = `${Math.round(mx)},${Math.round(my)}`;
+    let g = garde.get(cle);
+    if (g === undefined) {
+      const e = POSE_DOS_EG.echelle;
+      const [bx, by] = [(mx - POSE_DOS_EG.x) / e, (my - POSE_DOS_EG.y) / e];
+      const loin = distanceFauconEG(bx, by) * e > MARGE + 36;
+      g = loin && !(bx < DOS_NU.x && by > DOS_NU.y) && Math.hypot(mx - cx, my - cy) > RESERVE_LUNE + 36;
+      garde.set(cle, g);
+    }
+    return g;
+  };
   const dedans = (x: number, y: number): boolean => {
+    const champ = x > CHAMP.x0 && x < CHAMP.x1 && y > CHAMP.y0 && y < CHAMP.y1;
+    if ((quoi === "champ") !== champ) return false;
     // La bordure : un rang de dents tournées vers l'intérieur, puis un filet.
     const dg = x, dd = W - x, dh = y, db = H - 70 - y;
     const d = Math.min(dg, dd, dh, db);
@@ -100,28 +141,21 @@ function chale(seed: number) {
       const l = Math.abs(x - ox) / 40 + Math.abs(y - oy) / 40;
       return l < 0.62 || (l > 0.84 && l < 1.08);
     }
-    // Le soleil autour de la lune : un rang, puis des rais en triangles.
-    const r = Math.hypot(x - cx, y - cy);
-    if (r < 470) {
-      if (r > 336 && r < 346) return true;
-      if (r >= 352 && r < 460 && y < 1150) {
-        const a = Math.atan2(y - cy, x - cx);
-        const k = fr((a / (Math.PI * 2)) * 32 + 0.5);
-        const long = Math.round((a / (Math.PI * 2)) * 32 + 0.5) % 2 === 0 ? 108 : 64;
-        return Math.abs(k - 0.5) * 2 < 1 - (r - 352) / long;
-      }
-      return false;
-    }
-    // Le champ : un treillis de losanges, un cœur plein dans chacun.
-    if (x > CHAMP.x0 && x < CHAMP.x1 && y > CHAMP.y0 && y < CHAMP.y1) {
+    // Le champ : un semis de losanges pleins, en quinconce, sur le filet nu ; chacun gardé ou écarté entier.
+    if (champ) {
       const lx = 130, ly = 156;
+      // (les centres : en (½, 0) et (0, ½) de la maille)
       const u = (x - W / 2) / lx;
       const v = (y - CHAMP.y0) / ly;
-      const a = fr(u + v), b = fr(u - v);
-      const trait = Math.min(a, 1 - a) * lx * 0.7 < 5.4 || Math.min(b, 1 - b) * lx * 0.7 < 5.4;
-      // Le cœur de chaque losange, plein : les losanges sont centrés en (½, 0) et (0, ½).
-      const coeur = (cu: number, cv: number) => (Math.abs(fr(u - cu + 0.5) - 0.5) * lx) / 30 + (Math.abs(fr(v - cv + 0.5) - 0.5) * ly) / 36 < 1;
-      return trait || coeur(0.5, 0) || coeur(0, 0.5);
+      for (const [cu, cv] of [[0.5, 0], [0, 0.5]]) {
+        const du = fr(u - cu + 0.5) - 0.5;
+        const dv = fr(v - cv + 0.5) - 0.5;
+        if ((Math.abs(du) * lx) / 30 + (Math.abs(dv) * ly) / 36 >= 1) continue;
+        const [mx, my] = [W / 2 + (u - du) * lx, CHAMP.y0 + (v - dv) * ly];
+        // Un losange entier dans le champ, ou rien (jamais un demi-losange au bord).
+        return mx - 30 > CHAMP.x0 && mx + 30 < CHAMP.x1 && my - 36 > CHAMP.y0 && my + 36 < CHAMP.y1 && libre(mx, my);
+      }
+      return false;
     }
     // La lisière tissée sous le logotype : on n'y pose que des filets de lamelles.
     if (y > LISIERE.y0 && y < LISIERE.y1 && x > 110 && x < W - 110) {
@@ -134,7 +168,7 @@ function chale(seed: number) {
     }
     return false;
   };
-  return lamelles(dedans, seed ^ 0x7e111);
+  return lamelles(dedans, quoi === "champ" ? seed ^ 0x7e111 : seed ^ 0x7e222);
 }
 
 /** La lisière rayée tissée à la main (Haute-Égypte), sous le logotype : rayures de chaîne. */
@@ -256,6 +290,16 @@ function Telli({ cote, m, graine, id }: PropsMotifNation) {
         <pattern id={`ef-${id}`} width={9} height={12} patternUnits="userSpaceOnUse">
           <path d="M0 0L4.5 6L0 12M9 0L4.5 6L9 12" fill="none" stroke={m.clair} strokeWidth={0.9} />
         </pattern>
+        {/* Le tulle tendu inégal : une seconde maille, à peine tournée, qui moire la première. */}
+        <pattern id={`ew-${id}`} width={9} height={12} patternUnits="userSpaceOnUse" patternTransform={`rotate(${f(1.6 + (graine % 7) * 0.12)} ${W / 2} ${H / 2})`}>
+          <path d="M0 0L4.5 6L0 12M9 0L4.5 6L9 12" fill="none" stroke={m.clair} strokeWidth={0.7} />
+        </pattern>
+        {/* Le reflet doux là où l'étoffe a été roulée pour aplatir les lamelles. */}
+        <linearGradient id={`er-${id}`} gradientUnits="userSpaceOnUse" x1={0} y1={0} x2={0} y2={H}>
+          {[0, 0.18, 0.3, 0.5, 0.62, 0.8, 1].map((o, i) => (
+            <stop key={o} offset={o} stopColor="#e6e8ee" stopOpacity={[0, 0.035, 0, 0.03, 0, 0.04, 0][i]} />
+          ))}
+        </linearGradient>
         {/* L'argent : des bandes plus ou moins claires en biais, le scintillement des lamelles */}
         <linearGradient id={`eg-${id}`} gradientUnits="userSpaceOnUse" x1={0} y1={0} x2={W} y2={H}>
           {[0, 0.12, 0.22, 0.33, 0.45, 0.56, 0.68, 0.79, 0.9, 1].map((o, i) => (
@@ -264,6 +308,8 @@ function Telli({ cote, m, graine, id }: PropsMotifNation) {
         </linearGradient>
       </defs>
       <rect width={W} height={H} fill={`url(#ef-${id})`} />
+      <rect width={W} height={H} fill={`url(#ew-${id})`} opacity={0.55} />
+      <rect width={W} height={H} fill={`url(#er-${id})`} />
     </>
   );
   const metal = (l: { corps: string; arete: string }, force: number) => (
@@ -305,7 +351,8 @@ function Telli({ cote, m, graine, id }: PropsMotifNation) {
     );
   }
 
-  const ch = memo(`chale:${graine}`, () => chale(graine));
+  const bord = memo(`bord:${graine}`, () => chale(graine, "bord"));
+  const champ = memo(`champ:${graine}`, () => chale(graine, "champ"));
   return (
     <>
       {filet}
@@ -320,7 +367,9 @@ function Telli({ cote, m, graine, id }: PropsMotifNation) {
           fill={r.c === "l" ? `rgba(${LIN},0.2)` : r.c === "b" ? `rgba(${BOIS_CLAIR},0.4)` : `rgba(${ARGENT},0.3)`}
         />
       ))}
-      {metal(ch, 0.92)}
+      {/* Le châle : la bordure et la lisière ; le semis de losanges, écarté du faucon et de la lune, plus bas de ton. */}
+      {metal(bord, 0.92)}
+      {metal(champ, 0.65)}
     </>
   );
 }
@@ -364,6 +413,7 @@ const telli: SkinNation = {
     vive: "#c9ccd2",
     tranche: { couleur: "#1a1a1d", metal: 0.45, rugosite: 0.4 },
     holo: { force: 0.38, teinte: [0.96, 0.97, 1] },
+    dos: { micro: 0.018 },
   },
   Motif: Telli,
 };

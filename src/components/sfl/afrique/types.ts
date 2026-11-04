@@ -19,7 +19,18 @@
 //   · ni or, ni bleu cobalt, ni rouge laqué (DA : réservés aux cartes MVP,
 //     Défensive, Impact) ; le drapeau, s'il apparaît, en filet discret au dos ;
 //   · aucun nom, sigle, trophée, mascotte, logo de la CAF ; ni écusson ni
-//     surnom de sélection ; aucun objet sacré, aucune figure, aucun animal.
+//     surnom de sélection écrit ; aucun objet sacré, aucune figure ; un seul
+//     animal admis : le totem de la nation (Ilyes, 02/11/2026 : « rajoute un
+//     animal totem […] une belle silhouette, un beau truc de chaque équipe »),
+//     dessiné dans totems/<nation>.tsx et posé par totem.tsx, jamais nommé
+//     sur la carte.
+//
+// Le totem (TotemNation, plus bas) : un fichier totems/<nation>.tsx, des
+// tracés à la main (béziers) dans le repère propre du totem (boite), posés
+// par totem.tsx au dos (le héros, avec la rosace et la lune) et à la face
+// (dans la marge sous le portrait, ou gaufré sur le portrait, hors du
+// visage et de la bande du bas). Mêmes règles que le motif : du SVG pur,
+// sans filtre ni image, stable pour une même graine.
 
 import type { ReactNode } from "react";
 import type { Matiere } from "@/components/sfl/finitions-carte";
@@ -66,4 +77,93 @@ export interface SkinNation {
   matiere: Omit<Matiere, "nom" | "motif"> & { motif: { clair: string; fonce: string } };
   /** Le motif gravé : des éléments SVG dans le repère 1024 × 1656 (le registre pose le <svg>). */
   Motif: (p: PropsMotifNation) => ReactNode;
+}
+
+/* ------------------------------- Le totem ------------------------------- */
+
+/**
+ * Les couches où totem.tsx demande le dessin du totem :
+ *   · « dos »           : au dos, sous la lune et le logotype (dans le motif) ;
+ *   · « dos-devant »    : au dos, par-dessus la lune (seulement si pose.dos.devant :
+ *                         totem.tsx redessine alors la rosace, la lune et le logotype) ;
+ *   · « face-cadre »    : la face, sous le portrait : ne se voit que dans la marge
+ *                         (41 autour, 983 → 1024 sous le portrait) ;
+ *   · « face-portrait » : la face, par-dessus le portrait (photo ou rayures),
+ *                         coupé au portrait ; carte complète seulement.
+ */
+export type CoucheTotem = "dos" | "dos-devant" | "face-cadre" | "face-portrait";
+
+/** Les tons de la matière de la nation, que le totem reprend. */
+export interface TonsTotem {
+  /** L'encre de la carte, « r,g,b » (celle du dos au dos, si elle change). */
+  encre: string;
+  /** Les deux tons du motif (matiere.motif). */
+  clair: string;
+  fonce: string;
+  /** La carte est sombre (encre claire sur papier foncé). */
+  sombre: boolean;
+}
+
+export interface PropsTotem {
+  couche: CoucheTotem;
+  tons: TonsTotem;
+  /** Stable par joueur : une usure, un grain propre à chaque carte, si on le veut. */
+  graine: number;
+  /** « face-portrait » : une photo est dessous (sinon : les rayures et l'initiale). */
+  photo: boolean;
+  /** Un identifiant unique, pour les <linearGradient>, <pattern>, <clipPath>. */
+  id: string;
+}
+
+/**
+ * Une pose : la boîte du totem (0 0 boite.w boite.h) posée dans le repère de
+ * la carte (1024 × 1656) : son coin haut gauche en (x, y), mise à l'échelle,
+ * retournée (miroir horizontal) ou tournée (degrés, autour de son centre).
+ */
+export interface PoseTotem {
+  x: number;
+  y: number;
+  echelle: number;
+  miroir?: boolean;
+  rotation?: number;
+}
+
+export interface PoseDos extends PoseTotem {
+  /**
+   * true : le totem passe devant la lune. totem.tsx retire alors le logo du
+   * dos de dos-carte.tsx (matiere.dos.logo = false, via le registre) et
+   * redessine la rosace, la lune (à `lune`, si on la déplace) et le
+   * logotype, dans cet ordre : rosace, couche « dos », lune, couche
+   * « dos-devant », logotype.
+   */
+  devant?: boolean;
+  /** La lune et sa rosace déplacées (seulement avec devant) ; d : diamètre de la lune (300). */
+  lune?: { cx: number; cy: number; d?: number };
+  /**
+   * false : pas de rosace guillochée autour de la lune (seulement avec
+   * devant), quand le totem sertit la lune lui-même et que le halo
+   * brouillerait son dessin (l'Algérie : la lune en cabochon dans l'anneau).
+   */
+  rosace?: boolean;
+}
+
+export interface TotemNation {
+  nation: CodeNation;
+  /** L'animal, pour l'équipe seulement (jamais écrit sur la carte). */
+  animal: string;
+  /** Une phrase interne : la pose et le traitement retenus. */
+  quoi: string;
+  /** Les références consultées (anatomie, photos, objets) : jamais téléchargées. */
+  sources: SourceSkin[];
+  /** false : pas encore dessiné, totem.tsx ne pose rien. */
+  dessine: boolean;
+  /** Le repère du dessin : 0 0 w h. */
+  boite: { w: number; h: number };
+  pose: {
+    dos: PoseDos;
+    /** La face : l'une, l'autre ou les deux ; absente, rien sur la face. */
+    face?: { cadre?: PoseTotem; portrait?: PoseTotem };
+  };
+  /** Le dessin, dans le repère de la boîte, selon la couche demandée ; null : rien sur cette couche. */
+  Dessin: (p: PropsTotem) => ReactNode;
 }
