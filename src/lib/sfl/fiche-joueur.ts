@@ -59,7 +59,7 @@ function rangDe(players: Player[], moi: Player, valeur: (p: Player) => number): 
 }
 
 interface Mesure {
-  id: "buts" | "passes" | "mvp" | "def" | "pp";
+  id: "buts" | "passes" | "mvp" | "impact" | "def" | "pp";
   valeur: (p: Player) => number;
   quoi: (n: number) => string;
   /** « buteur » : le rang, après la place (« 1er buteur »). */
@@ -73,6 +73,10 @@ const MESURES: Mesure[] = [
   { id: "buts", valeur: (p) => p.buts, quoi: (n) => (n > 1 ? "buts" : "but"), titre: "buteur", premier: "Le buteur de la ligue.", podium: "Sur le podium des buteurs." },
   { id: "passes", valeur: (p) => p.passes, quoi: (n) => (n > 1 ? "passes" : "passe"), titre: "passeur", premier: "Le passeur de la ligue.", podium: "Sur le podium des passeurs." },
   { id: "mvp", valeur: (p) => p.mvp, quoi: () => "MVP", titre: "en MVP", premier: "Le MVP de la ligue.", podium: "Sur le podium des MVP." },
+  // Le Joueur Impact de son équipe, élu à chaque match (Ilyes, 03/11 : « pour
+  // les Impact dans les points forts de la fiche joueur, tu peux les ajouter »).
+  // Entre le MVP et Le Mur, l'ordre des puces : à rang égal, il passe devant Le Mur.
+  { id: "impact", valeur: (p) => p.impact, quoi: () => "fois Impact", titre: "en Impact", premier: "Le joueur Impact de la ligue.", podium: "Sur le podium des joueurs Impact." },
   { id: "def", valeur: (p) => p.def, quoi: () => "fois le Mur", titre: "défenseur", premier: "Le mur de la ligue.", podium: "Sur le podium des défenseurs." },
   { id: "pp", valeur: (p) => p.pp, quoi: () => "pts Pépite", titre: "au Pépite d'Or", premier: "En tête du Pépite d'Or.", podium: "Sur le podium du Pépite d'Or." },
 ];

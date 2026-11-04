@@ -124,7 +124,7 @@ export interface ObjectifDossier {
 /** Dimanches gardés dans le dossier, et joueurs cités par équipe. */
 const MATCHS_DOSSIER = 5;
 const NOMS_PAR_EQUIPE = 7;
-const CLASSEMENTS_DOSSIER = ["pp", "ovr", "buts", "passes", "mvp", "def", "presences"];
+const CLASSEMENTS_DOSSIER = ["pp", "ovr", "buts", "passes", "mvp", "impact", "def", "presences"];
 
 function sesMatchs(saison: Saison, nom: string, js: number[]): MatchDossier[] {
   return js.slice(0, MATCHS_DOSSIER).map((j) => {
