@@ -12,6 +12,13 @@
 // confirmer (le Racing Wazemmes a déjà saisi). Les résultats sont tirés
 // d'une graine fixe : la même démonstration à chaque ouverture.
 //
+// Depuis le 03/11/2026, Sunday Five a un entraîneur, Lucien (un nom de
+// démonstration, hors de la ligue) : le 7 + 1 se voit sans base, sa carte
+// d'entraîneur sur le banc ; et un match programmé contre le Racing, dans
+// deux jours, dont Lucien a déposé la feuille d'avant-match. Le 5 contre 4
+// aussi : le Racing n'était que quatre sur la feuille à confirmer, et mon
+// dernier résultat s'est joué contre une équipe à 4.
+//
 // Le monde de démonstration se demande une fois par appareil (?apercu=1 sur
 // la page Team, ?apercu=0 pour revenir à la base) : la page Team, la page de
 // chaque équipe (/bola-team/[id]), le profil des joueurs et Ma carte le
@@ -19,10 +26,13 @@
 
 import { blasonParDefaut, PALETTE, type Blason, type Embleme, type Forme, type Motif } from "@/lib/sfl/blason";
 import type { ButeurTeam, MatchTeam } from "@/lib/sfl/championnat-team";
-import { initialesDe, type Defi, type Equipe, type EquipeTeam } from "@/lib/sfl/equipes";
+import { initialesDe, joue, type Defi, type Equipe, type EquipeTeam, type Role } from "@/lib/sfl/equipes";
 import { aujourdhuiIso } from "@/lib/sfl/matchs";
 
 export const DEMO_EQUIPES = process.env.NEXT_PUBLIC_BOLA_ENV !== "production";
+
+/** L'entraîneur de Sunday Five dans la démonstration : un nom hors de la ligue. */
+export const ENTRAINEUR_DEMO = "Lucien";
 
 const CLE_APERCU = "bola-apercu-team";
 const EVT_APERCU = "bola-apercu-team";
@@ -105,7 +115,7 @@ const AUTRES: [string, Blason][] = [
 export function demoEquipes(noms: string[], moi: string): { equipes: Equipe[]; defis: Defi[] } {
   const autres = noms.filter((n) => n !== moi);
   const pris = (i: number, n: number) => autres.slice(i, i + n);
-  const m = (name: string, role: "capitaine" | "vice" | "membre" = "membre", statut: "membre" | "invite" = "membre") => ({
+  const m = (name: string, role: Role = "membre", statut: "membre" | "invite" = "membre") => ({
     id: `demo-${name}`,
     name,
     role,
@@ -133,6 +143,12 @@ export function demoEquipes(noms: string[], moi: string): { equipes: Equipe[]; d
     depuis: new Date(Date.now() - 5 * 3600_000).toISOString(),
     invitePar: `demo-${moi}`,
   });
+  // L'entraîneur, sur le banc depuis dix jours (Règlement version 3).
+  mienne.membres.push({
+    ...m(ENTRAINEUR_DEMO, "entraineur"),
+    reglement: "v3",
+    signeLe: new Date(Date.now() - 10 * 86_400_000).toISOString(),
+  });
   const [a, j, d] = aujourdhuiIso().split("-").map(Number);
   const dans = (n: number) => new Date(Date.UTC(a, j - 1, d + n)).toISOString().slice(0, 10);
   return {
@@ -142,7 +158,28 @@ export function demoEquipes(noms: string[], moi: string): { equipes: Equipe[]; d
       equipe(3, "Racing Wazemmes", "RW", "noir", "Lille", pris(11, 7)),
       equipe(4, "AS Fives", "ASF", "blanc", "Lille", pris(18, 3)),
     ],
-    defis: [{ id: 1, de: 2, a: 1, jour: dans(4), heure: "20:00", lieu: "Five Lille Sud", statut: "propose" }],
+    defis: [
+      { id: 1, de: 2, a: 1, jour: dans(4), heure: "20:00", lieu: "Five Lille Sud", statut: "propose" },
+      {
+        id: 2,
+        de: 1,
+        a: 3,
+        jour: dans(2),
+        heure: "20:00",
+        lieu: "Urban Lomme",
+        statut: "accepte",
+        feuilles: [
+          {
+            equipe: 1,
+            joueurs: mienne.membres.filter((x) => x.statut === "membre" && joue(x.role)).map((x) => x.id),
+            par: `demo-${ENTRAINEUR_DEMO}`,
+            le: new Date(Date.now() - 3 * 3600_000).toISOString(),
+          },
+        ],
+        // Le Racing a déposé la sienne : on sait seulement qu'elle l'est.
+        deposees: [1, 3],
+      },
+    ],
   };
 }
 
@@ -195,7 +232,11 @@ export function demoChampionnat(
     // Mon équipe, FC Belleville et le Racing se glissent parmi les premières nées.
     if (i === 2) {
       const e = dePage(1);
-      ajouter({ id: 1, nom: e.nom, initiales: e.initiales, fond: e.fond, blason: e.blason, ville: "Lille" }, e.membres.filter((x) => x.statut === "membre").map((x) => x.name), 1.3);
+      ajouter(
+        { id: 1, nom: e.nom, initiales: e.initiales, fond: e.fond, blason: e.blason, ville: "Lille" },
+        e.membres.filter((x) => x.statut === "membre" && joue(x.role)).map((x) => x.name),
+        1.3
+      );
     }
     if (i === 4) {
       const e = dePage(2);
@@ -306,7 +347,23 @@ export function demoChampionnat(
     return [...lignes.values()];
   }
 
-  // Mes deux feuilles en cours : celle d'hier soir, à remplir, et celle de samedi, que le Racing a déjà remplie.
+  // Un 5 contre 4 dans mon dernier résultat : l'adversaire était à 4, les deux feuilles le disent.
+  const quatre = [...matchs].reverse().find((x) => x.statut === "accepte" && x.saisies.length === 2 && (x.de === 1 || x.a === 1));
+  if (quatre) {
+    const adverse = quatre.de === 1 ? quatre.a : quatre.de;
+    quatre.saisies = quatre.saisies.map((x) => (x.equipe === adverse ? { ...x, presents: 4, presentsAdverses: 5 } : { ...x, presents: 5, presentsAdverses: 4 }));
+  }
+  // Les feuilles d'avant-match des matchs de la dernière journée : toute la ligue les lit, le coup d'envoi passé.
+  const derniere = JOURNEES[JOURNEES.length - 1];
+  for (const x of matchs)
+    if (x.jour === derniere && x.statut === "accepte")
+      x.feuilles = [x.de, x.a].map((e) => {
+        const n = (effectifs.get(e) ?? []).slice(0, 7);
+        return { equipe: e, joueurs: n.map((nom) => `demo-${nom}`), noms: n, par: null, le: `${derniere}T16:00:00Z` };
+      });
+
+  // Mes deux feuilles en cours : celle d'hier soir, à remplir (Lucien avait déposé la feuille d'avant-match),
+  // et celle de samedi, que le Racing a déjà remplie.
   matchs.push({
     id: 98,
     de: 2,
@@ -318,6 +375,7 @@ export function demoChampionnat(
     forfaitDe: null,
     saisies: [],
     buteurs: [],
+    feuilles: [{ equipe: 1, joueurs: (effectifs.get(1) ?? []).map((n) => `demo-${n}`), par: `demo-${ENTRAINEUR_DEMO}`, le: "2026-12-14T15:30:00Z" }],
   });
   matchs.push({
     id: 99,
@@ -328,7 +386,8 @@ export function demoChampionnat(
     lieu: "Urban Lomme",
     statut: "accepte",
     forfaitDe: null,
-    saisies: [{ equipe: 3, pour: 3, contre: 5, le: "2026-12-15T09:00:00Z" }],
+    // Le Racing n'était que quatre : le 5 contre 4 (le score final 5 – 2).
+    saisies: [{ equipe: 3, pour: 3, contre: 5, le: "2026-12-15T09:00:00Z", presents: 4, presentsAdverses: 5 }],
     buteurs: [{ equipe: 3, joueur: `demo-${effectifs.get(3)?.[0] ?? "?"}`, name: effectifs.get(3)?.[0] ?? "?", buts: 2, passes: 0 }],
   });
   return { equipes, matchs, maintenant: MAINTENANT_DEMO, effectifs };

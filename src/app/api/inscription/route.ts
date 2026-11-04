@@ -137,11 +137,13 @@ export async function POST(req: NextRequest) {
       .maybeSingle();
     if (!data) return perime;
     lien = data as unknown as Lien;
+    // Les places de joueurs : l'entraîneur n'en prend aucune.
     const { count } = await sb
       .from("equipe_membres")
       .select("joueur", { count: "exact", head: true })
       .eq("equipe_id", lien.equipe_id)
-      .eq("statut", "membre");
+      .eq("statut", "membre")
+      .neq("role", "entraineur");
     const places = 7 - (count ?? 0);
     if (places <= 0 || lien.utilisations >= places) return perime;
   }

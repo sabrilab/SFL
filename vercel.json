@@ -11,6 +11,10 @@
     {
       "path": "/api/divisions/equipes",
       "schedule": "0 17 * * 5"
+    },
+    {
+      "path": "/api/entraineurs/calcul",
+      "schedule": "30 4 * * *"
     }
   ]
 }

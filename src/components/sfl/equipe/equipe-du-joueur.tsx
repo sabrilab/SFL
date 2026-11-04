@@ -7,7 +7,8 @@
 // toucher ouvre la page de l'équipe (/bola-team/[id]). Sur le profil d'un
 // autre joueur (profil-joueur.tsx) et sur Ma carte. Rien sans équipe, ni
 // pour une équipe en formation qu'on ne voit pas (hooks/use-equipes.ts).
-// La carte du joueur, elle, ne change pas.
+// La carte du joueur, elle, ne change pas. L'entraîneur d'une équipe y est
+// dit « Entraîneur » (03/11/2026).
 
 import Link from "next/link";
 import { ChevronRight } from "lucide-react";
@@ -16,7 +17,7 @@ import { useEquipeDe } from "@/hooks/use-equipes";
 import type { Role } from "@/lib/sfl/equipes";
 import { cn } from "@/lib/utils";
 
-export const NOM_ROLE: Record<Role, string> = { capitaine: "Capitaine", vice: "Vice-capitaine", membre: "Joueur" };
+export const NOM_ROLE: Record<Role, string> = { capitaine: "Capitaine", vice: "Vice-capitaine", membre: "Joueur", entraineur: "Entraîneur" };
 
 export function EquipeDuJoueur({ nom, className }: { nom: string; className?: string }) {
   const sienne = useEquipeDe(nom);

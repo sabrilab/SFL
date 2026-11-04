@@ -129,6 +129,28 @@
   --t: 214 220 230;
   --t-sombre: #3d434d;
 }
+/* L'entraîneur (Bola Team, 03/11/2026) : le vert de craie de son Tableau. */
+.tuile--entraineur {
+  --t: 172 204 186;
+  --t-sombre: #22332c;
+}
+/* Son objet n'est pas une image : le dos de sa carte d'entraîneur (76 px,
+   rubriques.tsx, CarteDeTuile), penché dans le coin comme les objets, sous
+   le texte, et assez haut pour laisser la ligne de ses trois en clair. */
+.tuile__carte {
+  position: absolute;
+  z-index: -1;
+  top: -16px;
+  right: -10px;
+  pointer-events: none;
+  user-select: none;
+  transform: rotate(-6deg);
+  filter: drop-shadow(0 12px 14px rgb(0 0 0 / 0.28));
+}
+.dark .tuile__carte {
+  filter: drop-shadow(0 16px 20px rgb(0 0 0 / 0.55));
+}
+
 /* Les deux boutons du haut de Ma carte, en tuiles à objet (profil/page.tsx) :
    la bombe de peinture irisée de Personnaliser, l'enveloppe mauve d'Inviter. */
 .tuile--personnaliser {

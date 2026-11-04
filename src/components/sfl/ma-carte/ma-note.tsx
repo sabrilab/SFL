@@ -45,8 +45,8 @@ const listeGains = (g: Partial<Record<StatKey, number>>, gardien: boolean) =>
     .map((k) => `${abrege(k, gardien)} +${g[k]}`)
     .join(" · ");
 
-/** La jauge d'une stat : un trait par cran à verser, pleins ceux déjà versés. */
-function Jauge({ crans, taille }: { crans: number; taille: number }) {
+/** La jauge d'une stat : un trait par cran à verser, pleins ceux déjà versés (aussi la carte d'entraîneur). */
+export function Jauge({ crans, taille }: { crans: number; taille: number }) {
   if (taille === 0) return <span className="mono-label text-[9px] text-foreground/45">Max</span>;
   return (
     <span className="flex gap-[3px]" aria-hidden>

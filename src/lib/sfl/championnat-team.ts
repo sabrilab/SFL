@@ -28,6 +28,14 @@
 //     peut corriger la sienne tant que la feuille est ouverte, sinon le
 //     match n'est pas classé) ;
 //   · un forfait (un match annulé à moins de 48 h) se compte 3 – 0 ;
+//   · le 5 contre 4 (art. 7.2 et 7.3 ; 03/11/2026, Q4 à Ilyes) : avec le
+//     score du terrain, chaque capitaine déclare les présents des deux
+//     équipes (5 et plus, 4, 3 et moins), qui doivent coller eux aussi.
+//     L'équipe à 4 face à 5 ou plus perd 1 but au score final, ou
+//     l'adversaire en gagne 1 si elle n'a pas marqué (scoreFinal) ; deux
+//     équipes à 4 : un amical, qui ne prend pas l'une des 2 rencontres de
+//     la saison ; 3 ou moins : le forfait de cette équipe, 0 – 3 ; les deux :
+//     non classé. Les buts et passes du terrain gardent leur valeur ;
 //   · à égalité de points : la différence de buts, les buts marqués, les
 //     victoires.
 // Les buts et les passes n'entrent pas dans les points de l'équipe : ils
@@ -73,12 +81,18 @@ export interface EquipeChampionnat {
   active: boolean;
 }
 
+/** Les présents déclarés d'une équipe : 5 (cinq ou plus), 4, ou 3 (trois ou moins). */
+export type Presents = 3 | 4 | 5;
+
 export interface SaisieTeam {
   equipe: number;
   pour: number;
   contre: number;
   /** ISO. */
   le: string;
+  /** Les présents de son équipe, puis ceux de l'autre ; absents (une feuille d'avant le 03/11/2026) : 5. */
+  presents?: Presents;
+  presentsAdverses?: Presents;
 }
 
 export interface ButeurTeam {
@@ -87,6 +101,22 @@ export interface ButeurTeam {
   name: string;
   buts: number;
   passes: number;
+}
+
+/**
+ * La feuille d'avant-match d'une équipe (03/11/2026, equipe_feuille dans la
+ * base) : 5 à 7 de ses joueurs, figée au coup d'envoi. Avant, seule
+ * l'équipe la lit ; ensuite, toute la ligue.
+ */
+export interface FeuilleTeam {
+  equipe: number;
+  /** Les identifiants des joueurs inscrits. */
+  joueurs: string[];
+  /** Leurs noms, dans le même ordre (les deux feuilles se lisent dans la ligue après le coup d'envoi). */
+  noms?: string[];
+  /** Qui l'a déposée (son identifiant), et quand (ISO) : le dernier dépôt fait foi. */
+  par: string | null;
+  le: string;
 }
 
 export interface MatchTeam {
@@ -102,6 +132,8 @@ export interface MatchTeam {
   forfaitDe: number | null;
   saisies: SaisieTeam[];
   buteurs: ButeurTeam[];
+  /** Les feuilles d'avant-match qu'on peut lire (aucune avant leur dépôt). */
+  feuilles?: FeuilleTeam[];
 }
 
 export type EtatMatch =
@@ -112,8 +144,21 @@ export type EtatMatch =
   | { etat: "a-confirmer"; par: number; buts: [number, number]; vaut: Date; ferme: Date }
   /** Les deux saisies ne collent pas, la feuille est encore ouverte. */
   | { etat: "litige"; ferme: Date }
-  /** Le score de `de`, puis celui de `a`. */
-  | { etat: "valide"; buts: [number, number]; forfaitDe: number | null }
+  /**
+   * `buts` : le score du terrain, de `de` puis de `a` (un forfait : 3 – 0) ;
+   * `final` : celui qui décide du résultat (le 5 contre 4 l'a changé) ;
+   * `aQuatre` : l'équipe arrêtée à 4 face à 5 ou plus ; `amical` : deux
+   * équipes à 4 ; `presents` : ceux de `de`, puis de `a`.
+   */
+  | {
+      etat: "valide";
+      buts: [number, number];
+      final: [number, number];
+      forfaitDe: number | null;
+      aQuatre: number | null;
+      presents: [Presents, Presents];
+      amical?: "deux-a-quatre";
+    }
   /** Feuille fermée sans score qui tienne. */
   | { etat: "non-classe" };
 
@@ -132,11 +177,94 @@ export function coupDEnvoiTeam(m: Pick<MatchTeam, "jour" | "heure">): Date {
 /** La feuille ferme 3 jours après le coup d'envoi. */
 export const fermeture = (m: Pick<MatchTeam, "jour" | "heure">) => new Date(coupDEnvoiTeam(m).getTime() + CHAMPIONNAT.saisieJours * 24 * H);
 
+/**
+ * Jusqu'à quand une équipe peut saisir : la fermeture, 3 jours après le coup
+ * d'envoi ; mais une saisie faite seule par l'autre avant la fermeture lui
+ * laisse ses 24 h pour répondre (art. 8.7), même au-delà, à elle seule
+ * (contrôle du 03/11/2026 : une saisie faite seule deux minutes avant la
+ * fermeture ne se contestait plus). La base tient la même règle
+ * (equipe_resultat, supabase/schema.sql).
+ */
+export function fermeturePour(m: Pick<MatchTeam, "jour" | "heure" | "saisies">, equipe: number): Date {
+  const ferme = fermeture(m);
+  const autre = m.saisies.find((s) => s.equipe !== equipe);
+  const mienne = m.saisies.find((s) => s.equipe === equipe);
+  if (!autre || Date.parse(autre.le) > ferme.getTime()) return ferme;
+  if (mienne && Date.parse(mienne.le) <= ferme.getTime()) return ferme;
+  return new Date(Math.max(ferme.getTime(), Date.parse(autre.le) + CHAMPIONNAT.validationH * H));
+}
+
+/** Le score final d'après le score du terrain et les présents (art. 7.3), tout de `de` puis de `a`. */
+export interface ScoreFinal {
+  final: [number, number];
+  /** Le côté arrêté à 4 face à 5 ou plus (0 : `de`, 1 : `a`). */
+  aQuatre: 0 | 1 | null;
+  /** Le côté forfait, à 3 ou moins (0 – 3). */
+  forfait: 0 | 1 | null;
+  /** Deux équipes à 4 : un amical, rien de retiré. */
+  amical: boolean;
+  /** Les deux à 3 ou moins : personne ne gagne, le match n'est pas classé. */
+  nonClasse: boolean;
+}
+
+/**
+ * Le 5 contre 4 (Règlement Team art. 7.3, règle du fondateur) : l'équipe à
+ * 4 face à 5 ou plus perd 1 but au score final ; si elle n'a pas marqué,
+ * l'adversaire en gagne 1 (le score final ne descend pas sous 0). 3 ou moins
+ * d'un côté : son forfait, 0 – 3 ; des deux côtés : non classé.
+ */
+export function scoreFinal(terrain: [number, number], presents: [Presents, Presents]): ScoreFinal {
+  const [pDe, pA] = presents;
+  const rien = { aQuatre: null, forfait: null, amical: false, nonClasse: false } as const;
+  const f = CHAMPIONNAT.forfait;
+  if (pDe <= 3 && pA <= 3) return { ...rien, final: [0, 0], nonClasse: true };
+  if (pDe <= 3) return { ...rien, final: [0, f], forfait: 0 };
+  if (pA <= 3) return { ...rien, final: [f, 0], forfait: 1 };
+  if (pDe === 4 && pA === 4) return { ...rien, final: [terrain[0], terrain[1]], amical: true };
+  if (pDe === 4) return { ...rien, final: terrain[0] > 0 ? [terrain[0] - 1, terrain[1]] : [terrain[0], terrain[1] + 1], aQuatre: 0 };
+  if (pA === 4) return { ...rien, final: terrain[1] > 0 ? [terrain[0], terrain[1] - 1] : [terrain[0] + 1, terrain[1]], aQuatre: 1 };
+  return { ...rien, final: [terrain[0], terrain[1]] };
+}
+
+const presentsDe = (p: number | undefined): Presents => (p === 3 || p === 4 ? p : 5);
+
+/** Les présents qu'une saisie déclare, de `de` puis de `a`. */
+export function presentsSaisis(m: Pick<MatchTeam, "de">, s: SaisieTeam): [Presents, Presents] {
+  const miens = presentsDe(s.presents);
+  const siens = presentsDe(s.presentsAdverses);
+  return s.equipe === m.de ? [miens, siens] : [siens, miens];
+}
+
+/** Deux saisies collent : le même score du terrain et les mêmes présents, vus de chaque côté. */
+export const collent = (a: SaisieTeam, b: SaisieTeam) =>
+  a.pour === b.contre &&
+  a.contre === b.pour &&
+  presentsDe(a.presents) === presentsDe(b.presentsAdverses) &&
+  presentsDe(a.presentsAdverses) === presentsDe(b.presents);
+
+/** Le match validé : son score final, son forfait, son 5 contre 4 ; ou non classé (les deux à 3 ou moins). */
+function valide(m: MatchTeam, terrain: [number, number], presents: [Presents, Presents]): EtatMatch {
+  const s = scoreFinal(terrain, presents);
+  if (s.nonClasse) return { etat: "non-classe" };
+  const cote = (c: 0 | 1 | null) => (c == null ? null : c === 0 ? m.de : m.a);
+  if (s.forfait != null) return { etat: "valide", buts: s.final, final: s.final, forfaitDe: cote(s.forfait), aQuatre: null, presents };
+  return {
+    etat: "valide",
+    buts: terrain,
+    final: s.final,
+    forfaitDe: null,
+    aQuatre: cote(s.aQuatre),
+    presents,
+    ...(s.amical ? { amical: "deux-a-quatre" as const } : {}),
+  };
+}
+
 /** Où en est un match : à venir, à saisir, à confirmer, en litige, validé ou non classé. */
 export function etatMatch(m: MatchTeam, maintenant = new Date()): EtatMatch {
   if (m.statut === "forfait") {
     const f = CHAMPIONNAT.forfait;
-    return { etat: "valide", buts: m.forfaitDe === m.de ? [0, f] : [f, 0], forfaitDe: m.forfaitDe };
+    const buts: [number, number] = m.forfaitDe === m.de ? [0, f] : [f, 0];
+    return { etat: "valide", buts, final: buts, forfaitDe: m.forfaitDe, aQuatre: null, presents: [5, 5] };
   }
   const t = maintenant.getTime();
   if (coupDEnvoiTeam(m).getTime() > t) return { etat: "a-venir" };
@@ -144,17 +272,29 @@ export function etatMatch(m: MatchTeam, maintenant = new Date()): EtatMatch {
   const sDe = m.saisies.find((s) => s.equipe === m.de);
   const sA = m.saisies.find((s) => s.equipe === m.a);
   if (sDe && sA) {
-    if (sDe.pour === sA.contre && sDe.contre === sA.pour) return { etat: "valide", buts: [sDe.pour, sDe.contre], forfaitDe: null };
-    return ferme.getTime() > t ? { etat: "litige", ferme } : { etat: "non-classe" };
+    if (collent(sDe, sA)) return valide(m, [sDe.pour, sDe.contre], presentsSaisis(m, sDe));
+    // L'équipe qui a répondu après la fermeture peut encore corriger la sienne, jusqu'au bout de ses 24 h.
+    const fin = new Date(Math.max(fermeturePour(m, m.de).getTime(), fermeturePour(m, m.a).getTime()));
+    return fin.getTime() > t ? { etat: "litige", ferme: fin } : { etat: "non-classe" };
   }
   const s = sDe ?? sA;
   if (s) {
     const buts: [number, number] = s.equipe === m.de ? [s.pour, s.contre] : [s.contre, s.pour];
     const vaut = new Date(new Date(s.le).getTime() + CHAMPIONNAT.validationH * H);
-    if (vaut.getTime() <= t) return { etat: "valide", buts, forfaitDe: null };
-    return { etat: "a-confirmer", par: s.equipe, buts, vaut, ferme };
+    if (vaut.getTime() <= t) return valide(m, buts, presentsSaisis(m, s));
+    return { etat: "a-confirmer", par: s.equipe, buts, vaut, ferme: fermeturePour(m, s.equipe === m.de ? m.a : m.de) };
   }
   return ferme.getTime() > t ? { etat: "a-saisir", ferme } : { etat: "non-classe" };
+}
+
+/**
+ * Ce que dirait le match d'après une seule saisie (son score du terrain et
+ * ses présents) : la carte d'entraîneur lit ainsi un litige jamais tranché,
+ * avec la version de l'adversaire, en attendant la revue des litiges.
+ */
+export function versionDe(m: MatchTeam, s: SaisieTeam): EtatMatch {
+  const buts: [number, number] = s.equipe === m.de ? [s.pour, s.contre] : [s.contre, s.pour];
+  return valide(m, buts, presentsSaisis(m, s));
 }
 
 // ─────────────────────────────── Saisons ───────────────────────────────
@@ -206,6 +346,23 @@ export const saisonFinie = (n: number, maintenant = new Date()) => jourParis(mai
 /** La saison a-t-elle commencé ? */
 export const saisonCommencee = (n: number, maintenant = new Date()) => jourParis(maintenant) >= bornesSaison(n).debut;
 
+/** Le gel de fin de saison : ses 14 derniers jours (règles officielles, 04 §5). */
+export const GEL_JOURS = 14;
+
+/**
+ * Sommes-nous dans le gel de fin de saison (heure de Paris) ? Pas d'arrivée
+ * d'entraîneur pendant ces jours-là (contrôle du 03/11/2026 : rejoindre le
+ * leader la dernière semaine) ; les joueurs, eux, entrent comme avant. La
+ * base tient la même règle (equipe_gel, supabase/schema.sql).
+ */
+export function enGel(maintenant = new Date()): boolean {
+  const jour = jourParis(maintenant);
+  const s = saisonDuJour(jour);
+  if (s === 0) return false;
+  const debutGel = new Date(Date.parse(bornesSaison(s).finExclue) - GEL_JOURS * 86_400_000).toISOString().slice(0, 10);
+  return jour >= debutGel;
+}
+
 // ────────────────────────────── Divisions ──────────────────────────────
 
 /** Les tailles des divisions pour n équipes : une seule sous 30, puis des 18 et une dernière ouverte. */
@@ -255,8 +412,15 @@ export interface MatchCompteTeam {
   etat: EtatMatch;
   saison: number;
   compte: boolean;
-  /** Pourquoi il ne compte pas, quand il est validé. */
-  amical?: "rencontres" | "divisions" | "hors-saison";
+  /** Pourquoi il ne compte pas, quand il est validé (deux équipes à 4 : un amical, art. 7.2). */
+  amical?: "rencontres" | "divisions" | "hors-saison" | "deux-a-quatre";
+  /**
+   * Pas validé (en attente, en litige, non classé) : l'aurait-il été, entre
+   * divisions voisines et sous les 2 rencontres de la saison contre la même
+   * équipe ? Sans rien prendre au classement. La carte d'entraîneur lit ainsi
+   * un litige jamais tranché.
+   */
+  classable?: boolean;
 }
 
 export interface Classe {
@@ -371,7 +535,14 @@ export function championnat(
     const rencontres = new Map<string, number>();
     const joueurs = new Map<string, Classe>();
     const comptes: MatchCompteTeam[] = ici.map(({ m, etat }) => {
-      if (etat.etat !== "valide") return { m, etat, saison: s, compte: false };
+      if (etat.etat !== "valide") {
+        const [dDe, dA] = [divisionDe.get(m.de), divisionDe.get(m.a)];
+        const paire = m.de < m.a ? `${m.de}-${m.a}` : `${m.a}-${m.de}`;
+        const classable = dDe != null && dA != null && Math.abs(dDe - dA) <= 1 && (rencontres.get(paire) ?? 0) < CHAMPIONNAT.rencontres;
+        return { m, etat, saison: s, compte: false, classable };
+      }
+      // Deux équipes à 4 : un amical, qui ne prend pas l'une des deux rencontres de la saison.
+      if (etat.amical === "deux-a-quatre") return { m, etat, saison: s, compte: false, amical: "deux-a-quatre" as const };
       const dDe = divisionDe.get(m.de);
       const dA = divisionDe.get(m.a);
       if (dDe == null || dA == null || Math.abs(dDe - dA) > 1) return { m, etat, saison: s, compte: false, amical: "divisions" as const };
@@ -379,7 +550,8 @@ export function championnat(
       const n = rencontres.get(paire) ?? 0;
       if (n >= CHAMPIONNAT.rencontres) return { m, etat, saison: s, compte: false, amical: "rencontres" as const };
       rencontres.set(paire, n + 1);
-      const [bDe, bA] = etat.buts;
+      // Le score final : le 5 contre 4 a pu le changer.
+      const [bDe, bA] = etat.final;
       for (const [id, pour, contre] of [
         [m.de, bDe, bA],
         [m.a, bA, bDe],

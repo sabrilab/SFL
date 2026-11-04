@@ -78,12 +78,28 @@
 // (skins-arbitre.ts) ou le skin qu'il porte : sa satisfaction à la place de la note, ses chiffres
 // (matchs arbitrés, notes reçues…) à la place des six stats.
 //
+// La carte d'un entraîneur de Bola Team (`edition="entraineur"`,
+// `entraineur` ; Ilyes, 02/11/2026, carte-entraineur.tsx) garde elle aussi
+// toute la disposition, dans la matière de son métier (le Tableau, la
+// causerie ; skins-entraineur.ts) : sa note à lui ; ses trois
+// caractéristiques (rés, pré, coh ; lib/sfl/entraineur.ts, calculées par le
+// serveur) l'une sous l'autre dans le carré des stats, plus grandes que
+// celles d'un joueur, la dernière sur la ligne de base de la note ; son
+// équipe à la place du poste (« lucien · mons academy ») ; l'écusson de son
+// équipe à la place du numéro, aussi dans la pastille
+// (ecusson-entraineur.tsx), seul, sans bord : des tirets autour d'une
+// pastille disent « invité » ou « place vide », un bord plein « toi ». Sans
+// photo, le portrait reste vide : le schéma de la mi-temps s'y lit.
+// L'étiquette ENTRAÎNEUR cernée à la craie, jamais pleine comme celle de
+// l'arbitre. Le calcul des stats d'un joueur n'y est pour rien.
+//
 // Mêmes calques que la carte éditoriale (`data-card-part` body / player /
 // stats) : la 3D de card-3d.tsx mesure la carte et la prend telle quelle,
 // avec sa parallaxe — le portrait flotte au-dessus du papier, le texte
 // au-dessus du portrait. `data-matiere` et `data-nom` lui disent quel dos
 // dessiner, `data-emission` ce qu'une carte d'époque y écrit.
 
+import { Fragment } from "react";
 import { BulleBadge } from "@/components/sfl/insigne-carte";
 import {
   graine,
@@ -103,12 +119,15 @@ import { Cartons, Crans, filtrePhoto, InsigneRang, Lisere, Sceau, Sifflet, Voile
 import { GRADES, type FinitionArbitre, type GradeArbitre } from "@/components/sfl/skins-arbitre";
 import { BordEpoque, EmblemeEpoque, LosangeBallon, SigleSfl, SigleSouligne } from "@/components/sfl/marques-carte";
 import { MotifCarte } from "@/components/sfl/motif-carte";
+import { EcussonEntraineur } from "@/components/sfl/ecusson-entraineur";
+import { MATIERES_ENTRAINEUR } from "@/components/sfl/skins-entraineur";
 import type { BadgeCarte } from "@/lib/sfl/badge-carte";
 import { STAT_KEYS, type StatKey, type Stats } from "@/lib/sfl/engine";
 import { abrege, estGardien } from "@/lib/sfl/gardien";
+import type { FaceEntraineur } from "@/lib/sfl/entraineur";
 import { ligneDEmission, type EmissionCarte } from "@/lib/sfl/epoques";
 
-export type BolaEdition = "base" | "rare" | "mvp" | "impact" | "def" | "arbitre";
+export type BolaEdition = "base" | "rare" | "mvp" | "impact" | "def" | "arbitre" | "entraineur";
 
 /**
  * La carte d'un arbitre (carte-arbitre.tsx) : sa satisfaction à la place de
@@ -145,6 +164,9 @@ const SERIE_X = RAYON_CARTE / PHI; // 57 : la série rentrée, loin des coins
 // La bulle du badge : son objet à la marge, entre le bas du portrait (983)
 // et le haut des chiffres de la note (~1160) ; elle s'arrête avant la colonne du nom.
 const BULLE = { x: M, centre: 1078, fin: COL_X - 22 };
+// Les trois caractéristiques d'un entraîneur : les chiffres en 74, rangées de 92 ;
+// la dernière ligne de base sur celle de la note (1490 : 1101 + 0,864 × 450, Inter).
+const TROIS = { taille: 74, ecart: 18, haut: 1490 - 0.864 * 74 - 2 * (74 + 18) };
 // Le cadre du portrait (liseré, crans) : 12 autour, concentrique.
 const CADRE: Boite = {
   x: PORTRAIT.x - 12,
@@ -168,7 +190,31 @@ const SIGLE_H = 46;
 /** Une couleur « #rrggbb » à l'opacité voulue. */
 const opaque = (hex: string, a: number) => `${hex}${Math.round(a * 255).toString(16).padStart(2, "0")}`;
 
-/** Le portrait : la photo du joueur, ou à défaut son initiale en filigrane sur les rayures. */
+/**
+ * L'étiquette ENTRAÎNEUR cernée à la craie (le Tableau) : un rectangle à main
+ * levée, en trois brins interrompus comme l'écusson, qui dépasse un peu aux
+ * coins. Le repère suit la taille de l'étiquette (230 × 59 environ).
+ */
+function CadreCraie({ couleur }: { couleur: string }) {
+  const d = "M7 9.5 C60 6.6 150 7.8 223.5 6.4 M222.2 4.2 C224.6 22 223.8 38 225.3 54.2 M227 52.6 C150 53.6 70 52.4 5.4 54.3 M7.8 56.6 C6.2 40 7.2 22 5.6 7.2";
+  return (
+    <svg aria-hidden viewBox="0 0 230 61" preserveAspectRatio="none" style={{ position: "absolute", inset: "-8% -2%", width: "104%", height: "116%", overflow: "visible", pointerEvents: "none" }}>
+      <path d={d} fill="none" stroke={couleur} strokeWidth={6} strokeLinecap="round" opacity={0.12} />
+      {[
+        { dx: 0, dy: 0, l: 2.2, o: 0.95, tirets: "34 2.5 52 1.8 21 3.4 44 2" },
+        { dx: 0.9, dy: -0.7, l: 1.3, o: 0.6, tirets: "18 5 31 3 9 6 26 4" },
+        { dx: -0.8, dy: 0.9, l: 1.1, o: 0.45, tirets: "9 8 22 5 6 9 17 6" },
+      ].map((b, i) => (
+        <path key={i} d={d} transform={`translate(${b.dx} ${b.dy})`} fill="none" stroke={couleur} strokeWidth={b.l} strokeLinecap="round" strokeDasharray={b.tirets} opacity={b.o} />
+      ))}
+    </svg>
+  );
+}
+
+/**
+ * Le portrait : la photo du joueur, ou à défaut son initiale en filigrane sur
+ * les rayures (un entraîneur : rien, le motif de sa matière s'y lit).
+ */
 function Portrait({
   photo,
   nom,
@@ -180,9 +226,12 @@ function Portrait({
   cote,
   traitement,
   u,
+  vide,
 }: {
   photo?: string | null;
   nom: string;
+  /** Sans photo, ni initiale : le motif de la matière s'y lit (la carte d'entraîneur). */
+  vide?: boolean;
   /** Resserré sur le visage (cartes petites). */
   resserre: boolean;
   encre: string;
@@ -230,7 +279,7 @@ function Portrait({
             filter: filtrePhoto(traitement),
           }}
         />
-      ) : (
+      ) : vide ? null : (
         <div
           style={{
             position: "absolute",
@@ -328,6 +377,7 @@ export function BolaCard({
   habillage: habillageDemande,
   epoque,
   arbitre,
+  entraineur,
 }: {
   name: string;
   /** Le nom montré sur la carte, s'il diffère du nom de saison (voir lib/sfl/identites). */
@@ -353,16 +403,25 @@ export function BolaCard({
   epoque?: EmissionCarte | null;
   /** La carte d'un arbitre : sa satisfaction et ses chiffres (avec l'édition « arbitre »). */
   arbitre?: FaceArbitre;
+  /** La carte d'un entraîneur de Bola Team : sa note et ses trois caractéristiques (avec l'édition « entraineur »). */
+  entraineur?: FaceEntraineur;
 }) {
   // 254 px de large à taille 1, comme les autres cartes de l'app.
   const largeur = 254 * size;
   const u = (n: number) => n * size * (254 / W);
   const palier = palierCarte(largeur);
-  // L'arbitre a sa matière à lui (ou le skin de tenue qu'il porte), sans époque.
-  const p = edition === "arbitre" ? MATIERES[arbitre?.finition ?? "arbitre"] : matiereDe(edition, habillageDemande, epoque?.saison);
-  const note = arbitre ? arbitre.note : overall;
+  // L'arbitre a sa matière à lui (ou le skin de tenue qu'il porte), sans époque ; l'entraîneur aussi.
+  const p =
+    edition === "arbitre"
+      ? MATIERES[arbitre?.finition ?? "arbitre"]
+      : edition === "entraineur"
+        ? MATIERES_ENTRAINEUR[entraineur?.finition ?? "tableau"]
+        : matiereDe(edition, habillageDemande, epoque?.saison);
+  // Une carte qui n'est pas celle d'un joueur : sa note et ses chiffres à elle.
+  const autre = arbitre ?? entraineur;
+  const note = autre ? autre.note : overall;
   // Un gardien (poste G) : les mêmes six cases, sous des stats de gardien (lib/sfl/gardien.ts).
-  const gardien = !arbitre && estGardien(position);
+  const gardien = !autre && estGardien(position);
   // Une carte d'époque est restée telle qu'elle a été émise : sans habillage ni badge.
   const era = p.epoque;
   const habillage = era ? undefined : habillageDemande;
@@ -371,6 +430,12 @@ export function BolaCard({
   const { serie, numero: numeroSerie } = serieDe(name, p.nom === "fondateur" ? habillage : undefined);
   const emission = p.epoque ? ligneDEmission(epoque ?? { saison: p.epoque.saison, le: null, n: null, sur: null }) : null;
   const nomUp = (affiche ?? name).toUpperCase();
+  // La carte d'entraîneur : l'écusson de son équipe, à la craie ; sans photo, le portrait vide où se lit le schéma.
+  const trait = entraineur ? p.entraineur : undefined;
+  const equipe = trait ? entraineur?.equipe : undefined;
+  const ecusson = (hauteur: number, halo?: string) =>
+    equipe ? <EcussonEntraineur equipe={equipe} encre={p.encre} hauteur={hauteur} halo={halo} /> : null;
+  const halo = p.sombre ? "rgba(8,9,11,0.55)" : "rgba(255,255,255,0.7)";
 
   // La pastille : un carré, le visage, la note dans un onglet.
   if (palier === "pastille") {
@@ -410,7 +475,12 @@ export function BolaCard({
             cote={largeur * 0.86}
             traitement={habillage?.traitement}
             u={u}
+            vide={!!trait}
           />
+          {/* L'entraîneur : l'écusson de son équipe en haut à droite, là où un joueur n'a rien ; seul, c'est le signe. */}
+          {equipe && (
+            <span style={{ position: "absolute", right: "5%", top: "5%", display: "flex" }}>{ecusson(largeur * 0.39, halo)}</span>
+          )}
         </div>
         <div
           data-card-part="stats"
@@ -476,8 +546,8 @@ export function BolaCard({
   // Le haut à droite du portrait : le numéro de maillot ; sinon le poste, en grand format seulement.
   // Une carte d'époque : le poste, ou rien sous l'emblème d'une carte Boost.
   // Le badge n'est plus dans le coin : il est dans sa bulle, sur la bande.
-  // Un arbitre n'a ni numéro ni poste : son étiquette le dit déjà.
-  const marque = arbitre
+  // Un arbitre n'a ni numéro ni poste : son étiquette le dit déjà ; un entraîneur non plus.
+  const marque = autre
     ? null
     : era
       ? era.embleme || !complete
@@ -499,6 +569,7 @@ export function BolaCard({
     cote: u(PORTRAIT.c),
     traitement: habillage?.traitement,
     u,
+    vide: !!trait,
   };
   // L'habillage porté (habillage-carte.tsx).
   const signes = habillage?.signes ?? [];
@@ -512,7 +583,6 @@ export function BolaCard({
   const sifflet = complete && signes.includes("sifflet");
   const cartons = complete && signes.includes("cartons");
   const tailleMarque = !era && numero != null ? (complete ? 164 : compacte ? 225 : 287) : 80;
-  const halo = p.sombre ? "rgba(8,9,11,0.55)" : "rgba(255,255,255,0.7)";
   // La gravure en creux : l'ombre en haut à gauche, la lumière en bas à droite.
   const gravure = p.gravure
     ? `drop-shadow(-${u(2)}px -${u(2)}px 0 ${p.gravure.ombre}) drop-shadow(${u(2)}px ${u(3)}px 0 ${p.gravure.lumiere})`
@@ -559,7 +629,7 @@ export function BolaCard({
       }}
     >
       {/* La matière : le motif gravé ton sur ton (or, rouge, cobalt, nuit) */}
-      {p.motif && <MotifCarte motif={p.motif} graine={seed} eclats={false} nom={affiche ?? name} />}
+      {p.motif && <MotifCarte motif={p.motif} graine={seed} eclats={false} nom={affiche ?? name} noteCentree={reduite} epaisseur={300 / largeur} />}
       {/* Le papier : microtexte gravé et lignes de scan */}
       <div
         aria-hidden
@@ -584,14 +654,16 @@ export function BolaCard({
             )
           : microtexte(seed, 2600)}
       </div>
-      <div
-        aria-hidden
-        style={{
-          position: "absolute",
-          inset: 0,
-          background: `repeating-linear-gradient(0deg, ${encre(0.022)} 0 ${u(3)}px, transparent ${u(3)}px ${u(9)}px)`,
-        }}
-      />
+      {(p.trame ?? 0.022) > 0 && (
+        <div
+          aria-hidden
+          style={{
+            position: "absolute",
+            inset: 0,
+            background: `repeating-linear-gradient(0deg, ${encre(p.trame ?? 0.022)} 0 ${u(3)}px, transparent ${u(3)}px ${u(9)}px)`,
+          }}
+        />
+      )}
       {/* Le reflet : une bande diagonale, à peine (qui passe d'elle-même sur la finition animée). */}
       {p.anime ? (
         <div
@@ -699,6 +771,12 @@ export function BolaCard({
               {marque}
             </div>
           )}
+          {/* L'entraîneur : l'écusson de son équipe à la place du numéro */}
+          {equipe && (
+            <span style={{ position: "absolute", right: u(complete ? 58 : 46), top: u(complete ? 50 : 36), display: "flex" }}>
+              {ecusson(u(complete ? 150 : compacte ? 220 : 270), photo ? halo : undefined)}
+            </span>
+          )}
           {era?.embleme && complete && (
             <span className="absolute flex" style={{ right: u(46), top: u(40) }}>
               <EmblemeEpoque cote={u(124)} epoque={era} />
@@ -737,6 +815,7 @@ export function BolaCard({
               >
                 <div
                   style={{
+                    position: "relative",
                     height: u(51),
                     padding: `0 ${u(18)}px`,
                     boxSizing: "border-box",
@@ -745,10 +824,13 @@ export function BolaCard({
                     alignItems: "center",
                     background: p.etiquette.fond,
                     border: `${u(2)}px solid ${p.etiquette.bord}`,
+                    // L'entraîneur : l'étiquette cernée à la craie, jamais pleine comme celle de l'arbitre.
+                    ...(trait?.etiquette === "craie" && { border: "none" }),
                     ...mono(26, 2.5, 1, 700),
                     color: p.etiquette.texte,
                   }}
                 >
+                  {trait?.etiquette === "craie" && <CadreCraie couleur={p.etiquette.bord} />}
                   {p.titre}
                 </div>
                 {habillage?.rang && <InsigneRang rang={habillage.rang} hauteur={u(82)} />}
@@ -897,57 +979,108 @@ export function BolaCard({
                 ...(era && { color: era.libelle }),
               }}
             >
-              {complete ? `${username ? `${username} · ` : ""}${gardien ? "gardien" : position.toLowerCase()}` : position.toUpperCase()}
+              {complete ? (
+                entraineur ? (
+                  // Son équipe : coupée proprement si elle est longue, jamais sous le nom de la note.
+                  <span style={{ display: "inline-block", maxWidth: u(W - M - COL_X + 24), overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", verticalAlign: "top" }}>
+                    {`${username ? `${username} · ` : ""}${entraineur.detail ?? ""}`}
+                  </span>
+                ) : (
+                  `${username ? `${username} · ` : ""}${gardien ? "gardien" : position.toLowerCase()}`
+                )
+              ) : (
+                (entraineur?.court ?? position).toUpperCase()
+              )}
             </div>
           </>
         )}
 
         {complete && (
           <>
-            {/* Les six stats, deux par rangée, dans le carré sous le nom : « vit 84 » (« réf 89 » pour un gardien) */}
-            <div
-              style={{
-                position: "absolute",
-                left: u(COL_X + 20),
-                top: u(BANDE + NOM_H + 36),
-                width: u(W - M - COL_X - 20),
-                display: "grid",
-                gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-                rowGap: u(36),
-                columnGap: u(16),
-              }}
-            >
-              {(arbitre?.stats ?? STAT_KEYS.map((k) => [k, stats[k]] as const)).map(([k, valeur]) => {
-                const actif = highlightStats?.includes(k as StatKey);
-                const libelle = gardien ? abrege(k as StatKey, true) : k;
-                return (
-                  <div key={k} style={{ display: "flex", alignItems: "baseline", justifyContent: "flex-end", gap: u(12) }}>
-                    {era ? (
-                      // Les libellés d'alors : en capitales, dans le brun (ou le métal) de l'édition.
-                      <span style={{ ...mono(23, 2.5, 1, 700), color: era.libelle }}>{libelle.toUpperCase()}</span>
-                    ) : (
-                      <span style={mono(26, 1, 0.62, 500)}>{libelle.toLowerCase()}</span>
-                    )}
+            {entraineur ? (
+              // Les trois caractéristiques de l'entraîneur, l'une sous l'autre dans le carré sous le nom : les libellés
+              // en colonne, les chiffres en colonne, plus grands que les six d'un joueur ; la dernière rangée sur la
+              // ligne de base de la note (1490), comme si la note et ses trois raisons se lisaient d'un même regard.
+              <div
+                style={{
+                  position: "absolute",
+                  left: u(COL_X + 20),
+                  right: u(M),
+                  top: u(TROIS.haut),
+                  display: "grid",
+                  gridTemplateColumns: "1fr max-content max-content",
+                  columnGap: u(20),
+                  rowGap: u(TROIS.ecart),
+                  alignItems: "baseline",
+                }}
+              >
+                {entraineur.stats.map(([k, valeur]) => (
+                  <Fragment key={k}>
+                    <span />
+                    <span style={mono(30, 1, 0.62, 500)}>{k}</span>
                     <span
                       style={{
                         fontFamily: SANS,
                         fontWeight: 800,
-                        fontSize: u(56),
+                        fontSize: u(TROIS.taille),
                         lineHeight: 1,
-                        minWidth: u(70),
+                        letterSpacing: u(-1),
+                        minWidth: u(TROIS.taille * 1.18),
                         textAlign: "right",
                         color: encre(1),
-                        textDecoration: actif ? "underline" : "none",
-                        textDecorationThickness: u(4),
-                        textUnderlineOffset: u(8),
                       }}
                     >
                       {valeur}
                     </span>
-                  </div>
-                );
-              })}
-            </div>
+                  </Fragment>
+                ))}
+              </div>
+            ) : (
+              // Les six stats, deux par rangée, dans le carré sous le nom : « vit 84 » (« réf 89 » pour un gardien).
+              <div
+                style={{
+                  position: "absolute",
+                  left: u(COL_X + 20),
+                  top: u(BANDE + NOM_H + 36),
+                  width: u(W - M - COL_X - 20),
+                  display: "grid",
+                  gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+                  rowGap: u(36),
+                  columnGap: u(16),
+                }}
+              >
+                {(autre?.stats ?? STAT_KEYS.map((k) => [k, stats[k]] as const)).map(([k, valeur]) => {
+                  const actif = highlightStats?.includes(k as StatKey);
+                  const libelle = gardien ? abrege(k as StatKey, true) : k;
+                  return (
+                    <div key={k} style={{ display: "flex", alignItems: "baseline", justifyContent: "flex-end", gap: u(12) }}>
+                      {era ? (
+                        // Les libellés d'alors : en capitales, dans le brun (ou le métal) de l'édition.
+                        <span style={{ ...mono(23, 2.5, 1, 700), color: era.libelle }}>{libelle.toUpperCase()}</span>
+                      ) : (
+                        <span style={mono(26, 1, 0.62, 500)}>{libelle.toLowerCase()}</span>
+                      )}
+                      <span
+                        style={{
+                          fontFamily: SANS,
+                          fontWeight: 800,
+                          fontSize: u(56),
+                          lineHeight: 1,
+                          minWidth: u(70),
+                          textAlign: "right",
+                          color: encre(1),
+                          textDecoration: actif ? "underline" : "none",
+                          textDecorationThickness: u(4),
+                          textUnderlineOffset: u(8),
+                        }}
+                      >
+                        {valeur}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
 
             {/* Le filet pointillé, puis la série et le sigle de la ligue */}
             <div

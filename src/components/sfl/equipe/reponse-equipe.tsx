@@ -25,6 +25,7 @@ import { motion } from "motion/react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { CarteDe, FORMAT_CARTE } from "@/components/sfl/mini-carte";
+import { CarteEntraineurDe } from "@/components/sfl/carte-entraineur-de";
 import { Ecusson } from "@/components/sfl/equipe/ecusson";
 import { Maillot } from "@/components/sfl/equipe/maillot";
 import { signalerEquipe } from "@/hooks/use-mon-equipe";
@@ -32,12 +33,12 @@ import {
   VERSION_REGLEMENT,
   aSignerLaCharte,
   direErreurEquipe,
-  inviteur,
   invites,
   mesInvitations,
   monEquipe,
   retirerInvitation,
   signataires,
+  tInvite,
   type Equipe,
 } from "@/lib/sfl/equipes";
 import { finInvitation, quandTombe } from "@/lib/sfl/equipes-temps";
@@ -69,6 +70,8 @@ export function ReponseEquipe({ a, onFini, onPlusTard }: { a: EquipeAOuvrir; onF
   if (!e) return null;
   const invitation = a.quoi === "invitation" ? e.membres.find((m) => m.id === a.moi && m.statut === "invite") : undefined;
   const deja = signataires(e);
+  // L'entraîneur en place : sa pastille après les joueurs (l'écusson pour signe), jamais compté.
+  const coach = e.membres.find((m) => m.role === "entraineur" && m.statut === "membre") ?? null;
 
   async function non() {
     if (a.quoi !== "invitation" || !e) return;
@@ -120,7 +123,7 @@ export function ReponseEquipe({ a, onFini, onPlusTard }: { a: EquipeAOuvrir; onF
         </h2>
         <p className="text-lecture text-white/70">
           {a.quoi === "invitation"
-            ? [invitation && `${inviteur(e, invitation)} t'invite`, invitation?.depuis && `jusqu'à ${quandTombe(finInvitation(invitation.depuis))}`]
+            ? [invitation && tInvite(e, invitation), invitation?.depuis && `jusqu'à ${quandTombe(finInvitation(invitation.depuis))}`]
                 .filter(Boolean)
                 .join(" · ")
             : `${e.nom} · Règlement Team et Charte à signer`}
@@ -134,6 +137,12 @@ export function ReponseEquipe({ a, onFini, onPlusTard }: { a: EquipeAOuvrir; onF
               <span className="w-full truncate text-center text-petit font-medium text-white/80">{m.name.split(" ")[0]}</span>
             </span>
           ))}
+          {coach && (
+            <span className="flex w-[52px] flex-col items-center gap-1">
+              <CarteEntraineurDe nom={coach.name} id={coach.id} equipe={e} size={FORMAT_CARTE.petite} inerte />
+              <span className="w-full truncate text-center text-petit font-medium text-white/80">{coach.name.split(" ")[0]}</span>
+            </span>
+          )}
         </div>
       )}
       {a.quoi === "invitation" ? (

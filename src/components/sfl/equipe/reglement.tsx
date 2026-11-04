@@ -11,14 +11,18 @@
 // m'invite, jusqu'à quand, et les cartes de ceux qui ont déjà signé — on
 // sait où l'on entre avant de signer.
 //
-// Un membre qui avait signé la version 1 signe la 2 (SignerCharte) : la
-// page Team et l'ouverture de l'app la lui présentent (reponse-equipe.tsx).
+// Un membre qui avait signé une version d'avant signe la nouvelle
+// (SignerCharte) : la page Team et l'ouverture de l'app la lui présentent
+// (reponse-equipe.tsx). Depuis la version 3 (03/11/2026), l'entraîneur
+// signe avec sa propre formule (acceptationEntraineur) : il ne joue jamais
+// pour l'équipe et ne saisit ni le score ni les buteurs.
 
 import { useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { CarteDe, FORMAT_CARTE } from "@/components/sfl/mini-carte";
+import { CarteEntraineurDe } from "@/components/sfl/carte-entraineur-de";
 import { Ecusson } from "@/components/sfl/equipe/ecusson";
 import { Check } from "lucide-react";
 import {
@@ -26,14 +30,16 @@ import {
   CHARTE,
   REGLEMENT,
   VERSION_REGLEMENT,
+  acceptationEntraineur,
   confirmationSignature,
   direErreurEquipe,
   etatEquipe,
-  inviteur,
   signataires,
   signerCharte,
   signerReglement,
+  tInvite,
   type Equipe,
+  type Role,
 } from "@/lib/sfl/equipes";
 import { finInvitation, quandTombe } from "@/lib/sfl/equipes-temps";
 import { cn } from "@/lib/utils";
@@ -70,8 +76,8 @@ export function CharteListe() {
   );
 }
 
-/** La case à cocher de la signature, décochée par défaut. */
-export function CaseAcceptation({ coche, onChange }: { coche: boolean; onChange: (c: boolean) => void }) {
+/** La case à cocher de la signature, décochée par défaut : la formule d'un joueur, ou celle de l'entraîneur. */
+export function CaseAcceptation({ coche, onChange, texte = ACCEPTATION }: { coche: boolean; onChange: (c: boolean) => void; texte?: string }) {
   return (
     <button
       type="button"
@@ -89,8 +95,8 @@ export function CaseAcceptation({ coche, onChange }: { coche: boolean; onChange:
         {coche && <Check className="size-4" strokeWidth={3} />}
       </span>
       <span>
-        <strong className="font-semibold">{ACCEPTATION.slice(0, ACCEPTATION.indexOf(")") + 2)}</strong>
-        {ACCEPTATION.slice(ACCEPTATION.indexOf(")") + 2)}
+        <strong className="font-semibold">{texte.slice(0, texte.indexOf(")") + 2)}</strong>
+        {texte.slice(texte.indexOf(")") + 2)}
       </span>
     </button>
   );
@@ -139,6 +145,8 @@ export function SignerReglement({
   }
   const invitation = equipe?.membres.find((m) => m.id === moi && m.statut === "invite");
   const deja = equipe ? signataires(equipe) : [];
+  // L'entraîneur en place : sa pastille après les joueurs (l'écusson pour signe), jamais compté.
+  const coach = equipe?.membres.find((m) => m.role === "entraineur" && m.statut === "membre") ?? null;
   return (
     <Sheet open={!!equipe} onOpenChange={fermer}>
       <SheetContent side="bottom" className="max-h-[92dvh] overflow-y-auto rounded-t-[28px] pb-[calc(env(safe-area-inset-bottom,0px)+1.5rem)]">
@@ -148,12 +156,9 @@ export function SignerReglement({
               <Ecusson initiales={equipe.initiales} fond={equipe.fond} blason={equipe.blason} taille={44} />
               <span className="flex min-w-0 flex-col gap-0.5 pr-10">
                 <SheetTitle className="truncate text-titre-g font-bold tracking-tight">{equipe.nom}</SheetTitle>
-                {invitation && (
-                  <span className="truncate text-ligne text-muted-foreground">
-                    {[`${inviteur(equipe, invitation)} t'invite`, invitation.depuis && `jusqu'à ${quandTombe(finInvitation(invitation.depuis))}`]
-                      .filter(Boolean)
-                      .join(" · ")}
-                  </span>
+                {invitation && <span className="truncate text-ligne text-muted-foreground">{tInvite(equipe, invitation)}</span>}
+                {invitation?.depuis && (
+                  <span className="truncate text-ligne text-muted-foreground">jusqu&apos;à {quandTombe(finInvitation(invitation.depuis))}</span>
                 )}
               </span>
             </SheetHeader>
@@ -168,12 +173,22 @@ export function SignerReglement({
                         <span className="w-full truncate text-center text-petit font-medium">{m.name.split(" ")[0]}</span>
                       </span>
                     ))}
+                    {coach && equipe && (
+                      <span className="flex w-[52px] flex-col items-center gap-1">
+                        <CarteEntraineurDe nom={coach.name} id={coach.id} equipe={equipe} size={FORMAT_CARTE.petite} />
+                        <span className="w-full truncate text-center text-petit font-medium">{coach.name.split(" ")[0]}</span>
+                      </span>
+                    )}
                   </div>
                 </div>
               )}
               <ReglementListe />
               <CharteListe />
-              <CaseAcceptation coche={coche} onChange={setCoche} />
+              <CaseAcceptation
+                coche={coche}
+                onChange={setCoche}
+                texte={invitation?.role === "entraineur" ? acceptationEntraineur(equipe.nom) : ACCEPTATION}
+              />
               <Button variant="vert" disabled={!coche || envoi} onClick={signer} className="h-12 rounded-full text-lecture font-semibold">
                 Signer et rejoindre {equipe.nom}
               </Button>
@@ -185,15 +200,18 @@ export function SignerReglement({
   );
 }
 
-/** Un membre de l'équipe signe la nouvelle version : le Règlement (2 points la victoire) et la Charte. */
+/** Un membre de l'équipe signe la nouvelle version : le Règlement et la Charte (l'entraîneur, avec sa formule). */
 export function SignerCharte({
   equipe,
+  role,
   open,
   onOpenChange,
   apercu,
   onSigne,
 }: {
   equipe: Equipe | null;
+  /** Mon rôle dans l'équipe : l'entraîneur signe sa formule. */
+  role?: Role | null;
   open: boolean;
   onOpenChange: (o: boolean) => void;
   apercu?: boolean;
@@ -241,7 +259,7 @@ export function SignerCharte({
             <div className="flex flex-col gap-5 px-4">
               <CharteListe />
               <ReglementListe />
-              <CaseAcceptation coche={coche} onChange={setCoche} />
+              <CaseAcceptation coche={coche} onChange={setCoche} texte={role === "entraineur" ? acceptationEntraineur(equipe.nom) : ACCEPTATION} />
               <Button variant="vert" disabled={!coche || envoi} onClick={signer} className="h-12 rounded-full text-lecture font-semibold">
                 Signer
               </Button>
