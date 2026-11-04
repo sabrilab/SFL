@@ -14,8 +14,10 @@
 // coupées (Sabri, 18/10 : « ne déforme pas la carte »).
 //   · l'homme du dimanche : la grande carte sous un projecteur, les chiffres
 //     du jour à côté en grand ;
-//   · ils ont décroché    : une vitrine par joueur, la carte et son badge qui
-//     flotte à côté, la lumière du métal au sol ;
+//   · ils ont décroché    : une vitrine par joueur, la carte et son plus beau
+//     badge qui flotte à côté ; ses autres paliers du même dimanche en petit,
+//     dessous (Ilyes, 03/11 : « le badge du jour doit être unique : oui et
+//     non » : unique en vedette dans le fil, tous ici) ;
 //   · l'équipe type       : les cinq sur la pelouse, le meilleur du jour au
 //     centre en carte moyenne ; une carte à titre y porte ses puces, or MVP,
 //     rouge Impact, bleu Défensive (02/11/2026, puces-titres.tsx) ;
@@ -43,7 +45,7 @@ import { PucesTitres } from "@/components/sfl/puces-titres";
 import { useTitresDuJour } from "@/hooks/use-titres-du-jour";
 import { useMyPlayer } from "@/components/sfl/player-provider";
 import { useSeason } from "@/components/sfl/season-provider";
-import { honneurDe } from "@/lib/sfl/a-l-honneur";
+import { honneurDe, ligneDecroche, type Decroche } from "@/lib/sfl/a-l-honneur";
 import type { BoostType, Player } from "@/lib/sfl/engine";
 import { metal, NOM_METAL, TROPHEES, type TropheeId } from "@/lib/sfl/trophees";
 import type { PieceLigue } from "@/lib/sfl/vestiaire";
@@ -400,6 +402,9 @@ export function ALHonneur({ j }: { j: number }) {
 
   const mvp = h.mvp.filter((m) => carte(m.nom));
   const decroches = h.decroches.filter((d) => carte(d.nom));
+  // Une vitrine a ses autres paliers du jour dessous : toutes les vitrines de
+  // la rangée prennent alors la même hauteur.
+  const avecAussi = decroches.some((d) => d.aussi.length > 0);
   const equipe = h.equipeType
     .map((e) => ({ ...e, p: carte(e.nom) }))
     .filter((e): e is typeof e & { p: Player } => !!e.p)
@@ -426,16 +431,13 @@ export function ALHonneur({ j }: { j: number }) {
                 type: "ligue",
                 titre: "Ils ont décroché",
                 j,
-                lignes: decroches.slice(0, 6).map((d) => ({
-                  n: d.nom,
-                  v: `${DEF[d.id].nom} · ${NOM_METAL[metal(d.palier)!]}`,
-                })),
+                lignes: decroches.slice(0, 6).map(ligneDecroche),
               }}
             />
           </div>
           <Rangee>
             {decroches.map((d) => (
-              <Vitrine key={`${d.nom}-${d.id}`} d={d} p={carte(d.nom)!} />
+              <Vitrine key={`${d.nom}-${d.id}`} d={d} p={carte(d.nom)!} rangee={avecAussi} />
             ))}
           </Rangee>
         </section>
@@ -542,13 +544,22 @@ function HommesDuDimanche({ j, mvp, moi }: { j: number; mvp: (Mvp & { p: Player 
   );
 }
 
+/** Les autres paliers du jour, sous la vitrine : un badge = la grande ÷ φ². */
+const PETIT_BADGE = (W(MOYENNE) / PHI) / (PHI * PHI);
+/** Ce que la rangée des autres paliers ajoute à la vitrine : l'écart, le filet, son retrait, les badges. */
+const RANG_AUSSI = 13 + 1 + 13 + PETIT_BADGE;
+
 /**
  * Un badge tombé ce dimanche. Noir mat, sans décor (Sabri, 18/10 : la
  * vitrine voûtée ne lui plaisait pas) : la carte à gauche, le badge et son
  * chiffre à droite. Noir et blanc strict, seul le badge garde son métal.
  * Blanc mat en mode clair, comme le studio (globals.css, .vitrine-mate).
+ * Ses autres paliers du même dimanche (d.aussi) en petit, dessous, sous un
+ * filet, du plus rare au moins rare ; immobiles, sans texte : chaque badge
+ * dit son nom à l'accessibilité. `rangee` : une vitrine de la rangée en a,
+ * toutes prennent sa hauteur ; celles qui n'en ont pas y sont centrées.
  */
-function Vitrine({ d, p }: { d: { nom: string; id: TropheeId; palier: number }; p: Player }) {
+function Vitrine({ d, p, rangee }: { d: Decroche; p: Player; rangee: boolean }) {
   const def = DEF[d.id];
   const m = metal(d.palier)!;
   const seuil = def.paliers[d.palier - 1];
@@ -557,24 +568,33 @@ function Vitrine({ d, p }: { d: { nom: string; id: TropheeId; palier: number }; 
   const badge = largeur / PHI;
   return (
     <div
-      className="vitrine-mate relative flex shrink-0 snap-start gap-[var(--fib-21)] rounded-[21px] p-[var(--fib-21)]"
-      style={{ height: hauteur + 42 }}
+      className="vitrine-mate relative flex shrink-0 snap-start flex-col justify-center gap-[var(--fib-13)] rounded-[21px] p-[var(--fib-21)]"
+      style={{ height: hauteur + 42 + (rangee ? RANG_AUSSI : 0) }}
     >
-      <Manipulable pose={0}>
-        <MiniCarte player={p} size={MOYENNE} detail={`${def.nom} · ${NOM_METAL[m]} · ${seuil} ${unite(d.id, seuil)}`} />
-      </Manipulable>
-      <div className="flex flex-col justify-between" style={{ width: badge * 1.2 }}>
-        <span className="honneur-flotte pointer-events-none block self-center">
-          <Badge3D badge={{ famille: "palier", id: d.id, palier: d.palier }} largeur={badge} />
-        </span>
-        <div className="flex flex-col border-t border-contraste/10 pt-[var(--fib-13)]">
-          <span style={{ fontFamily: ANTON, fontSize: 55, lineHeight: 0.85 }} className="tabular-nums">
-            {seuil}
+      <div className="flex gap-[var(--fib-21)]" style={{ height: hauteur }}>
+        <Manipulable pose={0}>
+          <MiniCarte player={p} size={MOYENNE} detail={`${def.nom} · ${NOM_METAL[m]} · ${seuil} ${unite(d.id, seuil)}`} />
+        </Manipulable>
+        <div className="flex flex-col justify-between" style={{ width: badge * 1.2 }}>
+          <span className="honneur-flotte pointer-events-none block self-center">
+            <Badge3D badge={{ famille: "palier", id: d.id, palier: d.palier }} largeur={badge} />
           </span>
-          <span className="mono-label mt-[var(--fib-8)] text-micro text-contraste/55">{unite(d.id, seuil)}</span>
-          <span className="mono-label text-micro text-contraste/30">{NOM_METAL[m]}</span>
+          <div className="flex flex-col border-t border-contraste/10 pt-[var(--fib-13)]">
+            <span style={{ fontFamily: ANTON, fontSize: 55, lineHeight: 0.85 }} className="tabular-nums">
+              {seuil}
+            </span>
+            <span className="mono-label mt-[var(--fib-8)] text-micro text-contraste/55">{unite(d.id, seuil)}</span>
+            <span className="mono-label text-micro text-contraste/30">{NOM_METAL[m]}</span>
+          </div>
         </div>
       </div>
+      {d.aussi.length > 0 && (
+        <div className="flex items-center gap-[var(--fib-8)] border-t border-contraste/10 pt-[var(--fib-13)]">
+          {d.aussi.map((a) => (
+            <Badge3D key={a.id} badge={{ famille: "palier", id: a.id, palier: a.palier }} largeur={PETIT_BADGE} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
