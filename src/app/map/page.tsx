@@ -202,6 +202,7 @@ import { Ecusson } from "@/components/sfl/equipe/ecusson";
 import { useMatchsTeam, type MatchTeam } from "@/hooks/use-matchs-team";
 import type { FondCarte, PointPlan, PossiblePlan, ToiPlan } from "@/components/sfl/map/carte-map";
 import type { TeinteFantome } from "@/components/sfl/map/stade";
+import { idAdminLigue } from "@/lib/sfl/admin-ligue";
 import "./animations.css";
 import "@/components/sfl/map/contrats-map.css";
 
@@ -225,10 +226,20 @@ const teinteFantome = (): TeinteFantome =>
  * /?ambiance=rouge|braise|nuit-brume|nuit-braise|territoire|nuit|encre|classique.
  */
 const ESSAIS = process.env.NEXT_PUBLIC_BOLA_ENV !== "production";
+/** Les styles d'interface à l'essai (?style=N, style-ui/essai.tsx) ont chacun leur plan ; sans style, le plan de l'app ne change pas. */
+const PLAN_DU_STYLE: Record<number, Ambiance> = { 12: "bulle", 13: "nuit-chaleur", 14: "trace", 15: "sticker", 16: "nuit-pelouse", 17: "gravure", 18: "bulle-gomme", 19: "nuit-bulle", 20: "bulle-peche", 21: "bulle-lilas", 22: "bulle-encre", 23: "bulle-verre" };
 const ambianceDeLAdresse = (): Ambiance => {
   if (!ESSAIS) return "nuit-encre";
-  const a = new URLSearchParams(window.location.search).get("ambiance");
-  return TOUTES_AMBIANCES.includes(a as Ambiance) ? (a as Ambiance) : "nuit-encre";
+  const q = new URLSearchParams(window.location.search);
+  const a = q.get("ambiance");
+  if (TOUTES_AMBIANCES.includes(a as Ambiance)) return a as Ambiance;
+  let style = Number(q.get("style"));
+  if (!q.has("style")) {
+    try {
+      style = Number(localStorage.getItem("bola-style-ui-2") ?? 0);
+    } catch {}
+  }
+  return PLAN_DU_STYLE[style] ?? "nuit-encre";
 };
 /** Dans un aperçu, /?zones=demo ajoute une zone qui vient de s'ouvrir (Lens) et une zone fermée (Paris), pour voir le récit. */
 const zonesDemo = () => ESSAIS && new URLSearchParams(window.location.search).get("zones") === "demo";
@@ -387,6 +398,9 @@ interface MatchMap {
   ligue: LigueMatch;
   /** Une journée jouée en plusieurs lieux : ses matchs dans celui-ci (0 = Match 1). */
   matchsIci?: number[];
+  /** Un dimanche de la SFL montré à un joueur Bola (Sabri, 02/11 : « oui, avec
+   *  un lien pour rejoindre ») : on le voit, on n'y répond pas. */
+  vitrine?: boolean;
 }
 
 /** « 13h00 », « 13:30 » → 13 ; 13 à défaut. */
@@ -533,91 +547,108 @@ export default function MapPage() {
   // La ligue sur la Map, et tous ses dimanches joués (la page d'un lieu les
   // remonte : « les matchs précédents », Sabri 31/10).
   const { liste: ligue, jouees: ligueJouees } = useMemo<{ liste: MatchMap[]; jouees: MatchMap[] }>(() => {
-    if (sansSfl) return { liste: [], jouees: [] };
-    const passee = (m: JourneeMeta) => {
-      if (journeeJouee(saison, m.j)) return true;
-      const e = ecartJours(m.date, aujourdhui);
-      if (e == null) return false;
-      if (e < 0) return true;
-      const { repli, matchs: tous } = matchsDe(m);
-      return e === 0 && heure >= 0 && heure >= heureDe(dernierCoupDEnvoi(tous, repli.heure)) + 2;
-    };
-    const ecartConvocation = ecartJours(p.jour.replace(/^\S+\s+/, ""), aujourdhui);
-    const versMatchs = (m: JourneeMeta, joue: boolean): MatchMap[] => {
-      const lignes = saison.entries.filter((e) => e.j === m.j);
-      // Les équipes faites, un joueur resté sans équipe ne compte pas.
-      const presents = joueursDeLaFeuille(saison, m.j).noms;
-      const effectif = Math.max(EFFECTIF, lignes.length);
-      const e = ecartJours(m.date, aujourdhui);
-      const convoquee = !joue && e != null && e === ecartConvocation;
-      const { repli, matchs: tous } = matchsDe(m);
-      const lieux = matchsParLieu(tous);
-      // Un seul lieu (ou la journée jouée, qui reste une seule carte) : un
-      // seul match sur la Map, comme avant.
-      const separe = lieux.length > 1 && !joue;
-      const groupes = separe ? lieux : [{ lieu: lieux.length === 1 ? lieux[0].lieu : repli.lieu, matchs: tous }];
-      return groupes.map((g, i): MatchMap => {
-        const noms = new Set(g.matchs.flatMap((t) => [...t.noirs, ...t.blancs]));
-        const ici = separe ? presents.filter((n) => noms.has(n)) : presents;
-        const dedans = ici.includes(player.name);
-        // La convocation du dimanche : on y répond pour toute la journée.
-        const commeConvocation = convoquee && !separe;
-        const { etat, texte } = joue
-          ? { etat: { genre: "joue" } as EtatSticker, texte: dedans ? "Joué · tu y étais" : "Joué" }
-          : commeConvocation
-            ? etatLigue(p.mine === "present", p.presents.length)
-            : etatLigue(dedans, ici.length);
-        return {
-          cle: i === 0 ? `j${m.j}` : `j${m.j}-${g.lieu?.id ?? i}`,
-          j: m.j,
-          quand: joue ? { titre: m.date, jourCourt: m.date.toUpperCase().slice(0, 7), moment: "weekend" } : quand(m.date, null, aujourdhui),
-          dateLabel: m.date,
-          heure: matchDuJoueur(g.matchs, player.name)?.heure ?? premierCoupDEnvoi(g.matchs, repli.heure),
-          terrain: g.lieu,
-          presents: commeConvocation ? p.presents : ici,
-          effectif: commeConvocation ? p.effectif : effectif,
-          dedans: commeConvocation ? p.mine === "present" : dedans,
+    // Un joueur Bola (02/11, Sabri : « oui, avec un lien pour rejoindre ») :
+    // les dimanches à venir en vitrine, sans les joués, sans y répondre ;
+    // sous la carte choisie, « Rejoindre la ligue ».
+    if (sansSfl) {
+      const r = dimanches();
+      return {
+        liste: r.liste
+          .filter((m) => !m.joue)
+          .map((m) => {
+            const { etat, texte } = etatLigue(false, m.presents.length);
+            return { ...m, vitrine: true, dedans: false, convoquee: false, etat, etatTexte: texte };
+          }),
+        jouees: [],
+      };
+    }
+    return dimanches();
+    function dimanches(): { liste: MatchMap[]; jouees: MatchMap[] } {
+      const passee = (m: JourneeMeta) => {
+        if (journeeJouee(saison, m.j)) return true;
+        const e = ecartJours(m.date, aujourdhui);
+        if (e == null) return false;
+        if (e < 0) return true;
+        const { repli, matchs: tous } = matchsDe(m);
+        return e === 0 && heure >= 0 && heure >= heureDe(dernierCoupDEnvoi(tous, repli.heure)) + 2;
+      };
+      const ecartConvocation = ecartJours(p.jour.replace(/^\S+\s+/, ""), aujourdhui);
+      const versMatchs = (m: JourneeMeta, joue: boolean): MatchMap[] => {
+        const lignes = saison.entries.filter((e) => e.j === m.j);
+        // Les équipes faites, un joueur resté sans équipe ne compte pas.
+        const presents = joueursDeLaFeuille(saison, m.j).noms;
+        const effectif = Math.max(EFFECTIF, lignes.length);
+        const e = ecartJours(m.date, aujourdhui);
+        const convoquee = !joue && e != null && e === ecartConvocation;
+        const { repli, matchs: tous } = matchsDe(m);
+        const lieux = matchsParLieu(tous);
+        // Un seul lieu (ou la journée jouée, qui reste une seule carte) : un
+        // seul match sur la Map, comme avant.
+        const separe = lieux.length > 1 && !joue;
+        const groupes = separe ? lieux : [{ lieu: lieux.length === 1 ? lieux[0].lieu : repli.lieu, matchs: tous }];
+        return groupes.map((g, i): MatchMap => {
+          const noms = new Set(g.matchs.flatMap((t) => [...t.noirs, ...t.blancs]));
+          const ici = separe ? presents.filter((n) => noms.has(n)) : presents;
+          const dedans = ici.includes(player.name);
+          // La convocation du dimanche : on y répond pour toute la journée.
+          const commeConvocation = convoquee && !separe;
+          const { etat, texte } = joue
+            ? { etat: { genre: "joue" } as EtatSticker, texte: dedans ? "Joué · tu y étais" : "Joué" }
+            : commeConvocation
+              ? etatLigue(p.mine === "present", p.presents.length)
+              : etatLigue(dedans, ici.length);
+          return {
+            cle: i === 0 ? `j${m.j}` : `j${m.j}-${g.lieu?.id ?? i}`,
+            j: m.j,
+            quand: joue ? { titre: m.date, jourCourt: m.date.toUpperCase().slice(0, 7), moment: "weekend" } : quand(m.date, null, aujourdhui),
+            dateLabel: m.date,
+            heure: matchDuJoueur(g.matchs, player.name)?.heure ?? premierCoupDEnvoi(g.matchs, repli.heure),
+            terrain: g.lieu,
+            presents: commeConvocation ? p.presents : ici,
+            effectif: commeConvocation ? p.effectif : effectif,
+            dedans: commeConvocation ? p.mine === "present" : dedans,
+            etat,
+            etatTexte: texte,
+            joue,
+            convoquee,
+            ligue: "sfl",
+            ...(separe ? { matchsIci: g.matchs.map((t) => t.n) } : {}),
+          };
+        });
+      };
+
+      const parDate = [...saison.journees].sort((a, b) => a.j - b.j);
+      const aVenir = parDate.filter((m) => !passee(m)).flatMap((m) => versMatchs(m, false));
+      const derniere = parDate.filter(passee).at(-1);
+      const eDerniere = derniere ? ecartJours(derniere.date, aujourdhui) : null;
+      const recente = derniere && (eDerniere == null || eDerniere >= -6) ? versMatchs(derniere, true) : [];
+      const jouees = parDate.filter(passee).flatMap((m) => versMatchs(m, true));
+
+      if (aVenir.length) return { liste: [...aVenir, ...recente], jouees };
+      // Pas de journée à venir : la convocation du dimanche, si elle n'est pas
+      // elle-même passée (l'admin ouvre la suivante en ouvrant l'app).
+      if (ecartConvocation != null && ecartConvocation < 0) return { liste: recente, jouees };
+      const dedans = p.mine === "present";
+      const { etat, texte } = etatLigue(dedans, p.presents.length);
+      const liste: MatchMap[] = [
+        {
+          cle: "convocation",
+          j: null,
+          quand: quand(p.jour === "Dimanche" ? "" : p.jour, p.jour, aujourdhui),
+          dateLabel: p.jour,
+          heure: p.heure,
+          terrain: terrainDuMatch(saison, p.lieu),
+          presents: p.presents,
+          effectif: p.effectif,
+          dedans,
           etat,
           etatTexte: texte,
-          joue,
-          convoquee,
           ligue: "sfl",
-          ...(separe ? { matchsIci: g.matchs.map((t) => t.n) } : {}),
-        };
-      });
-    };
-
-    const parDate = [...saison.journees].sort((a, b) => a.j - b.j);
-    const aVenir = parDate.filter((m) => !passee(m)).flatMap((m) => versMatchs(m, false));
-    const derniere = parDate.filter(passee).at(-1);
-    const eDerniere = derniere ? ecartJours(derniere.date, aujourdhui) : null;
-    const recente = derniere && (eDerniere == null || eDerniere >= -6) ? versMatchs(derniere, true) : [];
-    const jouees = parDate.filter(passee).flatMap((m) => versMatchs(m, true));
-
-    if (aVenir.length) return { liste: [...aVenir, ...recente], jouees };
-    // Pas de journée à venir : la convocation du dimanche, si elle n'est pas
-    // elle-même passée (l'admin ouvre la suivante en ouvrant l'app).
-    if (ecartConvocation != null && ecartConvocation < 0) return { liste: recente, jouees };
-    const dedans = p.mine === "present";
-    const { etat, texte } = etatLigue(dedans, p.presents.length);
-    const liste: MatchMap[] = [
-      {
-        cle: "convocation",
-        j: null,
-        quand: quand(p.jour === "Dimanche" ? "" : p.jour, p.jour, aujourdhui),
-        dateLabel: p.jour,
-        heure: p.heure,
-        terrain: terrainDuMatch(saison, p.lieu),
-        presents: p.presents,
-        effectif: p.effectif,
-        dedans,
-        etat,
-        etatTexte: texte,
-        ligue: "sfl",
-      },
-      ...recente,
-    ];
-    return { liste, jouees };
+        },
+        ...recente,
+      ];
+      return { liste, jouees };
+    }
   }, [sansSfl, saison, matchsDe, player.name, aujourdhui, heure, p.heure, p.lieu, p.jour, p.mine, p.effectif, p.presents]);
   // Les habitués : ceux du dernier dimanche joué (la fiche d'une journée pas encore composée).
   const habitues = useMemo(() => {
@@ -1156,9 +1187,15 @@ export default function MapPage() {
     return () => window.removeEventListener("pointerdown", noter, { capture: true });
   }, []);
   const geste = useCallback((g: string, meta?: Record<string, string | number | boolean>) => logActivity("map", { path: "/", meta: { geste: g, ...meta } }), []);
+  // Rejoindre la SFL depuis un dimanche en vitrine (02/11) : l'entrée se fait
+  // quand l'admin pose le nom dans l'effectif ; le joueur lui écrit, en privé.
+  const rejoindreLigue = (depuis: string) => {
+    geste("rejoindre-sfl", { depuis });
+    void idAdminLigue().then((id) => window.location.assign(id ? `/messages/${id}` : "/messages"));
+  };
   // Le match du dimanche, convocation ouverte : on y répond depuis la Map.
   // Un suspendu (carton rouge, lib/sfl/cartons.ts) ne répond pas « Je viens » : sa convocation le dit.
-  const repondreIci = !!choisi && !choisi.joue && !choisi.partie && !choisi.team && (!!choisi.convoquee || choisi.cle === "convocation") && p.reponsesOuvertes && !p.suspendu;
+  const repondreIci = !!choisi && !choisi.vitrine && !choisi.joue && !choisi.partie && !choisi.team && (!!choisi.convoquee || choisi.cle === "convocation") && p.reponsesOuvertes && !p.suspendu;
 
   // Les joueurs, ville par ville, du mieux noté au moins bien noté : ceux de
   // la SFL et les comptes de Bola, pour tout le monde (Sabri, 02/11/2026 :
@@ -1727,6 +1764,15 @@ export default function MapPage() {
                   {/* Le match du dimanche s'accepte d'ici (31/10) : « Je viens »,
                       puis « Tu viens » une fois dit. Le nom du terrain est déjà
                       sur son stade et sur la carte. */}
+                  {choisi.vitrine && (
+                    <button
+                      type="button"
+                      onClick={() => rejoindreLigue("carte")}
+                      className="bouton-encre flex h-[30px] shrink-0 items-center gap-[5px] px-3.5 text-[12.5px] font-semibold"
+                    >
+                      Rejoindre la ligue
+                    </button>
+                  )}
                   {repondreIci &&
                     (p.mine === "present" ? (
                       <span className="flex h-[30px] items-center gap-[5px] rounded-full px-3 text-[12.5px] font-semibold" style={{ background: ENCRE, color: BLANC }}>

@@ -520,6 +520,26 @@ export function CarteMap({
     map.touchZoomRotate.disableRotation();
     map.keyboard.disableRotation();
     map.addControl(new maplibregl.AttributionControl({ compact: true }), "bottom-right");
+    // La surcouche (02/11, Sabri : « une surcouche à la carte qui la rend
+    // plus belle et plus dynamique », façon Snap Map, Zenly, Uber) : une
+    // couche peinte entre le plan et les repères, que chaque style
+    // d'interface habille (styles-ui.css, .surcouche-map) : nuées qui
+    // passent, grain, tontes de pelouse, guilloché, vignette. Elle suit le
+    // plan quand on le déplace (--sx, --sy), et vit seule le reste du temps.
+    // Sans style à l'essai, elle reste vide et invisible.
+    const surcouche = document.createElement("div");
+    surcouche.className = "surcouche-map";
+    surcouche.setAttribute("aria-hidden", "true");
+    surcouche.innerHTML = '<i class="sc sc--a"></i><i class="sc sc--b"></i><i class="sc sc--c"></i>';
+    map.getCanvas().after(surcouche);
+    const repere = map.getCenter();
+    const suivre = () => {
+      const p = map.project(repere);
+      surcouche.style.setProperty("--sx", `${p.x.toFixed(1)}px`);
+      surcouche.style.setProperty("--sy", `${p.y.toFixed(1)}px`);
+    };
+    map.on("move", suivre);
+    suivre();
     // Ce que le plan montre, à chaque arrêt : la page y lit les terrains.
     const montrer = () => {
       const b = map.getBounds();
@@ -611,8 +631,8 @@ export function CarteMap({
     };
     map.getContainer().addEventListener("error", secours, true);
     carte.current = map;
-    // Captures en développement : viser une ville à la main.
-    if (process.env.NODE_ENV === "development") (window as unknown as { __bolaMap?: PlanMap }).__bolaMap = map;
+    // Captures en développement et sur les aperçus : viser une ville à la main.
+    if (process.env.NODE_ENV === "development" || process.env.NEXT_PUBLIC_BOLA_ENV !== "production") (window as unknown as { __bolaMap?: PlanMap }).__bolaMap = map;
     const entreesAuMontage = entrees.current;
     return () => {
       debrancher();

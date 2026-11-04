@@ -1,0 +1,220 @@
+/* ═══════════════════ Six styles d'interface, à l'essai ═══════════════════
+   Sabri, 02/11/2026 : « les mêmes écrans, en gardant l'UX, mais tu changes
+   l'UI, l'interface, et tu changes de style », passés au crible de la
+   mignonitude, du nombre d'or et du design émotionnel. Rien n'est publié :
+   l'essai ne vit que sur l'aperçu (components/sfl/style-ui/essai.tsx pose
+   html[data-style="1…6"] depuis ?style=N, gardé dans bola-style-ui).
+
+   Ce qui change : la surface (fond, cartes, encre), les arrondis, les
+   ombres, les boutons, la barre d'onglets, les titres. Ce qui ne change
+   jamais : les cartes de joueur, les écussons, les trophées, la Map
+   elle-même (le plan et ses stickers), et la braise réservée au manque.
+
+   1 Galet     — la mignonitude : crème, tout est rond et dodu, ombres
+                 douces, boutons qui s'enfoncent (ombre portée sous la pilule).
+   2 Or        — le nombre d'or : papier et encre, filets d'un trait, arrondis
+                 de la suite 5 · 8 · 13 · 21 · 34, aucune ombre.
+   3 Vestiaire — l'émotion du soir : noir chaud, une lumière de projecteur
+                 tombe du haut, surfaces de cuir sombre.
+   4 Pelouse   — la charte en grand : le sauge devient le fond, l'encre vert
+                 profond, le mauve pour ce qui est à faire.
+   5 Velours   — la nuit douce : prune profonde, verre teinté de mauve,
+                 très arrondi.
+   6 Affiche   — le sticker : papier blanc, contours noirs de 2 px, ombres
+                 franches décalées, titres en Anton capitales.
+
+   Chaque bloc pose ses jetons sur :root, sur .dark et sur .surfaces-jour
+   (le tiroir de la Map), pour gagner sur le thème clair/sombre. Toutes les
+   couleurs de thème restent en hexadécimal (postcss-repli-opacite.cjs en
+   tire les canaux --x-rgb). */
+
+/* ─── 1 · Galet ─── */
+:root[data-style="1"], :root[data-style="1"].dark, :root[data-style="1"] .surfaces-jour {
+  --background: #fbf5ec; --foreground: #2a2420; --card: #ffffff; --card-foreground: #2a2420;
+  --popover: #ffffff; --popover-foreground: #2a2420; --primary: #2a2420; --primary-foreground: #fbf5ec;
+  --secondary: #f1e8dc; --secondary-foreground: #2a2420; --muted: #f1e8dc; --muted-foreground: #8b8076;
+  --accent: #efe5d8; --accent-foreground: #2a2420; --border: #eadfd1; --input: #eadfd1; --ring: #2a2420;
+  --vert: #bfe2bf; --mauve: #f3c6db; --contraste: #2a2420; --radius: 1.4rem; color-scheme: light;
+}
+/* ─── 2 · Or ─── */
+:root[data-style="2"], :root[data-style="2"].dark, :root[data-style="2"] .surfaces-jour {
+  --background: #f6f5f0; --foreground: #0b0b0b; --card: #fbfaf6; --card-foreground: #0b0b0b;
+  --popover: #fbfaf6; --popover-foreground: #0b0b0b; --primary: #0b0b0b; --primary-foreground: #f6f5f0;
+  --secondary: #ecebe5; --secondary-foreground: #0b0b0b; --muted: #ecebe5; --muted-foreground: #77766f;
+  --accent: #ecebe5; --accent-foreground: #0b0b0b; --border: #d9d8d0; --input: #d9d8d0; --ring: #0b0b0b;
+  --vert: #a9cba9; --mauve: #e0b3cb; --contraste: #0b0b0b; --radius: 0.8125rem; color-scheme: light;
+}
+/* ─── 3 · Vestiaire ─── */
+:root[data-style="3"], :root[data-style="3"].dark, :root[data-style="3"] .surfaces-jour {
+  --background: #15110e; --foreground: #f6ede3; --card: #201a16; --card-foreground: #f6ede3;
+  --popover: #241d18; --popover-foreground: #f6ede3; --primary: #f6ede3; --primary-foreground: #15110e;
+  --secondary: #2c241e; --secondary-foreground: #f6ede3; --muted: #201a16; --muted-foreground: #a39484;
+  --accent: #2c241e; --accent-foreground: #f6ede3; --border: #352c25; --input: #352c25; --ring: #f6ede3;
+  --vert: #a9cba9; --mauve: #e0b3cb; --contraste: #ffffff; --radius: 1.1rem; color-scheme: dark;
+}
+/* ─── 4 · Pelouse ─── */
+:root[data-style="4"], :root[data-style="4"].dark, :root[data-style="4"] .surfaces-jour {
+  --background: #dde9da; --foreground: #0f2414; --card: #f3f8f1; --card-foreground: #0f2414;
+  --popover: #f3f8f1; --popover-foreground: #0f2414; --primary: #0f2414; --primary-foreground: #eef5ec;
+  --secondary: #cfdfcb; --secondary-foreground: #0f2414; --muted: #cfdfcb; --muted-foreground: #587060;
+  --accent: #cfdfcb; --accent-foreground: #0f2414; --border: #c2d5be; --input: #c2d5be; --ring: #0f2414;
+  --vert: #9fc79f; --mauve: #e6bfd3; --contraste: #0f2414; --radius: 1.25rem; color-scheme: light;
+}
+/* ─── 5 · Velours ─── */
+:root[data-style="5"], :root[data-style="5"].dark, :root[data-style="5"] .surfaces-jour {
+  --background: #160f19; --foreground: #f7edf3; --card: #231928; --card-foreground: #f7edf3;
+  --popover: #2a1f30; --popover-foreground: #f7edf3; --primary: #f3d7e6; --primary-foreground: #160f19;
+  --secondary: #2f2335; --secondary-foreground: #f7edf3; --muted: #231928; --muted-foreground: #a8939f;
+  --accent: #2f2335; --accent-foreground: #f7edf3; --border: #3a2c41; --input: #3a2c41; --ring: #f3d7e6;
+  --vert: #a9cba9; --mauve: #e0b3cb; --contraste: #ffffff; --radius: 1.6rem; color-scheme: dark;
+}
+/* ─── 6 · Affiche ─── */
+:root[data-style="6"], :root[data-style="6"].dark, :root[data-style="6"] .surfaces-jour {
+  --background: #fffcf4; --foreground: #000000; --card: #ffffff; --card-foreground: #000000;
+  --popover: #ffffff; --popover-foreground: #000000; --primary: #000000; --primary-foreground: #fffcf4;
+  --secondary: #f3efe4; --secondary-foreground: #000000; --muted: #f3efe4; --muted-foreground: #5c5a54;
+  --accent: #f3efe4; --accent-foreground: #000000; --border: #000000; --input: #000000; --ring: #000000;
+  --vert: #a9cba9; --mauve: #e0b3cb; --contraste: #000000; --radius: 0.875rem; color-scheme: light;
+}
+
+/* ─── La famille Affiche (02/11, Sabri : « le seul où tu as été créatif ») ───
+   Même grammaire que le 6 (traits d'encre, ombres décalées, titres Anton),
+   réglée par des variables --af-* : trait, ombre, décalage, épaisseur,
+   arrondi, bouton principal. essai.tsx pose data-famille="affiche". */
+:root[data-style="6"] {
+  --af-trait: #000000; --af-ombre: #000000; --af-dec: 4px; --af-ep: 2px; --af-ligne: solid;
+  --af-r: 16px; --af-r-bouton: 14px; --af-carte: #ffffff; --af-bouton: #e0b3cb; --af-bouton-encre: #000000;
+  --af-plein-encre: #ffffff; --af-titre: none;
+}
+/* ─── 7 · Affiche nuit ─── */
+:root[data-style="7"], :root[data-style="7"].dark, :root[data-style="7"] .surfaces-jour {
+  --background: #0c0c0c; --foreground: #f5f1e8; --card: #171717; --card-foreground: #f5f1e8;
+  --popover: #171717; --popover-foreground: #f5f1e8; --primary: #f5f1e8; --primary-foreground: #0c0c0c;
+  --secondary: #1f1f1f; --secondary-foreground: #f5f1e8; --muted: #1f1f1f; --muted-foreground: #a39f96;
+  --accent: #1f1f1f; --accent-foreground: #f5f1e8; --border: #f5f1e8; --input: #f5f1e8; --ring: #f5f1e8;
+  --vert: #a9cba9; --mauve: #e0b3cb; --contraste: #ffffff; --radius: 0.875rem; color-scheme: dark;
+}
+:root[data-style="7"] {
+  --af-trait: #f5f1e8; --af-ombre: #e0b3cb; --af-dec: 4px; --af-ep: 2px; --af-ligne: solid;
+  --af-r: 16px; --af-r-bouton: 14px; --af-carte: #171717; --af-bouton: #a9cba9; --af-bouton-encre: #0c0c0c;
+  --af-plein-encre: #0c0c0c; --af-titre: none;
+}
+/* ─── 8 · Riso, deux encres (vert profond + mauve, mal calées) ─── */
+:root[data-style="8"], :root[data-style="8"].dark, :root[data-style="8"] .surfaces-jour {
+  --background: #f4efe2; --foreground: #1f3b2c; --card: #fbf8f0; --card-foreground: #1f3b2c;
+  --popover: #fbf8f0; --popover-foreground: #1f3b2c; --primary: #1f3b2c; --primary-foreground: #f4efe2;
+  --secondary: #ebe4d2; --secondary-foreground: #1f3b2c; --muted: #ebe4d2; --muted-foreground: #5d6b5f;
+  --accent: #ebe4d2; --accent-foreground: #1f3b2c; --border: #1f3b2c; --input: #1f3b2c; --ring: #1f3b2c;
+  --vert: #a9cba9; --mauve: #e0b3cb; --contraste: #1f3b2c; --radius: 0.625rem; color-scheme: light;
+}
+:root[data-style="8"] {
+  --af-trait: #1f3b2c; --af-ombre: #e0b3cb; --af-dec: 5px; --af-ep: 1.5px; --af-ligne: solid;
+  --af-r: 10px; --af-r-bouton: 10px; --af-carte: #fbf8f0; --af-bouton: #e0b3cb; --af-bouton-encre: #1f3b2c;
+  --af-plein-encre: #f4efe2; --af-titre: none;
+}
+/* ─── 9 · Billet (kraft, encre brune, pointillés de découpe) ─── */
+:root[data-style="9"], :root[data-style="9"].dark, :root[data-style="9"] .surfaces-jour {
+  --background: #efe4cf; --foreground: #2b1d12; --card: #f8f0de; --card-foreground: #2b1d12;
+  --popover: #f8f0de; --popover-foreground: #2b1d12; --primary: #2b1d12; --primary-foreground: #f8f0de;
+  --secondary: #e6d8bd; --secondary-foreground: #2b1d12; --muted: #e6d8bd; --muted-foreground: #6e5a46;
+  --accent: #e6d8bd; --accent-foreground: #2b1d12; --border: #2b1d12; --input: #2b1d12; --ring: #2b1d12;
+  --vert: #a9cba9; --mauve: #e0b3cb; --contraste: #2b1d12; --radius: 0.375rem; color-scheme: light;
+}
+:root[data-style="9"] {
+  --af-trait: #2b1d12; --af-ombre: #d3c3a3; --af-dec: 3px; --af-ep: 1.5px; --af-ligne: dashed;
+  --af-r: 6px; --af-r-bouton: 6px; --af-carte: #f8f0de; --af-bouton: #2b1d12; --af-bouton-encre: #f8f0de;
+  --af-plein-encre: #f8f0de; --af-titre: none;
+}
+/* ─── 10 · Pop (sauge, cartes blanches, gros traits ronds) ─── */
+:root[data-style="10"], :root[data-style="10"].dark, :root[data-style="10"] .surfaces-jour {
+  --background: #dfe9dc; --foreground: #000000; --card: #ffffff; --card-foreground: #000000;
+  --popover: #ffffff; --popover-foreground: #000000; --primary: #000000; --primary-foreground: #ffffff;
+  --secondary: #eef4ec; --secondary-foreground: #000000; --muted: #eef4ec; --muted-foreground: #4f5d4f;
+  --accent: #eef4ec; --accent-foreground: #000000; --border: #000000; --input: #000000; --ring: #000000;
+  --vert: #a9cba9; --mauve: #e0b3cb; --contraste: #000000; --radius: 1.375rem; color-scheme: light;
+}
+:root[data-style="10"] {
+  --af-trait: #000000; --af-ombre: #000000; --af-dec: 6px; --af-ep: 2.5px; --af-ligne: solid;
+  --af-r: 22px; --af-r-bouton: 999px; --af-carte: #ffffff; --af-bouton: #bfe8d0; --af-bouton-encre: #000000;
+  --af-plein-encre: #ffffff; --af-titre: none;
+}
+/* ─── 11 · Brutal (blanc, 3 px, angles droits, titres penchés) ─── */
+:root[data-style="11"], :root[data-style="11"].dark, :root[data-style="11"] .surfaces-jour {
+  --background: #ffffff; --foreground: #000000; --card: #ffffff; --card-foreground: #000000;
+  --popover: #ffffff; --popover-foreground: #000000; --primary: #000000; --primary-foreground: #ffffff;
+  --secondary: #f2f2f2; --secondary-foreground: #000000; --muted: #f2f2f2; --muted-foreground: #4a4a4a;
+  --accent: #f2f2f2; --accent-foreground: #000000; --border: #000000; --input: #000000; --ring: #000000;
+  --vert: #a9cba9; --mauve: #e0b3cb; --contraste: #000000; --radius: 0rem; color-scheme: light;
+}
+:root[data-style="11"] {
+  --af-trait: #000000; --af-ombre: #000000; --af-dec: 6px; --af-ep: 3px; --af-ligne: solid;
+  --af-r: 0px; --af-r-bouton: 0px; --af-carte: #ffffff; --af-bouton: #000000; --af-bouton-encre: #ffffff;
+  --af-plein-encre: #ffffff; --af-titre: skewX(-8deg);
+}
+
+/* ─── Le fond de page : les orbes du thème d'origine s'effacent ─── */
+:root[data-style] .orbs { display: none; }
+:root[data-style] body { background: var(--background); }
+:root[data-style="3"] body {
+  background: radial-gradient(120% 55% at 50% -12%, rgba(255, 228, 190, 0.2), transparent 62%), var(--background);
+}
+:root[data-style="8"] body {
+  background: radial-gradient(circle at 1px 1px, rgba(224, 179, 203, 0.35) 1px, transparent 1.4px) 0 0 / 7px 7px, var(--background);
+}
+:root[data-style="9"] body {
+  background: repeating-linear-gradient(0deg, rgba(43, 29, 18, 0.025) 0 1px, transparent 1px 4px), var(--background);
+}
+:root[data-style="5"] body {
+  background: radial-gradient(90% 50% at 85% -5%, rgba(224, 179, 203, 0.2), transparent 60%),
+    radial-gradient(80% 45% at 0% 100%, rgba(169, 203, 169, 0.1), transparent 60%), var(--background);
+}
+
+/* ─── La barre d'onglets ─── */
+:root[data-style="1"] .liquid-tabbar { --tabbar-verre: rgba(255, 255, 255, 0.92); --tabbar-plein: #2a2420; --tabbar-liseret: rgba(255,255,255,0.9); color: #2a2420; box-shadow: 0 10px 30px rgba(120, 90, 60, 0.16) !important; }
+:root[data-style="2"] .liquid-tabbar { --tabbar-verre: #fbfaf6; --tabbar-plein: #0b0b0b; color: #0b0b0b; box-shadow: none !important; outline: 1px solid #0b0b0b; border-radius: 21px !important; }
+:root[data-style="3"] .liquid-tabbar { --tabbar-verre: rgba(32, 26, 22, 0.88); --tabbar-plein: #f6ede3; }
+:root[data-style="4"] .liquid-tabbar { --tabbar-verre: rgba(243, 248, 241, 0.9); --tabbar-plein: #0f2414; color: #0f2414; }
+:root[data-style="5"] .liquid-tabbar { --tabbar-verre: rgba(42, 31, 48, 0.82); --tabbar-plein: #f3d7e6; }
+:root[data-famille="affiche"] .liquid-tabbar { --tabbar-verre: var(--af-carte); --tabbar-plein: var(--af-trait); color: var(--foreground); border: var(--af-ep) var(--af-ligne) var(--af-trait); box-shadow: var(--af-dec) var(--af-dec) 0 var(--af-ombre) !important; border-radius: var(--af-r) !important; backdrop-filter: none; -webkit-backdrop-filter: none; }
+:root[data-famille="affiche"] .liquid-tabbar__lentille:not([data-verre]) { border-radius: max(0px, calc(var(--af-r) - 4px)); box-shadow: none; }
+:root[data-famille="affiche"] .liquid-tabbar__onglet { color: var(--foreground) !important; }
+:root[data-famille="affiche"] .liquid-tabbar:not([data-tenu]) .liquid-tabbar__onglet[aria-current="page"] { color: var(--af-plein-encre) !important; }
+
+/* ─── Les boutons ─── */
+:root[data-style="1"] :is(.bouton-principal, .bouton-encre, .bouton-givre) { box-shadow: 0 4px 0 rgba(42, 36, 32, 0.16), 0 10px 22px rgba(120, 90, 60, 0.12) !important; border-radius: 999px; }
+:root[data-style="1"] :is(.bouton-principal, .bouton-encre, .bouton-givre):active { transform: translateY(3px); box-shadow: 0 1px 0 rgba(42, 36, 32, 0.16) !important; }
+:root[data-style="2"] :is(.bouton-principal, .bouton-secondaire, .bouton-encre, .bouton-givre) { background: transparent !important; color: #0b0b0b !important; box-shadow: none !important; border: 1px solid #0b0b0b !important; border-radius: 13px !important; }
+:root[data-style="2"] .bouton-principal { background: #0b0b0b !important; color: #f6f5f0 !important; }
+:root[data-style="3"] .bouton-principal { background: linear-gradient(180deg, #fff5e8, #e9dccb) !important; color: #15110e !important; }
+:root[data-style="4"] :is(.bouton-principal, .bouton-encre) { background: #0f2414 !important; color: #eef5ec !important; box-shadow: none !important; }
+:root[data-style="5"] .bouton-principal { background: linear-gradient(180deg, #f8e4ef, #e0b3cb) !important; color: #160f19 !important; box-shadow: 0 8px 24px rgba(224, 179, 203, 0.25) !important; }
+:root[data-famille="affiche"] :is(.bouton-principal, .bouton-secondaire, .bouton-encre, .bouton-givre) { border: var(--af-ep) var(--af-ligne) var(--af-trait) !important; box-shadow: calc(var(--af-dec) - 1px) calc(var(--af-dec) - 1px) 0 var(--af-ombre) !important; border-radius: var(--af-r-bouton) !important; color: var(--foreground) !important; background: var(--af-carte) !important; }
+:root[data-famille="affiche"] .bouton-principal { background: var(--af-bouton) !important; color: var(--af-bouton-encre) !important; }
+:root[data-famille="affiche"] :is(.bouton-principal, .bouton-secondaire, .bouton-encre, .bouton-givre):active { transform: translate(calc(var(--af-dec) - 1px), calc(var(--af-dec) - 1px)); box-shadow: 0 0 0 var(--af-ombre) !important; }
+
+/* ─── Les tuiles et le tiroir de la Map ─── */
+:root[data-style="1"] .tuile-match { border-radius: 32px !important; }
+:root[data-style="1"] .tiroir-map { border-radius: 40px !important; box-shadow: 0 16px 40px rgba(120, 90, 60, 0.18) !important; }
+:root[data-style="2"] .tuile-match { border-radius: 13px !important; box-shadow: 0 0 0 1px #0b0b0b !important; }
+:root[data-style="2"] .tiroir-map { border-radius: 21px !important; box-shadow: none !important; outline: 1px solid #0b0b0b; }
+:root[data-style="3"] .tiroir-map { box-shadow: 0 -10px 40px rgba(255, 228, 190, 0.08), 0 20px 40px rgba(0,0,0,0.5) !important; }
+:root[data-style="5"] .tuile-match { border-radius: 30px !important; }
+:root[data-style="5"] .tiroir-map { border-radius: 38px !important; }
+:root[data-famille="affiche"] .tuile-match { border-radius: var(--af-r) !important; border: var(--af-ep) var(--af-ligne) var(--af-trait); box-shadow: var(--af-dec) var(--af-dec) 0 var(--af-ombre) !important; }
+:root[data-famille="affiche"] .tiroir-map { border-radius: calc(var(--af-r) + 4px) !important; border: var(--af-ep) var(--af-ligne) var(--af-trait); box-shadow: calc(var(--af-dec) + 1px) calc(var(--af-dec) + 1px) 0 var(--af-ombre) !important; }
+
+/* ─── Les titres ─── */
+:root[data-style="1"] :is(h1, h2) { letter-spacing: -0.02em; font-weight: 900; }
+:root[data-style="2"] :is(h1, h2, h3) { font-weight: 700; letter-spacing: -0.01em; }
+:root[data-famille="affiche"] :is(h1, h2) { font-family: var(--font-anton), var(--font-inter), sans-serif; font-weight: 400; text-transform: uppercase; letter-spacing: 0.01em; transform: var(--af-titre); transform-origin: 0 50%; }
+
+@media (prefers-reduced-motion: reduce) {
+  :root[data-style] :is(.bouton-principal, .bouton-encre, .bouton-givre, .bouton-secondaire):active { transform: none; }
+}
+
+/* ─── Les tuiles et blocs de l'app (repérés par leur arrondi d'origine) ─── */
+:root[data-style="1"] :is(section, a, div)[class*="rounded-[2"]:not(.tuile-match):not([class*="carte"]) { border-radius: 32px; }
+:root[data-style="2"] :is(section, a, div)[class*="rounded-[2"]:not(.tuile-match):not([class*="carte"]) { border-radius: 13px; }
+:root[data-style="5"] :is(section, a, div)[class*="rounded-[2"]:not(.tuile-match):not([class*="carte"]) { border-radius: 30px; }
+:root[data-famille="affiche"] :is(section, a)[class*="rounded-[2"]:not(.tuile-match):not([class*="carte"]) { border-radius: var(--af-r); border: var(--af-ep) var(--af-ligne) var(--af-trait); box-shadow: var(--af-dec) var(--af-dec) 0 var(--af-ombre); }
+:root[data-famille="affiche"] :is(section, a)[class*="rounded-[2"] :is(h2, h3) { font-family: var(--font-anton), var(--font-inter), sans-serif; font-weight: 400; text-transform: uppercase; }

@@ -65,6 +65,7 @@ import { AppartenancesJoueur } from "@/components/sfl/badge-sfl";
 import { ProfilePhoto } from "@/components/sfl/profile-photo";
 import { ChoixBadge } from "@/components/sfl/choix-badge";
 import { PersonnaliserCarte } from "@/components/sfl/personnaliser-carte";
+import { PremiersPas } from "@/components/sfl/ma-carte/premiers-pas";
 import { CarteOfficielle } from "@/components/sfl/carte-officielle";
 import { classesTuile, ObjetDeTuile, RubriquesMaCarte, useMaCarte } from "@/components/sfl/ma-carte/rubriques";
 import { useJoueurBola, useMyPlayer } from "@/components/sfl/player-provider";
@@ -221,6 +222,9 @@ function ProfilJoueurPage() {
             {/* Joueur Bola : ses matchs validés, ceux qui font sa carte (lib/sfl/carte-bola.ts). */}
             {bola && <Chiffre valeur={player.matchs} quoi={player.matchs > 1 ? "Matchs" : "Match"} />}
           </div>
+          {/* Tes premiers pas, tant qu'il en reste (relifting du 02/11 :
+              ma-carte/premiers-pas.tsx), juste sous mes chiffres */}
+          <PremiersPas nom={player.name} aJoue={player.matchs > 0 || joues > 0} onPhoto={() => setPhotoOuverte(true)} />
           {/* Mes cartons de la SFL, s'il y en a (lib/sfl/cartons.ts, 01/11) */}
           {!bola && <MesCartons nom={player.name} />}
           {!bola && <p className="w-full text-titre-fort leading-[1.25] font-bold tracking-[-0.4px]">{fiche.synthese}</p>}

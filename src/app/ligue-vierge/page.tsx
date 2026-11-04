@@ -60,6 +60,7 @@ import { FORMAT_CARTE, MiniCarte } from "@/components/sfl/mini-carte";
 import { LIGNE_PODIUM, RangMetal } from "@/components/sfl/rang-metal";
 import { useMyPlayer } from "@/components/sfl/player-provider";
 import { VitrineBola } from "@/components/sfl/equipe/vitrine-team";
+import { PremierMatch } from "@/components/sfl/ma-carte/premier-match";
 import { useMonEquipe } from "@/hooks/use-mon-equipe";
 import { carteNeutre } from "@/components/sfl/qui-vient";
 import { useSeason } from "@/components/sfl/season-provider";
@@ -522,7 +523,10 @@ export default function LigueViergePage() {
               </div>
             </div>
             <MesFeuilles parties={feuilles} onSaisie={recharger} apercu={apercu} aOuvrir={feuilleLien} />
-            {vus !== null && mesDerniers.length === 0 && vide("Aucun match Bola pour l'instant.")}
+            {/* Aucun match encore : le geste suivant et les visages d'à côté, plus
+                jamais « Aucun match Bola pour l'instant. » (relifting du 02/11 :
+                ma-carte/premier-match.tsx) */}
+            {vus !== null && mesDerniers.length === 0 && <PremierMatch moi={player.name} />}
             {mesDerniers.length > 0 && (
               <div className="flex flex-col gap-3">
                 <h2 className="px-1 text-titre font-bold tracking-tight">Mes derniers matchs</h2>
