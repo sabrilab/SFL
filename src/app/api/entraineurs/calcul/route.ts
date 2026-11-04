@@ -22,6 +22,7 @@
 // 03/11/2026) : une session ouverte avec ce mot de passe ne relance rien et
 // ne lit pas le bilan.
 
+import { createHash, timingSafeEqual } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { appelant, estAdmin, serveur } from "@/lib/sfl/serveur-ligue.server";
 import { calculerCartesEntraineur } from "@/lib/sfl/entraineur-serveur.server";
@@ -33,13 +34,20 @@ export const maxDuration = 60;
 const DIX_MINUTES = 10 * 60_000;
 let dernierAppel = 0;
 
+/** L'en-tête Authorization est-il « Bearer <secret> » ? Comparé en temps constant
+ *  (les deux côtés passent par une empreinte de même longueur). */
+function bearerAttendu(recu: string | null, secret: string): boolean {
+  const empreinte = (x: string) => createHash("sha256").update(x).digest();
+  return timingSafeEqual(empreinte(recu ?? ""), empreinte(`Bearer ${secret}`));
+}
+
 /** Le cron de la nuit. */
 export async function GET(req: NextRequest) {
   const secret = process.env.CRON_SECRET;
   if (!secret && process.env.NODE_ENV === "production") {
     return NextResponse.json({ error: "CRON_SECRET manquant." }, { status: 503 });
   }
-  if (secret && req.headers.get("authorization") !== `Bearer ${secret}`) {
+  if (secret && !bearerAttendu(req.headers.get("authorization"), secret)) {
     return NextResponse.json({ error: "Non autorisé." }, { status: 401 });
   }
   const sb = serveur();

@@ -120,7 +120,10 @@ const ecrans = [
 const ficheTotem = new Set<string>();
 for (const t of Object.values(TOTEMS)) {
   ficheTotem.add(t.animal).add(t.quoi);
-  for (const src of t.sources) ficheTotem.add(src.titre).add(src.url);
+  for (const src of t.sources) {
+    ficheTotem.add(src.titre);
+    if (src.url) ficheTotem.add(src.url);
+  }
 }
 for (const f of ecrans) {
   const totem = f.startsWith("../src/components/sfl/afrique/totems/");

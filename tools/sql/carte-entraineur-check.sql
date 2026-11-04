@@ -137,17 +137,23 @@ select pg_temp.vrai('9 droits', not has_function_privilege('authenticated', 'pub
 select pg_temp.refuse('9 un joueur ne lit pas par là', 'Ilyes', 'public.matchs_bola_serveur()', '42501');
 select pg_temp.vrai('9 le serveur lit une liste', pg_temp.serveur('jsonb_typeof(public.matchs_bola_serveur())') = 'array');
 -- Un match Bola saisi, posé directement (sans session : la base laisse le serveur dater un match passé) : le serveur le lit.
+-- Le banc cherche son match par son id : une base qui a déjà d'autres matchs Bola saisis passe aussi.
 select set_config('request.jwt.claim.sub', '', true);
+create temp table match_du_banc (id bigint);
 with m as (
   insert into public.matchs (organisateur, visibilite, jour, heure, lieu, places, mode, score_clairs, score_fonces, saisi_le)
   values (pg_temp.uid('Badis'), 'prive', current_date - 10, '20h00', 'Terrain', 10, 'bola', 3, 2, now() - interval '9 days')
   returning id
+), garde as (
+  insert into match_du_banc select id from m returning id
 )
 insert into public.match_joueurs (match_id, player_id, statut, equipe, buts, passes)
 select m.id, pg_temp.uid(n), 'inscrit', case when o <= 4 then 'clairs' else 'fonces' end, case when o = 1 then 2 else 0 end, 0
   from m, unnest(array['Badis', 'Sami', 'Kader', 'Naim', 'Anis', 'Karim', 'Mehdi', 'Yacine']) with ordinality t(n, o);
 select pg_temp.vrai('9 le serveur lit le match, au format de ligue_vierge',
-  pg_temp.serveur($q$(select jsonb_array_length(x)::text || '/' || (x -> 0 ->> 'scoreClairs') || '/' || (x -> 0 -> 'joueurs' -> 0 ->> 'name') from (select public.matchs_bola_serveur() x) y)$q$) = '1/3/Badis',
+  pg_temp.serveur(format($q$(select count(*)::text || '/' || max(e ->> 'scoreClairs') || '/' || max(e -> 'joueurs' -> 0 ->> 'name')
+                              from jsonb_array_elements(public.matchs_bola_serveur()) e where (e ->> 'id')::bigint = %s)$q$,
+                          (select id from match_du_banc))) = '1/3/Badis',
   pg_temp.serveur('public.matchs_bola_serveur()'));
 
 -- 10 · La carte suit la personne : son compte effacé, sa carte part avec ; son équipe effacée, la carte reste, sans équipe.
