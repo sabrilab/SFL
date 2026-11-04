@@ -4,8 +4,13 @@
 //
 // La clé secrète n'existe que dans les variables de Vercel (production) et ne
 // part jamais au navigateur. Sans elle, les routes répondent « fermé ».
+//
+// Elle passe outre la RLS : chaque route qui l'utilise décide elle-même qui
+// est admin, par estAdmin, et seulement par lui. Un admin qui doit encore
+// changer son mot de passe n'y est pas admin (04/11/2026), comme en base.
 
 import { createClient, type SupabaseClient, type User } from "@supabase/supabase-js";
+import { lireMotDePasseAChanger } from "@/lib/server/mot-de-passe-a-changer";
 import { ACCOUNTS } from "@/lib/sfl/auth/accounts";
 import { username } from "@/lib/sfl/usernames";
 import { lireEffectifServeur } from "./saison-serveur.server";
@@ -31,10 +36,23 @@ export async function appelant(sb: SupabaseClient, req: Request): Promise<User |
   return error ? null : data.user;
 }
 
-/** Admin de la ligue ? Lu dans profiles, jamais dans le jeton ni ses métadonnées. */
+/**
+ * Admin de la ligue ? Lu dans profiles, jamais dans le jeton ni ses
+ * métadonnées. Comme is_league_admin() en base : pas tant qu'il doit encore
+ * changer son mot de passe (une ligne dans mot_de_passe_a_changer, d'origine
+ * ou provisoire). Fermé par défaut : une erreur de lecture répond non (le
+ * journal ne garde que le code) ; seule une base sans la table (aperçu pas
+ * encore migré) s'en tient à profiles.is_admin, comme avant.
+ */
 export async function estAdmin(sb: SupabaseClient, id: string): Promise<boolean> {
-  const { data } = await sb.from("profiles").select("is_admin").eq("id", id).maybeSingle();
-  return !!(data as { is_admin?: boolean } | null)?.is_admin;
+  const { data, error } = await sb.from("profiles").select("is_admin").eq("id", id).maybeSingle();
+  if (error) {
+    console.error("[admin] profiles", error.code);
+    return false;
+  }
+  if (!(data as { is_admin?: boolean } | null)?.is_admin) return false;
+  const aChanger = await lireMotDePasseAChanger(sb, [id], "[admin]");
+  return !!aChanger && !aChanger.has(id);
 }
 
 /** Pseudos qu'aucun joueur ne peut prendre : la ligue et ses services. */

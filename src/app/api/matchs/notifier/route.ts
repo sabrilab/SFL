@@ -14,7 +14,9 @@
 // Toucher la notification ouvre la fiche du match sur la Map (/?match=id).
 //
 // La route agit avec la clé secrète : elle vérifie que l'appelant est bien
-// l'organisateur du match.
+// l'organisateur du match. L'annulation d'un match à la feuille faite reste
+// à l'organisateur admin au sens d'estAdmin (pas tant qu'il doit encore
+// changer son mot de passe, comme is_league_admin en base, 04/11/2026).
 
 import { NextRequest, NextResponse } from "next/server";
 import { cleVapid } from "@/lib/server/web-push";

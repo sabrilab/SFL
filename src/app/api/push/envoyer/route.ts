@@ -12,12 +12,17 @@
 // Chaque annonce garde sa trace (motif « annonce », lib/server/push-envoi.ts)
 // pour la page Activité : écrite avec la clé secrète, la seule qui le peut ;
 // sans elle, l'annonce part quand même.
+//
+// Admin au sens d'estAdmin, lu avec les droits de l'appelant : pas tant
+// qu'il doit encore changer son mot de passe (04/11/2026). La base le
+// retenait déjà (is_league_admin dans la RLS des abonnements) ; la route ne
+// laisse plus ce compte aller jusqu'aux traces, écrites à la clé secrète.
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { cleVapid } from "@/lib/server/web-push";
 import { prevenir, type Envoi } from "@/lib/server/push-envoi";
-import { serveur } from "@/lib/sfl/serveur-ligue.server";
+import { estAdmin, serveur } from "@/lib/sfl/serveur-ligue.server";
 import { estNotif } from "@/lib/sfl/push";
 
 export const maxDuration = 60;
@@ -51,8 +56,7 @@ export async function POST(req: NextRequest) {
   });
   const { data: auth, error: authError } = await sb.auth.getUser(corps.accessToken);
   if (authError || !auth.user) return erreur("Session invalide.", 401);
-  const { data: profil } = await sb.from("profiles").select("is_admin").eq("id", auth.user.id).maybeSingle();
-  if (!profil?.is_admin) return erreur("Réservé à l'admin.", 403);
+  if (!(await estAdmin(sb, auth.user.id))) return erreur("Réservé à l'admin.", 403);
 
   let requete = sb.from("push_abonnements").select("user_id");
   if (corps.essai === true) requete = requete.eq("user_id", auth.user.id);

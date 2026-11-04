@@ -16,6 +16,9 @@
 // (« compte », « ne compte pas ») : choix par défaut, 28/10, pour éviter le bruit.
 //
 // La route agit avec la clé secrète : elle vérifie elle-même qui appelle.
+// Une feuille : l'organisateur du match, ou l'admin (estAdmin : pas tant
+// qu'il doit encore changer son mot de passe, 04/11/2026). L'organisateur
+// garde son droit tel quel : estAdmin n'est lu que pour un autre que lui.
 
 import { NextRequest, NextResponse } from "next/server";
 import { cleVapid } from "@/lib/server/web-push";
