@@ -2,6 +2,17 @@
 
 // Créer son compte — l'inscription autonome, de bout en bout.
 //
+// Le parcours court (Sabri, 02/11/2026 : « il faut que ce soit simple, qu'on
+// ait tous les éléments […] et que la création du compte soit la plus fluide
+// possible depuis getbola.app ») : quatre écrans après « Crée ta carte. » —
+// Toi (prénom, nom, homme ou femme), Ton jeu (date de naissance, poste, pied
+// fort), Ton gabarit, Ton compte (pseudo, email, un seul mot de passe qu'on
+// peut afficher, l'accord) — puis l'app s'ouvre directement : sa ville, sa
+// carte au studio et la révélation (accueil.tsx), qui ne redemande rien.
+// Le sexe se demande ici, l'accueil n'a plus à le faire. Les quatre photos
+// en pied sortent du parcours (ANGLES_A_L_INSCRIPTION), et un compte venu
+// seul entre aussitôt dans Bola (ENTREE_DIRECTE).
+//
 // Avant, seul l'admin fabriquait les comptes et distribuait les accès. Ici le
 // joueur crée le sien, une question par écran, et voit sa carte se remplir à
 // chaque réponse : son nom, son pseudo, son poste. Viennent ensuite les quatre
@@ -37,6 +48,7 @@
 // Page publique (hors de la porte de connexion, voir AuthGate).
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { noterSite } from "@/lib/sfl/site-visites";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Check, ChevronLeft, Eye, EyeOff, Loader2, Minus, Plus, RotateCcw } from "lucide-react";
@@ -73,10 +85,12 @@ import {
 } from "@/lib/sfl/parrainage";
 import {
   ANGLES,
+  ANGLES_A_L_INSCRIPTION,
   BORNES,
   MAILLOTS,
   PIEDS,
   POSTES,
+  SEXES,
   age,
   capitaliser,
   emailValide,
@@ -85,9 +99,13 @@ import {
   normaliserPseudo,
   type Angle,
   type Inscription,
+  type Sexe,
 } from "@/lib/sfl/inscription";
+import { marquerArriveeParInscription } from "@/lib/sfl/accueil";
+import { useT } from "@/lib/i18n/langue";
+import { ChoixLangue } from "@/components/sfl/langue/choix-langue";
 
-const ETAPES = ["accueil", "identite", "contact", "naissance", "gabarit", "jeu", "angles", "secret", "fini"] as const;
+const ETAPES = ["accueil", "identite", "jeu", "gabarit", "angles", "compte", "fini"] as const;
 type Etape = (typeof ETAPES)[number];
 
 const NOM_FOURNISSEUR: Record<Fournisseur, string> = { google: "Google", apple: "Apple" };
@@ -97,7 +115,7 @@ const STATS_DEPART: Stats = { VIT: 75, TIR: 75, PAS: 75, DRI: 75, DEF: 75, PHY: 
 
 const BROUILLON = "sfl-inscription";
 
-type Formulaire = Omit<Inscription, "motDePasse">;
+type Formulaire = Omit<Inscription, "motDePasse" | "sexe"> & { sexe: Sexe | null };
 
 const VIDE: Formulaire = {
   prenom: "",
@@ -111,6 +129,7 @@ const VIDE: Formulaire = {
   maillot: "M",
   pied: "droit",
   poste: "MC",
+  sexe: null,
 };
 
 /* ───────────────────────────── Briques ───────────────────────────── */
@@ -194,6 +213,7 @@ function Reglage({
   pas?: number;
   onChange: (v: number) => void;
 }) {
+  const t = useT();
   const borne = (v: number) => Math.min(max, Math.max(min, Math.round(v / pas) * pas));
   return (
     <div className="glass-soft rounded-[21px] px-[21px] pt-[13px] pb-[21px]">
@@ -203,19 +223,19 @@ function Reglage({
           <button
             type="button"
             onClick={() => onChange(borne(valeur - pas))}
-            aria-label={`${label} moins`}
+            aria-label={t("{label} moins", { label })}
             className="bouton-secondaire bouton--or grid size-[34px] place-items-center"
           >
             <Minus className="size-4" />
           </button>
           <span className="min-w-[89px] text-center text-nom leading-none font-black tracking-tight tabular-nums">
             {String(valeur).replace(".", ",")}
-            <span className="ml-1 text-corps font-bold text-encre-3">{unite}</span>
+            <span className="ms-1 text-corps font-bold text-encre-3">{unite}</span>
           </span>
           <button
             type="button"
             onClick={() => onChange(borne(valeur + pas))}
-            aria-label={`${label} plus`}
+            aria-label={t("{label} plus", { label })}
             className="bouton-secondaire bouton--or grid size-[34px] place-items-center"
           >
             <Plus className="size-4" />
@@ -241,10 +261,10 @@ function Reglage({
 export default function InscriptionPage() {
   const router = useRouter();
   const session = useSession();
+  const t = useT();
   const [etape, setEtape] = useState<Etape>("accueil");
   const [f, setF] = useState<Formulaire>(VIDE);
   const [motDePasse, setMotDePasse] = useState("");
-  const [confirmation, setConfirmation] = useState("");
   const [voir, setVoir] = useState(false);
   const [piege, setPiege] = useState("");
   const [refs, setRefs] = useState<Partial<Record<Angle, string>>>({});
@@ -316,12 +336,21 @@ export default function InscriptionPage() {
   const fini = etape === "fini";
   // Par Google ou Apple : ni email (le fournisseur le donne), ni mot de passe.
   // Venu par un lien (équipe, parrain) : pas les quatre photos en pied.
-  const court = !!equipe || !!parrain;
-  const etapes: readonly Etape[] = ETAPES.filter((e) => !(sociale && e === "secret") && !(court && e === "angles"));
+  const court = !!equipe || !!parrain || !ANGLES_A_L_INSCRIPTION;
+  const etapes: readonly Etape[] = ETAPES.filter((e) => !(court && e === "angles"));
   /** Les étapes comptées par la barre de progression (ni l'accueil, ni la fin). */
   const parcours = etapes.slice(1, -1);
   /** L'étape qui crée le compte. */
   const derniere = etapes[etapes.length - 2];
+
+  // L'entonnoir de getbola.app : chaque écran atteint, puis le compte créé
+  // (lib/sfl/site-visites.ts ; Admin → Analytics → Acquisition).
+  useEffect(() => {
+    if (etape !== "fini") noterSite(etape === "accueil" ? "inscription" : etape);
+  }, [etape]);
+  useEffect(() => {
+    if (nomFinal) noterSite("cree");
+  }, [nomFinal]);
 
   // Un membre déjà connecté n'a rien à faire ici. Pas pendant la création :
   // un compte qui entre aussitôt est connecté avant d'avoir fini.
@@ -375,7 +404,7 @@ export default function InscriptionPage() {
       const b = JSON.parse(brut) as { f: Formulaire; etape: Etape };
       // eslint-disable-next-line react-hooks/set-state-in-effect -- lecture unique d'un stockage externe au montage
       setF({ ...VIDE, ...b.f });
-      if (ETAPES.indexOf(b.etape) > 0 && ETAPES.indexOf(b.etape) <= ETAPES.indexOf("jeu")) setEtape(b.etape);
+      if (ETAPES.indexOf(b.etape) > 0 && ETAPES.indexOf(b.etape) <= ETAPES.indexOf("gabarit")) setEtape(b.etape);
     } catch {}
   }, []);
   useEffect(() => {
@@ -413,6 +442,7 @@ export default function InscriptionPage() {
       if (d.dejaMembre) {
         await oublierSessionServeur();
         setErreur(
+          // Traduite à l'affichage (la phrase française reste la clé).
           `Tu as déjà un compte avec cet email. Connecte-toi avec ton pseudo, puis lie ${NOM_FOURNISSEUR[fournisseur]} dans Réglages.`
         );
         return;
@@ -467,7 +497,7 @@ export default function InscriptionPage() {
     setErreur(null);
   }, []);
 
-  const nomCarte = nomFinal ?? (capitaliser(nettoyerNom(f.prenom)) || "Toi");
+  const nomCarte = nomFinal ?? (capitaliser(nettoyerNom(f.prenom)) || t("Toi"));
   const ans = age(f.naissance);
   const carte = useMemo(
     () => ({
@@ -484,26 +514,25 @@ export default function InscriptionPage() {
   function bloquant(e: Etape): string | null {
     switch (e) {
       case "identite":
-        if (!nettoyerNom(f.prenom)) return "Ton prénom.";
-        if (!nettoyerNom(f.nom)) return "Ton nom.";
+        if (!nettoyerNom(f.prenom)) return t("Ton prénom.");
+        if (!nettoyerNom(f.nom)) return t("Ton nom.");
+        if (!f.sexe) return t("Homme ou femme ?");
         return null;
-      case "contact": {
-        const ep = erreurPseudo(pseudo);
-        if (ep) return `Pseudo : ${ep}`;
-        if (pseudoEtat === "pris") return "Ce pseudo est déjà pris.";
-        if (!sociale && !emailValide(f.email)) return "Ton email.";
-        return null;
-      }
-      case "naissance":
-        if (ans === null) return "Ta date de naissance.";
-        if (ans < BORNES.ageMin || ans > 90) return "Vérifie ta date de naissance.";
+      case "jeu":
+        if (ans === null) return t("Ta date de naissance.");
+        if (ans < BORNES.ageMin || ans > 90) return t("Vérifie ta date de naissance.");
         return null;
       case "angles":
-        return ANGLES.every((a) => refs[a.id]) ? null : "Les quatre photos.";
-      case "secret":
-        if (motDePasse.length < BORNES.motDePasse) return `${BORNES.motDePasse} caractères au moins.`;
-        if (motDePasse !== confirmation) return "Les deux mots de passe diffèrent.";
+        return ANGLES.every((a) => refs[a.id]) ? null : t("Les quatre photos.");
+      case "compte": {
+        const ep = erreurPseudo(pseudo);
+        if (ep) return `${t("Pseudo")} : ${t(ep)}`;
+        if (pseudoEtat === "pris") return t("Ce pseudo est déjà pris.");
+        if (sociale) return null;
+        if (!emailValide(f.email)) return t("Ton email.");
+        if (motDePasse.length < BORNES.motDePasse) return t("Mot de passe : {n} caractères au moins.", { n: BORNES.motDePasse });
         return null;
+      }
       default:
         return null;
     }
@@ -512,8 +541,8 @@ export default function InscriptionPage() {
   const mineur = ans !== null && ans < AGE_ACCORD_PARENT;
   /** Les cases de la politique, à l'étape qui crée le compte. */
   function bloquantAccord(): string | null {
-    if (!accord) return "Coche la case de la politique de confidentialité.";
-    if (mineur && !accordParent) return "L'accord d'un de tes parents.";
+    if (!accord) return t("Coche la case de la politique de confidentialité.");
+    if (mineur && !accordParent) return t("L'accord d'un de tes parents.");
     return null;
   }
   /** L'accord, sous la session qui vient de naître ; il attend la prochaine ouverture s'il ne peut pas partir. */
@@ -538,7 +567,7 @@ export default function InscriptionPage() {
   }
 
   async function creer() {
-    const b = bloquant("secret") ?? bloquantAccord();
+    const b = bloquant("compte") ?? bloquantAccord();
     if (b) {
       setErreur(b);
       return;
@@ -551,6 +580,7 @@ export default function InscriptionPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...f,
+          sexe: f.sexe ?? undefined,
           pseudo,
           motDePasse,
           site: piege,
@@ -565,10 +595,10 @@ export default function InscriptionPage() {
         entre?: boolean;
       };
       if (!r.ok || !d.ok || !d.name) {
-        setErreur(d.error ?? "Création impossible pour l'instant.");
+        setErreur(t(d.error ?? "Création impossible pour l'instant."));
         if (d.champ === "pseudo" || d.champ === "email") {
           if (d.champ === "pseudo") setPseudoEtat("pris");
-          setEtape("contact");
+          setEtape("compte");
         }
         return;
       }
@@ -579,16 +609,18 @@ export default function InscriptionPage() {
       // propre session.
       const connexion = await signIn(pseudo, motDePasse);
       await enregistrerAccord(nom);
-      if (connexion.ok) await envoyerPhotos();
-      else setAvertissement(`Ton compte est créé. Connecte-toi avec @${pseudo} pour entrer.`);
+      const photosOk = connexion.ok ? await envoyerPhotos() : false;
+      if (!connexion.ok) setAvertissement(t("Ton compte est créé. Connecte-toi avec @{pseudo} pour entrer.", { pseudo }));
       try {
         sessionStorage.removeItem(BROUILLON);
       } catch {}
       setNomFinal(nom);
-      setEtape("fini");
       navigator.vibrate?.([12, 60, 24]);
+      // Il entre : l'app s'ouvre aussitôt sur la suite (ville, carte, révélation).
+      if (d.entre && connexion.ok && photosOk) return entrer(nom);
+      setEtape("fini");
     } catch {
-      setErreur("Pas de réseau. Réessaie dans un instant.");
+      setErreur(t("Pas de réseau. Réessaie dans un instant."));
     } finally {
       setEnvoi(false);
     }
@@ -608,10 +640,10 @@ export default function InscriptionPage() {
       if (!jeton) {
         setSociale(null);
         setEtape("accueil");
-        setErreur("La connexion a expiré. Recommence avec Google.");
+        setErreur(t("La connexion a expiré. Recommence avec Google."));
         return;
       }
-      const { email: _email, ...fiche } = f;
+      const { email: _email, sexe, ...fiche } = f;
       void _email;
       const r = await fetch("/api/inscription/sociale", {
         method: "POST",
@@ -619,6 +651,7 @@ export default function InscriptionPage() {
         body: JSON.stringify({
           action: "finir",
           ...fiche,
+          sexe: sexe ?? undefined,
           pseudo,
           site: piege,
           ...(parrainEnvoye ?? {}),
@@ -632,10 +665,10 @@ export default function InscriptionPage() {
         entre?: boolean;
       };
       if (!r.ok || !d.ok || !d.name) {
-        setErreur(d.error ?? "Création impossible pour l'instant.");
+        setErreur(t(d.error ?? "Création impossible pour l'instant."));
         if (d.champ === "pseudo") {
           setPseudoEtat("pris");
-          setEtape("contact");
+          setEtape("compte");
         }
         return;
       }
@@ -646,15 +679,16 @@ export default function InscriptionPage() {
       // (en attente, sauf venu par un parrain), puis les photos partent sous elle.
       await bootstrapServerSession();
       await enregistrerAccord(nom);
-      await envoyerPhotos();
+      const photosOk = await envoyerPhotos();
       try {
         sessionStorage.removeItem(BROUILLON);
       } catch {}
       setNomFinal(nom);
-      setEtape("fini");
       navigator.vibrate?.([12, 60, 24]);
+      if (d.entre && photosOk) return entrer(nom);
+      setEtape("fini");
     } catch {
-      setErreur("Pas de réseau. Réessaie dans un instant.");
+      setErreur(t("Pas de réseau. Réessaie dans un instant."));
     } finally {
       setEnvoi(false);
     }
@@ -674,32 +708,39 @@ export default function InscriptionPage() {
     router.replace("/");
   }
 
-  /** Les quatre prises, sous la session du joueur. */
-  async function envoyerPhotos() {
+  /** Les quatre prises, sous la session du joueur (rien à envoyer sans elles). */
+  async function envoyerPhotos(): Promise<boolean> {
+    if (Object.keys(refs).length === 0) return true;
     const ok = (await envoyerReferences(refs)).length === 0;
     setARenvoyer(!ok);
-    setAvertissement(ok ? null : "Certaines photos ne sont pas parties.");
+    setAvertissement(ok ? null : t("Certaines photos ne sont pas parties."));
+    return ok;
+  }
+
+  /** Le compte est ouvert : droit dans l'app, que l'accueil prend en main sans bienvenue. */
+  function entrer(nom: string) {
+    marquerArriveeParInscription(nom);
+    router.replace(apres);
   }
 
   /* ─────────────── Le contenu de chaque étape ─────────────── */
 
   const titres: Record<Etape, [string, string?]> = {
-    accueil: ["Crée ta carte."],
-    identite: ["Qui es-tu ?"],
-    contact: ["Ton nom de joueur."],
-    naissance: ["Ta date de naissance."],
-    gabarit: ["Ton gabarit."],
-    jeu: ["Ton jeu."],
-    angles: ["Tes quatre angles.", "Même cadre pour toute la ligue : tes skins naîtront de ces quatre photos."],
-    secret: ["Ton mot de passe."],
-    fini: [`Bienvenue, ${nomCarte}.`],
+    accueil: [t("Crée ta carte.")],
+    identite: [t("Qui es-tu ?")],
+    jeu: [t("Ton jeu.")],
+    gabarit: [t("Ton gabarit.")],
+    angles: [t("Tes quatre angles."), t("Même cadre pour toute la ligue : tes skins naîtront de ces quatre photos.")],
+    compte: [t(sociale ? "Ton nom de joueur." : "Ton compte.")],
+    fini: [t("Bienvenue, {nom}.", { nom: nomCarte })],
   };
 
   const etapeIndex = parcours.indexOf(etape);
   const avecCarte = etape !== "angles";
-  // Les étapes longues (gabarit, jeu) passent la carte au segment suivant de
-  // la suite d'or : 0,236 de l'écran, carte à 0,382.
-  const compacte = etape === "gabarit" || etape === "jeu";
+  // Les étapes longues (jeu, gabarit) passent la carte au segment suivant de
+  // la suite d'or : 0,236 de l'écran, carte à 0,382 ; « Ton compte », avec
+  // l'accord sous le pouce, encore au suivant (0,146, carte à 0,236).
+  const compacte = etape === "gabarit" || etape === "jeu" || etape === "compte";
   const [titre, sousTitre] = titres[etape];
 
   let corps: React.ReactNode = null;
@@ -709,13 +750,13 @@ export default function InscriptionPage() {
       if (equipe || sociale || parrain?.canal === "lien") break;
       corps = codeOuvert ? (
         <Champ
-          label="Code"
+          label={t("Code")}
           note={
             codeEtat === "inconnu" ? (
-              <span className="text-[#c8352b] dark:text-[#FF6B5E]">Code inconnu.</span>
+              <span className="text-[#c8352b] dark:text-[#FF6B5E]">{t("Code inconnu.")}</span>
             ) : parrain ? (
               <span className="text-encre-3">
-                <Check className="mr-1 inline size-3.5" />
+                <Check className="me-1 inline size-3.5" />
                 {parrain.p.affiche}
               </span>
             ) : null
@@ -737,7 +778,8 @@ export default function InscriptionPage() {
               autoCorrect="off"
               spellCheck={false}
               maxLength={21}
-              placeholder="code"
+              dir="ltr"
+              placeholder={t("code")}
               className={SAISIE}
             />
             {codeEtat === "verif" && <Loader2 className="size-4 shrink-0 animate-spin text-encre-4" />}
@@ -747,113 +789,53 @@ export default function InscriptionPage() {
         <button
           type="button"
           onClick={() => setCodeOuvert(true)}
-          className="bouton-discret -ml-[8px] px-[8px] py-[8px] text-corps font-semibold"
+          className="bouton-discret -ms-[8px] px-[8px] py-[8px] text-corps font-semibold"
         >
-          J&apos;ai un code
+          {t("J'ai un code")}
         </button>
       );
       break;
     case "identite":
       corps = (
         <div className="flex flex-col gap-[13px]">
-          <Champ label="Prénom">
+          <Champ label={t("Prénom")}>
             <input
               autoFocus
               value={f.prenom}
               onChange={(e) => maj("prenom", e.target.value)}
               autoComplete="given-name"
-              placeholder="Prénom"
+              placeholder={t("Prénom")}
+              dir="auto"
               className={SAISIE}
             />
           </Champ>
-          <Champ label="Nom">
+          <Champ label={t("Nom")}>
             <input
               value={f.nom}
               onChange={(e) => maj("nom", e.target.value)}
               autoComplete="family-name"
-              placeholder="Nom"
+              placeholder={t("Nom")}
+              dir="auto"
               className={SAISIE}
             />
           </Champ>
-        </div>
-      );
-      break;
-    case "contact":
-      corps = (
-        <div className="flex flex-col gap-[13px]">
-          <Champ
-            label="Pseudo"
-            note={
-              pseudoEtat === "pris" ? (
-                <span className="text-[#c8352b] dark:text-[#FF6B5E]">Déjà pris.</span>
-              ) : pseudoEtat === "libre" ? (
-                <span className="text-encre-3">
-                  <Check className="mr-1 inline size-3.5" />
-                  {sociale ? "Libre." : "Libre. C\u2019est aussi ton identifiant."}
-                </span>
-              ) : null
-            }
-          >
-            <span className="flex items-center">
-              <span className="text-titre-m font-bold text-encre-4">@</span>
-              <input
-                autoFocus
-                value={f.pseudo}
-                onChange={(e) => maj("pseudo", normaliserPseudo(e.target.value))}
-                autoCapitalize="none"
-                autoCorrect="off"
-                spellCheck={false}
-                autoComplete="username"
-                maxLength={20}
-                placeholder="pseudo"
-                className={SAISIE}
-              />
-              {pseudoEtat === "verif" && <Loader2 className="size-4 shrink-0 animate-spin text-encre-4" />}
-            </span>
-          </Champ>
-          {!sociale && (
-            <Champ label="Email">
-              <input
-                type="email"
-                inputMode="email"
-                value={f.email}
-                onChange={(e) => maj("email", e.target.value.trim())}
-                autoCapitalize="none"
-                autoComplete="email"
-                placeholder="toi@exemple.fr"
-                className={SAISIE}
-              />
-            </Champ>
-          )}
-        </div>
-      );
-      break;
-    case "naissance":
-      corps = (
-        <Champ
-          label="Né le"
-          note={ans !== null && ans >= 0 ? <span className="text-encre-3">{ans} ans</span> : null}
-        >
-          <input
-            autoFocus
-            type="date"
-            value={f.naissance}
-            max={new Date().toISOString().slice(0, 10)}
-            onChange={(e) => maj("naissance", e.target.value)}
-            autoComplete="bday"
-            className={cn(SAISIE, "[color-scheme:dark]")}
+          <Puces
+            options={SEXES.map((x) => ({ id: x, label: t(x === "homme" ? "Homme" : "Femme") }))}
+            valeur={f.sexe as Sexe}
+            onChange={(v) => maj("sexe", v)}
+            colonnes={2}
           />
-        </Champ>
+        </div>
       );
       break;
     case "gabarit":
       corps = (
         <div className="flex flex-col gap-[13px]">
-          <Reglage label="Taille" unite="cm" valeur={f.taille} min={BORNES.taille.min} max={BORNES.taille.max} onChange={(v) => maj("taille", v)} />
-          <Reglage label="Poids" unite="kg" valeur={f.poids} min={BORNES.poids.min} max={BORNES.poids.max} onChange={(v) => maj("poids", v)} />
-          <Reglage label="Pointure" unite="EU" valeur={f.pointure} min={BORNES.pointure.min} max={BORNES.pointure.max} pas={0.5} onChange={(v) => maj("pointure", v)} />
+          <Reglage label={t("Taille")} unite={t("cm")} valeur={f.taille} min={BORNES.taille.min} max={BORNES.taille.max} onChange={(v) => maj("taille", v)} />
+          <Reglage label={t("Poids")} unite={t("kg")} valeur={f.poids} min={BORNES.poids.min} max={BORNES.poids.max} onChange={(v) => maj("poids", v)} />
+          <Reglage label={t("Pointure")} unite="EU" valeur={f.pointure} min={BORNES.pointure.min} max={BORNES.pointure.max} pas={0.5} onChange={(v) => maj("pointure", v)} />
           <div>
-            <p className="mono-label mb-[8px] px-[13px] text-encre-3">Maillot</p>
+            <p className="mono-label mb-[8px] px-[13px] text-encre-3">{t("Maillot")}</p>
             <Puces
               options={MAILLOTS.map((m) => ({ id: m, label: m }))}
               valeur={f.maillot}
@@ -867,18 +849,31 @@ export default function InscriptionPage() {
     case "jeu":
       corps = (
         <div className="flex flex-col gap-[21px]">
+          <Champ
+            label={t("Né le")}
+            note={ans !== null && ans >= 0 ? <span className="text-encre-3">{t("{n} ans", { n: ans })}</span> : null}
+          >
+            <input
+              type="date"
+              value={f.naissance}
+              max={new Date().toISOString().slice(0, 10)}
+              onChange={(e) => maj("naissance", e.target.value)}
+              autoComplete="bday"
+              className={cn(SAISIE, "[color-scheme:dark]")}
+            />
+          </Champ>
           <div>
-            <p className="mono-label mb-[8px] px-[13px] text-encre-3">Poste</p>
+            <p className="mono-label mb-[8px] px-[13px] text-encre-3">{t("Poste")}</p>
             <Puces
-              options={POSTES.map((p) => ({ id: p.id, label: p.id, detail: p.label }))}
+              options={POSTES.map((p) => ({ id: p.id, label: p.id, detail: t(p.label) }))}
               valeur={f.poste}
               onChange={(v) => maj("poste", v)}
             />
           </div>
           <div>
-            <p className="mono-label mb-[8px] px-[13px] text-encre-3">Pied fort</p>
+            <p className="mono-label mb-[8px] px-[13px] text-encre-3">{t("Pied fort")}</p>
             <Puces
-              options={PIEDS.map((p) => ({ id: p, label: p.charAt(0).toUpperCase() + p.slice(1) }))}
+              options={PIEDS.map((p) => ({ id: p, label: t(p.charAt(0).toUpperCase() + p.slice(1)) }))}
               valeur={f.pied}
               onChange={(v) => maj("pied", v)}
             />
@@ -898,21 +893,21 @@ export default function InscriptionPage() {
                 type="button"
                 onClick={() => setPrise(a.id)}
                 className={cn(
-                  "relative aspect-[3/4] overflow-hidden rounded-[21px] text-left transition-all active:scale-[0.98]",
+                  "relative aspect-[3/4] overflow-hidden rounded-[21px] text-start transition-all active:scale-[0.98]",
                   src ? "bg-black" : "glass-soft",
                   prochaine && "ring-2 ring-foreground"
                 )}
               >
                 {src ? (
                   // eslint-disable-next-line @next/next/no-img-element -- data URL locale
-                  <img src={src} alt={a.label} className="absolute inset-0 size-full object-cover" />
+                  <img src={src} alt={t(a.label)} className="absolute inset-0 size-full object-cover" />
                 ) : (
                   <span className="absolute inset-0 grid place-items-center">
                     <span className="text-[55px] leading-none font-black text-foreground/10 tabular-nums">{i + 1}</span>
                   </span>
                 )}
                 <span className="absolute inset-x-0 bottom-0 flex items-center justify-between bg-gradient-to-t from-black/80 to-transparent px-[13px] pt-[21px] pb-[13px]">
-                  <span className="text-corps font-bold text-white">{a.label}</span>
+                  <span className="text-corps font-bold text-white">{t(a.label)}</span>
                   {src ? <RotateCcw className="size-3.5 text-white/70" /> : null}
                 </span>
               </button>
@@ -921,41 +916,74 @@ export default function InscriptionPage() {
         </div>
       );
       break;
-    case "secret":
+    case "compte":
       corps = (
         <div className="flex flex-col gap-[13px]">
-          <Champ label="Mot de passe">
-            <span className="flex items-center gap-2">
+          <Champ
+            label={t("Pseudo")}
+            note={
+              pseudoEtat === "pris" ? (
+                <span className="text-[#c8352b] dark:text-[#FF6B5E]">{t("Déjà pris.")}</span>
+              ) : pseudoEtat === "libre" ? (
+                <span className="text-encre-3">
+                  <Check className="me-1 inline size-3.5" />
+                  {t(sociale ? "Libre." : "Libre. C\u2019est aussi ton identifiant.")}
+                </span>
+              ) : null
+            }
+          >
+            <span dir="ltr" className="flex items-center">
+              <span className="text-titre-m font-bold text-encre-4">@</span>
               <input
                 autoFocus
-                type={voir ? "text" : "password"}
-                value={motDePasse}
-                onChange={(e) => {
-                  setMotDePasse(e.target.value);
-                  setErreur(null);
-                }}
-                autoComplete="new-password"
-                placeholder="••••••••"
+                value={f.pseudo}
+                onChange={(e) => maj("pseudo", normaliserPseudo(e.target.value))}
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                autoComplete="username"
+                maxLength={20}
+                placeholder={t("pseudo")}
                 className={SAISIE}
               />
-              <button type="button" onClick={() => setVoir((v) => !v)} aria-label={voir ? "Masquer" : "Afficher"} className="text-encre-3">
-                {voir ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-              </button>
+              {pseudoEtat === "verif" && <Loader2 className="size-4 shrink-0 animate-spin text-encre-4" />}
             </span>
           </Champ>
-          <Champ label="Encore une fois">
-            <input
-              type={voir ? "text" : "password"}
-              value={confirmation}
-              onChange={(e) => {
-                setConfirmation(e.target.value);
-                setErreur(null);
-              }}
-              autoComplete="new-password"
-              placeholder="••••••••"
-              className={SAISIE}
-            />
-          </Champ>
+          {!sociale && (
+            <Champ label={t("Email")}>
+              <input
+                type="email"
+                inputMode="email"
+                value={f.email}
+                onChange={(e) => maj("email", e.target.value.trim())}
+                autoCapitalize="none"
+                autoComplete="email"
+                dir="ltr"
+                placeholder="toi@exemple.fr"
+                className={SAISIE}
+              />
+            </Champ>
+          )}
+          {!sociale && (
+            <Champ label={t("Mot de passe")}>
+              <span dir="ltr" className="flex items-center gap-2">
+                <input
+                  type={voir ? "text" : "password"}
+                  value={motDePasse}
+                  onChange={(e) => {
+                    setMotDePasse(e.target.value);
+                    setErreur(null);
+                  }}
+                  autoComplete="new-password"
+                  placeholder="••••••••"
+                  className={SAISIE}
+                />
+                <button type="button" onClick={() => setVoir((v) => !v)} aria-label={t(voir ? "Masquer" : "Afficher")} className="text-encre-3">
+                  {voir ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                </button>
+              </span>
+            </Champ>
+          )}
           {/* Champ piège : invisible pour un humain, rempli par les robots. */}
           <input
             tabIndex={-1}
@@ -965,9 +993,6 @@ export default function InscriptionPage() {
             onChange={(e) => setPiege(e.target.value)}
             className="absolute -left-[9999px] h-0 w-0 opacity-0"
           />
-          <p className="px-[13px] text-corps text-encre-3">
-            Tu te connecteras avec <span className="font-bold text-encre-2">@{pseudo}</span> et ce mot de passe.
-          </p>
         </div>
       );
       break;
@@ -975,9 +1000,9 @@ export default function InscriptionPage() {
       corps = (
         <div className="flex flex-col gap-[13px]">
           {!entre && <div className="glass-soft rounded-[21px] px-[21px] py-[13px]">
-            <p className="mono-label text-encre-3">En attente</p>
+            <p className="mono-label text-encre-3">{t("En attente")}</p>
             <p className="mt-[8px] text-lecture leading-snug font-semibold">
-              La ligue valide ton entrée. Ta carte s&apos;ouvre dès que c&apos;est fait.
+              {t("La ligue valide ton entrée. Ta carte s'ouvre dès que c'est fait.")}
             </p>
           </div>}
           {avertissement && <p className="px-[13px] text-corps text-[#c8352b] dark:text-[#FF6B5E]">{avertissement}</p>}
@@ -992,7 +1017,7 @@ export default function InscriptionPage() {
               }}
               className="bouton-secondaire bouton--or py-[13px] text-ligne font-semibold"
             >
-              Renvoyer les photos
+              {t("Renvoyer les photos")}
             </button>
           )}
         </div>
@@ -1003,7 +1028,7 @@ export default function InscriptionPage() {
   /* ─────────────── La mise en page ─────────────── */
 
   const accueil = etape === "accueil";
-  const action = accueil ? "Commencer" : etape === derniere ? "Créer mon compte" : fini ? "Entrer" : "Continuer";
+  const action = t(accueil ? "Commencer" : etape === derniere ? "Créer mon compte" : fini ? "Entrer" : "Continuer");
 
   return (
     <div className="fixed inset-0 z-[60] flex flex-col bg-background" style={{ paddingTop: "env(safe-area-inset-top)" }}>
@@ -1019,10 +1044,10 @@ export default function InscriptionPage() {
           <button
             type="button"
             onClick={() => aller(-1)}
-            aria-label="Retour"
-            className="bouton-discret -ml-2 grid size-[34px] shrink-0 place-items-center"
+            aria-label={t("Retour")}
+            className="bouton-discret -ms-2 grid size-[34px] shrink-0 place-items-center"
           >
-            <ChevronLeft className="size-5" />
+            <ChevronLeft className="size-5 rtl:-scale-x-100" />
           </button>
           <div className="flex flex-1 gap-[5px]">
             {parcours.map((p, i) => (
@@ -1047,9 +1072,11 @@ export default function InscriptionPage() {
                 "flex items-end justify-center transition-[height] duration-500",
                 accueil || fini
                   ? "h-[52dvh] min-h-[340px]"
-                  : compacte
-                    ? "h-[23.6dvh] min-h-[150px]"
-                    : "h-[38.2dvh] min-h-[230px]"
+                  : etape === "compte"
+                    ? "h-[14.6dvh] min-h-[96px]"
+                    : compacte
+                      ? "h-[23.6dvh] min-h-[150px]"
+                      : "h-[38.2dvh] min-h-[230px]"
               )}
             >
               <div
@@ -1057,7 +1084,7 @@ export default function InscriptionPage() {
                 className={cn(fini && "animate-in zoom-in-90 fade-in duration-700")}
                 style={{ filter: "drop-shadow(0 21px 34px rgba(0,0,0,.55))" }}
               >
-                <BolaCard {...carte} size={accueil || fini ? 1 : compacte ? 0.382 : 0.618} />
+                <BolaCard {...carte} size={accueil || fini ? 1 : etape === "compte" ? 0.236 : compacte ? 0.382 : 0.618} />
               </div>
             </div>
           )}
@@ -1065,11 +1092,14 @@ export default function InscriptionPage() {
           {/* Le grand segment (0,618) : la question */}
           <div className="flex flex-1 flex-col pt-[34px]">
             {accueil && (
-              <p className="mono-label text-encre-3">
-                {parrain
-                  ? `Invité par ${parrain.p.affiche}${parrain.p.sfl ? " · Bola Team offert un mois" : ""}`
-                  : "Bola · Sunday Five League"}
-              </p>
+              <div className="flex items-center justify-between gap-[13px]">
+                <p className="mono-label text-encre-3">
+                  {parrain
+                    ? `${t("Invité par {nom}", { nom: parrain.p.affiche })}${parrain.p.sfl ? ` · ${t("Bola Team offert un mois")}` : ""}`
+                    : "Bola"}
+                </p>
+                {!sociale && <ChoixLangue />}
+              </div>
             )}
             {/* La taille AVANT l'interligne : tailwind-merge retire un leading-*
                 placé avant un text-[…], qui peut porter le sien. */}
@@ -1080,10 +1110,10 @@ export default function InscriptionPage() {
             <div className="mt-[21px]">{corps}</div>
             {accueil && ouvert === false && (
               <p className="mt-[13px] text-corps text-encre-3">
-                Les inscriptions ouvrent bientôt. En attendant, l&apos;admin te donne ton accès.
+                {t("Les inscriptions ouvrent bientôt. En attendant, l'admin te donne ton accès.")}
               </p>
             )}
-            {erreur && <p className="mt-[13px] px-[13px] text-corps font-medium text-[#c8352b] dark:text-[#FF6B5E]">{erreur}</p>}
+            {erreur && <p role="alert" className="mt-[13px] px-[13px] text-corps font-medium text-[#c8352b] dark:text-[#FF6B5E]">{t(erreur)}</p>}
             <div className="min-h-[34px] flex-1" />
           </div>
         </div>
@@ -1107,11 +1137,11 @@ export default function InscriptionPage() {
             </CaseAccord>
             {mineur && (
               <CaseAccord coche={accordParent} onChange={setAccordParent}>
-                {PHRASE_PARENT}
+                {t(PHRASE_PARENT)}
               </CaseAccord>
             )}
-            <CaseAccord coche={horsApp} onChange={setHorsApp} note="Facultatif">
-              Bola peut aussi montrer ma carte dans ses vidéos et ses posts, hors de l&apos;app.
+            <CaseAccord coche={horsApp} onChange={setHorsApp} note={t("Facultatif")}>
+              {t("Bola peut aussi montrer ma carte dans ses vidéos et ses posts, hors de l'app.")}
             </CaseAccord>
           </div>
         )}
@@ -1141,11 +1171,11 @@ export default function InscriptionPage() {
               onClick={() => void annulerSociale()}
               className="bouton-discret mt-[13px] block w-full py-[8px] text-center text-corps font-semibold"
             >
-              Annuler
+              {t("Annuler")}
             </button>
           ) : (
             <Link href="/" className="bouton-discret mt-[13px] block py-[8px] text-center text-corps font-semibold">
-              J&apos;ai déjà un compte
+              {t("J'ai déjà un compte")}
             </Link>
           ))}
       </div>

@@ -31,6 +31,7 @@ import { InvitationCarte } from "@/components/sfl/invitation-carte";
 import { Accueil, ApresAccueil } from "@/components/sfl/accueil/accueil";
 import { PorteSfl } from "@/components/sfl/porte-sfl";
 import { EssaiDesign } from "@/components/ds/essai-design";
+import { LangueDocument, SCRIPT_LANGUE } from "@/lib/i18n/langue";
 
 // Typographie de l'app BOLA, celle de la Map (Sabri, 22/10 : « uniformise le
 // tout ») : Inter pour tout ce qui se lit (celle du site), au plus gras pour
@@ -90,13 +91,14 @@ export default function RootLayout({
   return (
     <html
       lang="fr"
-      // Bulle (style 18) est le style de l'app (Sabri, 03/11) : posé dès le
-      // serveur pour qu'il n'y ait aucun éclair de l'ancien style.
-      data-style="18"
-      data-famille="bulle"
       suppressHydrationWarning
       className={`${inter.variable} ${anton.variable} ${barlow.variable} h-full antialiased`}
     >
+      {/* La langue (français, ou arabe de droite à gauche) posée avant le
+          premier rendu : lib/i18n/langue.tsx. */}
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: SCRIPT_LANGUE }} />
+      </head>
       {/* body ne défile jamais lui-même (overflow hidden, hauteur figée à
           celle de l'écran) : c'est le conteneur interne juste en dessous
           qui porte tout le scroll. Sans ça, le rebond élastique iOS/PWA
@@ -111,6 +113,7 @@ export default function RootLayout({
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem storageKey="bola-theme" disableTransitionOnChange>
           <CouleurTheme />
           <EssaiStyleUi />
+          <LangueDocument />
           <SeasonProvider>
             <PlayerProvider>
             <XpLigueProvider>

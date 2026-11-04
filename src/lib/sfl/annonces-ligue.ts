@@ -17,8 +17,10 @@
 //     après le coup d'envoi ; jusqu'au surlendemain. Dès la J5, au plus tôt
 //     à la révélation (revelation.ts) : la saison lue est la vue figée, où la
 //     journée n'est jouée qu'à 19 h. Chacun reçoit le sien : le MVP « J3 · Tu
-//     es le MVP », un joueur du jour son score, les autres les MVP ; et sa
-//     division (« Tu montes en D2. »). Toucher ouvre les Actus.
+//     es le MVP », un joueur du jour son score, les autres les MVP ; ses
+//     autres titres du jour (« Impact et Le Mur de ton équipe. », un même
+//     joueur peut avoir les trois) ; et sa division (« Tu montes en D2. »).
+//     Toucher ouvre les Actus.
 // Jamais la nuit : de 22 h (22 h 30 pour les résultats) à 9 h, l'annonce
 // attend le matin.
 //
@@ -34,6 +36,8 @@ import { journeeJouee, terrainDeJournee } from "./saisie/mutations";
 import { numeroSaison, type JourneeMeta, type Saison } from "./saisie/types";
 import { dernierBilan, nomDivision, type EtatDivisions } from "./divisions";
 import { nouveauRegime } from "./revelation";
+import { titresEnMots } from "./fiche-joueur";
+import { ORDRE_TITRES } from "./puces-titres";
 
 /** La feuille ne bouge plus depuis ce temps-là : l'admin a fini de la remplir. */
 export const CALME = 30 * 60_000;
@@ -187,11 +191,19 @@ function texteSansDivision(saison: Saison, j: number, joueur: string): { titre: 
   const mvps = [...new Set(s.entries.filter((e) => e.j === j && e.mvp && !isHidden(e.player)).map((e) => e.player))];
   const ligne = s.entries.find((e) => e.j === j && e.player === joueur && e.statut === "Présent" && !e.extraTime);
   const prenom = (nom: string) => nom.split(" ")[0];
+  // Tous ses titres du jour (votes posés), dans l'ordre des puces : un même
+  // joueur peut être MVP, Impact et Mur. Le MVP se dit dans le titre ; l'Impact
+  // et le Mur, ceux de son équipe, dans le texte.
+  const titres = ligne ? ORDRE_TITRES.filter((t) => ligne[t]) : [];
+  const dEquipe = titresEnMots(titres.filter((t) => t !== "mvp"), "ton");
 
   if (ligne?.mvp) {
+    const cartes = titres.length > 1 ? `Tes ${titres.length} cartes sont dans les Actus.` : "Ta carte est dans les Actus.";
     return {
       titre: `J${j} · Tu es le MVP`,
-      texte: `${pluriel(ligne.buts, "but", "buts")}, ${pluriel(ligne.passes, "passe décisive", "passes décisives")}. Ta carte est dans les Actus.`,
+      texte: [`${pluriel(ligne.buts, "but", "buts")}, ${pluriel(ligne.passes, "passe décisive", "passes décisives")}.`, dEquipe && `${dEquipe}.`, cartes]
+        .filter(Boolean)
+        .join(" "),
     };
   }
   const journee = computeJournees(s).find((x) => x.j === j);
@@ -205,7 +217,7 @@ function texteSansDivision(saison: Saison, j: number, joueur: string): { titre: 
     const siens = mvps.filter((n) => duMatch.has(n));
     return {
       titre: `J${j} · ${issue} ${pour} – ${contre}`,
-      texte: [`Avec les ${place.team.name}.`, siens.length ? `MVP du match : ${etListe(siens.map(prenom))}.` : ""]
+      texte: [`Avec les ${place.team.name}.`, dEquipe ? `${dEquipe}.` : "", siens.length ? `MVP du match : ${etListe(siens.map(prenom))}.` : ""]
         .filter(Boolean)
         .join(" "),
     };

@@ -11,10 +11,15 @@
 // (AuthGate) ; un joueur connecté n'en télécharge pas un octet, et le site,
 // sur son origine à lui, ne lit jamais la session de l'app.
 
+import { useEffect } from "react";
+import { noterSite } from "@/lib/sfl/site-visites";
+
 /** Le site de la marque ; une préversion peut en viser une autre. */
 const SITE = (process.env.NEXT_PUBLIC_SITE_BOLA || "https://bola-site.vercel.app").replace(/\/+$/, "");
 
 export function LandingSite() {
+  // Le haut de l'entonnoir : un visiteur de plus sur getbola.app (lib/sfl/site-visites.ts).
+  useEffect(() => noterSite("site"), []);
   // L'app dit au site où renvoyer ses boutons (getbola.app, sfl-eight, une préversion).
   const src = `${SITE}/?app=${encodeURIComponent(window.location.origin)}`;
   return (

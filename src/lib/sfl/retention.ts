@@ -123,8 +123,13 @@ export interface JoueurStat {
   email: string | null;
 }
 
+/** Les cinq étapes du funnel AARRR, dans l'ordre (Admin → Analytics, 03/11/2026). */
+export type EtapeAarrr = "acquisition" | "activation" | "retention" | "revenu" | "recommandation";
+
 export interface Conclusion {
   ton: "bon" | "alerte" | "idee";
+  /** L'étape du funnel où la conclusion se range. */
+  etape: EtapeAarrr;
   titre: string;
   detail: string;
   action: string;
@@ -722,6 +727,7 @@ function conclure(a: Omit<Analyse, "conclusions">): Conclusion[] {
     const d = (fin.hebdo - il14.hebdo) / il14.hebdo;
     if (d >= 0.15) {
       out.push({
+        etape: "retention",
         ton: "bon",
         titre: `La ligue repart : ${fin.hebdo} joueurs actifs sur 7 jours`,
         detail: `Contre ${il14.hebdo} il y a deux semaines (+${Math.round(d * 100)} %).`,
@@ -729,6 +735,7 @@ function conclure(a: Omit<Analyse, "conclusions">): Conclusion[] {
       });
     } else if (d <= -0.15) {
       out.push({
+        etape: "retention",
         ton: "alerte",
         titre: `L'activité baisse : ${fin.hebdo} joueurs actifs sur 7 jours`,
         detail: `Contre ${il14.hebdo} il y a deux semaines (${Math.round(d * 100)} %).`,
@@ -736,6 +743,7 @@ function conclure(a: Omit<Analyse, "conclusions">): Conclusion[] {
       });
     } else {
       out.push({
+        etape: "retention",
         ton: "idee",
         titre: `Activité stable : ${fin.hebdo} joueurs actifs sur 7 jours`,
         detail: `${il14.hebdo} il y a deux semaines.`,
@@ -750,6 +758,7 @@ function conclure(a: Omit<Analyse, "conclusions">): Conclusion[] {
     const jours = Math.round((c.a - c.de) / DAY) + 1;
     const dans = (t: number) => t >= c.de && t < c.a + DAY;
     out.push({
+      etape: "retention",
       ton: "alerte",
       titre: `Un trou de ${Math.round(jours / 7)} semaines, du ${jjmm(c.de)} au ${jjmm(c.a)}`,
       detail: `Les actifs sur 7 jours sont tombés à ${c.plancher}, contre ${c.pic} au plus haut. ${
@@ -768,6 +777,7 @@ function conclure(a: Omit<Analyse, "conclusions">): Conclusion[] {
     const part = r7.revenus / r7.eligibles;
     const sur10 = Math.round(part * 10);
     out.push({
+      etape: "activation",
       ton: part >= 0.5 ? "bon" : "alerte",
       titre: `Sur 10 nouveaux, ${sur10} reviennent après une semaine`,
       detail: `${r7.revenus} joueurs sur ${r7.eligibles} ont rouvert l'app 7 jours ou plus après leur arrivée.`,
@@ -784,6 +794,7 @@ function conclure(a: Omit<Analyse, "conclusions">): Conclusion[] {
     const avec = meilleur.avecRevenus / meilleur.avec;
     const sans = meilleur.sans ? meilleur.sansRevenus / meilleur.sans : 0;
     out.push({
+      etape: "activation",
       ton: "idee",
       titre: `Ceux qui ${meilleur.geste} reviennent plus`,
       detail: `Dans leur première semaine : ${pct(avec)} reviennent s'ils le font (${meilleur.avec} joueurs), ${pct(sans)} sinon (${meilleur.sans} joueurs).`,
@@ -795,6 +806,7 @@ function conclure(a: Omit<Analyse, "conclusions">): Conclusion[] {
   if (a.aRelancer.length >= 2) {
     const avecMail = a.aRelancer.filter((j) => j.email).length;
     out.push({
+      etape: "retention",
       ton: "alerte",
       titre: `${a.aRelancer.length} habitués ne viennent plus`,
       detail: `Venus plusieurs jours, plus vus depuis une semaine ou plus. ${
@@ -812,6 +824,7 @@ function conclure(a: Omit<Analyse, "conclusions">): Conclusion[] {
     const heures = a.carte[jourFort];
     const heureForte = heures.indexOf(Math.max(...heures));
     out.push({
+      etape: "retention",
       ton: "idee",
       titre: `Le jour fort : le ${JOURS_FR[jourFort]}, surtout vers ${heureForte} h`,
       detail: `Le ${JOURS_FR[jourFort]} concentre ${pct(parJour[jourFort] / total)} de la présence de la période.`,
@@ -824,6 +837,7 @@ function conclure(a: Omit<Analyse, "conclusions">): Conclusion[] {
   const jamais = a.familles.find((f) => f.id === "jamais")!.noms.length;
   if (jamais >= 3) {
     out.push({
+      etape: "activation",
       ton: "alerte",
       titre: `${jamais} comptes créés n'ont jamais servi`,
       detail: `Sur ${a.comptes} comptes créés, ${venus} sont venus au moins une fois.`,
@@ -839,6 +853,7 @@ function conclure(a: Omit<Analyse, "conclusions">): Conclusion[] {
       .map((x) => x.label.toLowerCase());
     if (rares.length >= 2) {
       out.push({
+        etape: "retention",
         ton: "idee",
         titre: "Des fonctions presque jamais utilisées",
         detail: `${capitale(liste(rares))} : moins de 1 % des actions chacune.`,
@@ -850,6 +865,7 @@ function conclure(a: Omit<Analyse, "conclusions">): Conclusion[] {
   // 9. Des sessions courtes.
   if (a.dureeMediane > 0 && a.dureeMediane < 3 * 60000) {
     out.push({
+      etape: "retention",
       ton: "idee",
       titre: `Des visites éclair : ${duree(a.dureeMediane)} en médiane`,
       detail: "Les joueurs ouvrent l'app pour une info précise, puis la referment.",

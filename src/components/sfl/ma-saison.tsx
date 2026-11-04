@@ -41,6 +41,7 @@ import {
 } from "@/lib/sfl/fiche-joueur";
 import { ordinal } from "@/lib/sfl/fin-de-saison";
 import { journeeJouee } from "@/lib/sfl/saisie/mutations";
+import { titreEnGrand } from "@/lib/sfl/titres-ecrans";
 import { cn } from "@/lib/utils";
 
 /** Sa place au Pépite d'Or après un dimanche, et ce qu'il a gagné (+) ou perdu (−) ce jour-là. */
@@ -77,7 +78,11 @@ function Pastille({ r }: { r: Resultat }) {
   );
 }
 
-/** Ses titres du jour, chacun avec le rond de la couleur de sa carte. */
+/**
+ * Ses titres du jour, chacun avec le rond de la couleur de sa carte, dans
+ * l'ordre des puces (dimanchesDe) : le MVP est celui du match, l'Impact et le
+ * Mur ceux de son équipe.
+ */
 function Titres({ titres, taille = "petit" }: { titres: TitreDuJour[]; taille?: "petit" | "grand" }) {
   if (!titres.length) return null;
   return (
@@ -89,7 +94,7 @@ function Titres({ titres, taille = "petit" }: { titres: TitreDuJour[]; taille?: 
             className={cn("shrink-0 rounded-full", taille === "grand" ? "size-2.5" : "size-2")}
             style={{ background: TEINTE_TITRE[t], boxShadow: `0 0 8px ${TEINTE_TITRE[t]}` }}
           />
-          {taille === "grand" ? `${NOM_TITRE[t]} du match` : NOM_TITRE[t]}
+          {taille === "grand" ? titreEnGrand(t) : NOM_TITRE[t]}
         </span>
       ))}
     </span>

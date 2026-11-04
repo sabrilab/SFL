@@ -27,7 +27,8 @@
 import { estGardien, NOMS_GARDIEN } from "./gardien";
 import { STAT_KEYS, ovr, type Player, type StatKey } from "./engine";
 import { jourMoisDuLibelle } from "./convocation-temps";
-import { ficheJoueur } from "./fiche-joueur";
+import { ficheJoueur, NOM_TITRE, type TitreDuJour } from "./fiche-joueur";
+import { ORDRE_TITRES } from "./puces-titres";
 import { RANKINGS } from "./rankings";
 import type { SchemaCoach } from "./schemas-coach";
 import { quantite, vitrine } from "./trophees";
@@ -65,7 +66,8 @@ export interface DernierMatch {
   resultat: string | null;
   buts: number;
   passes: number;
-  mvp: boolean;
+  /** Tous ses titres du jour, dans l'ordre des puces : un même joueur peut être MVP, Impact et Mur. */
+  titres: TitreDuJour[];
   /** Jours écoulés depuis le match (0 = aujourd'hui). */
   ilYa: number;
 }
@@ -78,7 +80,7 @@ export interface DossierJoueur {
   statut: string;
   /** Les six stats de la carte, de la meilleure à la pire. */
   stats: { id: StatKey; nom: string; valeur: number }[];
-  saison: { matchs: number; buts: number; passes: number; mvp: number; mur: number; pepite: number };
+  saison: { matchs: number; buts: number; passes: number; mvp: number; impact: number; mur: number; pepite: number };
   synthese: string;
   pointsForts: string[];
   dernierMatch: DernierMatch | null;
@@ -97,7 +99,8 @@ export interface MatchDossier {
   resultats: string[];
   buts: number;
   passes: number;
-  mvp: boolean;
+  /** Ses titres du jour, dans l'ordre des puces (mvp, impact, def). */
+  titres: TitreDuJour[];
   coequipiers: string[];
   adversaires: string[];
 }
@@ -137,7 +140,7 @@ function sesMatchs(saison: Saison, nom: string, js: number[]): MatchDossier[] {
       resultats: lui.map((e) => e.result).filter((r): r is NonNullable<typeof r> => !!r),
       buts: lui.reduce((a, e) => a + e.buts, 0),
       passes: lui.reduce((a, e) => a + e.passes, 0),
-      mvp: lui.some((e) => e.mvp),
+      titres: ORDRE_TITRES.filter((t) => lui.some((e) => e[t])),
       coequipiers: equipe ? noms((t) => t === equipe).slice(0, NOMS_PAR_EQUIPE) : [],
       adversaires: equipe ? noms((t) => !!t && t !== equipe) : [],
     };
@@ -204,7 +207,7 @@ export function dossierJoueur(saison: Saison, moi: Player, players: Player[], ma
       resultat: ce.map((e) => e.result).filter(Boolean).join(", ") || null,
       buts: ce.reduce((a, e) => a + e.buts, 0),
       passes: ce.reduce((a, e) => a + e.passes, 0),
-      mvp: ce.some((e) => e.mvp),
+      titres: ORDRE_TITRES.filter((t) => ce.some((e) => e[t])),
       ilYa: quand ? Math.max(0, Math.floor((maintenant.getTime() - quand.getTime()) / 86400_000)) : 99,
     };
   }
@@ -214,7 +217,7 @@ export function dossierJoueur(saison: Saison, moi: Player, players: Player[], ma
     note: ovr(moi.stats),
     statut: moi.statut,
     stats: statsTriees(moi),
-    saison: { matchs: moi.matchs, buts: moi.buts, passes: moi.passes, mvp: moi.mvp, mur: moi.def, pepite: moi.pp },
+    saison: { matchs: moi.matchs, buts: moi.buts, passes: moi.passes, mvp: moi.mvp, impact: moi.impact, mur: moi.def, pepite: moi.pp },
     synthese: fiche.synthese,
     pointsForts: fiche.forts.map((f) => `${f.chiffre} ${f.quoi} (${f.rang})`),
     dernierMatch,
@@ -227,14 +230,19 @@ export function dossierJoueur(saison: Saison, moi: Player, players: Player[], ma
 /** Le dernier match est-il assez frais pour que le coach demande comment ça s'est passé ? */
 export const debriefFrais = (d: DossierJoueur) => !!d.dernierMatch && d.dernierMatch.ilYa <= 3;
 
-/** La question d'ouverture du coach, après un match. */
+/**
+ * La question d'ouverture du coach, après un match : « J4 : défaite, 2 buts,
+ * 3 passes, Impact et Le Mur. Alors, c'était comment ? ». Tous ses titres du
+ * jour, dans l'ordre des puces.
+ */
 export function questionDebrief(m: DernierMatch): string {
   const res = m.resultat ? m.resultat.toLowerCase() : null;
+  const titres = m.titres.map((t) => NOM_TITRE[t]);
   const faits = [
     res,
     m.buts ? `${m.buts} but${m.buts > 1 ? "s" : ""}` : null,
     m.passes ? `${m.passes} passe${m.passes > 1 ? "s" : ""}` : null,
-    m.mvp ? "MVP" : null,
+    titres.length > 1 ? `${titres.slice(0, -1).join(", ")} et ${titres[titres.length - 1]}` : titres[0] ?? null,
   ].filter(Boolean);
   return `J${m.j}${faits.length ? ` : ${faits.join(", ")}` : ""}. Alors, c'était comment ?`;
 }
@@ -366,5 +374,7 @@ export function lireImage(v: unknown): ImageCoach | null {
   const chemin = typeof i.chemin === "string" && /^[0-9a-f-]{36}\/[\w.-]+$/.test(i.chemin) ? i.chemin : undefined;
   const url = typeof i.url === "string" && i.url.startsWith("data:image/") ? i.url : undefined;
   if (!chemin && !url) return null;
-  return { chemin, url, legende: typeof i.legende === "string" ? i.legende.slice(0, 200) : "" };
+  // 200 unités, sans garder la première moitié d'un emoji coupé.
+  const legende = typeof i.legende === "string" ? i.legende.slice(0, 200).replace(/[\uD800-\uDBFF]$/, "") : "";
+  return { chemin, url, legende };
 }

@@ -16,7 +16,7 @@
 // Rien ne change à ce qui part au serveur : signIn, comme avant.
 // Mouvement réduit : tout est posé d'emblée, la carte ne flotte pas.
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
@@ -25,6 +25,9 @@ import { DosCarte } from "@/components/sfl/dos-carte";
 import { LOGO_BOLA, matiereDe, RAYON_CARTE } from "@/components/sfl/finitions-carte";
 import { BoutonsSociaux } from "./boutons-sociaux";
 import { cn } from "@/lib/utils";
+import { useT } from "@/lib/i18n/langue";
+import { noterSite } from "@/lib/sfl/site-visites";
+import { ChoixLangue } from "@/components/sfl/langue/choix-langue";
 
 const MESSAGES: Record<string, string> = {
   "bad-password": "Identifiant ou mot de passe incorrect.",
@@ -89,6 +92,9 @@ function CarteQuiFlotte({ size }: { size: number }) {
 
 export function LoginScreen() {
   const reduit = useReducedMotion();
+  // L'entonnoir de getbola.app : la connexion ouverte (lib/sfl/site-visites.ts).
+  useEffect(() => noterSite("connexion"), []);
+  const t = useT();
   const [user, setUser] = useState("");
   const [password, setPassword] = useState("");
   const [show, setShow] = useState(false);
@@ -104,7 +110,7 @@ export function LoginScreen() {
     setError(null);
     const res = await signIn(user, password);
     if (!res.ok) {
-      setError(MESSAGES[res.reason] ?? "Connexion impossible.");
+      setError(t(MESSAGES[res.reason] ?? "Connexion impossible."));
       setBusy(false);
       navigator.vibrate?.([18, 40, 18]);
     }
@@ -130,8 +136,10 @@ export function LoginScreen() {
       </div>
 
       <div className="relative z-10 mx-auto flex w-full max-w-[380px] flex-1 flex-col">
-        <motion.div {...entree(-3)} className="flex justify-center pt-[8px]">
+        <motion.div {...entree(-3)} className="relative flex min-h-[34px] items-center justify-center pt-[8px]">
           <LogoBola className="h-[21px] w-auto text-foreground" />
+          {/* Le logo reste au centre ; la langue, au bout de la ligne. */}
+          <ChoixLangue className="absolute end-0 top-[4px]" />
         </motion.div>
 
         <div className="flex flex-1 flex-col items-center justify-center py-[21px] [@media(max-height:700px)]:py-[13px]">
@@ -145,14 +153,14 @@ export function LoginScreen() {
             {...entree(0)}
             className="mt-[21px] text-center text-titre-l leading-[1.06] font-extrabold tracking-tight text-balance text-foreground"
           >
-            Reviens au ballon.
+            {t("Reviens au ballon.")}
           </motion.h1>
         </div>
 
         <form onSubmit={submit} className="flex flex-col">
           <motion.div {...entree(1)} className="glass-soft overflow-hidden rounded-[22px]">
             <label className="flex flex-col gap-[3px] px-[18px] pt-[13px] pb-[11px]">
-              <span className="mono-label text-encre-3">Pseudo</span>
+              <span className="mono-label text-encre-3">{t("Pseudo")}</span>
               <input
                 value={user}
                 onChange={(e) => {
@@ -164,13 +172,14 @@ export function LoginScreen() {
                 autoComplete="username"
                 spellCheck={false}
                 enterKeyHint="next"
-                aria-label="Pseudo ou identifiant"
-                className="w-full bg-transparent text-titre font-semibold text-foreground outline-none"
+                aria-label={t("Pseudo ou identifiant")}
+                dir="ltr"
+                className="w-full bg-transparent text-start text-titre font-semibold text-foreground outline-none"
               />
             </label>
             <span className="mx-[18px] block h-px bg-contraste/8" />
             <label className="flex flex-col gap-[3px] px-[18px] pt-[11px] pb-[13px]">
-              <span className="mono-label text-encre-3">Mot de passe</span>
+              <span className="mono-label text-encre-3">{t("Mot de passe")}</span>
               <span className="flex items-center gap-2">
                 <input
                   type={show ? "text" : "password"}
@@ -181,13 +190,14 @@ export function LoginScreen() {
                   }}
                   autoComplete="current-password"
                   enterKeyHint="go"
-                  className="min-w-0 flex-1 bg-transparent text-titre font-semibold text-foreground outline-none"
+                  dir="ltr"
+                  className="min-w-0 flex-1 bg-transparent text-start text-titre font-semibold text-foreground outline-none"
                 />
                 <button
                   type="button"
                   onClick={() => setShow((s) => !s)}
-                  aria-label={show ? "Masquer le mot de passe" : "Afficher le mot de passe"}
-                  className="-mr-1 grid size-[30px] shrink-0 place-items-center text-encre-3"
+                  aria-label={t(show ? "Masquer le mot de passe" : "Afficher le mot de passe")}
+                  className="-me-1 grid size-[30px] shrink-0 place-items-center text-encre-3"
                 >
                   {show ? <EyeOff className="size-[18px]" /> : <Eye className="size-[18px]" />}
                 </button>
@@ -221,7 +231,7 @@ export function LoginScreen() {
             )}
           >
             {busy && <Loader2 className="size-4 animate-spin" />}
-            Entrer
+            {t("Entrer")}
           </motion.button>
         </form>
 
@@ -231,7 +241,7 @@ export function LoginScreen() {
 
         <motion.div {...entree(4)} className="mt-[21px] flex items-center justify-between px-[6px]">
           <Link href="/inscription" className="bouton-discret text-ligne font-semibold">
-            Créer ma carte
+            {t("Créer ma carte")}
           </Link>
           <button
             type="button"
@@ -239,7 +249,7 @@ export function LoginScreen() {
             aria-expanded={oubli}
             className="bouton-discret text-ligne font-semibold text-encre-3"
           >
-            Mot de passe oublié ?
+            {t("Mot de passe oublié ?")}
           </button>
         </motion.div>
         <AnimatePresence initial={false}>
@@ -248,16 +258,16 @@ export function LoginScreen() {
               initial={reduit ? false : { opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: "auto" }}
               exit={{ opacity: 0, height: 0 }}
-              className="overflow-hidden px-[6px] pt-[8px] text-right text-corps leading-snug text-encre-3"
+              className="overflow-hidden px-[6px] pt-[8px] text-end text-corps leading-snug text-encre-3"
             >
-              Un admin de la ligue t&apos;en donne un provisoire.
+              {t("Un admin de la ligue t'en donne un provisoire.")}
             </motion.p>
           )}
         </AnimatePresence>
 
         <motion.div {...entree(5)} className="mt-[21px] flex justify-center">
           <Link href="/confidentialite" className="text-micro font-medium text-encre-4 underline-offset-2 hover:underline">
-            Politique de confidentialité
+            {t("Politique de confidentialité")}
           </Link>
         </motion.div>
       </div>

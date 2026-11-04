@@ -24,6 +24,11 @@
 // où passe le cron : appelée par n'importe qui un dimanche, elle clôturait la
 // convocation du jour même et ouvrait déjà la semaine suivante (22/10/2026).
 // Le lundi matin, elle ne fait rien de plus que ce que le cron ferait.
+//
+// Une erreur ne sort jamais telle quelle (audit de sécurité du 03/11/2026,
+// T13) : l'appelant, qui peut être anonyme, ne reçoit qu'un message
+// générique ; le détail (message de la base, connexion refusée) reste dans
+// le journal du serveur, sans le nom de la variable de connexion.
 
 import { NextRequest, NextResponse } from "next/server";
 import { Client } from "pg";
@@ -31,6 +36,9 @@ import { candidateUrls, normalizeDbUrl } from "@/lib/server/migrate";
 import { instantParis, labelDateFr, prochainDimanche } from "@/lib/sfl/convocation-temps";
 
 export const dynamic = "force-dynamic";
+
+/** Ce que reçoit l'appelant quand la rotation échoue : rien de la base ni de la connexion. */
+const ECHEC = { status: "error", message: "La rotation de la semaine n'a pas pu se faire." } as const;
 
 interface DerniereConvocation {
   id: number;
@@ -67,8 +75,9 @@ export async function GET(req: NextRequest) {
   const dimanche = prochainDimanche(new Date());
   const label = labelDateFr(dimanche);
 
-  const connectErrors: string[] = [];
+  let essais = 0;
   for (const c of candidates) {
+    essais += 1;
     const client = new Client({
       connectionString: normalizeDbUrl(c.url),
       connectionTimeoutMillis: 8000,
@@ -76,7 +85,8 @@ export async function GET(req: NextRequest) {
     try {
       await client.connect();
     } catch (e) {
-      connectErrors.push(`${c.name}: ${e instanceof Error ? e.message : String(e)}`);
+      // La connexion par son rang seulement, jamais par le nom de sa variable.
+      console.error(`[cron] connexion ${essais}/${candidates.length} :`, e instanceof Error ? e.message : String(e));
       await client.end().catch(() => {});
       continue;
     }
@@ -98,7 +108,10 @@ export async function GET(req: NextRequest) {
         .catch((e) => console.error("[cron] suivi des notifications :", e instanceof Error ? e.message : e));
       // Les liens de parrainage ouverts : 13 mois au plus, eux aussi.
       await client
-        .query("delete from public.parrainage_visites where created_at < now() - interval '13 months'")
+        .query(
+          `delete from public.parrainage_visites where created_at < now() - interval '13 months';
+           delete from public.site_visites where created_at < now() - interval '13 months'`
+        )
         .catch((e) => console.error("[cron] liens de parrainage ouverts :", e instanceof Error ? e.message : e));
       // Les Fondateurs : ceux qui ont passé 10 recrues actives cette semaine
       // reçoivent leur numéro sur 500 (l'app le fait aussi à l'ouverture).
@@ -143,17 +156,12 @@ export async function GET(req: NextRequest) {
       );
       return NextResponse.json({ status: "ouverte", journee, dimanche: label });
     } catch (e) {
-      return NextResponse.json(
-        { status: "error", message: e instanceof Error ? e.message : String(e) },
-        { status: 500 }
-      );
+      console.error("[cron] rotation :", e instanceof Error ? e.message : String(e));
+      return NextResponse.json(ECHEC, { status: 500 });
     } finally {
       await client.end().catch(() => {});
     }
   }
 
-  return NextResponse.json(
-    { status: "error", message: `connexion impossible — ${connectErrors.join(" | ")}` },
-    { status: 500 }
-  );
+  return NextResponse.json(ECHEC, { status: 500 });
 }

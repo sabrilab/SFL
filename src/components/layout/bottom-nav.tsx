@@ -48,6 +48,7 @@ import { useInvitationsMatch } from "@/hooks/use-invitations";
 import { useDiscussionsMatch } from "@/hooks/use-discussions-match";
 import { useMonEquipe } from "@/hooks/use-mon-equipe";
 import { useModeClair } from "@/hooks/use-mode-clair";
+import { useT } from "@/lib/i18n/langue";
 
 const TABS = [
   { href: "/", Icon: MapIcon, label: "Map" },
@@ -57,8 +58,18 @@ const TABS = [
 
 const surMap = (pathname: string) => pathname === "/" || pathname === "/map";
 
+/**
+ * Les parcours plein écran ouverts à tous (la création du compte, le lien
+ * d'un parrain ou d'une équipe, l'accueil de l'admin, la politique) : pas de
+ * barre. Sur iPhone, leur page est dessinée dans #app-scroll, que WebKit
+ * place sous la barre quel que soit son z-index : la barre couvrait le
+ * bouton « Continuer » de l'inscription (Sabri, 02/11/2026).
+ */
+const SANS_BARRE = ["/inscription", "/bienvenue", "/equipe/", "/p/", "/confidentialite"];
+
 export function BottomNav() {
   const pathname = usePathname();
+  const t = useT();
   const onglet = ongletActif(pathname);
   const actif = TABS.findIndex(({ href }) => href === onglet);
   // La bulle ouvre la discussion : le Vestiaire, et Bola Agent à côté. Le
@@ -98,9 +109,13 @@ export function BottomNav() {
   // L'admin est un outil (30/10/2026) : son geste du moment occupe le bas de
   // l'écran, sous le pouce ; le retour en haut à gauche ramène à l'app.
   if (pathname.startsWith("/admin")) return null;
+  if (SANS_BARRE.some((r) => pathname.startsWith(r))) return null;
 
   return (
+    // De gauche à droite dans toutes les langues : la lentille glisse d'un
+    // tiers à l'autre (globals.css, .liquid-tabbar__lentille).
     <div
+      dir="ltr"
       className="fixed left-1/2 z-40 flex [html[data-clavier]_&]:hidden -translate-x-1/2 items-center gap-2"
       style={{
         bottom: "max(calc(env(safe-area-inset-bottom) - 4px), 14px)",
@@ -108,7 +123,7 @@ export function BottomNav() {
       }}
     >
       <nav
-        aria-label="Onglets"
+        aria-label={t("Onglets")}
         ref={nav}
         {...gestes}
         className="liquid-tabbar relative flex min-w-0 flex-1"
@@ -146,7 +161,7 @@ export function BottomNav() {
                 {href === "/" && surOngletMap > 0 && <Pastille n={surOngletMap} clair={clair} />}
               </span>
               <span className={choisi ? "liquid-tabbar__libelle" : "sr-only"} style={{ fontWeight: 650 }}>
-                {label}
+                {t(label)}
               </span>
             </Link>
           );
@@ -155,7 +170,7 @@ export function BottomNav() {
 
       {!bola && horsSflEtat === false && <Link
         href="/vestiaire"
-        aria-label={nonLus > 0 ? `Vestiaire, ${nonLus} nouveaux messages` : "Vestiaire"}
+        aria-label={nonLus > 0 ? t("Vestiaire, {n} nouveaux messages", { n: nonLus }) : t("Vestiaire")}
         aria-current={vestiaire ? "page" : undefined}
         className="liquid-tabbar liquid-tabbar--rond"
         data-clair={clair ? "" : undefined}

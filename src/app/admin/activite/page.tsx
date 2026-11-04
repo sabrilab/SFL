@@ -1,20 +1,16 @@
 "use client";
 
-// Activité & rétention — le gestionnaire de l'admin.
+// Analytics (Activité & rétention) — le gestionnaire de l'admin.
 //
-// Cette page lit le journal `activity` (réservé à l'admin par RLS) et la table
-// des profils, puis passe le tout à la vue (`vue.tsx`), qui analyse
-// (`lib/sfl/retention.ts`) et affiche : conclusions, courbes de croissance,
-// rétention par cohorte, gestes qui font revenir, notifications (qui les a
-// activées, ce que chaque motif fait faire : ./notifications.tsx, qui lit ses
-// propres tables), pays choisis pour la carte (table photo_studio), joueurs à
-// relancer. Sous les courbes, les repères de ce que l'app a fait chaque jour
-// (journées, matchs, notifications, mises en ligne), et « Qui ramène du
-// monde » : ./lectures.ts lit leurs tables (24/10). En
-// dessous, les vidéos de Bola (./videos.tsx : les poser, les publier, qui
-// les regarde), le parrainage vers 500 joueurs (./parrainage.tsx), les sujets de
-// Bola Agent (./agent.tsx), sans le contenu, puis les accords à la politique
-// de confidentialité (./confidentialite.tsx).
+// Cette page lit le journal `activity` (réservé à l'admin par RLS), la table
+// des profils, les photos du studio, les repères et « Qui ramène du monde »
+// (./lectures.ts), les parrainages (qui a fait venir qui, et par où chaque
+// compte est entré), l'entonnoir de getbola.app (table site_visites, 03/11)
+// et le parcours des comptes de moins de 90 jours (./parcours.ts), puis
+// passe le tout à la vue (`vue.tsx`), rangée selon le funnel AARRR :
+// acquisition, activation, rétention, revenu, recommandation. Les blocs qui
+// lisent leurs propres tables (vidéos, Bola Agent, parrainage, packs en XP,
+// accords) lui sont donnés à part, et elle les range dans leur étape.
 // Rien n'est agrégé en base, donc rien à maintenir quand on ajoute un type
 // d'événement.
 //
@@ -34,7 +30,9 @@ import { ParrainageStats } from "./parrainage";
 import { VideosStats } from "./videos";
 import { ActiviteVue, type DonneesActivite } from "./vue";
 import { lireParcours } from "./parcours";
-import { FENETRE_NOUVEAUX } from "./nouveaux";
+import { FENETRE_ACTIVATION } from "./activation";
+import type { Canal } from "./acquisition";
+import { Revenu } from "./revenu";
 
 /** Lignes rendues au plus par une requête au serveur (réglage Supabase). */
 const PAGE = 1000;
@@ -99,8 +97,28 @@ export default function ActivitePage() {
         // Les repères et « Qui ramène » : une lecture ratée les laisse vides.
         lireReperes(sb).catch(() => null),
         // Qui a fait venir qui, pour les nouveaux arrivants (./nouveaux.tsx).
-        sb.from("parrainages").select("filleul, parrain"),
+        sb.from("parrainages").select("filleul, parrain, canal, created_at"),
       ]);
+      // L'entonnoir de getbola.app (./acquisition.tsx) : une lecture ratée le dit, sans plus.
+      const lireSite = async () => {
+        const lignes: { visiteur: string; etape: string; source: string | null; jour: string }[] = [];
+        for (let debut = 0; debut < MAX_EVENEMENTS; debut += PAGE) {
+          const { data, error } = await sb
+            .from("site_visites")
+            .select("visiteur, etape, source, jour")
+            .order("id")
+            .range(debut, debut + PAGE - 1);
+          if (error) return null;
+          lignes.push(...(data ?? []));
+          if (!data || data.length < PAGE) break;
+        }
+        // « 2026-11-03 » → minuit local de ce jour, comme les jours des courbes.
+        return lignes.map((l) => {
+          const [y, m, d] = l.jour.split("-").map(Number);
+          return { visiteur: l.visiteur, etape: l.etape, source: l.source, t: new Date(y, m - 1, d).getTime() };
+        });
+      };
+      const site = await lireSite().catch(() => null);
       if (prof.error) throw new Error(prof.error.message);
 
       type Brut = {
@@ -142,23 +160,39 @@ export default function ActivitePage() {
           at: new Date(d.created_at).getTime(),
         })) ?? null;
       const reperes = reperesBrut ? assemblerReperes(reperesBrut, noms) : null;
-      const parrains = parrainagesBrut.error
-        ? null
-        : new Map(
-            ((parrainagesBrut.data ?? []) as { filleul: string; parrain: string }[]).flatMap((x) => {
+      type LienBrut = { filleul: string; parrain: string | null; canal: Canal; created_at: string };
+      const liensBruts = parrainagesBrut.error ? null : ((parrainagesBrut.data ?? []) as LienBrut[]);
+      const parrains = liensBruts
+        ? new Map(
+            liensBruts.flatMap((x) => {
               const f = noms.get(x.filleul);
-              const pa = noms.get(x.parrain);
+              const pa = x.parrain ? noms.get(x.parrain) : undefined;
               return f && pa ? [[f, pa] as const] : [];
             })
-          );
-      // Le parcours des comptes de moins de 30 jours (./parcours.ts), pour Nouveaux arrivants.
+          )
+        : null;
+      // Par où chaque compte est entré (seul par le site, un parrain, une équipe).
+      const canaux = liensBruts
+        ? new Map(liensBruts.flatMap((x) => (noms.get(x.filleul) ? [[noms.get(x.filleul)!, x.canal] as const] : [])))
+        : null;
+      // Les filleuls (venus par quelqu'un), datés : la recommandation.
+      const filleuls = liensBruts
+        ? liensBruts.flatMap((x) =>
+            x.canal !== "site" && noms.get(x.filleul) ? [{ name: noms.get(x.filleul)!, at: new Date(x.created_at).getTime() }] : []
+          )
+        : null;
+      const idsAdmins = new Set(
+        ((prof.data ?? []) as ProfilBrut[]).filter((p) => !!p.is_admin || isAdmin(p.name)).map((p) => p.id)
+      );
+      // Le parcours des comptes de moins de 90 jours (./parcours.ts), pour
+      // l'activation et Nouveaux arrivants (qui ne garde que ses 30 jours).
       const recents = new Map(
         ((prof.data ?? []) as ProfilBrut[])
-          .filter((p) => p.created_at && Date.now() - new Date(p.created_at).getTime() <= FENETRE_NOUVEAUX)
+          .filter((p) => p.created_at && Date.now() - new Date(p.created_at).getTime() <= FENETRE_ACTIVATION)
           .map((p) => [p.id, p.name] as const)
       );
       const parcours = await lireParcours(sb, recents).catch(() => null);
-      setData({ evenements, profiles, studio, reperes, parrains, parcours, now: Date.now() });
+      setData({ evenements, profiles, studio, reperes, parrains, canaux, filleuls, site, idsAdmins, parcours, now: Date.now() });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Lecture impossible.");
     }
@@ -205,14 +239,13 @@ export default function ActivitePage() {
       loading={loading}
       onRefresh={load}
       error={error}
-      pied={(public_, admins) => (
-        <>
-          <VideosStats public={public_} admins={admins} />
-          <ParrainageStats />
-          <AgentStats public={public_} admins={admins} />
-          <AccordsStats public={public_} admins={admins} />
-        </>
-      )}
+      blocs={{
+        videos: (public_, admins) => <VideosStats public={public_} admins={admins} />,
+        agent: (public_, admins) => <AgentStats public={public_} admins={admins} />,
+        parrainage: () => <ParrainageStats />,
+        revenu: (depuis, actifs, garde) => <Revenu depuis={depuis} actifs={actifs} garde={garde} />,
+        accords: (public_, admins) => <AccordsStats public={public_} admins={admins} />,
+      }}
     />
   );
 }

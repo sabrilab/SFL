@@ -615,7 +615,7 @@ function FeuilleTrophees() {
     { piece: <Trophee id="buteur" rang={1} taille={64} eclats={false} />, nom: "Meilleur buteur", regle: "Les trois joueurs qui ont marqué le plus de buts dans la saison." },
     { piece: <Trophee id="passeur" rang={1} taille={64} eclats={false} />, nom: "Meilleur passeur", regle: "Les trois joueurs qui ont fait le plus de passes décisives." },
     { piece: <Trophee id="mvp" rang={1} taille={64} eclats={false} />, nom: "MVP", regle: "Les trois joueurs élus le plus souvent meilleur joueur du match." },
-    { piece: <Trophee id="defenseur" rang={1} taille={64} eclats={false} />, nom: "Défensive", regle: "Les trois joueurs élus le plus souvent meilleur défenseur du match." },
+    { piece: <Trophee id="defenseur" rang={1} taille={64} eclats={false} />, nom: "Défensive", regle: "Les trois joueurs élus le plus souvent meilleur défenseur de leur équipe." },
     { piece: <TropheeObjet objet="coupe-but" taille={64} eclats={false} />, nom: "But d'exception", regle: "Le plus beau but de la saison.", bientot: true },
     { piece: <MedailleTop rang={1} taille={44} />, nom: `Médaille Top ${TOP_MEDAILLE}`, regle: `Les ${TOP_MEDAILLE} premiers du Pépite d'Or, leur rang gravé dessus.` },
     { piece: <TropheeObjet objet="coupe-engage" taille={64} eclats={false} />, nom: "Joueur engagé", regle: "Pour tous les joueurs qui ont disputé plus d'un match dans la saison." },

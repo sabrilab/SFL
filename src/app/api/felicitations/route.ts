@@ -9,7 +9,11 @@
 // retire son bravo puis le redonne ne le réveille pas deux fois). Les bravos
 // d'un même exploit se comptent dans la même notification, qui remplace la
 // précédente : « Kader et 2 autres t'ont félicité · Pour ton titre d'homme
-// du dimanche · J2 · +10 XP ». Les 10 XP ne s'annoncent que tant qu'ils
+// du dimanche · J2 · +10 XP ». Un même bravo qui touche plusieurs exploits
+// d'un joueur (un joueur peut être MVP, Impact et Défensive le même jour) les
+// dit tous dans une seule notification : « Pour tes titres de Joueur Impact
+// et de meilleur défenseur · J4 · +20 XP » (le calcul, pur et vérifié :
+// lib/sfl/felicitations-notif.ts). Avant, la dernière seule restait. Les 10 XP ne s'annoncent que tant qu'ils
 // comptent : cinq félicitations au plus par exploit, dix par joueur et par
 // journée (les plafonds de lib/sfl/missions.ts). La toucher ouvre l'exploit
 // dans les Actus (/ligue?exploit=…). Elle est suivie comme les autres
@@ -19,35 +23,18 @@ import { NextRequest, NextResponse } from "next/server";
 import { prevenir, type Envoi } from "@/lib/server/push-envoi";
 import { cleVapid } from "@/lib/server/web-push";
 import { appelant, serveur } from "@/lib/sfl/serveur-ligue.server";
-import { exploitsDeLaSaison, lireCle, type Exploit } from "@/lib/sfl/exploits";
+import { exploitsDeLaSaison, type Exploit } from "@/lib/sfl/exploits";
+import { exploitsDemandes, notificationsDesBravos, type Recue } from "@/lib/sfl/felicitations-notif";
 import type { Saison } from "@/lib/sfl/saisie/types";
 import { lireSaisonServeur } from "@/lib/sfl/saison-serveur.server";
 
 export const maxDuration = 30;
-
-/** Au plus, par appel : une rubrique des Actus tient sept joueurs. */
-const MAX = 10;
-const XP_RECUE = 10;
-/** Les félicitations comptées pour l'XP : par exploit, et par joueur et par journée. */
-const PAR_EXPLOIT = 5;
-const PAR_JOURNEE = 10;
-
-const couper = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
 
 interface Profil {
   id: string;
   name: string;
   nom_affiche: string | null;
   valide: boolean;
-}
-
-interface Ligne {
-  id: number;
-  de: string;
-  a: string;
-  exploit: string;
-  saison: number;
-  j: number;
 }
 
 export async function POST(req: NextRequest) {
@@ -57,10 +44,7 @@ export async function POST(req: NextRequest) {
   const moi = await appelant(sb, req);
   if (!moi) return NextResponse.json({ error: "Session requise." }, { status: 401 });
 
-  const corps = (await req.json().catch(() => ({}))) as { exploits?: unknown };
-  const demandes = Array.isArray(corps.exploits)
-    ? [...new Set(corps.exploits.filter((x): x is string => typeof x === "string" && x.length <= 120 && !!lireCle(x)))].slice(0, MAX)
-    : [];
+  const demandes = exploitsDemandes(await req.json().catch(() => ({})));
   if (demandes.length === 0) return NextResponse.json({ error: "Exploit inconnu." }, { status: 400 });
 
   // La saison publiée : un exploit d'une journée en brouillon n'existe pas encore.
@@ -121,36 +105,13 @@ export async function POST(req: NextRequest) {
     .in("saison", [...new Set(cibles.map((f) => exploits.get(f.exploit)!.saison))])
     .in("j", [...new Set(cibles.map((f) => exploits.get(f.exploit)!.j))])
     .order("id");
-  const toutes = (recues ?? []) as Ligne[];
+  const toutes = (recues ?? []) as Recue[];
   const prenom = (lui.nom_affiche ?? lui.name).split(" ")[0];
 
+  // Une notification par joueur prévenu, avec tous ses exploits de l'appel.
   const envois = new Map<string, Envoi>();
-  for (const f of cibles) {
-    const e = exploits.get(f.exploit)!;
-    const duJour = toutes.filter((x) => x.a === f.a && x.saison === e.saison && x.j === e.j);
-    // Les félicitations comptées, dans l'ordre où elles sont arrivées.
-    let jour = 0;
-    const parExploit = new Map<string, number>();
-    let compte = false;
-    for (const x of duJour) {
-      const n = parExploit.get(x.exploit) ?? 0;
-      const retenue = n < PAR_EXPLOIT && jour < PAR_JOURNEE;
-      parExploit.set(x.exploit, n + 1);
-      if (retenue) jour++;
-      if (x.id === f.id) compte = retenue;
-    }
-    const autres = duJour.filter((x) => x.exploit === f.exploit).length - 1;
-    // Plusieurs exploits du même joueur dans l'appel : la dernière notification reste.
-    envois.set(f.a, {
-      notif: {
-        titre: couper(autres > 0 ? `${prenom} et ${autres} ${autres > 1 ? "autres" : "autre"} t'ont félicité` : `${prenom} t'a félicité`, 60),
-        texte: couper(`Pour ${e.quoi} · J${e.j}${compte ? ` · +${XP_RECUE} XP` : ""}`, 180),
-        url: `/ligue?exploit=${encodeURIComponent(e.cle)}`,
-        tag: `felicitation-${e.cle}`,
-      },
-      motif: "felicitation",
-      ref: `exploit:${e.cle}`,
-    });
+  for (const [a, n] of notificationsDesBravos(cibles, exploits, toutes, prenom)) {
+    envois.set(a, { notif: { titre: n.titre, texte: n.texte, url: n.url, tag: n.tag }, motif: "felicitation", ref: n.ref });
   }
 
   const { recus } = await prevenir(sb, cle, envois, { de: moi.id });

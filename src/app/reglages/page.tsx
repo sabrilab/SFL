@@ -22,6 +22,8 @@ import { isAdmin } from "@/lib/sfl/admin";
 import { AccountCard } from "@/components/sfl/auth/account-card";
 import { ReglageNotifications } from "@/components/sfl/notifications/reglage-notifications";
 import { ReglageConfidentialite } from "@/components/sfl/confidentialite/reglage";
+import { useT } from "@/lib/i18n/langue";
+import { ReglageLangue } from "@/components/sfl/langue/choix-langue";
 
 // Le mode de l'app : clair, sombre, ou Auto, qui suit le réglage du
 // téléphone (le mot d'iOS). Le sombre reste le défaut. Le même choix se fait
@@ -38,6 +40,7 @@ export default function ReglagesPage() {
   const current = isClient ? (theme ?? "dark") : null;
   const { me } = useMyPlayer();
   const admin = isClient && isAdmin(me);
+  const t = useT();
 
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-7 px-5 py-4 sm:py-8">
@@ -47,16 +50,16 @@ export default function ReglagesPage() {
           <Settings className="size-5" />
         </span>
         <div>
-          <p className="text-corps font-medium text-encre-3">Personnalisation</p>
-          <h1 className="text-titre-l font-bold tracking-tight">Réglages</h1>
+          <p className="text-corps font-medium text-encre-3">{t("Personnalisation")}</p>
+          <h1 className="text-titre-l font-bold tracking-tight">{t("Réglages")}</h1>
         </div>
       </div>
 
       <AccountCard />
 
       <section>
-        <h2 className="mb-3 px-1 text-sm font-semibold text-encre-3">Apparence</h2>
-        <div role="radiogroup" aria-label="Apparence" className="glass flex rounded-2xl p-1">
+        <h2 className="mb-3 px-1 text-sm font-semibold text-encre-3">{t("Apparence")}</h2>
+        <div role="radiogroup" aria-label={t("Apparence")} className="glass flex rounded-2xl p-1">
           {THEME_OPTIONS.map(({ value, label, icon: Icon }) => {
             const active = current === value;
             return (
@@ -72,7 +75,7 @@ export default function ReglagesPage() {
                 )}
               >
                 <Icon className="relative size-5" />
-                <span className="relative">{label}</span>
+                <span className="relative">{t(label)}</span>
               </button>
             );
           })}
@@ -80,12 +83,17 @@ export default function ReglagesPage() {
       </section>
 
       <section>
-        <h2 className="mb-3 px-1 text-sm font-semibold text-encre-3">Notifications</h2>
+        <h2 className="mb-3 px-1 text-sm font-semibold text-encre-3">{t("Langue")}</h2>
+        <ReglageLangue />
+      </section>
+
+      <section>
+        <h2 className="mb-3 px-1 text-sm font-semibold text-encre-3">{t("Notifications")}</h2>
         <ReglageNotifications />
       </section>
 
       <section>
-        <h2 className="mb-3 px-1 text-sm font-semibold text-encre-3">Confidentialité</h2>
+        <h2 className="mb-3 px-1 text-sm font-semibold text-encre-3">{t("Confidentialité")}</h2>
         <ReglageConfidentialite />
       </section>
 
@@ -164,9 +172,9 @@ export default function ReglagesPage() {
               <ShieldCheck className="size-[18px]" />
             </span>
             <span className="flex-1">
-              <span className="block text-lecture font-semibold">Activité &amp; rétention</span>
+              <span className="block text-lecture font-semibold">Analytics</span>
               <span className="block text-petit text-encre-3">
-                Qui se connecte, quand — et les emails collectés
+                Acquisition, activation, rétention, revenu, recommandation
               </span>
             </span>
             <ChevronRight className="size-4 text-encre-3" />

@@ -13,15 +13,17 @@ import { LogOut } from "lucide-react";
 import { toast } from "sonner";
 import { signOut } from "@/lib/sfl/auth/session";
 import { cn } from "@/lib/utils";
+import { useT } from "@/lib/i18n/langue";
 
 export function BoutonDeconnexion({ className }: { className?: string }) {
+  const t = useT();
   return (
     <button
       type="button"
       onClick={() => {
-        if (!window.confirm("Te déconnecter ?")) return;
+        if (!window.confirm(t("Te déconnecter ?"))) return;
         signOut();
-        toast.success("À dimanche 👋");
+        toast.success(t("À dimanche 👋"));
       }}
       className={cn(
         "bouton-secondaire bouton--rouge flex items-center justify-center gap-2 py-[15px] text-lecture font-semibold",
@@ -29,7 +31,7 @@ export function BoutonDeconnexion({ className }: { className?: string }) {
       )}
     >
       <LogOut className="size-4" />
-      Se déconnecter
+      {t("Se déconnecter")}
     </button>
   );
 }

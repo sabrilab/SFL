@@ -1,8 +1,11 @@
 "use client";
 
 // Le vote du jour : Joueur Impact et meilleur défenseur, pour un adversaire
-// de son match. On touche la carte de celui qu'on choisit ; on peut changer
-// d'avis jusqu'à la fin du vote (revelation.ts : 18 h, une heure au moins
+// de son match. Chaque équipe a les siens (Ilyes, 02/11/2026) : mon vote élit
+// ceux de l'équipe adverse, dont les cartes sont sous le titre, et « n/N ont
+// voté » compte les électeurs de cette élection, mes coéquipiers et moi. On
+// touche la carte de celui qu'on choisit ; on peut changer d'avis jusqu'à la
+// fin du vote (revelation.ts : 18 h, une heure au moins
 // après la dernière feuille ; minuit jusqu'à la J4). Le vote se lit sur le
 // direct (useSeason().saisonLue) : sur la vue figée, la feuille n'est remplie
 // qu'à la révélation. Les voix restent cachées tant que le vote est
@@ -27,6 +30,7 @@ import {
   decompterMatch,
   feuilleRemplie,
   monVote,
+  urneDuVotant,
   voter,
   type CategorieVote,
 } from "@/lib/sfl/votes";
@@ -93,7 +97,8 @@ export function VoteFigures({ journee, me }: { journee: Journee; me: string }) {
       ) : (
         CATEGORIES_VOTE.map((cat) => {
           const mien = monVote(votes, numero, journee.j, cat, me);
-          const d = decompterMatch(votes, numero, journee.j, place.match, cat);
+          // L'élection de l'équipe adverse, celle où je vote.
+          const urne = urneDuVotant(decompterMatch(votes, numero, journee.j, place.match, cat), place);
           return (
             <section
               key={cat}
@@ -102,7 +107,7 @@ export function VoteFigures({ journee, me }: { journee: Journee; me: string }) {
               <div className="flex items-baseline justify-between px-1">
                 <h3 className="text-[15px] font-bold tracking-tight">{LIBELLES_VOTE[cat]}</h3>
                 <span className="mono-label text-foreground/40 tabular-nums">
-                  {ouvert ? `${d.votants}/${d.inscrits} ont voté` : "Pas encore ouvert"}
+                  {ouvert ? `${urne.votants}/${urne.inscrits} ont voté` : "Pas encore ouvert"}
                 </span>
               </div>
               <div className="-mx-5 flex gap-3 overflow-x-auto px-5 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
