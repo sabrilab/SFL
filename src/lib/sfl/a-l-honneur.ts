@@ -3,7 +3,9 @@
 // montrer beaucoup de cartes »). Le haut de la vue Journée en est fait :
 //   · l'homme du dimanche  : le ou les MVP de la journée ;
 //   · ils ont décroché     : les badges de palier gagnés ce dimanche-là
-//                            (la vitrine au soir de J comparée à celle de la veille) ;
+//                            (la vitrine au soir de J comparée à celle de la veille),
+//                            une entrée par joueur : son plus beau, et les
+//                            autres paliers franchis le même jour dans `aussi` ;
 //   · l'équipe type        : les cinq qui ont pris le plus de points Pépite ;
 //   · le duo               : la passe et le but qui se sont le plus répétés ;
 //   · ils montent          : les plus belles remontées au classement Pépite ;
@@ -17,14 +19,27 @@ import { entryPP } from "./saisie/engine";
 import { classables, standingsJusqua } from "./rangs";
 import { journeeJouee } from "./saisie/mutations";
 import type { Saison } from "./saisie/types";
-import { vitrine, type TropheeId } from "./trophees";
+import { metal, NOM_METAL, TROPHEES, vitrine, type TropheeId } from "./trophees";
 
-export interface Decroche {
-  nom: string;
+/** Un palier franchi un dimanche. */
+export interface PalierDuJour {
   id: TropheeId;
   /** Le palier atteint ce dimanche (1 = bronze… 4 = rouge et or). */
   palier: number;
   valeur: number;
+}
+
+/**
+ * Ce qu'un joueur a décroché un dimanche : son plus beau badge, et les autres
+ * paliers franchis le même jour, du plus rare au moins rare (Ilyes, 03/11 :
+ * « le badge du jour doit être unique : oui et non, choisis »). Unique là où
+ * il est en vedette — le fil des Actus n'en fait qu'une cinématique, la
+ * sienne — et tous visibles dans la Ligue, sur sa vitrine (a-l-honneur.tsx).
+ */
+export interface Decroche extends PalierDuJour {
+  nom: string;
+  /** Ses autres paliers du jour, dans l'ordre de rareté (ORDRE, palier) ; [] s'il n'en a qu'un. */
+  aussi: PalierDuJour[];
 }
 
 export interface Surface {
@@ -44,6 +59,18 @@ export interface Honneur {
   duo: { passeur: string; buteur: string; n: number } | null;
   montent: { nom: string; gain: number; rang: number }[];
   surface: Surface[];
+}
+
+/**
+ * La ligne d'un joueur dans le partage « Ils ont décroché » (au Vestiaire) :
+ * son plus beau badge, « MVP du match · Bronze », et le nombre de ses autres
+ * paliers du jour, « MVP du match · Bronze +2 ». Une ligne par joueur : le
+ * Vestiaire pose une carte par ligne.
+ */
+export function ligneDecroche(d: Decroche): { n: string; v: string } {
+  const nom = TROPHEES.find((t) => t.id === d.id)?.nom ?? d.id;
+  const base = `${nom} · ${NOM_METAL[metal(d.palier)!]}`;
+  return { n: d.nom, v: d.aussi.length ? `${base} +${d.aussi.length}` : base };
 }
 
 const jusqua = (s: Saison, j: number): Saison => ({
@@ -82,13 +109,13 @@ export function honneurDe(saison: Saison, j: number, moi?: string): Honneur {
   // Les badges : la vitrine au soir de J, et la veille.
   const apres = jusqua(saison, j);
   const avant = { ...saison, entries: saison.entries.filter((e) => e.j < j), events: saison.events?.filter((e) => e.j < j) };
-  const decroches: Decroche[] = [];
+  const franchis: (PalierDuJour & { nom: string })[] = [];
   const surface: Surface[] = [];
   for (const nom of presents) {
     const v1 = vitrine(apres, nom);
     const v0 = new Map(vitrine(avant, nom).map((t) => [t.def.id, t.palier]));
     for (const t of v1) {
-      if (t.palier > (v0.get(t.def.id) ?? 0)) decroches.push({ nom, id: t.def.id, palier: t.palier, valeur: t.valeur });
+      if (t.palier > (v0.get(t.def.id) ?? 0)) franchis.push({ nom, id: t.def.id, palier: t.palier, valeur: t.valeur });
       if (t.cible != null && t.cible - t.valeur === 1) {
         surface.push({ nom, id: t.def.id, reste: 1, palier: t.palier + 1 });
       }
@@ -96,9 +123,16 @@ export function honneurDe(saison: Saison, j: number, moi?: string): Honneur {
   }
   const rare = (a: { id: TropheeId; palier: number }, b: { id: TropheeId; palier: number }) =>
     b.palier - a.palier || ORDRE.indexOf(a.id) - ORDRE.indexOf(b.id);
-  // Un badge par joueur dans la vitrine du jour : son plus beau.
-  decroches.sort(rare);
-  const unParJoueur = decroches.filter((d, i) => decroches.findIndex((x) => x.nom === d.nom) === i);
+  // Une entrée par joueur dans la vitrine du jour : son plus beau badge en
+  // tête, ses autres paliers du jour derrière, dans le même ordre.
+  franchis.sort(rare);
+  const parJoueur = new Map<string, Decroche>();
+  for (const { nom, ...b } of franchis) {
+    const deja = parJoueur.get(nom);
+    if (deja) deja.aussi.push(b);
+    else parJoueur.set(nom, { nom, ...b, aussi: [] });
+  }
+  const unParJoueur = [...parJoueur.values()];
   surface.sort((a, b) => (a.nom === moi ? -1 : b.nom === moi ? 1 : rare(a, b)));
   const surfaceUnique = surface.filter((d, i) => surface.findIndex((x) => x.nom === d.nom) === i);
 
