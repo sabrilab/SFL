@@ -27,16 +27,10 @@
 // ailleurs, le verre suit le mode de l'app : fumé et encre blanche en
 // sombre, clair et encre noire en clair (23/10) — exactement le
 // `toolbarColorScheme` de l'onglet Jouer dans l'app.
-//
-// Relifting du 02/11/2026 (inspirations de Sabri) : la lentille de l'onglet
-// choisi devient une pilule pleine (blanche en sombre, noire en clair), son
-// icône et son libellé côte à côte à l'encre inverse ; les autres onglets ne
-// gardent que l'icône (le libellé reste lu par VoiceOver).
 
 import { useEffect } from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { useLentilleLiquide } from "./lentille-liquide";
+import { usePathname } from "next/navigation";
 import { ActusIcon, CarteIcon, MapIcon, VestiaireIcon } from "./nav-icons";
 import { ongletActif } from "@/lib/nav";
 import { remonter, retrouverOnglet } from "./memoire-navigation";
@@ -96,16 +90,6 @@ export function BottomNav() {
   // L'icône de l'app : tous les messages pas lus, comme les notifications.
   useEffect(() => pastilleIcone(nonLus + discussions + equipe), [nonLus, discussions, equipe]);
 
-  // La goutte de verre sous le doigt (lentille-liquide.ts) : un glissé
-  // navigue lui-même vers l'onglet où on lâche.
-  const router = useRouter();
-  const lien = (racine: string) => (horsSfl && racine === "/ligue" ? "/ligue-vierge" : racine);
-  const { nav, lentille, verre, gestes } = useLentilleLiquide(TABS.length, actif, (i) => {
-    const href = lien(TABS[i].href);
-    retrouverOnglet(href);
-    router.push(href);
-  });
-
   // L'admin est un outil (30/10/2026) : son geste du moment occupe le bas de
   // l'écran, sous le pouce ; le retour en haut à gauche ramène à l'app.
   if (pathname.startsWith("/admin")) return null;
@@ -124,21 +108,18 @@ export function BottomNav() {
     >
       <nav
         aria-label={t("Onglets")}
-        ref={nav}
-        {...gestes}
         className="liquid-tabbar relative flex min-w-0 flex-1"
         data-clair={clair ? "" : undefined}
-        data-tenu={verre ? "" : undefined}
         // La place de la lentille : un tiers, décalé de l'onglet choisi.
         style={{ ["--onglet" as string]: Math.max(0, actif) }}
       >
         {/* La lentille de l'onglet choisi */}
-        {actif >= 0 && <span ref={lentille} aria-hidden className="liquid-tabbar__lentille" data-verre={verre ? "" : undefined} />}
+        {actif >= 0 && <span aria-hidden className="liquid-tabbar__lentille" />}
 
         {TABS.map(({ href: racine, Icon, label }, i) => {
           const choisi = i === actif;
           // Les Actus d'un joueur Bola sont celles de Bola (porte-sfl.tsx).
-          const href = lien(racine);
+          const href = horsSfl && racine === "/ligue" ? "/ligue-vierge" : racine;
           return (
             <Link
               key={racine}
@@ -151,16 +132,13 @@ export function BottomNav() {
                 } else retrouverOnglet(href);
               }}
               className="liquid-tabbar__onglet"
-              // L'onglet choisi est plein, à l'encre inverse (relifting du 02/11).
-              // Sous la goutte de verre, plus de pilule : tous à l'encre de la barre.
-              style={{ color: choisi && !verre ? (clair ? "#ffffff" : "#0a0b0d") : encre }}
-              draggable={false}
+              style={{ color: encre }}
             >
               <span className="relative flex">
                 <Icon plein={choisi} />
                 {href === "/" && surOngletMap > 0 && <Pastille n={surOngletMap} clair={clair} />}
               </span>
-              <span className={choisi ? "liquid-tabbar__libelle" : "sr-only"} style={{ fontWeight: 650 }}>
+              <span className="liquid-tabbar__libelle" style={{ fontWeight: choisi ? 600 : 500 }}>
                 {t(label)}
               </span>
             </Link>
@@ -175,7 +153,7 @@ export function BottomNav() {
         className="liquid-tabbar liquid-tabbar--rond"
         data-clair={clair ? "" : undefined}
         data-choisi={vestiaire ? "" : undefined}
-        style={{ color: vestiaire ? (clair ? "#ffffff" : "#0a0b0d") : encre }}
+        style={{ color: encre }}
       >
         <span className="relative">
           <VestiaireIcon plein={vestiaire} />

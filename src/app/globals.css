@@ -109,7 +109,6 @@
    calmer l'interface. On neutralise les animations et transitions plutôt
    que de les supprimer, pour que les états finaux restent atteints. */
 @media (prefers-reduced-motion: reduce) {
-  .tuile-match, .tuile-match:active { transition: none; transform: none; }
   *,
   *::before,
   *::after {
@@ -1378,7 +1377,6 @@
   --tabbar-lentille: rgba(255, 255, 255, 0.13);
   --tabbar-liseret: rgba(255, 255, 255, 0.34);
   --tabbar-trou: #3a3b40;
-  --tabbar-plein: #f4f5f2;
   height: 62px;
   padding: 4px;
   border-radius: 999px;
@@ -1400,7 +1398,6 @@
   --tabbar-lentille: rgba(10, 11, 13, 0.08);
   --tabbar-liseret: rgba(255, 255, 255, 0.95);
   --tabbar-trou: #eeeef0;
-  --tabbar-plein: #0a0b0d;
   box-shadow:
     inset 1.2px 1.2px 0.5px -0.5px var(--tabbar-liseret),
     inset -1px -1px 0.5px -0.5px rgba(255, 255, 255, 0.7),
@@ -1416,80 +1413,24 @@
   left: 4px;
   width: calc((100% - 8px) / 3);
   border-radius: 999px;
-  /* Relifting du 02/11 : une pilule pleine sous l'onglet choisi. */
-  background: var(--tabbar-plein);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+  background: var(--tabbar-lentille);
+  box-shadow:
+    inset 0.8px 0.8px 0.4px -0.4px rgba(255, 255, 255, 0.45),
+    inset 0 0 0 0.5px rgba(255, 255, 255, 0.08);
   transform: translateX(calc(var(--onglet) * 100%));
   /* Le ressort d'iOS : ça part vite, dépasse un peu, se pose. */
   transition: transform 0.5s cubic-bezier(0.32, 1.35, 0.42, 1);
   pointer-events: none;
-}
-/* La goutte de verre sous le doigt (layout/lentille-liquide.ts, 02/11/2026) :
-   la pilule pleine devient du verre clair qui déborde de la barre, au-dessus
-   des onglets (ils passent sous elle, grossis comme sous une loupe). Le bord
-   est peint : liseré de lumière en haut à gauche, franges froide à gauche et
-   chaude à droite, comme le bord du verre d'iOS en sombre. La pilule revient
-   en fondu une fois la goutte posée. */
-.liquid-tabbar {
-  touch-action: none;
-}
-.liquid-tabbar__lentille {
-  transform-origin: 50% 50%;
-  will-change: transform;
-}
-.liquid-tabbar__lentille[data-verre] {
-  z-index: 2;
-  /* Pas de backdrop-filter ici : imbriqué dans celui de la barre, il
-     éteint le flou de la barre (Chromium). Le verre est peint. */
-  background: rgba(255, 255, 255, 0.12);
-  box-shadow:
-    inset 0 0 0 0.75px rgba(255, 255, 255, 0.5),
-    inset 1.5px 2px 1px -1px rgba(255, 255, 255, 0.95),
-    inset -1.5px -2px 1.5px -1px rgba(255, 255, 255, 0.4),
-    inset 5px 0 7px -5px rgba(150, 205, 255, 0.55),
-    inset -5px 0 7px -5px rgba(255, 196, 150, 0.5),
-    inset 0 -6px 10px -8px rgba(255, 255, 255, 0.45),
-    0 6px 18px rgba(0, 0, 0, 0.22);
-  transition: background-color 0.12s ease;
-}
-.liquid-tabbar[data-clair] .liquid-tabbar__lentille[data-verre] {
-  background: rgba(236, 236, 240, 0.55);
-  box-shadow:
-    inset 0 0 0 0.75px rgba(0, 0, 0, 0.08),
-    inset 1.5px 2px 1px -1px #ffffff,
-    inset -1.5px -2px 1.5px -1px rgba(0, 0, 0, 0.1),
-    0 2px 5px rgba(0, 0, 0, 0.1),
-    inset 5px 0 7px -5px rgba(150, 205, 255, 0.45),
-    inset -5px 0 7px -5px rgba(255, 196, 150, 0.4),
-    0 7px 18px rgba(0, 0, 0, 0.16);
-}
-/* La pilule pleine réapparaît en retard, comme sur iOS. */
-.liquid-tabbar__lentille:not([data-verre]) {
-  transition: background-color 0.24s ease 0.04s, box-shadow 0.24s ease;
-}
-/* La barre s'éclaire et s'élargit un peu autour de la goutte. */
-.liquid-tabbar[data-tenu] {
-  --tabbar-verre: rgba(52, 53, 58, 0.66);
-}
-.liquid-tabbar[data-clair][data-tenu] {
-  --tabbar-verre: rgba(255, 255, 255, 0.78);
-}
-.liquid-tabbar {
-  transition: background-color 0.25s ease;
-}
-.liquid-tabbar[data-tenu] .liquid-tabbar__onglet {
-  transition: none;
 }
 .liquid-tabbar__onglet {
   position: relative;
   z-index: 1;
   display: flex;
   flex: 1 1 0;
-  flex-direction: row;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 7px;
-  min-height: 44px;
+  gap: 1px;
   border-radius: 999px;
   transition: transform 0.35s cubic-bezier(0.32, 1.35, 0.42, 1);
   -webkit-tap-highlight-color: transparent;
@@ -1501,10 +1442,9 @@
 }
 .liquid-tabbar__libelle {
   font-family: var(--font-sans), system-ui, sans-serif;
-  font-size: 14px;
-  line-height: 16px;
-  letter-spacing: -0.1px;
-  white-space: nowrap;
+  font-size: 10px;
+  line-height: 12px;
+  letter-spacing: 0.1px;
 }
 /* La pastille de la Recherche, détachée à droite de la capsule : même verre,
    même hauteur, ronde. Choisie, elle prend la lentille. */
@@ -1517,7 +1457,7 @@
   transition: transform 0.35s cubic-bezier(0.32, 1.35, 0.42, 1), background-color 0.25s ease;
 }
 .liquid-tabbar--rond[data-choisi] {
-  background-image: linear-gradient(var(--tabbar-plein), var(--tabbar-plein));
+  background-image: linear-gradient(var(--tabbar-lentille), var(--tabbar-lentille));
 }
 .liquid-tabbar--rond:active {
   transform: scale(1.08);
@@ -1984,39 +1924,6 @@
   .chargement-bola__lune {
     animation: chargement-bola-souffle 2.4s ease-in-out infinite;
   }
-}
-
-/* La Map refaite (02/11, map/tiroir-map.tsx) : le tiroir monte à l'ouverture,
-   la commune de la barre se fond quand elle change, une tuile se pose. */
-@keyframes tiroir-monte {
-  from { transform: translateY(36px); opacity: 0; }
-  to { transform: none; opacity: 1; }
-}
-@keyframes barre-titre-entre {
-  from { transform: translateY(5px); opacity: 0; }
-  to { transform: none; opacity: 1; }
-}
-.tiroir-map { animation: tiroir-monte 0.6s cubic-bezier(0.2, 0.85, 0.25, 1) 0.15s both; }
-/* Le toucher qui rebondit (02/11, la mignonitude) : la tuile s'enfonce un peu
-   et revient en dépassant à peine, comme un objet souple ; le contour de la
-   choisie glisse en même temps. */
-.tuile-match { transition: transform 0.42s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.3s ease; }
-.tuile-match:active { transform: scale(0.955); transition-duration: 0.12s; }
-.barre-map-titre { animation: barre-titre-entre 0.35s ease-out both; }
-@media (prefers-reduced-motion: reduce) {
-  .tiroir-map, .barre-map-titre { animation: none; }
-}
-
-/* Le plan de jour (02/11, map/ambiances.ts « jour », « aube ») : la barre,
-   les pastilles et le tiroir posés dessus passent au clair, même quand l'app
-   est en sombre ; un panneau noir sur un plan clair faisait fuir. */
-.dark .surfaces-jour {
-  --background: #f8f8f5;
-  --foreground: #08090b;
-  --card: #ffffff;
-  --border: #e0e1dd;
-  --muted-foreground: #8f908b;
-  color-scheme: light;
 }
 
 /* ───────────── L'arabe (lib/i18n) ─────────────

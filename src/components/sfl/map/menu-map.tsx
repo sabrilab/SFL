@@ -72,7 +72,6 @@ export function MenuMap({
   admin = [],
   filtre,
   className,
-  boutonClassName,
 }: {
   bascules: BasculeMenu[];
   raccourcis: RaccourciMenu[];
@@ -80,8 +79,6 @@ export function MenuMap({
   /** Un filtre est posé : un point sur le bouton. */
   filtre: boolean;
   className?: string;
-  /** La taille du bouton, quand il se pose à côté de la barre du haut (02/11). */
-  boutonClassName?: string;
 }) {
   const [ouvert, setOuvert] = useState(false);
   const boite = useRef<HTMLDivElement>(null);
@@ -145,7 +142,7 @@ export function MenuMap({
         }}
         aria-expanded={ouvert}
         aria-label={filtre ? "Filtres et raccourcis, un filtre est posé" : "Filtres et raccourcis"}
-        className={cn("map-bord map-touche relative grid size-10 place-items-center", ouvert ? "bouton-encre" : "bouton-givre", boutonClassName)}
+        className={cn("map-bord map-touche relative grid size-10 place-items-center", ouvert ? "bouton-encre" : "bouton-givre")}
       >
         <SlidersHorizontal className="size-[18px]" strokeWidth={2.2} />
         {filtre && !ouvert && <span aria-hidden className="absolute top-[7px] right-[7px] size-[9px] rounded-full border-2 border-[#f4f1ed] bg-[#0a0b0d]" />}
