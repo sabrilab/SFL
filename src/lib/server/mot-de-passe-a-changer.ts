@@ -8,8 +8,8 @@
 // Deux appelants, une seule lecture :
 //   · lib/server/push-envoi.ts (motDePasseAChanger) : personne n'est prévenu
 //     tant qu'il doit changer son mot de passe ;
-//   · lib/sfl/serveur-ligue.server.ts (estAdmin) : un tel compte n'est pas
-//     admin pour les routes (04/11/2026).
+//   · lib/sfl/serveur-ligue.server.ts (estAdmin, estMembre) : un tel compte
+//     n'est ni admin (04/11/2026) ni membre (05/11/2026) pour les routes.
 //
 // Fermé par défaut : une erreur de lecture rend null (l'appelant refuse).
 // Seule une base sans la table (42P01 / PGRST205 : aperçu pas encore migré)
@@ -26,7 +26,7 @@ export const TABLE_ABSENTE = new Set(["42P01", "PGRST205"]);
 /**
  * Ceux des comptes `ids` qui doivent encore changer leur mot de passe ; null
  * si la table n'a pas pu être lue. `etiquette` préfixe la ligne du journal
- * (« [push] », « [admin] »).
+ * (« [push] », « [admin] », « [membre] »).
  */
 export async function lireMotDePasseAChanger(
   sb: SupabaseClient,

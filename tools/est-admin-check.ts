@@ -6,16 +6,19 @@
 // Fermé par défaut : une erreur de lecture de profiles ou du verrou répond
 // non, et le journal ne garde que le code. Seule une base sans la table
 // (42P01, PGRST205 : aperçu pas encore migré) garde le comportement d'avant.
+// estMembre, son pendant pour est_membre() (validé, et pas tant que le mot
+// de passe reste à changer), suit les mêmes règles (05/11/2026).
 // Puis les routes : toutes passent par estAdmin, aucune ne relit
-// profiles.is_admin pour l'appelant, et l'organisateur d'un match garde son
-// droit sans qu'estAdmin soit lu.
+// profiles.is_admin pour l'appelant (quelle que soit la liste de colonnes),
+// l'organisateur d'un match garde son droit sans qu'estAdmin soit lu, et
+// matchs/notifier exige estMembre de l'organisateur avant d'effacer.
 // Sans réseau : un faux client rend ce qu'on lui dit.
 //   npx tsx tools/est-admin-check.ts
 import assert from "node:assert/strict";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { estAdmin } from "../src/lib/sfl/serveur-ligue.server";
+import { estAdmin, estMembre } from "../src/lib/sfl/serveur-ligue.server";
 
 type Erreur = { code: string; message: string } | null;
 type Reponse = { data: unknown; error: Erreur };
@@ -112,6 +115,41 @@ async function main() {
     assert.match(String(ligne[0]), /^\[admin\] (profiles|mot_de_passe_a_changer)$/);
   }
 
+  // 7 bis · estMembre : les mêmes cas, sur profiles.valide.
+  const membre: Reponse = { data: { valide: true }, error: null };
+  const enAttente: Reponse = { data: { valide: false }, error: null };
+  const journalM: unknown[][] = [];
+  console.error = (...x: unknown[]) => void journalM.push(x);
+  try {
+    {
+      const { sb, lus } = fauxClient({ profiles: membre, mot_de_passe_a_changer: { data: [], error: null } });
+      assert.equal(await estMembre(sb, ID), true);
+      assert.deepEqual(lus, ["profiles", "mot_de_passe_a_changer"]);
+    }
+    for (const motif of ["origine", "provisoire"])
+      assert.equal(await estMembre(fauxClient({ profiles: membre, mot_de_passe_a_changer: verrou(motif) }).sb, ID), false, motif);
+    {
+      const { sb, lus } = fauxClient({ profiles: enAttente, mot_de_passe_a_changer: { data: [], error: null } });
+      assert.equal(await estMembre(sb, ID), false);
+      assert.deepEqual(lus, ["profiles"]);
+      assert.equal(await estMembre(fauxClient({ profiles: { data: null, error: null } }).sb, ID), false, "aucun profil");
+    }
+    for (const code of ["57014", "08006", ""]) {
+      assert.equal(await estMembre(fauxClient({ profiles: panne(code) }).sb, ID), false, code);
+      assert.equal(await estMembre(fauxClient({ profiles: membre, mot_de_passe_a_changer: panne(code) }).sb, ID), false, code);
+    }
+    for (const code of ["42P01", "PGRST205"])
+      assert.equal(await estMembre(fauxClient({ profiles: membre, mot_de_passe_a_changer: panne(code) }).sb, ID), true, code);
+  } finally {
+    console.error = avant;
+  }
+  assert.ok(journalM.length > 0);
+  for (const ligne of journalM) {
+    const texte = ligne.map(String).join(" ");
+    assert.ok(!texte.includes(ID) && !texte.includes("panne"), texte);
+    assert.match(String(ligne[0]), /^\[membre\] (profiles|mot_de_passe_a_changer)$/);
+  }
+
   // 8 · Les routes. Toute route qui agit avec la clé secrète et réserve un
   //     geste à l'admin passe par estAdmin ; aucune ne relit is_admin pour
   //     l'appelant (la cible protégée, elle, peut l'être).
@@ -142,7 +180,12 @@ async function main() {
   for (const p of routes) {
     const s = readFileSync(p, "utf8");
     if (!/\bserveur\(\)/.test(s)) continue;
-    assert.doesNotMatch(s, /select\("is_admin"\)\s*\.eq\("id",\s*(moi|auth\.user|user)\.id\)/, p);
+    // Quelle que soit la liste de colonnes (« name, is_admin »…) ou les guillemets.
+    assert.doesNotMatch(
+      s,
+      /select\(\s*["'`][^"'`]*\bis_admin\b[^"'`]*["'`]\s*\)\s*\.eq\(\s*["'`]id["'`]\s*,\s*(moi|auth\.user|user)\.id\s*\)/,
+      p
+    );
     if (/Réservé à l'admin/.test(s)) assert.match(s, /estAdmin\(sb, (moi|auth\.user)\.id\)/, p);
   }
   // push/envoyer lit avec les droits de l'appelant, mais ses traces partent à la clé secrète.
@@ -151,6 +194,16 @@ async function main() {
   assert.doesNotMatch(lire("entraineurs/calcul"), /motDePasseAChanger/);
   // L'organisateur d'un match garde son droit : estAdmin n'est lu que pour un autre.
   assert.match(lire("matchs/resultat"), /match\.organisateur !== moi\.id && !\(await estAdmin\(sb, moi\.id\)\)/);
+  // matchs/notifier : l'organisateur doit être membre (estMembre) avant que
+  // la route lise les joueurs ou efface le match, comme la base.
+  {
+    const s = lire("matchs/notifier");
+    const garde = s.search(/if \(!\(await estMembre\(sb, moi\.id\)\) && !\(await estAdmin\(sb, moi\.id\)\)\)\s*return/);
+    const orga = s.indexOf("match.organisateur !== moi.id");
+    assert.ok(orga > 0 && garde > orga, "notifier : garde estMembre après le contrôle de l'organisateur");
+    for (const apres of ['from("match_joueurs")', 'from("matchs").delete()', "prevenir("])
+      assert.ok(s.indexOf(apres) > garde, `notifier : ${apres} avant la garde estMembre`);
+  }
 }
 
 main().then(
