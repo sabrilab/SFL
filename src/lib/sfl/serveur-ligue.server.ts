@@ -4,8 +4,21 @@
 //
 // La clé secrète n'existe que dans les variables de Vercel (production) et ne
 // part jamais au navigateur. Sans elle, les routes répondent « fermé ».
+//
+// Elle passe outre la RLS : chaque route qui l'utilise décide elle-même qui
+// est admin, par estAdmin, et seulement par lui. Un admin qui doit encore
+// changer son mot de passe n'y est pas admin (04/11/2026), comme en base.
+// estMembre est le pendant d'est_membre() : matchs/notifier l'exige de
+// l'organisateur, comme la base pour annuler, modifier ou inviter.
+//
+// Les deux sont fermés par défaut : une panne passagère de lecture répond
+// non, et la route refuse (« Réservé à l'admin. », par exemple) le temps que
+// la base revienne. Rien ne reste bloqué (aucun cron ne passe par eux) : il
+// suffit de refaire le geste. Choix voulu : mieux vaut un faux refus qu'un
+// compte verrouillé qui passe.
 
 import { createClient, type SupabaseClient, type User } from "@supabase/supabase-js";
+import { lireMotDePasseAChanger } from "@/lib/server/mot-de-passe-a-changer";
 import { ACCOUNTS } from "@/lib/sfl/auth/accounts";
 import { username } from "@/lib/sfl/usernames";
 import { lireEffectifServeur } from "./saison-serveur.server";
@@ -31,10 +44,40 @@ export async function appelant(sb: SupabaseClient, req: Request): Promise<User |
   return error ? null : data.user;
 }
 
-/** Admin de la ligue ? Lu dans profiles, jamais dans le jeton ni ses métadonnées. */
+/**
+ * Admin de la ligue ? Lu dans profiles, jamais dans le jeton ni ses
+ * métadonnées. Comme is_league_admin() en base : pas tant qu'il doit encore
+ * changer son mot de passe (une ligne dans mot_de_passe_a_changer, d'origine
+ * ou provisoire). Fermé par défaut : une erreur de lecture répond non (le
+ * journal ne garde que le code) ; seule une base sans la table (aperçu pas
+ * encore migré) s'en tient à profiles.is_admin, comme avant.
+ */
 export async function estAdmin(sb: SupabaseClient, id: string): Promise<boolean> {
-  const { data } = await sb.from("profiles").select("is_admin").eq("id", id).maybeSingle();
-  return !!(data as { is_admin?: boolean } | null)?.is_admin;
+  const { data, error } = await sb.from("profiles").select("is_admin").eq("id", id).maybeSingle();
+  if (error) {
+    console.error("[admin] profiles", error.code);
+    return false;
+  }
+  if (!(data as { is_admin?: boolean } | null)?.is_admin) return false;
+  const aChanger = await lireMotDePasseAChanger(sb, [id], "[admin]");
+  return !!aChanger && !aChanger.has(id);
+}
+
+/**
+ * Membre de la ligue ? Le pendant serveur d'est_membre() : un compte validé
+ * (profiles.valide), pas tant qu'il doit encore changer son mot de passe.
+ * Fermé par défaut comme estAdmin ; seule une base sans la table s'en tient
+ * à profiles.valide.
+ */
+export async function estMembre(sb: SupabaseClient, id: string): Promise<boolean> {
+  const { data, error } = await sb.from("profiles").select("valide").eq("id", id).maybeSingle();
+  if (error) {
+    console.error("[membre] profiles", error.code);
+    return false;
+  }
+  if (!(data as { valide?: boolean } | null)?.valide) return false;
+  const aChanger = await lireMotDePasseAChanger(sb, [id], "[membre]");
+  return !!aChanger && !aChanger.has(id);
 }
 
 /** Pseudos qu'aucun joueur ne peut prendre : la ligue et ses services. */

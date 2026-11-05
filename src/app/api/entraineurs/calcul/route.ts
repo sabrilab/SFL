@@ -20,13 +20,13 @@
 // mot_de_passe_a_changer : d'origine, devenu public, ou provisoire) n'est
 // pas admin ici, comme pour la base (is_league_admin, audit de sécurité du
 // 03/11/2026) : une session ouverte avec ce mot de passe ne relance rien et
-// ne lit pas le bilan.
+// ne lit pas le bilan. Depuis le 04/11, estAdmin le refuse lui-même, pour
+// toutes les routes à clé secrète (même réponse : 403 « Réservé à l'admin. »).
 
 import { createHash, timingSafeEqual } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { appelant, estAdmin, serveur } from "@/lib/sfl/serveur-ligue.server";
 import { calculerCartesEntraineur } from "@/lib/sfl/entraineur-serveur.server";
-import { motDePasseAChanger } from "@/lib/server/push-envoi";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -68,8 +68,6 @@ export async function POST(req: NextRequest) {
   const moi = await appelant(sb, req);
   if (!moi) return NextResponse.json({ error: "Session requise." }, { status: 401 });
   if (!(await estAdmin(sb, moi.id))) return NextResponse.json({ error: "Réservé à l'admin." }, { status: 403 });
-  const aChanger = await motDePasseAChanger(sb, [moi.id]);
-  if (!aChanger || aChanger.has(moi.id)) return NextResponse.json({ error: "Réservé à l'admin." }, { status: 403 });
   dernierAppel = Date.now();
   const bilan = await calculerCartesEntraineur(sb);
   return NextResponse.json(bilan, { status: bilan.statut === "ok" ? 200 : 500 });

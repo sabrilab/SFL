@@ -27,12 +27,14 @@
 // audit de sécurité du 03/11/2026) : une notification porte le texte d'un
 // message, et un téléphone a pu être abonné avec ce mot de passe avant que
 // la base ne le refuse. Seule une base sans la table (aperçu pas encore
-// migré) laisse passer ; toute autre erreur de lecture n'envoie rien.
+// migré) laisse passer ; toute autre erreur de lecture n'envoie rien. La
+// lecture est partagée avec estAdmin (lib/server/mot-de-passe-a-changer.ts).
 //
 // SERVEUR UNIQUEMENT.
 
 import { randomUUID } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { lireMotDePasseAChanger } from "@/lib/server/mot-de-passe-a-changer";
 import { envoyer, type Abonnement, type CleVapid } from "@/lib/server/web-push";
 import type { MotifNotif } from "@/lib/sfl/motifs-notif";
 import type { Notif } from "@/lib/sfl/push";
@@ -57,15 +59,8 @@ export interface Options {
  * Ceux des joueurs qui doivent encore changer leur mot de passe ; null si la
  * table n'a pas pu être lue (on ne prévient alors personne).
  */
-export async function motDePasseAChanger(sb: SupabaseClient, ids: string[]): Promise<Set<string> | null> {
-  if (ids.length === 0) return new Set();
-  const { data, error } = await sb.from("mot_de_passe_a_changer").select("user_id").in("user_id", ids);
-  if (error) {
-    if (error.code === "42P01" || error.code === "PGRST205") return new Set();
-    console.error("[push] mot_de_passe_a_changer", error.code);
-    return null;
-  }
-  return new Set(((data ?? []) as { user_id: string }[]).map((x) => x.user_id));
+export function motDePasseAChanger(sb: SupabaseClient, ids: string[]): Promise<Set<string> | null> {
+  return lireMotDePasseAChanger(sb, ids, "[push]");
 }
 
 export interface Bilan {

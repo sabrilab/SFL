@@ -14,12 +14,19 @@
 // Toucher la notification ouvre la fiche du match sur la Map (/?match=id).
 //
 // La route agit avec la clé secrète : elle vérifie que l'appelant est bien
-// l'organisateur du match.
+// l'organisateur du match, et qu'il est membre au sens d'estMembre (validé,
+// et pas tant qu'il doit encore changer son mot de passe), comme la base
+// l'exige de l'organisateur pour annuler, modifier ou inviter (est_membre(),
+// 05/11/2026) ; sinon 403, avant toute lecture des joueurs et tout effacement.
+// L'admin au sens d'estAdmin passe aussi, comme « or is_league_admin() ».
+// L'annulation d'un match à la feuille faite reste à l'organisateur admin
+// au sens d'estAdmin (pas tant qu'il doit encore changer son mot de passe,
+// comme is_league_admin en base, 04/11/2026).
 
 import { NextRequest, NextResponse } from "next/server";
 import { cleVapid } from "@/lib/server/web-push";
 import { prevenir, type Envoi } from "@/lib/server/push-envoi";
-import { appelant, estAdmin, serveur } from "@/lib/sfl/serveur-ligue.server";
+import { appelant, estAdmin, estMembre, serveur } from "@/lib/sfl/serveur-ligue.server";
 import { jourLong } from "@/lib/sfl/jour-long";
 import type { Notif } from "@/lib/sfl/push";
 
@@ -48,6 +55,10 @@ export async function POST(req: NextRequest) {
     .maybeSingle();
   if (!match) return NextResponse.json({ error: "Match inconnu." }, { status: 404 });
   if (match.organisateur !== moi.id) return NextResponse.json({ error: "Ce match n'est pas le tien." }, { status: 403 });
+  // Un organisateur verrouillé (mot de passe d'origine ou provisoire) ou plus
+  // validé n'agit plus, comme en base (est_membre()).
+  if (!(await estMembre(sb, moi.id)) && !(await estAdmin(sb, moi.id)))
+    return NextResponse.json({ error: "Réservé aux joueurs de la ligue." }, { status: 403 });
   // L'admin garde la main, comme en base (or is_league_admin()).
   if (type === "annule" && match.saisi_le && !(await estAdmin(sb, moi.id)))
     return NextResponse.json({ error: "match déjà joué" }, { status: 409 });
