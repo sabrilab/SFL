@@ -9,7 +9,8 @@
 //     attente bornée par appel et pour tout le suivi ;
 //   · le vrai supabase-js sur un faux fetch, pour la vraie forme des erreurs :
 //     le 401 PGRST303 d'une lecture et d'un rpc, un 504 et une panne réseau
-//     sur un rpc, un 42501 (droits) jamais repris ;
+//     sur un rpc, un 42501 (droits) jamais repris ; un 502/504 sur une
+//     lecture (toutesLesLignes, lireSaisonServeur : l'erreur porte son statut) ;
 //   · le calcul entier sur ce faux fetch : la nuit du 07/11 rejouée (profiles
 //     refusé une fois) finit « ok » avec une reprise ; refusée trois fois, il
 //     finit en erreur avec deux reprises ; une erreur de droits, aucune.
@@ -20,6 +21,7 @@ import { readFileSync } from "node:fs";
 import { createClient } from "@supabase/supabase-js";
 import { ATTENTES_MS, ESSAIS, LIMITE_MS, avecReprise, erreurPassagere, nouveauSuivi, ouLever } from "../src/lib/server/reprise-base";
 import { calculerCartesEntraineur } from "../src/lib/sfl/entraineur-serveur.server";
+import { lireSaisonServeur, toutesLesLignes } from "../src/lib/sfl/saison-serveur.server";
 
 /** Un suivi à horloge fausse : attendre avance l'horloge et note l'attente. */
 function suiviFaux(limiteMs = LIMITE_MS) {
@@ -178,6 +180,36 @@ const refusJwt: Rendu = { status: 401, corps: JWT_FUTUR };
   ok(Array.isArray(lignes) && appels.get("/rest/v1/profiles") === 2 && suivi.reprises === 1, "GET 401 PGRST303 : repris une fois");
 }
 {
+  // Un 502/504 sur une LECTURE : toutesLesLignes et lireSaisonServeur lèvent l'erreur avec son
+  // statut (sans lui, l'erreur de postgrest-js n'a pas de `status` et rien n'était repris).
+  // Pas de 503 ici : postgrest-js reprend déjà seul un GET en 503, avec de vraies attentes.
+  const passerelle = (status: number): Rendu => ({ status, corps: { message: status === 504 ? "Gateway Timeout" : "Bad Gateway" } });
+  for (const status of [502, 504]) {
+    const { fetch, appels } = fauxFetch((c, n) => (c === "/rest/v1/profiles" && n === 1 ? passerelle(status) : undefined));
+    const { suivi } = suiviFaux();
+    const lignes = await avecReprise(suivi, () => toutesLesLignes(client(fetch), "profiles", "id", ["id"]), true);
+    ok(Array.isArray(lignes) && appels.get("/rest/v1/profiles") === 2 && suivi.reprises === 1, `toutesLesLignes ${status} : repris une fois`);
+    const e = await toutesLesLignes(client(fauxFetch((c) => (c === "/rest/v1/profiles" ? passerelle(status) : undefined)).fetch), "profiles", "id", ["id"]).then(
+      () => null,
+      (x: unknown) => x as { status?: number; message?: string }
+    );
+    ok(e?.status === status && typeof e.message === "string" && e.message.length > 0, `toutesLesLignes ${status} : l'erreur porte son statut et garde son message`);
+  }
+  {
+    const { fetch, appels } = fauxFetch((c, n) => (c === "/rest/v1/saison" && n === 1 ? passerelle(504) : c === "/rest/v1/saison" ? { status: 200, corps: null } : undefined));
+    const { suivi } = suiviFaux();
+    const lue = await avecReprise(suivi, () => lireSaisonServeur(client(fetch)), true);
+    ok(lue === null && appels.get("/rest/v1/saison") === 2 && suivi.reprises === 1, "lireSaisonServeur 504 : repris une fois");
+  }
+  // Non rejouable, ou une erreur de droits sur une lecture : toujours pas repris.
+  {
+    const { fetch, appels } = fauxFetch((c) => (c === "/rest/v1/profiles" ? passerelle(504) : undefined));
+    const { suivi } = suiviFaux();
+    await avecReprise(suivi, () => toutesLesLignes(client(fetch), "profiles", "id", ["id"]), false).catch(() => null);
+    ok(appels.get("/rest/v1/profiles") === 1 && suivi.reprises === 0, "lecture 504 non rejouable : un seul appel");
+  }
+}
+{
   // Un rpc (POST) : PGRST303, 504, panne réseau repris ; 42501 jamais.
   const cas: [string, Rendu[], number, boolean][] = [
     ["PGRST303", [refusJwt], 2, true],
@@ -231,6 +263,13 @@ const LECTURES = [
   const { suivi } = suiviFaux();
   const bilan = await calculerCartesEntraineur(client(fetch), new Date("2026-11-08T04:30:41Z"), suivi);
   ok(bilan.statut === "erreur" && bilan.reprises === 0 && appels.get("/rest/v1/equipes") === 1, "erreur de droits : un seul appel, aucune reprise");
+}
+{
+  // Un 504 de la passerelle sur une lecture du calcul : repris, le calcul finit « ok ».
+  const { fetch, appels } = fauxFetch((c, n) => (c === "/rest/v1/equipe_membres" && n === 1 ? { status: 504, corps: { message: "Gateway Timeout" } } : undefined));
+  const { suivi } = suiviFaux();
+  const bilan = await calculerCartesEntraineur(client(fetch), new Date("2026-11-08T04:30:41Z"), suivi);
+  ok(bilan.statut === "ok" && bilan.reprises === 1 && appels.get("/rest/v1/equipe_membres") === 2, `lecture 504 dans le calcul : ok après une reprise (${JSON.stringify(bilan)})`);
 }
 {
   // Une nuit sans erreur : rien ne change, zéro reprise.

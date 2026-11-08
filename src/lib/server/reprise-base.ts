@@ -10,18 +10,23 @@
 // « proxy_status: PostgREST; error=PGRST303 » ; les onze autres, dans la même
 // dizaine de millisecondes et avec la même clé, ont rendu 200. Avec les clés
 // secrètes (sb_secret_…), la passerelle fabrique un jeton à chaque requête ;
-// un léger décalage d'horloge avec PostgREST le fait refuser. PostgREST le
-// refuse en vérifiant le jeton, AVANT d'exécuter quoi que ce soit : la même
-// requête, renvoyée une seconde plus tard, passe. postgrest-js réessaie déjà
-// seul les GET après une panne réseau ou un 503/520, jamais un 401, jamais un
-// POST (donc aucun `rpc`).
+// cause PROBABLE, que les journaux ne montrent pas : un léger décalage
+// d'horloge entre elle et PostgREST. Ce qui est établi : PostgREST le refuse
+// en vérifiant le jeton, AVANT d'exécuter quoi que ce soit, et les requêtes
+// voisines passent ; qu'un nouvel essai 1 s ou 3 s plus tard passe aussi
+// reste à voir en production (le journal du cron le dira : « calcul fait
+// après N reprise(s) », ou l'erreur « (après N reprise(s)) »). postgrest-js
+// réessaie déjà seul les GET après une panne réseau ou un 503/520, jamais un
+// 401, jamais un POST (donc aucun `rpc`).
 //
 // Ce qui est repris (erreurPassagere) :
 //   · « JWT issued at future » (PGRST303) : jamais exécutée, toujours sûre ;
 //   · une panne réseau (statut 0) ou un 502/503/504 de la passerelle, quand
 //     l'appelant le déclare `rejouable` : une lecture, ou une écriture dont
 //     le second passage ne change rien (l'appel a pu s'exécuter avant que la
-//     réponse ne se perde).
+//     réponse ne se perde). L'erreur doit porter ce statut : ouLever le pose
+//     pour un rpc, toutesLesLignes et lireSaisonServeur pour une lecture
+//     (l'erreur que rend postgrest-js ne l'a pas).
 // Jamais repris : une erreur de droits, de données, de requête (tout code
 // Postgres ou PostgREST autre que ci-dessus), une erreur du code lui-même.
 //

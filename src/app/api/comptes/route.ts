@@ -10,12 +10,21 @@
 // L'appelant présente son jeton de session (« Authorization: Bearer … ») :
 // Supabase en vérifie la signature, is_admin est lu dans profiles, et chaque
 // lecture passe par les règles RLS de l'admin.
+//
+// Depuis le 08/11/2026, le test d'admin passe par estAdmin
+// (serveur-ligue.server.ts), comme les autres routes d'admin : un admin qui
+// doit encore changer son mot de passe (une ligne dans mot_de_passe_a_changer)
+// est refusé ici aussi (403, même message), comme par is_league_admin() en
+// base. Avant, la route lisait is_admin seul et lui rendait au moins la liste
+// d'origine (ACCOUNTS) et sa propre ligne. Fermé par défaut : une panne de
+// lecture répond non.
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { ACCOUNTS } from "@/lib/sfl/auth/accounts";
 import { identifiantPour } from "@/lib/sfl/auth/derive.server";
 import { lireEffectifServeur } from "@/lib/sfl/saison-serveur.server";
+import { estAdmin } from "@/lib/sfl/serveur-ligue.server";
 
 const SUPABASE_URL =
   process.env.NEXT_PUBLIC_SUPABASE_URL ?? "https://tpfusliksgxcvfrodchk.supabase.co";
@@ -50,12 +59,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Session invalide." }, { status: 401 });
   }
 
-  const { data: profile } = await sb
-    .from("profiles")
-    .select("is_admin")
-    .eq("id", auth.user.id)
-    .maybeSingle();
-  if (!profile?.is_admin) {
+  // estAdmin sur ce même client (le jeton de l'appelant) : is_admin, ET pas
+  // tant qu'il doit encore changer son mot de passe (08/11/2026).
+  if (!(await estAdmin(sb, auth.user.id))) {
     return NextResponse.json({ error: "Réservé à l'admin." }, { status: 403 });
   }
 

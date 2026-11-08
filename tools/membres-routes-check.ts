@@ -13,7 +13,12 @@
 //   · l'inventaire est fermé : toute route qui ouvre la session d'un appelant
 //     puis agit est dans INVENTAIRE, passe par estAdmin avant d'agir, ou est
 //     dans EXEMPTES avec sa raison. Une route nouvelle sans garde fait échouer
-//     le banc.
+//     le banc ;
+//   · le sens de chaque garde, mot pour mot : `if (!(await garde(sb, id)))
+//     return <refus>;` (seuls des refus de plus peuvent précéder le garde) ;
+//     un garde neutralisé, retourné ou sans son refus fait échouer le banc ;
+//   · le test d'admin de l'appelant passe partout par estAdmin, jamais par
+//     is_admin lu seul (comptes POST compris, qui ne fait que lire).
 //   npx tsx tools/membres-routes-check.ts
 import assert from "node:assert/strict";
 import { readdirSync, readFileSync, statSync } from "node:fs";
@@ -282,6 +287,18 @@ function inventaire() {
     // Le refus suit le garde, avec le message et le code d'avant.
     const apres = h!.slice(g, g + 220);
     ok(new RegExp(`${echapper(e.refus)}["'][^]*?${e.code}`).test(apres), `${e.route} : refus « ${e.refus} » ${e.code}`);
+    // Le SENS de la condition, mot pour mot : `if (` [des refus de plus] `!(await garde(sb, id)))
+    // return <le refus>;`. Un garde neutralisé (« false && »), retourné (sans « ! ») ou suivi
+    // d'autre chose que son refus fait échouer le banc. Les seuls termes admis devant lui
+    // refusent davantage (pas de session, pas validé, pas de nom) ; l'admin n'est admis
+    // qu'à matchs/notifier (« or is_league_admin() », comme en base).
+    const si = h!.lastIndexOf("if (", g);
+    const prefixe = String.raw`(?:!(?:moi|user|lui\?\.valide|p\?\.valide|p\.name) \|\| )*`;
+    const appelGarde = String.raw`!\(await ${e.garde}\(sb, (?:(?:moi|auth\.user|user)\.id|moi)\)\)`;
+    const ouAdmin = e.route === "matchs/notifier" ? String.raw` && !\(await estAdmin\(sb, moi\.id\)\)` : "";
+    const refus = `(?:NextResponse\\.json\\(\\{ error: "${echapper(e.refus)}" \\}, \\{ status: ${e.code} \\}\\)|erreur\\("${echapper(e.refus)}", ${e.code}\\))`;
+    const forme = new RegExp(`^if \\(${prefixe}${appelGarde}${ouAdmin}\\)\\s*return ${refus};`);
+    ok(si >= 0 && g - si < 120 && forme.test(h!.slice(si)), `${e.route} : la condition refuse exactement quand ${e.garde} répond non (${h!.slice(Math.max(si, 0), g + 60).replace(/\s+/g, " ")})`);
     // Plus de test valide seul pour l'appelant là où estMembre le remplace.
     if (e.garde === "estMembre" && e.route !== "matchs/notifier")
       ok(!/select\("valide"\)\s*\.eq\("id",/.test(h!.replace(/\s+/g, " ").replace(/\(\s/g, "(")), `${e.route} : la lecture de valide seule est partie`);
@@ -308,6 +325,23 @@ function ferme() {
   for (const cle of [...dansInventaire, ...Object.keys(EXEMPTES)]) ok(vus.includes(cle), `${cle} : toujours une route qui agit (sinon la sortir de la liste)`);
 }
 
+/**
+ * Le test d'admin de l'appelant passe toujours par estAdmin (qui porte le
+ * verrou), jamais par une lecture d'is_admin seul : même une route qui ne
+ * fait que lire (comptes POST, sans motif d'EFFETS, que ferme() ne voit pas).
+ */
+function admins() {
+  for (const r of routes()) {
+    const s = sansCommentaires(readFileSync(join(RACINE, r, "route.ts"), "utf8")).replace(/\s+/g, "");
+    ok(!/\.select\("is_admin"\)\.eq\("id",(auth\.user|moi|user)\.id\)/.test(s), `${r} : le test d'admin de l'appelant passe par estAdmin, pas par is_admin seul`);
+  }
+  const { handlers, admin } = analyser(join(RACINE, "comptes", "route.ts"));
+  const h = handlers.get("POST")!;
+  const lecture = h.search(/\.select\("id, name, username"\)/);
+  ok(admin(h) < lecture && lecture < Infinity && /if \(!\(await estAdmin\(sb, auth\.user\.id\)\)\) \{\s*return NextResponse\.json\(\{ error: "Réservé à l'admin\." \}, \{ status: 403 \}\);/.test(h),
+    "comptes POST : estAdmin avant toute lecture, refus « Réservé à l'admin. » 403");
+}
+
 /** Les crons de vercel.json n'ouvrent aucune session et ne passent par aucun garde de l'inventaire. */
 function crons() {
   const v = JSON.parse(readFileSync(join(import.meta.dirname, "..", "vercel.json"), "utf8")) as { crons: { path: string }[] };
@@ -326,6 +360,7 @@ async function main() {
   await garde();
   inventaire();
   ferme();
+  admins();
   crons();
   console.log(`membres-routes : ok (${verifs} vérifications, ${INVENTAIRE.length} routes gardées)`);
 }
