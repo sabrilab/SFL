@@ -30,10 +30,17 @@
 // le 18/10/2026 après le comparatif sur un vrai selfie : il garde le mieux les
 // traits ; ~0,07 $ l'image en 1536²), les filtres restent sur Nano Banana
 // (~0,04 $), qui ne touche qu'au fond ou au style d'une photo déjà faite.
+//
+// Depuis le 08/11/2026, l'appelant passe par estMembre
+// (serveur-ligue.server.ts) : validé, et pas tant qu'il doit encore changer
+// son mot de passe (mot_de_passe_a_changer), comme est_membre() en base. Un
+// compte verrouillé reçoit le refus d'un compte non validé, avant tout envoi,
+// écriture ou appel payant.
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { SANS_ACCORD, accordEnregistre } from "@/lib/sfl/confidentialite.server";
+import { estMembre } from "@/lib/sfl/serveur-ligue.server";
 import {
   LIMITE_JOUR,
   SELFIES_MAX,
@@ -150,12 +157,9 @@ export async function POST(req: NextRequest) {
   const { data: auth, error: authError } = await sb.auth.getUser(corps.accessToken);
   if (authError || !auth.user) return erreur("Session invalide.", 401);
 
-  const { data: profil } = await sb
-    .from("profiles")
-    .select("valide")
-    .eq("id", auth.user.id)
-    .maybeSingle();
-  if (!profil?.valide) return erreur("Ton compte attend d'être accepté.", 403);
+  // Membre au sens d'estMembre, lu avec son jeton (« mot_de_passe_a_changer: je lis le mien ») : validé, et pas
+  // tant qu'il doit encore changer son mot de passe (08/11/2026). Avant tout appel payant.
+  if (!(await estMembre(sb, auth.user.id))) return erreur("Ton compte attend d'être accepté.", 403);
   if (!(await accordEnregistre(sb, auth.user.id))) return erreur(SANS_ACCORD, 403);
 
   // Le crédit : LIMITE_JOUR photos depuis minuit, heure de Paris.

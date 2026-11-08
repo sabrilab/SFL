@@ -17,11 +17,15 @@
 //   5. rend { obtenu, serie, xp, monnaie, solde, deja } (xp : le prix payé,
 //      dans sa monnaie) ; un refus : 402 « XP S insuffisantes. » avec le
 //      solde réel, 409 « Pack complet. ».
+//
+// Depuis le 08/11/2026, pas tant qu'il doit encore changer son mot de passe
+// (motDePasseChoisi, serveur-ligue.server.ts : mot_de_passe_a_changer) : le
+// refus d'un compte non validé, avant tout envoi ou écriture.
 
 import { NextRequest, NextResponse } from "next/server";
 import { COMPTES_VITRINE } from "@/lib/sfl/compte-vitrine";
 import { nationsEnJeu, PACK_AFRIQUE } from "@/lib/sfl/pack-afrique";
-import { appelant, serveur } from "@/lib/sfl/serveur-ligue.server";
+import { appelant, motDePasseChoisi, serveur } from "@/lib/sfl/serveur-ligue.server";
 import { bilanServeurDe, xpServeurRecent } from "@/lib/sfl/xp-serveur.server";
 
 export const maxDuration = 30;
@@ -38,7 +42,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Demande invalide." }, { status: 400 });
   const { data: profil } = await sb.from("profiles").select("name, valide").eq("id", moi.id).maybeSingle();
   const p = profil as { name: string; valide: boolean } | null;
-  if (!p?.valide || !p.name) return NextResponse.json({ error: "Réservé aux joueurs de la ligue." }, { status: 403 });
+  // Pas tant qu'il doit encore changer son mot de passe (motDePasseChoisi, 08/11/2026) : même refus.
+  if (!p?.valide || !p.name || !(await motDePasseChoisi(sb, moi.id))) return NextResponse.json({ error: "Réservé aux joueurs de la ligue." }, { status: 403 });
   if ((COMPTES_VITRINE as readonly string[]).includes(p.name)) return NextResponse.json({ error: "Compte vitrine." }, { status: 403 });
   const choix = nationsEnJeu();
   if (!choix.length) return NextResponse.json({ error: "Pas encore ouvert." }, { status: 409 });

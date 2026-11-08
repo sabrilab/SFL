@@ -11,11 +11,17 @@
 // rien. Un envoi qui échoue partout libère la réservation : le prochain
 // appel réessaie. Session de membre exigée ; la route agit avec la clé
 // secrète.
+//
+// Depuis le 08/11/2026, l'appelant passe par estMembre
+// (serveur-ligue.server.ts) : validé, et pas tant qu'il doit encore changer
+// son mot de passe (mot_de_passe_a_changer), comme est_membre() en base. Un
+// compte verrouillé reçoit le refus d'un compte non validé, avant tout envoi,
+// écriture ou appel payant.
 
 import { NextRequest, NextResponse } from "next/server";
 import { prevenir, type Envoi } from "@/lib/server/push-envoi";
 import { cleVapid } from "@/lib/server/web-push";
-import { appelant, serveur } from "@/lib/sfl/serveur-ligue.server";
+import { appelant, estMembre, serveur } from "@/lib/sfl/serveur-ligue.server";
 import { lireSaisonServeur } from "@/lib/sfl/saison-serveur.server";
 import { cartonsDeLaSaison, cleNotifCarton, texteCarton } from "@/lib/sfl/cartons";
 
@@ -26,8 +32,8 @@ export async function POST(req: NextRequest) {
   if (!sb) return NextResponse.json({ error: "pas branché" }, { status: 503 });
   const moi = await appelant(sb, req);
   if (!moi) return NextResponse.json({ error: "Session requise." }, { status: 401 });
-  const { data: profil } = await sb.from("profiles").select("valide").eq("id", moi.id).maybeSingle();
-  if (!(profil as { valide?: boolean } | null)?.valide) return NextResponse.json({ error: "Réservé à la ligue." }, { status: 403 });
+  // Membre au sens d'estMembre : validé, et pas tant qu'il doit encore changer son mot de passe (08/11/2026).
+  if (!(await estMembre(sb, moi.id))) return NextResponse.json({ error: "Réservé à la ligue." }, { status: 403 });
 
   const lue = await lireSaisonServeur(sb).catch(() => null);
   // Le direct (la saison publiée, sans figer) : le carton se donne sur place.

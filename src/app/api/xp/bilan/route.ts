@@ -10,9 +10,13 @@
 // session de membre validé. Le même joueur qui rappelle dans les secondes
 // qui suivent reprend le calcul en cours ou le précédent (xpServeurRecent) :
 // un appel répété ne recalcule pas toute la ligue.
+//
+// Depuis le 08/11/2026, pas tant qu'il doit encore changer son mot de passe
+// (motDePasseChoisi, serveur-ligue.server.ts : mot_de_passe_a_changer) : le
+// refus d'un compte non validé, avant tout envoi ou écriture.
 
 import { NextRequest, NextResponse } from "next/server";
-import { appelant, serveur } from "@/lib/sfl/serveur-ligue.server";
+import { appelant, motDePasseChoisi, serveur } from "@/lib/sfl/serveur-ligue.server";
 import { bilanServeurDe, paliersAGarder, xpServeurRecent, type XpServeur } from "@/lib/sfl/xp-serveur.server";
 
 export const maxDuration = 30;
@@ -24,7 +28,8 @@ export async function POST(req: NextRequest) {
   if (!moi) return NextResponse.json({ error: "Session requise." }, { status: 401 });
   const { data: profil } = await sb.from("profiles").select("name, valide").eq("id", moi.id).maybeSingle();
   const p = profil as { name: string; valide: boolean } | null;
-  if (!p?.valide || !p.name) return NextResponse.json({ error: "Réservé aux joueurs de la ligue." }, { status: 403 });
+  // Pas tant qu'il doit encore changer son mot de passe (motDePasseChoisi, 08/11/2026) : même refus.
+  if (!p?.valide || !p.name || !(await motDePasseChoisi(sb, moi.id))) return NextResponse.json({ error: "Réservé aux joueurs de la ligue." }, { status: 403 });
   const jeton = req.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ?? "";
   const maintenant = new Date();
   let x: XpServeur;

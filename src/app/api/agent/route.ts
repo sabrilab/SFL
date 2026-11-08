@@ -38,6 +38,12 @@
 // comptes, rien à modifier dans l'app) et de quoi il parle. Les journaux du
 // serveur ne gardent d'une réponse que sa longueur et sa raison, jamais son
 // texte.
+//
+// Depuis le 08/11/2026, l'appelant passe par estMembre
+// (serveur-ligue.server.ts) : validé, et pas tant qu'il doit encore changer
+// son mot de passe (mot_de_passe_a_changer), comme est_membre() en base. Un
+// compte verrouillé reçoit le refus d'un compte non validé, avant tout envoi,
+// écriture ou appel payant.
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
@@ -57,6 +63,7 @@ import { debut, dossierBorne, historiqueDeLignes, lireCorps, messagesPour, taill
 import { STAT_KEYS } from "@/lib/sfl/engine";
 import { COTES, ROLES_TERRAIN, TYPES_FLECHE, ZONES_CORPS, lireSchema, type SchemaCoach } from "@/lib/sfl/schemas-coach";
 import { SANS_ACCORD, accordEnregistre } from "@/lib/sfl/confidentialite.server";
+import { estMembre } from "@/lib/sfl/serveur-ligue.server";
 
 export const maxDuration = 120;
 
@@ -318,8 +325,9 @@ export async function POST(req: NextRequest) {
   });
   const { data: auth, error: authError } = await sb.auth.getUser(corps.accessToken);
   if (authError || !auth.user) return erreur("Session invalide.", 401);
-  const { data: profil } = await sb.from("profiles").select("valide").eq("id", auth.user.id).maybeSingle();
-  if (!profil?.valide) return erreur("Ton compte attend d'être accepté.", 403);
+  // Membre au sens d'estMembre, lu avec son jeton (« mot_de_passe_a_changer: je lis le mien ») : validé, et pas
+  // tant qu'il doit encore changer son mot de passe (08/11/2026). Avant tout appel payant.
+  if (!(await estMembre(sb, auth.user.id))) return erreur("Ton compte attend d'être accepté.", 403);
   // Ses questions et son dossier partent chez Anthropic : pas sans son accord.
   if (!(await accordEnregistre(sb, auth.user.id))) return erreur(SANS_ACCORD, 403);
 
