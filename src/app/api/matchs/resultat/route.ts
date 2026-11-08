@@ -19,11 +19,17 @@
 // Une feuille : l'organisateur du match, ou l'admin (estAdmin : pas tant
 // qu'il doit encore changer son mot de passe, 04/11/2026). L'organisateur
 // garde son droit tel quel : estAdmin n'est lu que pour un autre que lui.
+//
+// Depuis le 08/11/2026, une session ouverte avec un mot de passe d'origine
+// ou provisoire (mot_de_passe_a_changer) ne compte pas : motDePasseChoisi
+// (serveur-ligue.server.ts), le verrou seul, sans exiger profiles.valide (un
+// joueur Bola garde son droit). Même refus que sans session, avant tout
+// envoi, écriture ou appel payant.
 
 import { NextRequest, NextResponse } from "next/server";
 import { cleVapid } from "@/lib/server/web-push";
 import { prevenir, type Envoi } from "@/lib/server/push-envoi";
-import { appelant, estAdmin, serveur } from "@/lib/sfl/serveur-ligue.server";
+import { appelant, estAdmin, motDePasseChoisi, serveur } from "@/lib/sfl/serveur-ligue.server";
 import { jourLong } from "@/lib/sfl/jour-long";
 import { maLigne, matchDe } from "@/lib/sfl/confirmation-resultat";
 import { mvpsDuMatch } from "@/lib/sfl/ligue-vierge";
@@ -52,7 +58,8 @@ export async function POST(req: NextRequest) {
   const sb = serveur();
   if (!sb) return NextResponse.json({ error: "pas branché" }, { status: 503 });
   const moi = await appelant(sb, req);
-  if (!moi)
+  // Une session ouverte avec un mot de passe d'origine ou provisoire ne compte pas (motDePasseChoisi, 08/11/2026).
+  if (!moi || !(await motDePasseChoisi(sb, moi.id)))
     return NextResponse.json({ error: "Session requise." }, { status: 401 });
 
   const corps = (await req.json().catch(() => ({}))) as {

@@ -14,9 +14,15 @@
 // les visages). Le crédit fal est celui de Sabri : LIMITE_JOUR affiches par
 // jour pour toute l'app, remises à minuit, heure de Paris ; une image ratée
 // reste comptée. fal est prié de ne rien garder (X-Fal-Store-IO: 0).
+//
+// Depuis le 08/11/2026, une session ouverte avec un mot de passe d'origine
+// ou provisoire (mot_de_passe_a_changer) ne compte pas : motDePasseChoisi
+// (serveur-ligue.server.ts), le verrou seul, sans exiger profiles.valide (un
+// joueur Bola garde son droit). Même refus que sans session, avant tout
+// envoi, écriture ou appel payant.
 
 import { NextRequest, NextResponse } from "next/server";
-import { appelant, serveur } from "@/lib/sfl/serveur-ligue.server";
+import { appelant, motDePasseChoisi, serveur } from "@/lib/sfl/serveur-ligue.server";
 import { jourDeParis } from "@/lib/sfl/photo-studio";
 
 export const maxDuration = 120;
@@ -55,7 +61,9 @@ export async function POST(req: NextRequest) {
   const sb = serveur();
   const cle = process.env.FAL_KEY;
   if (!sb || !cle) return NextResponse.json({ error: "L'affiche n'est pas encore branchée." }, { status: 503 });
-  if (!(await appelant(sb, req))) return NextResponse.json({ error: "Session requise." }, { status: 401 });
+  // Une session ouverte avec un mot de passe d'origine ou provisoire ne compte pas (motDePasseChoisi, 08/11/2026).
+  const moi = await appelant(sb, req);
+  if (!moi || !(await motDePasseChoisi(sb, moi.id))) return NextResponse.json({ error: "Session requise." }, { status: 401 });
 
   const corps = (await req.json().catch(() => ({}))) as { noirs?: unknown; blancs?: unknown; joueurs?: unknown };
   const noirs = listeDeNoms(corps.noirs);

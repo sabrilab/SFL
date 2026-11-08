@@ -16,11 +16,15 @@
 // « suivi », dont le geste attendu est de suivre en retour (la base le
 // reconnaît, trigger suivis_push_effet), ou « suivi-retour » quand ils se
 // suivent déjà et qu'il n'y a rien à faire.
+//
+// Depuis le 08/11/2026, pas tant qu'il doit encore changer son mot de passe
+// (motDePasseChoisi, serveur-ligue.server.ts : mot_de_passe_a_changer) : le
+// refus d'un compte non validé, avant tout envoi ou écriture.
 
 import { NextRequest, NextResponse } from "next/server";
 import { prevenir, type Envoi } from "@/lib/server/push-envoi";
 import { cleVapid } from "@/lib/server/web-push";
-import { appelant, serveur } from "@/lib/sfl/serveur-ligue.server";
+import { appelant, motDePasseChoisi, serveur } from "@/lib/sfl/serveur-ligue.server";
 
 export const maxDuration = 30;
 
@@ -66,7 +70,8 @@ export async function POST(req: NextRequest) {
   const { data: profils } = await sb.from("profiles").select("id, name, username, nom_affiche, valide").in("id", [moi.id, ...frais]);
   const tous = (profils ?? []) as Profil[];
   const lui = tous.find((p) => p.id === moi.id);
-  if (!lui?.valide) return NextResponse.json({ error: "Compte pas encore accepté." }, { status: 403 });
+  // Pas tant qu'il doit encore changer son mot de passe (motDePasseChoisi, 08/11/2026) : même refus.
+  if (!lui?.valide || !(await motDePasseChoisi(sb, moi.id))) return NextResponse.json({ error: "Compte pas encore accepté." }, { status: 403 });
 
   // Une fois par suiveur et par joueur suivi : la ligne posée, on prévient ;
   // déjà là, il a déjà été prévenu.

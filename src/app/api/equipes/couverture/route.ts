@@ -23,6 +23,12 @@
 // Chaque demande est notée AVANT l'appel (equipe_couvertures) : la base
 // refuse celle qui dépasse (indice « credit-du-jour »), et une image ratée
 // chez fal reste comptée.
+//
+// Depuis le 08/11/2026, l'appelant passe par estMembre
+// (serveur-ligue.server.ts) : validé, et pas tant qu'il doit encore changer
+// son mot de passe (mot_de_passe_a_changer), comme est_membre() en base. Un
+// compte verrouillé reçoit le refus d'un compte non validé, avant tout envoi,
+// écriture ou appel payant.
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
@@ -30,6 +36,7 @@ import { SANS_ACCORD, accordEnregistre } from "@/lib/sfl/confidentialite.server"
 import { dansCombien, jourDeParis } from "@/lib/sfl/photo-studio";
 import { libelleCouleur, lireBlason } from "@/lib/sfl/blason";
 import { joue, peut, type Role } from "@/lib/sfl/equipes-droits";
+import { estMembre } from "@/lib/sfl/serveur-ligue.server";
 
 export const maxDuration = 120;
 
@@ -101,8 +108,9 @@ export async function POST(req: NextRequest) {
   if (authError || !auth.user) return erreur("Session invalide.", 401);
   const moi = auth.user.id;
 
-  const { data: profil } = await sb.from("profiles").select("valide").eq("id", moi).maybeSingle();
-  if (!profil?.valide) return erreur("Ton compte attend d'être accepté.", 403);
+  // Membre au sens d'estMembre, lu avec son jeton (« mot_de_passe_a_changer: je lis le mien ») : validé, et pas
+  // tant qu'il doit encore changer son mot de passe (08/11/2026). Avant tout appel payant.
+  if (!(await estMembre(sb, moi))) return erreur("Ton compte attend d'être accepté.", 403);
   if (!(await accordEnregistre(sb, moi))) return erreur(SANS_ACCORD, 403);
 
   const [{ data: equipe }, { data: lignes, error: lignesError }] = await Promise.all([

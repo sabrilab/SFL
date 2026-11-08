@@ -28,11 +28,17 @@
 // missions (trigger missions_reponses_push_effet).
 //
 // La route agit avec la clé secrète : elle exige une session de membre.
+//
+// Depuis le 08/11/2026, l'appelant passe par estMembre
+// (serveur-ligue.server.ts) : validé, et pas tant qu'il doit encore changer
+// son mot de passe (mot_de_passe_a_changer), comme est_membre() en base. Un
+// compte verrouillé reçoit le refus d'un compte non validé, avant tout envoi,
+// écriture ou appel payant.
 
 import { NextRequest, NextResponse } from "next/server";
 import { prevenir, type Envoi } from "@/lib/server/push-envoi";
 import { cleVapid } from "@/lib/server/web-push";
-import { appelant, serveur } from "@/lib/sfl/serveur-ligue.server";
+import { appelant, estMembre, serveur } from "@/lib/sfl/serveur-ligue.server";
 import { lireSaisonServeur } from "@/lib/sfl/saison-serveur.server";
 import { dimancheEnCours, phrase, rangDe, risqueDe, type Mission } from "@/lib/sfl/missions";
 
@@ -68,8 +74,8 @@ export async function POST(req: NextRequest) {
   if (!sb) return NextResponse.json({ error: "pas branché" }, { status: 503 });
   const moi = await appelant(sb, req);
   if (!moi) return NextResponse.json({ error: "Session requise." }, { status: 401 });
-  const { data: profil } = await sb.from("profiles").select("valide").eq("id", moi.id).maybeSingle();
-  if (!profil?.valide) return NextResponse.json({ error: "Réservé aux joueurs de la ligue." }, { status: 403 });
+  // Membre au sens d'estMembre : validé, et pas tant qu'il doit encore changer son mot de passe (08/11/2026).
+  if (!(await estMembre(sb, moi.id))) return NextResponse.json({ error: "Réservé aux joueurs de la ligue." }, { status: 403 });
 
   // Les missions se tirent sur la saison des votes appliqués, comme sur les
   // téléphones (use-missions.ts) : mêmes rivaux, mêmes cibles.

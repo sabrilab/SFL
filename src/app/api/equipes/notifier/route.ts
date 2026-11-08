@@ -37,11 +37,17 @@
 //
 // La route agit avec la clé secrète, donc elle ne croit pas l'appelant sur
 // parole : son rôle dans l'équipe et l'état de chaque ligne sont relus ici.
+//
+// Depuis le 08/11/2026, une session ouverte avec un mot de passe d'origine
+// ou provisoire (mot_de_passe_a_changer) ne compte pas : motDePasseChoisi
+// (serveur-ligue.server.ts), le verrou seul, sans exiger profiles.valide (un
+// joueur Bola garde son droit). Même refus que sans session, avant tout
+// envoi, écriture ou appel payant.
 
 import { NextRequest, NextResponse } from "next/server";
 import { cleVapid } from "@/lib/server/web-push";
 import { prevenir, type Envoi } from "@/lib/server/push-envoi";
-import { appelant, serveur } from "@/lib/sfl/serveur-ligue.server";
+import { appelant, motDePasseChoisi, serveur } from "@/lib/sfl/serveur-ligue.server";
 import { finInvitation, quandTombe } from "@/lib/sfl/equipes-temps";
 import { joue, peut, type Role } from "@/lib/sfl/equipes-droits";
 import { coupDEnvoiTeam } from "@/lib/sfl/championnat-team";
@@ -78,7 +84,8 @@ export async function POST(req: NextRequest) {
   const sb = serveur();
   if (!sb) return NextResponse.json({ envoyes: 0, raison: "pas branché" });
   const moi = await appelant(sb, req);
-  if (!moi) return NextResponse.json({ error: "Session requise." }, { status: 401 });
+  // Une session ouverte avec un mot de passe d'origine ou provisoire ne compte pas (motDePasseChoisi, 08/11/2026).
+  if (!moi || !(await motDePasseChoisi(sb, moi.id))) return NextResponse.json({ error: "Session requise." }, { status: 401 });
 
   const corps = (await req.json().catch(() => ({}))) as { equipe?: unknown; type?: unknown; joueur?: unknown; defi?: unknown };
   const type = corps.type as Type;

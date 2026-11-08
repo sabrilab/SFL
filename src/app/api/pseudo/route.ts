@@ -10,9 +10,15 @@
 //
 // La connexion par mot de passe suit d'elle-même : l'écran de connexion
 // retrouve l'identifiant d'un nouveau pseudo (identifiant_de_connexion).
+//
+// Depuis le 08/11/2026, une session ouverte avec un mot de passe d'origine
+// ou provisoire (mot_de_passe_a_changer) ne compte pas : motDePasseChoisi
+// (serveur-ligue.server.ts), le verrou seul, sans exiger profiles.valide (un
+// joueur Bola garde son droit). Même refus que sans session, avant tout
+// envoi, écriture ou appel payant.
 
 import { NextRequest, NextResponse } from "next/server";
-import { appelant, dejaPris, serveur } from "@/lib/sfl/serveur-ligue.server";
+import { appelant, dejaPris, motDePasseChoisi, serveur } from "@/lib/sfl/serveur-ligue.server";
 import { erreurPseudo, normaliserPseudo } from "@/lib/sfl/inscription";
 
 const FERME = NextResponse.json({ error: "Changement de pseudo indisponible pour l'instant." }, { status: 503 });
@@ -52,7 +58,8 @@ export async function POST(req: NextRequest) {
   const sb = serveur();
   if (!sb) return FERME;
   const user = await appelant(sb, req);
-  if (!user) return NextResponse.json({ error: "Reconnecte-toi." }, { status: 401 });
+  // Une session ouverte avec un mot de passe d'origine ou provisoire ne compte pas (motDePasseChoisi, 08/11/2026).
+  if (!user || !(await motDePasseChoisi(sb, user.id))) return NextResponse.json({ error: "Reconnecte-toi." }, { status: 401 });
 
   const corps = (await req.json().catch(() => null)) as { pseudo?: string } | null;
   const pseudo = normaliserPseudo(String(corps?.pseudo ?? ""));

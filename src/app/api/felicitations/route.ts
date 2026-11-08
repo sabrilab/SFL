@@ -18,11 +18,15 @@
 // journée (les plafonds de lib/sfl/missions.ts). La toucher ouvre l'exploit
 // dans les Actus (/ligue?exploit=…). Elle est suivie comme les autres
 // (lib/server/push-envoi.ts, motif « felicitation »).
+//
+// Depuis le 08/11/2026, pas tant qu'il doit encore changer son mot de passe
+// (motDePasseChoisi, serveur-ligue.server.ts : mot_de_passe_a_changer) : le
+// refus d'un compte non validé, avant tout envoi ou écriture.
 
 import { NextRequest, NextResponse } from "next/server";
 import { prevenir, type Envoi } from "@/lib/server/push-envoi";
 import { cleVapid } from "@/lib/server/web-push";
-import { appelant, serveur } from "@/lib/sfl/serveur-ligue.server";
+import { appelant, motDePasseChoisi, serveur } from "@/lib/sfl/serveur-ligue.server";
 import { exploitsDeLaSaison, type Exploit } from "@/lib/sfl/exploits";
 import { exploitsDemandes, notificationsDesBravos, type Recue } from "@/lib/sfl/felicitations-notif";
 import type { Saison } from "@/lib/sfl/saisie/types";
@@ -54,7 +58,8 @@ export async function POST(req: NextRequest) {
   ]);
   const tous = (profils ?? []) as Profil[];
   const lui = tous.find((p) => p.id === moi.id);
-  if (!lui?.valide) return NextResponse.json({ error: "Compte pas encore accepté." }, { status: 403 });
+  // Pas tant qu'il doit encore changer son mot de passe (motDePasseChoisi, 08/11/2026) : même refus.
+  if (!lui?.valide || !(await motDePasseChoisi(sb, moi.id))) return NextResponse.json({ error: "Compte pas encore accepté." }, { status: 403 });
   // La vue figée, votes posés (revelation.ts) : un exploit n'existe qu'à la révélation, comme dans le fil.
   const saison: Saison | undefined = lue?.saison;
   if (!saison?.journees) return NextResponse.json({ error: "Saison introuvable." }, { status: 503 });

@@ -29,6 +29,12 @@
 // part d'une feuille que la ligue ne voit pas. C'est la SEULE lecture de la
 // saison côté serveur (tools/lecteurs-check.ts le vérifie) ; ce qui n'a
 // besoin que de l'effectif passe par lireEffectifServeur.
+//
+// Les erreurs levées (toutesLesLignes, lireSaisonServeur) portent depuis le
+// 08/11/2026 le statut HTTP de la réponse (`status`) : l'erreur que rend
+// postgrest-js ne l'a pas, et sans lui la reprise (lib/server/reprise-base.ts)
+// ne pouvait pas reconnaître un 502/503/504 de la passerelle sur une lecture.
+// Le message et le code ne changent pas.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { definirArbitres, definirNonJoueurs } from "./hidden";
@@ -52,8 +58,8 @@ export async function toutesLesLignes<T>(
     let q = sb.from(table).select(colonnes);
     if (filtre) q = q.eq(filtre.colonne, filtre.valeur);
     for (const o of ordre) q = q.order(o);
-    const { data, error } = await q.range(de, de + 999);
-    if (error) throw error;
+    const { data, error, status } = await q.range(de, de + 999);
+    if (error) throw Object.assign(error, { status });
     const page = (data ?? []) as T[];
     out.push(...page);
     if (page.length < 1000) return out;
@@ -118,8 +124,8 @@ export interface SaisonServeur {
  * répond « pas fini », le prochain appel réessaie).
  */
 export async function lireSaisonServeur(sb: SupabaseClient, maintenant = new Date()): Promise<SaisonServeur | null> {
-  const { data: doc, error } = await sb.from("saison").select("data, updated_at").eq("id", 1).maybeSingle();
-  if (error) throw error;
+  const { data: doc, error, status } = await sb.from("saison").select("data, updated_at").eq("id", 1).maybeSingle();
+  if (error) throw Object.assign(error, { status });
   const ligne = doc as { data?: Saison; updated_at?: string | null } | null;
   const document = ligne?.data;
   if (!document) return null;

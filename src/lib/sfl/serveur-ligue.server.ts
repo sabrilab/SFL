@@ -80,6 +80,20 @@ export async function estMembre(sb: SupabaseClient, id: string): Promise<boolean
   return !!aChanger && !aChanger.has(id);
 }
 
+/**
+ * A-t-il choisi son mot de passe ? Le pendant serveur de
+ * mot_de_passe_choisi() : non tant qu'une ligne l'attend dans
+ * mot_de_passe_a_changer (d'origine ou provisoire). Le verrou SEUL, sans
+ * profiles.valide : pour les routes qui ne demandaient que la session
+ * (joueurs Bola compris), et pour celles qui lisent déjà valide avec
+ * d'autres colonnes (08/11/2026). Fermé par défaut comme estMembre ; une
+ * base sans la table laisse passer, comme avant.
+ */
+export async function motDePasseChoisi(sb: SupabaseClient, id: string): Promise<boolean> {
+  const aChanger = await lireMotDePasseAChanger(sb, [id], "[session]");
+  return !!aChanger && !aChanger.has(id);
+}
+
 /** Pseudos qu'aucun joueur ne peut prendre : la ligue et ses services. */
 const RESERVES = ["admin", "sfl", "bola", "ligue", "support"];
 
