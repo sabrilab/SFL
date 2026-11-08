@@ -22,6 +22,13 @@
 // 03/11/2026) : une session ouverte avec ce mot de passe ne relance rien et
 // ne lit pas le bilan. Depuis le 04/11, estAdmin le refuse lui-même, pour
 // toutes les routes à clé secrète (même réponse : 403 « Réservé à l'admin. »).
+//
+// Les nuits du 06 et du 07/11, le calcul a échoué sur une erreur passagère de
+// la base (« JWT issued at future » : une lecture sur douze refusée avant
+// d'être exécutée). Depuis le 08/11, chaque appel du calcul est relancé au
+// plus deux fois après une telle erreur (lib/server/reprise-base.ts). Le
+// bilan donne `reprises` ; le journal le dit sans rien d'autre (ni table, ni
+// identifiant) : une erreur après reprises, ou un calcul réussi après reprise.
 
 import { createHash, timingSafeEqual } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
@@ -55,10 +62,11 @@ export async function GET(req: NextRequest) {
   if (Date.now() - dernierAppel < DIX_MINUTES) return NextResponse.json({ statut: "a-jour" });
   dernierAppel = Date.now();
   const bilan = await calculerCartesEntraineur(sb);
-  if (bilan.statut !== "ok") console.error(`[entraineurs] ${bilan.erreur ?? "erreur"}`);
+  if (bilan.statut !== "ok") console.error(`[entraineurs] ${bilan.erreur ?? "erreur"}${bilan.reprises > 0 ? ` (après ${bilan.reprises} reprise(s))` : ""}`);
+  else if (bilan.reprises > 0) console.warn(`[entraineurs] calcul fait après ${bilan.reprises} reprise(s) d'une erreur passagère de la base`);
   // Le cron n'a besoin que des comptes : ni le texte de la base, ni les paires à revoir.
-  const { statut, entraineurs, ecrites, normes, ms } = bilan;
-  return NextResponse.json({ statut, entraineurs, ecrites, normes, aRevoir: bilan.aRevoir.length, ms }, { status: statut === "ok" ? 200 : 500 });
+  const { statut, entraineurs, ecrites, normes, ms, reprises } = bilan;
+  return NextResponse.json({ statut, entraineurs, ecrites, normes, aRevoir: bilan.aRevoir.length, ms, reprises }, { status: statut === "ok" ? 200 : 500 });
 }
 
 /** L'admin, tout de suite. */

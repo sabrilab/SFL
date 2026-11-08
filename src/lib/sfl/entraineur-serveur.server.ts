@@ -24,6 +24,16 @@
 // Le même calcul deux fois donne la même carte : il repart chaque jour des
 // faits, sans rien retenir de la veille que le plancher.
 //
+// Chaque appel à la base passe par avecReprise (lib/server/reprise-base.ts,
+// 08/11/2026) : après une erreur passagère (« JWT issued at future », qui a
+// fait échouer les nuits du 06 et du 07/11 ; panne réseau, 502/503/504), le
+// même appel est relancé au plus deux fois, après 1 s puis 3 s. Tous sont
+// rejouables : des lectures, figer_normes_entraineur (« on conflict do
+// nothing ») et poser_cartes_entraineur (la plus haute de chaque
+// caractéristique, le reste recopié : le second passage écrit la même
+// ligne). Une erreur de droits ou de données n'est jamais reprise. Le bilan
+// dit combien de reprises il a fallu (`reprises`).
+//
 // Serveur seulement : la clé secrète (serveur-ligue.server.ts).
 
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -31,6 +41,7 @@ import type { NormesLigue, StatsEntraineur } from "./entraineur";
 import { cartesDeLaLigue, cartesEntraineurs, JOURNAL_GARDE, type ARevoir, type LignesEntraineur } from "./entraineur-faits";
 import type { MatchBola } from "./ligue-vierge";
 import { lireSaisonServeur, toutesLesLignes } from "./saison-serveur.server";
+import { avecReprise, nouveauSuivi, ouLever, type SuiviReprises } from "@/lib/server/reprise-base";
 
 export interface BilanCartesEntraineur {
   statut: "ok" | "erreur";
@@ -46,6 +57,8 @@ export interface BilanCartesEntraineur {
    */
   aRevoir: ARevoir[];
   ms: number;
+  /** Les appels relancés après une erreur passagère de la base (reprise-base.ts). */
+  reprises: number;
   erreur?: string;
 }
 
@@ -54,9 +67,15 @@ const PAQUET = 100;
 
 type Ligne<T> = T extends readonly (infer U)[] ? U : never;
 
-export async function calculerCartesEntraineur(sb: SupabaseClient, maintenant = new Date()): Promise<BilanCartesEntraineur> {
+export async function calculerCartesEntraineur(
+  sb: SupabaseClient,
+  maintenant = new Date(),
+  suivi: SuiviReprises = nouveauSuivi()
+): Promise<BilanCartesEntraineur> {
   const debut = Date.now();
-  const lire = <T>(table: string, colonnes: string, ordre: string[]) => toutesLesLignes<T>(sb, table, colonnes, ordre);
+  // Toutes les lectures et les deux écritures sont rejouables (en-tête).
+  const reprendre = <T>(appel: () => Promise<T>) => avecReprise(suivi, appel, true);
+  const lire = <T>(table: string, colonnes: string, ordre: string[]) => reprendre(() => toutesLesLignes<T>(sb, table, colonnes, ordre));
   try {
     const [entraineurs, equipes, membres, signatures, departs, defis, resultats, feuilles, feuilleJoueurs, profils, gardees, figees] = await Promise.all([
       lire<Ligne<LignesEntraineur["entraineurs"]>>("equipe_entraineurs", "equipe_id, joueur, debut, fin, motif", ["id"]),
@@ -90,15 +109,14 @@ export async function calculerCartesEntraineur(sb: SupabaseClient, maintenant = 
     let cartes = cartesDeLaLigue({ saison: null, maintenant, matchsBola: [] });
     if (feuilles.length > 0) {
       const [lue, bola, entrees] = await Promise.all([
-        lireSaisonServeur(sb, maintenant),
-        sb.rpc("matchs_bola_serveur"),
+        reprendre(() => lireSaisonServeur(sb, maintenant)),
+        reprendre(() => ouLever(sb.rpc("matchs_bola_serveur"))),
         lire<{ joueur: string; le: string }>("entrees_sfl", "joueur, le", ["joueur"]),
       ]);
-      if (bola.error) throw bola.error;
       cartes = cartesDeLaLigue({
         saison: lue?.saison ?? null,
         maintenant,
-        matchsBola: (bola.data ?? []) as MatchBola[],
+        matchsBola: (bola ?? []) as MatchBola[],
         entreesSfl: new Map(entrees.map((e) => [e.joueur, e.le])),
       });
     }
@@ -110,12 +128,15 @@ export async function calculerCartesEntraineur(sb: SupabaseClient, maintenant = 
 
     // Les normes d'abord : une saison figée l'est pour tous les calculs suivants.
     for (const n of calcul.normes) {
-      const { error } = await sb.rpc("figer_normes_entraineur", {
-        p_saison: n.saison,
-        p_presence: n.normes.presence,
-        p_departs: n.normes.departsParJour,
-      });
-      if (error) throw error;
+      await reprendre(() =>
+        ouLever(
+          sb.rpc("figer_normes_entraineur", {
+            p_saison: n.saison,
+            p_presence: n.normes.presence,
+            p_departs: n.normes.departsParJour,
+          })
+        )
+      );
     }
     const aPoser = calcul.cartes.map((c) => ({
       joueur: c.joueur,
@@ -132,8 +153,8 @@ export async function calculerCartesEntraineur(sb: SupabaseClient, maintenant = 
     }));
     let ecrites = 0;
     for (let i = 0; i < aPoser.length; i += PAQUET) {
-      const { data, error } = await sb.rpc("poser_cartes_entraineur", { p_lignes: aPoser.slice(i, i + PAQUET) });
-      if (error) throw error;
+      const paquet = aPoser.slice(i, i + PAQUET);
+      const data = await reprendre(() => ouLever(sb.rpc("poser_cartes_entraineur", { p_lignes: paquet })));
       ecrites += Number(data ?? 0);
     }
     return {
@@ -143,9 +164,10 @@ export async function calculerCartesEntraineur(sb: SupabaseClient, maintenant = 
       normes: calcul.normes.map((n) => n.saison),
       aRevoir: calcul.cartes.flatMap((c) => c.aRevoir),
       ms: Date.now() - debut,
+      reprises: suivi.reprises,
     };
   } catch (e) {
     const erreur = e instanceof Error ? e.message : typeof e === "object" && e && "message" in e ? String((e as { message: unknown }).message) : String(e);
-    return { statut: "erreur", entraineurs: 0, ecrites: 0, normes: [], aRevoir: [], ms: Date.now() - debut, erreur };
+    return { statut: "erreur", entraineurs: 0, ecrites: 0, normes: [], aRevoir: [], ms: Date.now() - debut, reprises: suivi.reprises, erreur };
   }
 }
