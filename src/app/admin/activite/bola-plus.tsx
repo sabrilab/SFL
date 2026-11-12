@@ -27,11 +27,12 @@ const MESSAGE: Record<EchecLecture, string> = {
 /** « 12 nov. » */
 const jour = (iso: string) => new Date(iso).toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
 
-function Tuile({ label, valeur }: { label: string; valeur: number }) {
+function Tuile({ label, valeur, note }: { label: string; valeur: number; note?: string }) {
   return (
     <div className="glass-soft rounded-2xl px-3.5 py-3">
       <p className="mono-label text-micro text-encre-3">{label}</p>
       <p className="mt-1.5 text-titre-g leading-none font-extrabold tabular-nums">{valeur}</p>
+      {note && <p className="mt-1.5 text-legende leading-tight text-encre-3">{note}</p>}
     </div>
   );
 }
@@ -64,11 +65,11 @@ export function BolaPlusStats() {
       ) : (
         <>
           <div className="grid grid-cols-3 gap-2">
-            <Tuile label="Intéressés" valeur={lu.total} />
+            {/* Le total n'est pas la somme des deux formules : ceux qui n'en ont pas choisi se lisent sous lui. */}
+            <Tuile label="Intéressés" valeur={lu.total} note={lu.sansFormule > 0 ? `dont ${lu.sansFormule} sans formule` : undefined} />
             <Tuile label="Mensuel" valeur={lu.mensuel} />
             <Tuile label="Annuel" valeur={lu.annuel} />
           </div>
-          {lu.sansFormule > 0 && <p className="mt-2.5 text-corps text-encre-3">{lu.sansFormule} sans formule</p>}
           {lu.total === 0 ? (
             <p className="mt-4 text-corps text-encre-3">Personne pour l&apos;instant.</p>
           ) : (

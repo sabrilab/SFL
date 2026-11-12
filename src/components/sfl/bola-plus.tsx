@@ -11,6 +11,7 @@
 //     puis « Je suis intéressé ». Le bouton marche avec ou sans formule ; une
 //     fois touché, il laisse la place à « C'est noté » et à « Annuler ». Les
 //     formules restent touchables : en toucher une change la formule notée.
+//     Après « Annuler », plus rien n'est coché.
 //
 // Aucun paiement, aucun formulaire, aucun texte d'aide : le nom, les deux
 // prix, le bouton. Ce que contient Bola Plus n'est pas arrêté : l'écran n'en
@@ -104,10 +105,16 @@ export function OffreBolaPlus() {
     else if (interet.formule !== f) noter(f);
   }
 
+  // Après « Annuler », rien ne reste coché : ni la formule notée, ni celle d'avant.
+  function defaire() {
+    setChoix(null);
+    annuler();
+  }
+
   return (
     <div className="flex flex-col gap-[var(--fib-21)]">
-      {/* Sur un écran court (iPhone SE), l'emblème rétrécit : le bouton reste au-dessus de la barre d'onglets. */}
-      <EmblemeBolaPlus className="mx-auto size-[150px] text-foreground [@media(max-height:700px)]:size-[116px]" />
+      {/* Sur un écran court (iPhone SE) ou étroit (320 px), l'emblème rétrécit : le bouton reste au-dessus de la barre d'onglets. */}
+      <EmblemeBolaPlus className="mx-auto size-[150px] text-foreground [@media(max-height:700px)]:size-[116px] [@media(max-width:350px)]:size-[92px]" />
 
       <div role="radiogroup" aria-label="Formule" className="flex flex-col gap-2.5">
         {FORMULES.map((f) => {
@@ -135,7 +142,7 @@ export function OffreBolaPlus() {
                   <span className="text-corps font-medium text-encre-2">/ {p.par}</span>
                 </span>
               </span>
-              <span className="text-right text-corps leading-tight font-semibold text-encre-2">{p.detail}</span>
+              <span className="text-right text-corps leading-tight font-semibold whitespace-nowrap text-encre-2">{p.detail}</span>
               <span
                 aria-hidden
                 className={cn(
@@ -155,9 +162,9 @@ export function OffreBolaPlus() {
           <CestNote className="py-4 text-lecture font-bold" />
           <button
             type="button"
-            onClick={annuler}
+            onClick={defaire}
             disabled={occupe}
-            className="bouton-discret bouton--rouge px-5 py-2 text-corps font-semibold disabled:opacity-50"
+            className="bouton-discret bouton--rouge min-h-11 px-5 py-2 text-corps font-semibold disabled:opacity-50"
           >
             Annuler
           </button>

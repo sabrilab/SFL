@@ -10,12 +10,16 @@
 //   5 · le magasin en production : noter et annuler passent par la fonction
 //       bola_plus_interesse et elle seule ; un refus se dit « Pas enregistré… »
 //       et ne change rien ; on ne lit que sa ligne ; rien sur le téléphone ;
+//       un toucher avant la fin de la lecture lit d'abord : ce qui est noté
+//       n'est pas écrasé, et une lecture en échec n'écrit rien ;
 //   6 · la lecture de l'admin : les lignes et leurs noms, la table absente
 //       (« sans-table »), une autre panne (« autre »), et dans un aperçu l'essai
 //       du téléphone montré même sans la table ;
 //   7 · garde de source : dans le magasin, noter et annuler traitent l'aperçu
 //       et en sortent avant tout appel à la base ; aucun des fichiers de Bola
-//       Plus ne cite un prestataire de paiement.
+//       Plus ne cite un prestataire de paiement ; la route, la tuile de Ma
+//       carte et la section de l'admin sont branchées ; après « Annuler », rien
+//       ne reste coché, et le bouton fait 44 px.
 // Sans réseau : fetch est remplacé.
 //   npx tsx tools/bola-plus-check.ts
 import assert from "node:assert/strict";
@@ -160,6 +164,14 @@ async function banc() {
   await abime.noterInteret("Léo", "mensuel");
   assert.equal(lireEssais(stockage.get("bola-plus-apercu") ?? null).Léo.formule, "mensuel");
 
+  // Un toucher arrivé pendant la lecture fait foi : la lecture ne l'efface pas.
+  stockage.clear();
+  const course = charger(undefined);
+  const lecture = course.chargerInteret("Léo");
+  await course.noterInteret("Léo", "annuel");
+  await lecture;
+  assert.equal(course.interetEnMemoire("Léo")?.formule, "annuel", "la lecture n'écrase pas le toucher");
+
   // 5 · En production.
   stockage.clear();
   requetes.length = 0;
@@ -212,6 +224,44 @@ async function banc() {
   await p.chargerInteret("Léo");
   assert.equal(p.interetEnMemoire("Léo"), undefined);
 
+  // Un toucher avant la fin de la lecture (rien en mémoire) : on lit d'abord.
+  const LIGNE = { formule: "mensuel", le: "2026-11-10T08:20:00+00:00" };
+  const parMethode = (lecture: { status: number; body: unknown }, ecriture: { status: number; body: unknown }) => (r: Requete) => (r.methode === "GET" ? lecture : ecriture);
+  //   · déjà noté, toucher sans formule : rien n'est écrit, la formule notée reste ;
+  p = charger("production");
+  requetes.length = 0;
+  repondre = parMethode({ status: 200, body: LIGNE }, { status: 200, body: "2026-11-12T20:00:00+00:00" });
+  await p.noterInteret("Léo", null);
+  assert.deepEqual(requetes.map((r) => r.methode), ["GET"], "un toucher sans formule n'écrase pas la formule notée");
+  assert.deepEqual(p.interetEnMemoire("Léo"), LIGNE);
+  //   · déjà noté, la même formule : rien à écrire ;
+  p = charger("production");
+  requetes.length = 0;
+  await p.noterInteret("Léo", "mensuel");
+  assert.deepEqual(requetes.map((r) => r.methode), ["GET"]);
+  //   · déjà noté, une autre formule : elle est écrite ;
+  p = charger("production");
+  requetes.length = 0;
+  repondre = parMethode({ status: 200, body: LIGNE }, { status: 200, body: LIGNE.le });
+  await p.noterInteret("Léo", "annuel");
+  assert.deepEqual(requetes.map((r) => r.methode), ["GET", "POST"]);
+  assert.deepEqual(requetes[1].corps, { p_interesse: true, p_formule: "annuel" });
+  assert.deepEqual(p.interetEnMemoire("Léo"), { formule: "annuel", le: LIGNE.le });
+  //   · rien de noté : le toucher est écrit ;
+  p = charger("production");
+  requetes.length = 0;
+  repondre = parMethode({ status: 200, body: null }, { status: 200, body: "2026-11-12T20:00:00+00:00" });
+  await p.noterInteret("Léo", null);
+  assert.deepEqual(requetes.map((r) => r.methode), ["GET", "POST"]);
+  assert.deepEqual(p.interetEnMemoire("Léo"), { formule: null, le: "2026-11-12T20:00:00+00:00" });
+  //   · la lecture échoue : on n'écrit pas à l'aveugle.
+  p = charger("production");
+  requetes.length = 0;
+  repondre = parMethode({ status: 500, body: { code: "XX000", message: "panne" } }, { status: 200, body: "2026-11-12T20:00:00+00:00" });
+  await assert.rejects(p.noterInteret("Léo", null), { message: REFUS });
+  assert.deepEqual(requetes.map((r) => r.methode), ["GET"], "lecture en échec : aucune écriture");
+  assert.equal(p.interetEnMemoire("Léo"), undefined);
+
   // 6 · La lecture de l'admin.
   const enBase = [
     { joueur: "a", formule: "annuel", le: "2026-11-12T19:42:00+00:00", profiles: { name: "Malo" } },
@@ -233,6 +283,12 @@ async function banc() {
   }
   repondre = () => ({ status: 500, body: { code: "XX000", message: "panne" } });
   assert.deepEqual(await p.lireInteresses("Léo"), { lignes: [], echec: "autre" });
+  // En production, un vieil essai resté sur le téléphone ne compte pas.
+  stockage.set("bola-plus-apercu", JSON.stringify({ Léo: { formule: "annuel", le: "2026-11-01T10:00:00.000Z" } }));
+  repondre = () => ({ status: 200, body: enBase });
+  assert.equal((await p.lireInteresses("Léo")).lignes.length, 3, "en production, l'essai du téléphone ne s'ajoute pas");
+  repondre = () => ({ status: 404, body: { code: "PGRST205", message: "Could not find the table" } });
+  assert.deepEqual(await p.lireInteresses("Léo"), { lignes: [], echec: "sans-table" });
   // Dans un aperçu : l'essai du téléphone s'ajoute, même sans la table ; jamais sur une autre panne.
   stockage.clear();
   const a = charger(undefined);
@@ -274,6 +330,20 @@ async function banc() {
     const trouve = PAIEMENT.exec(readFileSync(join(SRC, f), "utf8"));
     assert.equal(trouve, null, `${f} cite un moyen de paiement : ${trouve?.[0]}`);
   }
+
+  // Les trois branchements : la route et son titre, la tuile de Ma carte, la section de l'admin.
+  const src = (f: string) => readFileSync(join(SRC, f), "utf8");
+  const nav = src("lib/nav.ts");
+  assert.ok(nav.includes('["/profil/bola-plus", MA_CARTE]'), "la page Bola Plus revient à Ma carte");
+  assert.ok(nav.includes('["/profil/bola-plus", "Bola Plus"]'), "la page Bola Plus a son titre");
+  assert.ok(src("app/profil/page.tsx").includes("<TuileBolaPlus />"), "la tuile est sur Ma carte");
+  assert.ok(src("app/admin/activite/revenu.tsx").includes("<BolaPlusStats />"), "le compteur est dans Activité → Revenu");
+  assert.ok(src("app/profil/bola-plus/page.tsx").includes("<OffreBolaPlus />"), "la page montre l'offre");
+  // L'écran : après « Annuler », rien ne reste coché ; le bouton fait 44 px de haut.
+  const ecran = src("components/sfl/bola-plus.tsx");
+  assert.ok(/function defaire\(\) \{\s*setChoix\(null\);\s*annuler\(\);\s*\}/.test(ecran), "« Annuler » décoche la formule");
+  assert.ok(/onClick=\{defaire\}[\s\S]{0,120}min-h-11/.test(ecran), "« Annuler » : une cible de 44 px");
+  assert.ok(!/onClick=\{annuler\}/.test(ecran), "« Annuler » passe par defaire");
 
   console.log("bola-plus : ok");
 }

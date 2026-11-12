@@ -87,13 +87,30 @@ async function lire(nom: string): Promise<Interet | null> {
 
 /** « Je suis intéressé », ou changer de formule : la date du premier toucher reste. */
 export async function noterInteret(nom: string, formule: Formule | null): Promise<void> {
-  const avant = cache.get(nom) ?? null;
+  let avant = cache.get(nom) ?? null;
   if (APERCU) {
     const interet: Interet = { formule, le: avant?.le ?? new Date().toISOString() };
     ecrireApercu({ ...lireApercu(), [nom]: interet });
     cache.set(nom, interet);
     emit();
     return;
+  }
+  // Un toucher avant la fin de la lecture : on lit d'abord. Ce qui est déjà
+  // noté en base n'est pas écrasé par un toucher sans formule ; et si la
+  // lecture échoue, on n'écrit pas à l'aveugle.
+  if (!cache.has(nom)) {
+    let deja: Interet | null;
+    try {
+      deja = await lire(nom);
+    } catch {
+      throw new Error(REFUS);
+    }
+    if (deja && (formule === null || deja.formule === formule)) {
+      cache.set(nom, deja);
+      emit();
+      return;
+    }
+    avant = deja;
   }
   const { data, error } = await supabase().rpc("bola_plus_interesse", { p_interesse: true, p_formule: formule });
   if (error) throw new Error(REFUS);

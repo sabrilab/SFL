@@ -186,10 +186,10 @@
   pointer-events: none;
   color: var(--foreground);
 }
-/* « C'est noté », à gauche de l'emblème. */
+/* « C'est noté », à gauche de l'emblème, sans le toucher. */
 .tuile__note {
   flex-shrink: 0;
-  margin-right: 86px;
+  margin-right: 96px;
 }
 /* Un écran étroit (320 px) : l'emblème plus petit, les mots tiennent sur la ligne. */
 @media (max-width: 350px) {
@@ -199,7 +199,7 @@
     height: 104px;
   }
   .tuile__note {
-    margin-right: 54px;
+    margin-right: 62px;
   }
 }
 
