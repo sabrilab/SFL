@@ -1,20 +1,19 @@
 "use client";
 
-// Nouveauté du 27/10 au soir : trois choses d'un coup (Sabri, 27/10 : « à
+// Nouveauté du 27/10 au soir : deux choses d'un coup (Sabri, 27/10 : « à
 // chaque fois qu'on met de nouvelles fonctionnalités en place, on veut un
 // petit slideshow au début pour que les gens puissent voir quelles sont les
-// nouveautés »).
+// nouveautés »). Elles étaient trois : la première diapo, « Invite. Monte. »
+// (les paliers des recrues), est partie le 12/11, quand le parrainage a eu
+// son annonce à lui (parrainage.tsx) : personne ne le voit annoncé deux fois.
 //
-//   1. « Invite. Monte. » : les paliers des recrues (skins-recrues.ts) sur la
-//      vraie carte du joueur en Fondateur, numérotée, et la rangée des
-//      quatre paliers (+100 XP, Recruteur, Filigrane, Fondateur).
-//   2. « Une réponse, une seule. » : le bouton rond glisse de la piste
+//   1. « Une réponse, une seule. » : le bouton rond glisse de la piste
 //      jusqu'à « Je viens », la grille de pixels s'allume derrière lui, la
 //      réponse se scelle au cadenas. La piste et sa grille sont celles de la
 //      réponse scellée (GrilleGlisse, les classes de scelle.css), menées ici
 //      par une horloge ; « Pas dispo » reste dans le neutre (ni rouge ni
 //      bleu dans une annonce).
-//   3. « Les missions sont dans Ma carte. » : les onglets du Niveau XP
+//   2. « Les missions sont dans Ma carte. » : les onglets du Niveau XP
 //      (Passe, Missions, Les autres), recréés ; l'onglet passe des miennes à
 //      celles de toute la ligue, sur les vraies cartes des joueurs.
 //
@@ -30,27 +29,15 @@ import { ANTON } from "@/components/sfl/actus/ecran";
 import { CarteDe, FORMAT_CARTE } from "@/components/sfl/mini-carte";
 import { Nom } from "@/components/sfl/nom";
 import { course, GrilleGlisse } from "@/components/sfl/reponse-scellee";
-import { Mini } from "@/components/sfl/passe-bola";
 import { useSeason } from "@/components/sfl/season-provider";
-import {
-  PALIERS_RECRUES,
-  numeroFondateur,
-} from "@/components/sfl/skins-recrues";
-import { useHabillage } from "@/hooks/use-habillage";
 import { NOM_DE_CODE, PRIME, rangDe, type Genre } from "@/lib/sfl/missions";
 import { rankPlayers, type Player } from "@/lib/sfl/engine";
 import { isHidden } from "@/lib/sfl/hidden";
 import { cn } from "@/lib/utils";
-import { useCourt, type Diapo } from "./diaporama";
+import type { Diapo } from "./diaporama";
 
 export function diaposNouveautes2710(player: Player): Diapo[] {
   return [
-    {
-      visuel: <PaliersRecrues player={player} />,
-      titre: "Invite. Monte.",
-      ligne:
-        "+100 XP par recrue qui joue. Recruteur à 3, Filigrane à 5, et à 10 la carte Fondateur, numérotée sur 500.",
-    },
     {
       visuel: <ReponseQuiSeScelle />,
       titre: "Une réponse, une seule.",
@@ -68,98 +55,7 @@ export function diaposNouveautes2710(player: Player): Diapo[] {
 
 const ressort = { type: "spring", stiffness: 260, damping: 24 } as const;
 
-/** Le numéro d'exemple : celui de skins-recrues.ts (« N° 097 / 500 »). */
-const NUMERO_EXEMPLE = 97;
-
-/* ------------------------------ 1. Les paliers ------------------------------ */
-
-/** Sa carte en Fondateur, numérotée, puis les quatre paliers qui s'allument un à un. */
-function PaliersRecrues({ player }: { player: Player }) {
-  const reduit = useReducedMotion();
-  const court = useCourt();
-  const porte = useHabillage(player.name);
-  const base = { cran: porte.cran, rang: porte.rang };
-  // La carte entière (Mini la dessine en grand puis la réduit) : la ligne de série se lit.
-  const l = court ? 112 : 146;
-  const h = Math.round((l * 1656) / 1024);
-  // Les miniatures des paliers : assez grandes pour que les trois papiers se distinguent.
-  const mini = court ? { l: 36, h: 58 } : { l: 44, h: 71 };
-  return (
-    <div className="flex w-full flex-col items-center gap-[21px] [@media(max-height:739px)]:gap-[13px]">
-      <motion.div
-        initial={reduit ? false : { opacity: 0, y: 14, scale: 0.96 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        transition={{ ...ressort, delay: reduit ? 0 : 0.85 }}
-        className="flex flex-col items-center gap-2"
-      >
-        <span
-          className="relative block overflow-hidden rounded-[10px]"
-          style={{ width: l, height: h }}
-        >
-          <Mini
-            player={player}
-            habillage={{
-              ...base,
-              finition: "fondateur",
-              fondateur: NUMERO_EXEMPLE,
-            }}
-            l={l}
-            h={h}
-          />
-        </span>
-        <span className="mono-label text-etiquette text-white/70">
-          {numeroFondateur(NUMERO_EXEMPLE)}
-        </span>
-      </motion.div>
-      <ol className="flex w-full max-w-[320px] items-end justify-between gap-2">
-        {PALIERS_RECRUES.map((p, k) => (
-          <motion.li
-            key={p.n}
-            initial={reduit ? false : { opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ ...ressort, delay: reduit ? 0 : 0.08 + 0.14 * k }}
-            className="flex flex-1 flex-col items-center gap-1.5"
-          >
-            <span
-              className="relative block overflow-hidden rounded-[6px]"
-              style={{ width: mini.l, height: mini.h }}
-            >
-              {p.finition ? (
-                <Mini
-                  player={player}
-                  habillage={{
-                    ...base,
-                    finition: p.finition,
-                    fondateur:
-                      p.finition === "fondateur" ? NUMERO_EXEMPLE : undefined,
-                  }}
-                  l={mini.l}
-                  h={mini.h}
-                />
-              ) : (
-                <span className="flex h-full flex-col items-center justify-center gap-0.5 bg-white/[0.08] font-mono font-bold leading-none">
-                  <span className="text-legende">+100</span>
-                  <span className="text-micro text-white/60">XP</span>
-                </span>
-              )}
-            </span>
-            <span
-              className="text-titre-fort leading-none tracking-tight tabular-nums"
-              style={{ fontFamily: ANTON }}
-            >
-              {p.n}
-            </span>
-            <span className="mono-label text-etiquette text-white/50">
-              {p.finition ? p.titre : "Par recrue"}
-            </span>
-          </motion.li>
-        ))}
-      </ol>
-    </div>
-  );
-}
-
-/* --------------------------- 2. La réponse scellée --------------------------- */
+/* --------------------------- 1. La réponse scellée --------------------------- */
 
 // La piste du diaporama : la taille « md » de la réponse scellée, à la largeur
 // que laisse le plus petit iPhone (320 px moins les marges du diaporama) : la
@@ -278,7 +174,7 @@ function ReponseQuiSeScelle() {
   );
 }
 
-/* ---------------------------- 3. Les onglets du Niveau XP ---------------------------- */
+/* ---------------------------- 2. Les onglets du Niveau XP ---------------------------- */
 
 type Vue = "missions" | "autres";
 

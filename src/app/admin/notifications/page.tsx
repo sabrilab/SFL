@@ -1,7 +1,8 @@
 "use client";
 
 // Envoyer une notification — l'admin écrit un titre, un texte, choisit la
-// page qui s'ouvre au toucher, et voit combien de téléphones la recevront.
+// page qui s'ouvre au toucher (Ma carte, Map, Actus, Inviter : PAGES), et
+// voit combien de téléphones la recevront.
 // « M'envoyer un essai » ne vise que ses propres téléphones ; l'envoi à toute
 // la ligue demande une confirmation, car il ne se rattrape pas.
 //
@@ -24,6 +25,7 @@ const PAGES = [
   { url: "/profil", label: "Ma carte" },
   { url: "/map", label: "Map" },
   { url: "/ligue", label: "Actus" },
+  { url: "/parrainage", label: "Inviter" },
 ] as const;
 
 const BROUILLON: Notif = {

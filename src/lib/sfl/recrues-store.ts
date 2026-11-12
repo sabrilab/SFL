@@ -3,7 +3,8 @@
 // Les recrues de la ligue (lib/sfl/recrues.ts), chargées une fois pour toute
 // l'app : recrues_de_la_ligue() pour l'XP et les skins de chacun,
 // mes_recrues() pour mes filleuls nom par nom, et le plus haut numéro de
-// Fondateur posé (les 500 places prises : fermé). À l'ouverture d'Inviter
+// Fondateur posé (les 500 places prises : fermé ; l'annonce du parrainage en
+// tire le prochain numéro). À l'ouverture d'Inviter
 // seulement, et en production seulement, fondateurs_attribuer() pose d'abord
 // les numéros de ceux qui viennent de passer 10 recrues actives (le cron du
 // lundi le fait aussi) : pas à chaque lancement de l'app, le calcul est
@@ -25,13 +26,15 @@ const PRODUCTION = process.env.NEXT_PUBLIC_BOLA_ENV === "production";
 export interface EtatRecrues {
   ligue: readonly RecruesJoueur[];
   miennes: readonly MaRecrue[];
+  /** Le plus haut numéro de Fondateur posé, comptes partis compris (0 : aucun). */
+  plusHaut: number;
   /** Les 500 numéros de Fondateur sont posés : le palier est fermé. */
   complet: boolean;
   /** La base a répondu (ou la démo est posée). */
   charge: boolean;
 }
 
-let etat: EtatRecrues = { ligue: [], miennes: [], complet: false, charge: false };
+let etat: EtatRecrues = { ligue: [], miennes: [], plusHaut: 0, complet: false, charge: false };
 let demo = false;
 
 const emit = () => window.dispatchEvent(new Event(RECRUES_EVENT));
@@ -79,6 +82,7 @@ export async function chargerRecrues(depuisLaBase: boolean, numeroter = false): 
           activeLe: l.active_le,
           compte: l.compte !== false,
         })),
+    plusHaut,
     complet: plusHaut >= FONDATEURS_MAX,
     charge: true,
   };
@@ -117,6 +121,7 @@ export function poserDemoRecrues(n: number, nom: string): void {
   etat = {
     ligue: [{ nom, actives: n, activations, fondateur: n >= 10 ? 97 : null }],
     miennes: miennes.reverse(),
+    plusHaut: n >= 10 ? 97 : 0,
     complet: false,
     charge: true,
   };
