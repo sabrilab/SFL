@@ -9813,18 +9813,27 @@ grant execute on function public.site_vu(text, text, text) to anon, authenticate
 -- ─────────────── La reprise d'une journée en suspens (12/11/2026) ───────────────
 -- Ilyes : « que les joueurs puissent voir que cette journée-là sera
 -- rattrapée ». Une journée en suspens se rattrape à une autre date : l'admin
--- change sa date, puis la reprend (publier_saison, le seul chemin). Au moment
--- de cette reprise, et dans la même transaction, la base fait le ménage de
--- l'ancienne date, pour cette saison et ce numéro seulement :
+-- change sa date, puis la reprend (publier_saison, le seul chemin), ou la
+-- reprend d'abord puis change sa date (la reprise garde la date d'origine,
+-- reprise.date). Au moment où la journée reprise quitte sa date d'origine, et
+-- dans la même transaction, la base fait le ménage de ce qui n'est pas du
+-- nouveau jour, pour cette saison et ce numéro seulement :
 --   · les votes Impact et Défensive (personne ne pourrait revoter, et les
 --     anciens compteraient) ;
 --   · les feuilles en direct (une feuille scellée bloquerait la nouvelle) ;
 --   · la fin des matchs gardée (fins_des_matchs) ;
---   · la fermeture des notes d'arbitre, reposée au mardi minuit qui suit la
---     nouvelle date (comme heuresDeJournee, missions.ts).
+--   · les notes d'arbitre données avant le nouveau jour, et leur fermeture,
+--     reposée au mardi minuit qui suit la nouvelle date (comme
+--     heuresDeJournee, missions.ts).
+-- Ce qui est du nouveau jour reste : une reprise faite le soir du rattrapage,
+-- après les matchs, garde la fin des matchs que saison_fin_des_matchs vient
+-- de poser (BEFORE, dans la même écriture) et les feuilles que l'admin a
+-- tenues ce jour-là. Une date illisible : tout le ménage, comme avant.
 -- Rien si la date n'a pas changé, ni pour une journée qui n'était pas en
--- suspens. Les clés d'annonce (annonces_envois) ne sont pas libérées.
--- Additif et rejouable ; une écriture sans le champ « suspens » ne fait rien.
+-- suspens, ni pour une journée reprise qui a déjà quitté sa date d'origine
+-- (un report du rattrapage est un changement de date ordinaire). Les clés
+-- d'annonce (annonces_envois) ne sont pas libérées.
+-- Additif et rejouable ; une écriture sans « suspens » ni « reprise » ne fait rien.
 create or replace function public.saison_reprise()
 returns trigger
 language plpgsql
@@ -9834,7 +9843,7 @@ as $$
 declare
   numero int := coalesce(public.entier_sur(new.data ->> 'numero'), 0);
   r      record;
-  jour   date;
+  nouveau date;
 begin
   if coalesce(public.entier_sur(old.data ->> 'numero'), 0) <> numero then
     return null;                                                      -- une clôture : rien à rattraper
@@ -9844,22 +9853,42 @@ begin
       from jsonb_array_elements(case when jsonb_typeof(new.data -> 'journees') = 'array' then new.data -> 'journees' else '[]'::jsonb end) n(m)
       join jsonb_array_elements(case when jsonb_typeof(old.data -> 'journees') = 'array' then old.data -> 'journees' else '[]'::jsonb end) o(m)
         on (o.m ->> 'j') = (n.m ->> 'j')
-     where public.est_en_suspens(o.m)
-       and not public.est_en_suspens(n.m)
-       and (o.m -> 'suspens' ->> 'date') is not null
-       and (n.m ->> 'date') is distinct from (o.m -> 'suspens' ->> 'date')
+     where not public.est_en_suspens(n.m)
+       and (
+         -- Reprise : elle était en suspens, et sa date n'est plus celle de la suspension.
+         (public.est_en_suspens(o.m)
+          and (o.m -> 'suspens' ->> 'date') is not null
+          and (n.m ->> 'date') is distinct from (o.m -> 'suspens' ->> 'date'))
+         or
+         -- Reprise d'abord, date changée ensuite : elle était encore à sa date d'origine.
+         (not public.est_en_suspens(o.m)
+          and jsonb_typeof(o.m -> 'reprise') = 'object'
+          and (o.m -> 'reprise' ->> 'date') is not null
+          and (o.m ->> 'date') = (o.m -> 'reprise' ->> 'date')
+          and (n.m -> 'reprise' ->> 'date') is not distinct from (o.m -> 'reprise' ->> 'date')
+          and (n.m ->> 'date') is distinct from (o.m ->> 'date'))
+       )
   loop
     continue when r.j is null;
-    delete from public.votes_figures v where v.saison = numero and v.j = r.j;
-    delete from public.feuilles_direct f where f.saison = numero and f.j = r.j;
-    delete from public.fins_des_matchs f where f.saison = numero and f.j = r.j;
-    -- La nouvelle date est à venir : date_de_journee prend l'année de la
-    -- référence, moins un au-delà d'une semaine ; une référence six mois plus
-    -- loin lit juste toute date de six mois en arrière à six mois en avant.
-    jour := public.date_de_journee(r.date, now() + interval '6 months');
-    if jour is not null then
+    -- Le nouveau jour : date_de_journee prend l'année de la référence, moins
+    -- un au-delà d'une semaine ; une référence six mois plus loin lit juste
+    -- toute date de six mois en arrière à six mois en avant (le jour même
+    -- compris : c'est celui qu'a écrit saison_fin_des_matchs).
+    nouveau := public.date_de_journee(r.date, now() + interval '6 months');
+    delete from public.votes_figures v
+     where v.saison = numero and v.j = r.j and (nouveau is null or v.jour is distinct from nouveau);
+    delete from public.feuilles_direct f
+     where f.saison = numero and f.j = r.j
+       and (nouveau is null or (f.debut at time zone 'Europe/Paris')::date is distinct from nouveau);
+    delete from public.fins_des_matchs f
+     where f.saison = numero and f.j = r.j and (nouveau is null or f.jour is distinct from nouveau);
+    delete from public.avis_arbitre av
+     using public.arbitrages a
+     where av.arbitrage_id = a.id and a.saison = numero and a.j = r.j
+       and (nouveau is null or (av.le at time zone 'Europe/Paris')::date < nouveau);
+    if nouveau is not null then
       update public.arbitrages a
-         set ferme_le = (jour + 3)::timestamp at time zone 'Europe/Paris'
+         set ferme_le = (nouveau + 3)::timestamp at time zone 'Europe/Paris'
        where a.saison = numero and a.j = r.j;
     end if;
   end loop;

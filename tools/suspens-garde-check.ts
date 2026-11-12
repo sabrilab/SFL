@@ -13,7 +13,10 @@
 //   5 · le libellé « En suspens · à rattraper » n'est écrit qu'une fois
 //       (suspens.ts) ;
 //   6 · la preuve par mutation : les contrôles 3 et 4, joués sur une copie
-//       dont on a retiré la ligne du suspens, échouent.
+//       dont on a retiré la ligne du suspens, échouent ;
+//   7 · les heures posées par Suspendre et Reprendre (suspens.depuis,
+//       reprise.le) sont celles de la ligue (horloge.ts), jamais new Date()
+//       d'un téléphone : I13 les compare (contrôle du 12/11, défaut 6).
 //   npx tsx tools/suspens-garde-check.ts
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync, statSync } from "node:fs";
@@ -121,6 +124,13 @@ assert.equal(suspensAvantRegime(deplacee), false, "la ligne après le régime : 
 const schemaMute = schema.replace("if public.est_en_suspens(meta) then\n    return 'suspens';\n  end if;", "");
 assert.notEqual(schemaMute, schema, "la mutation de feuille_hors_jeu s'applique");
 assert.deepEqual(sqlSansTrou(schemaMute), ["feuille_hors_jeu"], "sans la ligne, le contrôle 4 échoue");
+
+// 7 · L'heure de la ligue pour Suspendre et Reprendre.
+const appels = tous.flatMap((f) =>
+  [...sansImports(f.texte).matchAll(/\b(suspendreJournee|reprendreJournee)\(([^;]*?)\)\s*;/g)].map((m) => ({ chemin: f.chemin, appel: m[0] }))
+).filter((a) => !a.chemin.startsWith("lib/sfl/saisie/suspens.ts"));
+assert.ok(appels.length >= 3, `les appels de Suspendre et Reprendre sont trouvés (${appels.length})`);
+for (const a of appels) if (/new Date\(/.test(a.appel)) fautes.push(`${a.chemin} : ${a.appel} — l'heure de la ligue (horloge.ts, maintenant())`);
 
 assert.deepEqual(fautes, [], fautes.join("\n"));
 console.log(

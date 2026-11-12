@@ -42,10 +42,11 @@
 
 import { heureDuJour } from "./convocation-temps";
 import { isHidden } from "./hidden";
-import { missionsDeJournee, type DimancheMissions, type LigneXp } from "./missions";
+import { journeesDatees, missionsDeJournee, type DimancheMissions, type LigneXp } from "./missions";
 import { entryPP } from "./saisie/engine";
 import { classables, standingsJusqua } from "./rangs";
 import { journeeJouee } from "./saisie/mutations";
+import { journeeDuMoment } from "./saisie/suspens";
 import type { MatchEntry, Saison } from "./saisie/types";
 
 /* ------------------------------- Le barème ------------------------------- */
@@ -207,14 +208,14 @@ export function pronosDeJournee(
   };
 }
 
-/** La dernière journée qui a des équipes : celle des pronos en cours. */
+/**
+ * La journée des pronos en cours : la même que celle des missions
+ * (dimancheEnCours), choisie par date et non par numéro — une journée
+ * rattrapée se joue après de plus grands numéros (journeeDuMoment).
+ */
 export function journeeDesPronos(s: Saison, maintenant: Date): JourneePronos | null {
-  const js = [...s.journees].map((m) => m.j).sort((a, b) => b - a);
-  for (const j of js) {
-    const p = pronosDeJournee(s, s.numero ?? 0, j, maintenant);
-    if (p) return p;
-  }
-  return null;
+  const choisie = journeeDuMoment(journeesDatees(s, maintenant), maintenant);
+  return choisie ? pronosDeJournee(s, s.numero ?? 0, choisie.j, maintenant) : null;
 }
 
 /** Ce qu'un joueur peut choisir sur un match : tout, sauf contre son propre camp. */

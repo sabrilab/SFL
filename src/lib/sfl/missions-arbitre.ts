@@ -21,10 +21,18 @@
 // réussies, 150 de plus pour les trois. Elle fait le passe d'arbitre de la
 // saison (passe-arbitre.ts), jamais de points Pépite.
 //
+// Une journée en suspens (12/11/2026, saisie/suspens.ts) est en phase
+// « a-rattraper » passé son coup d'envoi, comme celle des joueurs
+// (phaseDeJournee, pronos.ts) : ni verdict ni XP (la vue figée ne la dit pas
+// jouée), et la base efface les notes de l'ancienne date au rattrapage
+// (public.saison_reprise). La journée du moment se choisit par date, pas
+// par numéro : une journée rattrapée se joue après de plus grands numéros.
+//
 // Pur : ni React ni réseau.
 
 import { heuresDeJournee, risqueDe, rangDe, XP_PARFAIT, type LigneXp, type SaisonLue } from "./missions";
 import { journeeJouee } from "./saisie/mutations";
+import { estEnSuspens } from "./saisie/suspens";
 import type { Saison } from "./saisie/types";
 import type { Arbitrage, Avis } from "./arbitres";
 
@@ -63,7 +71,8 @@ export interface ReponseArbitre {
   le: string;
 }
 
-export type PhaseArbitre = "ouvert" | "en-jeu" | "fini";
+/** « a-rattraper » : la journée en suspens, passé son coup d'envoi (ni verdict ni XP avant la reprise). */
+export type PhaseArbitre = "ouvert" | "en-jeu" | "fini" | "a-rattraper";
 
 export interface JourneeArbitre {
   saison: number;
@@ -75,6 +84,8 @@ export interface JourneeArbitre {
   finDesNotes: Date;
   /** La feuille porte des résultats. */
   joue: boolean;
+  /** La journée est en suspens (saisie/suspens.ts). */
+  suspens: boolean;
   /** Ses matchs de la journée. */
   arbitrages: Arbitrage[];
   missions: MissionArbitre[];
@@ -130,6 +141,7 @@ export function journeeArbitre(
     coupEnvoi: h.coupEnvoi,
     finDesNotes: h.finDesNotes,
     joue: journeeJouee(s, j),
+    suspens: estEnSuspens(h.meta),
     arbitrages: [...arbitrages].sort((a, b) => a.n - b.n),
     missions: missionsArbitre(arbitrages.length),
   };
@@ -137,6 +149,7 @@ export function journeeArbitre(
 
 export function phaseArbitre(d: JourneeArbitre, maintenant: Date): PhaseArbitre {
   if (maintenant.getTime() < d.coupEnvoi.getTime()) return "ouvert";
+  if (d.suspens) return "a-rattraper";
   return maintenant.getTime() < d.finDesNotes.getTime() ? "en-jeu" : "fini";
 }
 
@@ -204,9 +217,14 @@ export function journeesArbitre(s: Saison, arbitre: string, arbitrages: Arbitrag
   return out;
 }
 
-/** La journée des missions : la prochaine à jouer, sinon la dernière dont le verdict n'est pas tombé, sinon la dernière. */
+/**
+ * La journée des missions : la prochaine à jouer, sinon la dernière dont le
+ * verdict n'est pas tombé, sinon la dernière — par date et non par numéro
+ * (une journée rattrapée se joue après de plus grands numéros) ; une journée
+ * à rattraper ne passe qu'en dernier recours.
+ */
 export function journeeEnCours(journees: JourneeArbitre[], saison: number, maintenant: Date): JourneeArbitre | null {
-  const ici = journees.filter((d) => d.saison === saison);
+  const ici = journees.filter((d) => d.saison === saison).sort((a, b) => a.coupEnvoi.getTime() - b.coupEnvoi.getTime() || a.j - b.j);
   return (
     ici.find((d) => phaseArbitre(d, maintenant) === "ouvert") ??
     [...ici].reverse().find((d) => phaseArbitre(d, maintenant) === "en-jeu") ??

@@ -17,7 +17,8 @@
 // Une journée en suspens (12/11/2026, saisie/suspens.ts) garde sa capsule,
 // « ‖ à rattraper » au lieu de ses buts ; ouverte, sa carte (suspens.tsx :
 // la date, la pastille, le motif, ses matchs sans score) prend la place du
-// récap, qui n'a rien à compter.
+// récap, qui n'a rien à compter ; dans Matchs, la même carte vient en tête,
+// avant les journées jouées.
 
 import Link from "next/link";
 import { BoutonRetour } from "@/components/layout/bouton-retour";
@@ -276,6 +277,11 @@ function Ligue({ saisonClose }: { saisonClose?: { numero: number; nom: string } 
             {played.length > 1 ? "s" : ""} jouée{played.length > 1 ? "s" : ""}
           </p>
           <div className="grid grid-cols-1 gap-3.5 md:grid-cols-2 lg:gap-[var(--fib-21)] xl:grid-cols-3">
+            {!saisonClose &&
+              saison.journees
+                .filter(estEnSuspens)
+                .sort((a, b) => a.j - b.j)
+                .map((meta) => <CarteSuspens key={`suspens-${meta.j}`} meta={meta} />)}
             {[...played].reverse().map((jn) => (
               <CarteJournee
                 key={jn.j}

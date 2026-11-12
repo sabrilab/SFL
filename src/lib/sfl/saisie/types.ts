@@ -92,8 +92,13 @@ export interface JourneeMeta {
    * (supabase/schema.sql), saisie/suspens.ts ici.
    */
   suspens?: { depuis: string; par: string; date: string; motif?: string };
-  /** Sa dernière reprise, gardée comme `publiee`. */
-  reprise?: { le: string; par: string };
+  /**
+   * Sa dernière reprise, gardée comme `publiee`. `date` : la date de la
+   * journée au moment de la suspension (`suspens.date`), gardée pour que la
+   * base fasse le ménage de cette date si la journée change de date après
+   * avoir été reprise (public.saison_reprise). Absente : une reprise d'avant.
+   */
+  reprise?: { le: string; par: string; date?: string };
   /**
    * La fin des matchs (ISO) : l'instant où la dernière feuille du jour a été
    * remplie (02/11/2026, revelation.ts). Posé par la base

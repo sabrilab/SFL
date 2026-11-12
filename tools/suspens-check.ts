@@ -29,7 +29,15 @@
 //       la reprise à la même date passée (compte aussitôt), incomplète
 //       (bloquée), à une autre date (en ligne) ;
 //   3 · la rétrocompatibilité : absent, null, false ;
-//   4 · I13 : « Écraser » depuis une copie d'avant la suspension bloque.
+//   4 · I13 : « Écraser » depuis une copie d'avant la suspension bloque ;
+//   5 · le rattrapage après la J6 (contrôle du 12/11) : la journée du moment
+//       se choisit par date (missions, pronos, arbitres, journeeDuMoment),
+//       les divisions se rejouent dans l'ordre du calendrier (le dernier
+//       bilan est celui du rattrapage, ceux de la J6 et de la J7 ne bougent
+//       pas), « Ma carte » ne compte pas la journée en suspens comme à jouer,
+//       l'arbitre lit « a-rattraper » ; la reprise garde la date d'origine ;
+//       le chapitre d'avant de l'outsider saute la journée en suspens ;
+//       prochaineAJouer sur le document brut.
 // Les garde-fous statiques (anti-contournement) sont dans
 // tools/suspens-garde-check.ts ; la règle en base, tools/sql/suspens-check.sql.
 //   npx tsx tools/suspens-check.ts
@@ -41,6 +49,7 @@ import {
   journeesEnSuspens,
   libelleSuspens,
   MOTIF_MAX,
+  journeeDuMoment,
   premiereAVenir,
   prochaineAJouer,
   rattrapeeAilleurs,
@@ -66,16 +75,18 @@ import {
   voteOuvertA,
 } from "../src/lib/sfl/revelation";
 import { etatJournee, gesteDuMoment, prochaineJournee } from "../src/lib/sfl/saisie/etat-journee";
-import { etatDivisions } from "../src/lib/sfl/divisions";
+import { dernierBilan, etatDivisions } from "../src/lib/sfl/divisions";
 import { droitDePrendre, MOTS_DU_REFUS } from "../src/lib/sfl/feuille-direct";
 import { publicationAnnoncable } from "../src/lib/sfl/annonce-publication";
 import { cloturerSaison, updateJournee } from "../src/lib/sfl/saisie/mutations";
 import { remettreEnBrouillon, raisonDeGarder } from "../src/lib/sfl/saisie/brouillon";
 import { cartonsDeLaSaison } from "../src/lib/sfl/cartons";
 import { journalCompletAvecS, type EntreesXp } from "../src/lib/sfl/xp-calcul";
-import { JAMAIS, missionsDeJournee, type FelicitationXp, type Reponse } from "../src/lib/sfl/missions";
-import { flairsDuJoueur, pronosDeJournee, type Prono } from "../src/lib/sfl/pronos";
-import { dimancheAAnnoncer } from "../src/lib/sfl/outsiders";
+import { dimancheEnCours, JAMAIS, missionsDeJournee, type FelicitationXp, type Reponse } from "../src/lib/sfl/missions";
+import { flairsDuJoueur, journeeDesPronos, pronosDeJournee, type Prono } from "../src/lib/sfl/pronos";
+import { arcOutsider, dimancheAAnnoncer } from "../src/lib/sfl/outsiders";
+import { journeeEnCours, journeesArbitre, phaseArbitre } from "../src/lib/sfl/missions-arbitre";
+import { ordreDuCalendrier } from "../src/lib/sfl/convocation-temps";
 import { bloquantsEcriture, nouveauxEcarts } from "../src/lib/sfl/saisie/integrite";
 import { isHidden, neJouePas } from "../src/lib/sfl/hidden";
 import type { JourneeMeta, MatchEntry, Saison } from "../src/lib/sfl/saisie/types";
@@ -373,4 +384,103 @@ for (const t of Object.values(T)) assert.equal(figer(vide, t), vide, "sans suspe
   assert.ok(!nouveauxEcarts(doc, supprimee).some((e) => e.r === "I13"), "supprimer la journée reste permis");
 }
 
-console.log("suspens-check : la règle (3 variantes × 4 heures), l'aller-retour, les refus, la reprise, la rétrocompatibilité et I13 — ok");
+/* ------------------- 5 · Le rattrapage après la J6 (12/11) ------------------- */
+
+// La reprise garde la date d'origine (la base fait le même ménage si la date change ensuite).
+{
+  const r = reprendreJournee(suspendue(vide), 5, { par: "Ilyes", le: "2026-11-09T10:00:00.000Z" });
+  assert.ok("saison" in r);
+  assert.deepEqual(r.saison.journees.find((m) => m.j === 5)!.reprise, { le: "2026-11-09T10:00:00.000Z", par: "Ilyes", date: "8 nov." }, "reprise.date");
+}
+
+// journeeDuMoment : la prochaine à se jouer ou à se dénouer, par date ; sinon la dernière par date.
+{
+  const d = (j: number, coup: string, fin: string, suspens = false) => ({ j, coupEnvoi: new Date(coup), finDuJour: new Date(fin), suspens });
+  const j5 = d(5, "2026-11-29T11:30:00Z", "2026-11-29T18:00:00Z");
+  const j6 = d(6, "2026-11-15T11:30:00Z", "2026-11-15T18:00:00Z");
+  const j7 = d(7, "2026-11-22T11:30:00Z", "2026-11-22T18:00:00Z");
+  assert.equal(journeeDuMoment([j5, j6, j7], new Date("2026-11-20T12:00:00Z"))?.j, 7, "le 20/11 : la J7 du 22, pas la J5 du 29");
+  assert.equal(journeeDuMoment([j5, j6, j7], new Date("2026-11-29T09:00:00Z"))?.j, 5, "le 29/11 : le rattrapage de la J5");
+  assert.equal(journeeDuMoment([j5, j6, j7], new Date("2026-12-01T09:00:00Z"))?.j, 5, "après tout : la dernière par date");
+  const s5 = d(5, "2026-11-08T11:30:00Z", JAMAIS.toISOString(), true);
+  assert.equal(journeeDuMoment([s5, j6], new Date("2026-11-12T12:00:00Z"))?.j, 6, "une journée en suspens ne passe pas devant la J6");
+  assert.equal(journeeDuMoment([d(4, "2026-11-01T11:30:00Z", "2026-11-01T18:00:00Z"), s5], new Date("2026-11-12T12:00:00Z"))?.j, 5, "en dernier recours, la journée en suspens");
+  assert.equal(journeeDuMoment([], new Date()), null);
+  // Les numéros dans l'ordre des dates : la plus grande qui a des équipes, comme avant.
+  assert.equal(journeeDuMoment([d(4, "2026-11-01T11:30:00Z", "2026-11-01T18:00:00Z"), j6], new Date("2026-11-12T12:00:00Z"))?.j, 6);
+  assert.equal(journeeDuMoment([d(4, "2026-11-01T11:30:00Z", "2026-11-01T18:00:00Z"), d(5, "2026-11-08T11:30:00Z", "2026-11-08T18:00:00Z")], new Date("2026-11-12T12:00:00Z"))?.j, 5);
+}
+assert.deepEqual(ordreDuCalendrier({ journees: [{ j: 5, date: "29 nov." }, { j: 6, date: "15 nov." }, { j: 7, date: "22 nov." }, { j: 4, date: "1 nov." }] }, [4, 5, 6, 7]), [4, 6, 7, 5]);
+assert.deepEqual(ordreDuCalendrier({ journees: [{ j: 1, date: "20 déc." }, { j: 2, date: "3 janv." }, { j: 3, date: "" }, { j: 4, date: "10 janv." }] }, [4, 3, 2, 1]), [1, 2, 3, 4], "l'année change ; une date illisible garde sa place");
+
+{
+  // La ligue : la J5 suspendue le 8, la J6 jouée le 15, la J7 le 22, la J5 rattrapée le 29.
+  const metaDe = (j: number, date: string): JourneeMeta => ({ ...metaJ5, j, date });
+  const ligne = (j: number, joue: boolean) => (nom: string, i: number): MatchEntry => {
+    const team = equipeDe(i);
+    const result = !joue ? null : team.startsWith("Noirs") ? ("Victoire" as const) : ("Défaite" as const);
+    return { ...ligneJ5(nom, i), j, result, buts: joue && (i === 0 || i === 11) ? 2 : 0 };
+  };
+  const jouer = (s: Saison, j: number): Saison => ({
+    ...s,
+    entries: s.entries.map((e) => (e.j === j ? ligne(j, true)(e.player, presents.indexOf(e.player)) : e)),
+  });
+  const base: Saison = {
+    ...vide,
+    journees: [...vide.journees, metaDe(6, "15 nov."), metaDe(7, "22 nov."), metaDe(8, "6 déc.")],
+    entries: [...vide.entries, ...presents.map(ligne(6, true)), ...presents.map(ligne(7, false)), ...presents.map(ligne(8, false))],
+  };
+  const doc = suspendue(base);
+  const t16 = new Date("2026-11-16T12:00:00Z");
+  const v16 = figer(doc, t16);
+  assert.equal(dimancheEnCours(v16, t16)?.j, 7, "le 16 : les missions de la J7, pas de la J8");
+  assert.equal(journeeDesPronos(v16, t16)?.j, 7, "le 16 : les pronos de la J7");
+  assert.equal(evolutionDe(v16).calendrier.prochaineApresJ, evolutionDe(figer({ ...base, journees: base.journees.filter((m) => m.j !== 5), entries: base.entries.filter((e) => e.j !== 5) }, t16)).calendrier.prochaineApresJ, "Ma carte : la J5 en suspens n'est pas à jouer");
+  assert.equal(prochaineAJouer(doc), 7, "prochaineAJouer sur le document brut");
+  // Le chapitre d'avant de l'outsider de la J6 : la J4 (la J5 en suspens sautée).
+  const { journal } = journalCompletAvecS(entrees(v16, t16, []));
+  assert.equal(arcOutsider(v16, journal, deriveSeason(v16).players, 6)?.precedent?.j, 4, "l'outsider : le chapitre d'avant est la J4");
+  // L'arbitre de la J5 : « a-rattraper », et pas la journée du moment devant la J7.
+  const arb = [5, 7].map((j, i) => ({ id: i + 1, saison: 1, j, n: 0, arbitre: presents[20], equipes: ["Noirs 1", "Blancs 1"] }));
+  const ja = journeesArbitre(v16, presents[20], arb, t16);
+  assert.equal(phaseArbitre(ja.find((x) => x.j === 5)!, t16), "a-rattraper", "l'arbitre : à rattraper");
+  assert.equal(journeeEnCours(ja, 1, t16)?.j, 7, "l'arbitre : la J7");
+  assert.equal(journeeEnCours(ja.filter((x) => x.j === 5), 1, t16)?.j, 5, "seule, la J5 à rattraper");
+  // La date change (29 nov.), puis la reprise ; la J7 se joue le 22.
+  const r = reprendreJournee(updateJournee(doc, 5, { date: "29 nov." }), 5, { par: "Ilyes", le: "2026-11-20T10:00:00.000Z" });
+  assert.ok("saison" in r);
+  const t20 = new Date("2026-11-20T12:00:00Z");
+  assert.equal(dimancheEnCours(figer(r.saison, t20), t20)?.j, 7, "le 20 : la J7 du 22 d'abord");
+  assert.equal(journeeEnCours(journeesArbitre(figer(r.saison, t20), presents[20], arb, t20), 1, t20)?.j, 7, "l'arbitre, le 20 : la J7 du 22 d'abord");
+  const avecJ7 = jouer(r.saison, 7);
+  const t29 = new Date("2026-11-29T09:00:00Z");
+  const v29 = figer(avecJ7, t29);
+  assert.equal(dimancheEnCours(v29, t29)?.j, 5, "le 29 au matin : les missions du rattrapage");
+  assert.equal(journeeDesPronos(v29, t29)?.j, 5, "le 29 au matin : les pronos du rattrapage");
+  assert.equal(phaseArbitre(journeesArbitre(v29, presents[20], arb, t29).find((x) => x.j === 5)!, t29), "ouvert", "l'arbitre du rattrapage : ouvert");
+  // Les divisions : la J5 jouée le 29 vient après la J7 ; les mouvements de la J6 et de la J7 ne bougent pas.
+  const t30 = new Date("2026-11-30T12:00:00Z");
+  const avant = etatDivisions(figer(avecJ7, t30))!;
+  const apres = etatDivisions(figer(jouer(avecJ7, 5), t30))!;
+  assert.deepEqual(apres.journees.map((x) => x.j), [4, 6, 7, 5], "l'ordre du calendrier");
+  assert.equal(dernierBilan(apres)?.j, 5, "le dernier bilan est celui du rattrapage");
+  for (const j of [6, 7]) assert.deepEqual(apres.journees.find((x) => x.j === j), avant.journees.find((x) => x.j === j), `la J${j} n'est pas réécrite`);
+  const j5 = apres.journees.find((x) => x.j === 5)!.mouvements;
+  const apresJ7 = avant.decoupage.parNom;
+  assert.ok(j5.every((m) => m.de === (apresJ7.get(m.nom)?.division ?? 3)), "le rattrapage part des divisions d'après la J7");
+}
+
+// prochaineAJouer sur le document brut : une journée en suspens jouée ne fait pas sauter une journée à jouer avant elle.
+{
+  const r = suspendreJournee({ ...finie, journees: [...finie.journees, { ...metaJ5, j: 6, date: "15 nov." }] }, 5, SUSPENS);
+  assert.ok("saison" in r);
+  const sansJ5Jouee = { ...r.saison, entries: r.saison.entries.map((e) => (e.j === 5 ? { ...e, j: 6 } : e)) };
+  // J4 jouée, J5 sans feuille (à jouer), J6 jouée mais en suspens : la prochaine est la J5.
+  const j6EnSuspens = {
+    ...sansJ5Jouee,
+    journees: sansJ5Jouee.journees.map((m) => (m.j === 5 ? { ...m, suspens: undefined } : m.j === 6 ? { ...m, suspens: { depuis: SUSPENS.le, par: "Ilyes", date: "15 nov." } } : m)),
+  };
+  assert.equal(prochaineAJouer(j6EnSuspens), 5, "la J5 à jouer, pas la J7");
+}
+
+console.log("suspens-check : la règle (3 variantes × 4 heures), l'aller-retour, les refus, la reprise, la rétrocompatibilité, I13 et le rattrapage après la J6 — ok");

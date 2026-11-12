@@ -127,7 +127,8 @@ create function pg_temp.suspens(p_date text, motif text default 'Travaux sur les
 create function pg_temp.sans_suspens(d jsonb, p_j int) returns jsonb language sql immutable as $$
   select jsonb_set(d, '{journees}', (
     select jsonb_agg(case when (m ->> 'j')::int = p_j
-                          then (m - 'suspens') || '{"reprise":{"le":"2026-11-12T10:00:00.000Z","par":"Ilyes"}}'::jsonb
+                          then (m - 'suspens') || jsonb_build_object('reprise', jsonb_build_object(
+                                 'le', '2026-11-12T10:00:00.000Z', 'par', 'Ilyes', 'date', m -> 'suspens' ->> 'date'))
                           else m end order by i)
       from jsonb_array_elements(d -> 'journees') with ordinality t(m, i))) $$;
 
@@ -236,6 +237,8 @@ select pg_temp.vrai('S10 notes fermées le mardi minuit d''après la nouvelle da
 select pg_temp.vrai('S10 la J4 intacte', exists (select 1 from public.votes_figures where saison = 1 and j = 4)
   and exists (select 1 from public.fins_des_matchs where saison = 1 and j = 4)
   and (select ferme_le from public.arbitrages where saison = 1 and j = 4) = (pg_temp.auj() - 4)::timestamp at time zone 'Europe/Paris');
+select pg_temp.vrai('S10 notes d''arbitre de l''ancienne date effacées', not exists (
+  select 1 from public.avis_arbitre av join public.arbitrages a on a.id = av.arbitrage_id where a.saison = 1 and a.j = 5));
 select pg_temp.vrai('S10 une J5 à venir : la feuille ne se prend pas aujourd''hui', pg_temp.en('Kader', $$public.prendre_feuille(5, 'Noirs 2', 'Blancs 2')$$) ->> 'refus' = 'pas-du-jour');
 
 -- 11 · Une journée qui n'a jamais été en suspens : une publication ne déclenche aucun ménage.
@@ -243,6 +246,88 @@ select pg_temp.vote_pose(4, 'Badis', 'Ilyes');
 select pg_temp.publier(pg_temp.avec_meta(pg_temp.doc(), 4, '{"sflTime":true}'));
 select pg_temp.vrai('S11 rien d''effacé sur la J4', (select count(*) from public.votes_figures where saison = 1 and j = 4) = 2
   and exists (select 1 from public.fins_des_matchs where saison = 1 and j = 4));
+
+-- Une feuille, un vote et une note d'arbitre « d'il y a quatre jours » (la J5 du 8 nov.).
+create function pg_temp.traces_anciennes() returns void language sql as $$
+  insert into public.feuilles_direct (saison, j, noirs, blancs, debut, fin)
+  values (1, 5, 'Noirs 1', 'Blancs 1', now() - interval '4 days', now() - interval '4 days' + interval '50 minutes')
+  on conflict (saison, j, noirs, blancs) do update set debut = excluded.debut, fin = excluded.fin;
+  insert into public.votes_figures (saison, j, categorie, votant, candidat, match_id, jour, votant_id)
+  select 1, 5, 'impact', 'Théo', 'Badis', 'm1', pg_temp.auj() - 4, id from public.profiles where name = 'Théo' and id::text like 'd0000000-%'
+  on conflict (saison, j, categorie, votant) do update set jour = excluded.jour;
+  insert into public.avis_arbitre (arbitrage_id, joueur_id, note, le)
+  select a.id, p.id, 4, now() - interval '4 days' from public.arbitrages a, public.profiles p
+   where a.saison = 1 and a.j = 5 and p.name = 'Badis' and p.id::text like 'd0000000-%'
+  on conflict (arbitrage_id, joueur_id) do update set le = excluded.le;
+$$;
+create function pg_temp.vider_j5() returns void language sql as $$
+  delete from public.feuilles_direct where saison = 1 and j = 5;
+  delete from public.votes_figures where saison = 1 and j = 5;
+  delete from public.fins_des_matchs where saison = 1 and j = 5;
+  delete from public.avis_arbitre av using public.arbitrages a where av.arbitrage_id = a.id and a.saison = 1 and a.j = 5;
+$$;
+create function pg_temp.toutes(d jsonb, r text) returns jsonb language sql immutable as $$
+  select pg_temp.resultat(pg_temp.resultat(pg_temp.resultat(pg_temp.resultat(d, 'Noirs 1', r), 'Blancs 1', r), 'Noirs 2', r), 'Blancs 2', r) $$;
+
+-- 12 · Rattrapée aujourd'hui, reprise le soir APRÈS les matchs (contrôle du 12/11, défaut 1) :
+-- la fin des matchs que saison_fin_des_matchs pose dans la même écriture est
+-- gardée, ainsi que la feuille tenue par l'admin aujourd'hui ; seul l'ancien
+-- jour est effacé.
+select pg_temp.vider_j5();
+select pg_temp.publier(pg_temp.avec_meta(pg_temp.toutes(pg_temp.doc(), null), 5, jsonb_build_object(
+  'date', pg_temp.libelle(pg_temp.auj() - 4), 'suspens', pg_temp.suspens(pg_temp.libelle(pg_temp.auj() - 4)), 'reprise', null, 'finDesMatchs', null)));
+select pg_temp.traces_anciennes();
+select pg_temp.publier(pg_temp.avec_meta(pg_temp.doc(), 5, jsonb_build_object('date', pg_temp.libelle(pg_temp.auj()))));
+-- L'admin a tenu et scellé la feuille du match 2 aujourd'hui (feuille_admin passe outre le suspens).
+insert into public.feuilles_direct (saison, j, noirs, blancs, debut, fin) values (1, 5, 'Noirs 2', 'Blancs 2', now(), now());
+select pg_temp.publier(pg_temp.toutes(pg_temp.doc(), 'Nul'));
+select pg_temp.vrai('S12 terminée en suspens, sans F', public.journee_terminee(pg_temp.doc(), 5)
+  and not (pg_temp.meta(5) ? 'finDesMatchs') and not exists (select 1 from public.fins_des_matchs where saison = 1 and j = 5));
+select pg_temp.publier(pg_temp.sans_suspens(pg_temp.doc(), 5));
+select pg_temp.vrai('S12 F posé et gardé en base', exists (
+  select 1 from public.fins_des_matchs f where f.saison = 1 and f.j = 5 and f.jour = pg_temp.auj()
+     and to_char(f.fin at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') = pg_temp.meta(5) ->> 'finDesMatchs'));
+select pg_temp.vrai('S12 la feuille du jour gardée', exists (select 1 from public.feuilles_direct where saison = 1 and j = 5 and noirs = 'Noirs 2'));
+select pg_temp.vrai('S12 la feuille de l''ancien jour effacée', not exists (select 1 from public.feuilles_direct where saison = 1 and j = 5 and noirs = 'Noirs 1'));
+select pg_temp.vrai('S12 le vote de l''ancien jour effacé', not exists (select 1 from public.votes_figures where saison = 1 and j = 5));
+select pg_temp.vrai('S12 la note de l''ancien jour effacée', not exists (
+  select 1 from public.avis_arbitre av join public.arbitrages a on a.id = av.arbitrage_id where a.saison = 1 and a.j = 5));
+select pg_temp.vrai('S12 la reprise garde la date d''origine', pg_temp.meta(5) -> 'reprise' ->> 'date' = pg_temp.libelle(pg_temp.auj() - 4));
+-- La publication suivante relit le F gardé (une valeur de l'app vieille de 10 min ne le déplace pas).
+create temp table f12 as select pg_temp.meta(5) ->> 'finDesMatchs' as f;
+select pg_temp.publier(pg_temp.avec_meta(pg_temp.doc(), 5, jsonb_build_object('finDesMatchs',
+  to_char((now() - interval '10 minutes') at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'))));
+select pg_temp.vrai('S12 F ne bouge pas à la publication suivante', pg_temp.meta(5) ->> 'finDesMatchs' = (select f from f12)
+  and exists (select 1 from public.fins_des_matchs where saison = 1 and j = 5));
+
+-- 13 · Ordre inverse (défaut 3) : reprise à la même date passée, PUIS la date
+-- change : le même ménage, une fois ; un report ensuite est un changement de
+-- date ordinaire.
+select pg_temp.vider_j5();
+select pg_temp.publier(pg_temp.avec_meta(pg_temp.toutes(pg_temp.doc(), null), 5, jsonb_build_object(
+  'date', pg_temp.libelle(pg_temp.auj() - 4), 'suspens', pg_temp.suspens(pg_temp.libelle(pg_temp.auj() - 4)), 'reprise', null, 'finDesMatchs', null)));
+select pg_temp.traces_anciennes();
+select pg_temp.publier(pg_temp.sans_suspens(pg_temp.doc(), 5));
+select pg_temp.vrai('S13 reprise à la même date : rien d''effacé', exists (select 1 from public.feuilles_direct where saison = 1 and j = 5)
+  and exists (select 1 from public.votes_figures where saison = 1 and j = 5)
+  and exists (select 1 from public.avis_arbitre av join public.arbitrages a on a.id = av.arbitrage_id where a.saison = 1 and a.j = 5));
+select pg_temp.publier(pg_temp.avec_meta(pg_temp.doc(), 5, jsonb_build_object('date', pg_temp.libelle(pg_temp.auj()))));
+select pg_temp.vrai('S13 date changée après la reprise : feuille effacée', not exists (select 1 from public.feuilles_direct where saison = 1 and j = 5));
+select pg_temp.vrai('S13 vote effacé', not exists (select 1 from public.votes_figures where saison = 1 and j = 5));
+select pg_temp.vrai('S13 note d''arbitre effacée', not exists (
+  select 1 from public.avis_arbitre av join public.arbitrages a on a.id = av.arbitrage_id where a.saison = 1 and a.j = 5));
+select pg_temp.vrai('S13 notes refermées le mardi minuit d''après', (select ferme_le from public.arbitrages where saison = 1 and j = 5)
+  = (pg_temp.auj() + 3)::timestamp at time zone 'Europe/Paris');
+select pg_temp.vrai('S13 rattrapage : Badis prend la feuille du match 1', (pg_temp.en('Badis', $$public.prendre_feuille(5, 'Noirs 1', 'Blancs 1')$$) ->> 'ok') = 'true');
+select pg_temp.vote_pose(5, 'Théo', 'Sami');
+select pg_temp.publier(pg_temp.avec_meta(pg_temp.doc(), 5, jsonb_build_object('date', pg_temp.libelle(pg_temp.auj() + 21))));
+select pg_temp.vrai('S13 un report ensuite ne refait pas le ménage', exists (select 1 from public.feuilles_direct where saison = 1 and j = 5)
+  and exists (select 1 from public.votes_figures where saison = 1 and j = 5));
+-- Une reprise d'avant (sans date d'origine) : une date changée ne fait rien.
+select pg_temp.publier(pg_temp.avec_meta(pg_temp.doc(), 5, jsonb_build_object('date', pg_temp.libelle(pg_temp.auj()),
+  'reprise', '{"le":"2026-11-12T10:00:00.000Z","par":"Ilyes"}'::jsonb)));
+select pg_temp.publier(pg_temp.avec_meta(pg_temp.doc(), 5, jsonb_build_object('date', pg_temp.libelle(pg_temp.auj() + 21))));
+select pg_temp.vrai('S13 reprise sans date d''origine : rien d''effacé', exists (select 1 from public.votes_figures where saison = 1 and j = 5));
 
 select 'suspens-check : tout est ok' as bilan;
 rollback;

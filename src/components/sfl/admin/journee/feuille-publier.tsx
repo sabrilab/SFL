@@ -20,8 +20,11 @@
 // bouton rouge des suppressions. Suspendre : les compteurs en mots, un motif
 // d'une ligne que les joueurs liront (facultatif) ; la journée reste visible
 // et ne compte plus nulle part. Reprendre : les mêmes compteurs et la date
-// (on la change d'abord pour la rattraper un autre dimanche) ; le glissé dit
-// l'état d'arrivée (« En ligne », « Révélée », « Bloquée »).
+// (on la change d'abord pour la rattraper un autre dimanche), avec, à côté,
+// la pastille de l'état d'arrivée (« En ligne », « En direct », « Révélée »,
+// « Bloquée »), que le glissé redit. Les heures posées (suspens.depuis,
+// reprise.le) sont celles de la ligue (horloge.ts) : deux téléphones aux
+// horloges décalées ne bloquent pas une reprise (I13, integrite.ts).
 
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -41,6 +44,7 @@ import { matchsDeclares } from "@/lib/sfl/saisie/mutations";
 import { saisieStore } from "@/lib/sfl/saisie/store";
 import { numeroSaison, type Saison } from "@/lib/sfl/saisie/types";
 import { haptique } from "@/lib/sfl/haptique";
+import { maintenant as heureLigue } from "@/lib/sfl/horloge";
 import { ETATS, Etiquette, Feuille, Pastille, PastilleEtat, Segmente } from "./ui";
 
 const pluriel = (n: number, mot: string) => `${n} ${mot}${n > 1 ? "S" : ""}`;
@@ -267,15 +271,14 @@ export function FeuilleSuspendre({
   faire: (f: (s: Saison) => Saison, label: string) => boolean;
 }) {
   const [motif, setMotif] = useState("");
-  const maintenant = new Date();
-  const etat = etatJournee(saison, j, maintenant);
+  const etat = etatJournee(saison, j, heureLigue());
   const meta = saison.journees.find((m) => m.j === j);
   const revelee = etat === "revelee" || etat === "terminee";
 
   async function suspendre(): Promise<IssueReponse> {
     let refus: RefusSuspendre | null = null;
     const ok = faire((s) => {
-      const r = suspendreJournee(s, j, { par, le: new Date().toISOString(), motif });
+      const r = suspendreJournee(s, j, { par, le: heureLigue().toISOString(), motif });
       if ("refus" in r) {
         refus = r.refus;
         return s;
@@ -343,14 +346,15 @@ export function FeuilleReprendre({
 }) {
   const meta = saison.journees.find((m) => m.j === j);
   const apres = useMemo(() => {
-    const r = reprendreJournee(saison, j, { par, le: new Date().toISOString() });
-    return "saison" in r ? etatJournee(r.saison, j, new Date()) : null;
+    const t = heureLigue();
+    const r = reprendreJournee(saison, j, { par, le: t.toISOString() });
+    return "saison" in r ? etatJournee(r.saison, j, t) : null;
   }, [saison, j, par]);
 
   async function reprendre(): Promise<IssueReponse> {
     let refus = false;
     const ok = faire((s) => {
-      const r = reprendreJournee(s, j, { par, le: new Date().toISOString() });
+      const r = reprendreJournee(s, j, { par, le: heureLigue().toISOString() });
       if ("refus" in r) {
         refus = true;
         return s;
@@ -377,9 +381,16 @@ export function FeuilleReprendre({
         {meta?.suspens?.motif && <p className="mono-label text-encre-2">{meta.suspens.motif}</p>}
         <p className="mono-label text-encre-2">{joueEnMots(saison, j)}</p>
         {meta && (
-          <div className="flex flex-wrap gap-1.5">
-            <Pastille onClick={onDate}>Dim {meta.date}</Pastille>
-            {meta.heure && <Pastille onClick={onDate}>{meta.heure}</Pastille>}
+          <div className="flex flex-wrap items-center gap-1.5">
+            <Pastille onClick={onDate} className="min-h-11">
+              Dim {meta.date}
+            </Pastille>
+            {meta.heure && (
+              <Pastille onClick={onDate} className="min-h-11">
+                {meta.heure}
+              </Pastille>
+            )}
+            {apres && <PastilleEtat etat={apres} className="border border-foreground/40 bg-transparent text-encre-2" />}
           </div>
         )}
       </div>

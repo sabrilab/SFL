@@ -597,9 +597,10 @@ export default function MapPage() {
           const dedans = ici.includes(player.name);
           // La convocation du dimanche : on y répond pour toute la journée.
           const commeConvocation = convoquee && !separe;
-          // La journée en suspens (saisie/suspens.ts) : « ‖ À rattraper », jouée ou non.
+          // La journée en suspens (saisie/suspens.ts) : « ‖ En suspens · à
+          // rattraper », le libellé unique (libelleSuspens), jouée ou non.
           const { etat, texte } = estEnSuspens(m)
-            ? { etat: { genre: "a-rattraper" } as EtatSticker, texte: `${SIGNE_SUSPENS} À rattraper` }
+            ? { etat: { genre: "a-rattraper" } as EtatSticker, texte: `${SIGNE_SUSPENS} ${libelleSuspens(m)!.etat}` }
             : joue
             ? { etat: { genre: "joue" } as EtatSticker, texte: dedans ? "Joué · tu y étais" : "Joué" }
             : commeConvocation
@@ -2728,6 +2729,13 @@ function Jeton({ texte, ton, couleur, petit }: { texte: string; ton: EtatSticker
           color: couleur ?? (ton === "manque" ? BRAISE : ton === "complet" ? "rgba(255,255,255,0.5)" : "rgba(255,255,255,0.92)"),
           boxShadow: "inset 0 0 0 0.5px rgba(255,255,255,0.15)",
         };
+  // La journée en suspens : l'étiquette mono des autres écrans (« ‖ EN SUSPENS · À RATTRAPER »), jamais en petit.
+  if (ton === "a-rattraper")
+    return (
+      <span className="mono-label truncate rounded-full px-2.5 py-[5px] text-white" style={style}>
+        {texte}
+      </span>
+    );
   return (
     <span className={cn("truncate rounded-full font-medium", petit ? "px-2 py-[3px] text-[10px]" : "px-2.5 py-[4.5px] text-[11px]")} style={style}>
       {texte}

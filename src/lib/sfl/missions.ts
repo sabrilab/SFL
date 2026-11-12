@@ -49,7 +49,7 @@ import { computeJournees, computeStandings, entryPP } from "./saisie/engine";
 import { anneeProche, dateDeParis } from "./convocation-temps";
 import { revelation, verdictDeJournee } from "./revelation";
 import { journeeJouee } from "./saisie/mutations";
-import { estEnSuspens } from "./saisie/suspens";
+import { estEnSuspens, journeeDuMoment } from "./saisie/suspens";
 import { isHidden } from "./hidden";
 import { matchsDeJournee, premierCoupDEnvoi } from "./matchs-du-jour";
 import { ovr, type Player } from "./engine";
@@ -478,15 +478,27 @@ export function missionsDeJournee(
   };
 }
 
-/** Le dimanche des missions de la saison en cours : la dernière journée qui a des équipes. */
+/**
+ * Les journées de la saison qui ont des équipes, avec leurs heures : de quoi
+ * choisir celle du moment (journeeDuMoment, saisie/suspens.ts).
+ */
+export function journeesDatees(s: SaisonLue, reference: Date): { j: number; coupEnvoi: Date; finDuJour: Date; suspens: boolean }[] {
+  return s.journees.flatMap((m) => {
+    const h = heuresDeJournee(s, m.j, reference);
+    return h ? [{ j: m.j, coupEnvoi: h.coupEnvoi, finDuJour: h.finDuJour, suspens: h.suspens }] : [];
+  });
+}
+
+/**
+ * Le dimanche des missions de la saison en cours : parmi les journées qui ont
+ * des équipes, la prochaine à se jouer ou à se dénouer, sinon la dernière
+ * jouée, par date et non par numéro (une journée rattrapée se joue après de
+ * plus grands numéros : journeeDuMoment).
+ */
 export function dimancheEnCours(s: Saison, maintenant: Date): DimancheMissions | null {
   const passe = (s.archives ?? []).flatMap((a) => a.entries);
-  const js = [...s.journees].map((m) => m.j).sort((a, b) => b - a);
-  for (const j of js) {
-    const d = missionsDeJournee(s, s.numero ?? 0, j, maintenant, passe);
-    if (d) return d;
-  }
-  return null;
+  const choisie = journeeDuMoment(journeesDatees(s, maintenant), maintenant);
+  return choisie ? missionsDeJournee(s, s.numero ?? 0, choisie.j, maintenant, passe) : null;
 }
 
 /* ------------------------------- Le verdict ------------------------------- */

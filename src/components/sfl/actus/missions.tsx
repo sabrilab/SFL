@@ -23,7 +23,9 @@
 // (19 h ; minuit jusqu'à la J4). L'XP va
 // au Niveau XP et au passe de la saison (Ma carte), jamais aux points Pépite.
 // Une journée en suspens (saisie/suspens.ts) garde ses missions et leurs
-// réponses, sans verdict ni XP : « ‖ À rattraper » jusqu'à sa reprise.
+// réponses, sans verdict ni XP : « ‖ À rattraper » jusqu'à sa reprise, même
+// sur une mission pas acceptée (elle n'a pas expiré : elle attend le
+// rattrapage, décision D4).
 //
 // Toute la ligue voit les missions acceptées, sous les fiches (Contrats en
 // jeu, contrats-en-jeu.tsx) : dès que quelqu'un signe un contrat contre toi,
@@ -409,7 +411,7 @@ function Action({ l, mm, attente, repondre }: { l: LigneMission; mm: MesMissions
   if (r !== "acceptee")
     return (
       <div className="flex min-h-12 items-center pl-1">
-        <Tampon ton="gris">{r === "passee" ? `Passé${e}` : `Expiré${e}`}</Tampon>
+        <Tampon ton="gris">{r === "passee" ? `Passé${e}` : mm.phase === "a-rattraper" ? `${SIGNE_SUSPENS} ${capitale(A_RATTRAPER)}` : `Expiré${e}`}</Tampon>
       </div>
     );
   const v = l.verdict;

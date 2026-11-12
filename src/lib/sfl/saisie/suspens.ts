@@ -30,8 +30,13 @@
 // journée en suspens ne se remet pas en brouillon (brouillon.ts).
 //
 // Le rattrapage : la même journée, à une autre date (on change la date, puis
-// on reprend). La base fait alors le ménage de l'ancienne date (votes,
-// feuilles, fin des matchs : public.saison_reprise).
+// on reprend, ou l'inverse : la reprise garde la date d'origine). La base
+// fait alors le ménage de ce qui n'est pas du nouveau jour (votes, feuilles,
+// fin des matchs, notes d'arbitre : public.saison_reprise). Une journée
+// rattrapée se joue après de plus grands numéros : la journée du moment
+// (missions, pronos, arbitres) se choisit par date (journeeDuMoment), et les
+// divisions se rejouent dans l'ordre du calendrier (ordreDuCalendrier,
+// convocation-temps.ts).
 //
 // Pur : ni base, ni écran.
 
@@ -92,7 +97,10 @@ export function suspendreJournee(
   return { saison: { ...s, journees: s.journees.map((m) => (m.j === j ? { ...m, suspens } : m)) } };
 }
 
-/** Reprend la journée : retire `suspens`, pose `reprise`. Elle vit ensuite son cycle normal à sa date. */
+/**
+ * Reprend la journée : retire `suspens`, pose `reprise` (avec la date
+ * d'origine). Elle vit ensuite son cycle normal à sa date.
+ */
 export function reprendreJournee(s: Saison, j: number, o: { par: string; le: string }): { saison: Saison } | { refus: RefusReprendre } {
   const meta = s.journees.find((m) => m.j === j);
   if (!meta) return { refus: "absente" };
@@ -102,9 +110,11 @@ export function reprendreJournee(s: Saison, j: number, o: { par: string; le: str
       ...s,
       journees: s.journees.map((m) => {
         if (m.j !== j) return m;
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const { suspens, ...reste } = m;
-        return { ...reste, reprise: { le: o.le, par: o.par } };
+        // La date d'origine voyage avec la reprise : changer la date ensuite
+        // fait le même ménage qu'un rattrapage (public.saison_reprise).
+        const date = estEnSuspens({ suspens }) ? suspens?.date : undefined;
+        return { ...reste, reprise: { le: o.le, par: o.par, ...(date ? { date } : {}) } };
       }),
     },
   };
@@ -133,6 +143,26 @@ export function prochaineAJouer(s: Pick<Saison, "journees" | "entries">): number
   let j = Math.max(0, ...s.journees.map((m) => m.j).filter((x) => !enSuspens.has(x) && journeeJouee(s as Saison, x))) + 1;
   while (enSuspens.has(j)) j++;
   return j;
+}
+
+/**
+ * La journée « du moment » parmi des journées datées (missions, pronos,
+ * arbitres) : la prochaine à se jouer ou à se dénouer — pas encore finie,
+ * hors suspens, la plus proche par son coup d'envoi —, sinon la dernière par
+ * date, une journée en suspens comprise. Les numéros ne disent pas l'ordre du
+ * calendrier : une J5 rattrapée le 29/11 se joue après la J7 du 22/11
+ * (contrôle du 12/11). Quand les numéros suivent les dates, c'est la journée
+ * qu'on prenait avant (la plus grande qui a des équipes), sauf qu'une
+ * journée pas encore révélée passe devant la suivante déjà convoquée.
+ */
+export function journeeDuMoment<T extends { j: number; coupEnvoi: Date; finDuJour: Date; suspens: boolean }>(
+  liste: readonly T[],
+  maintenant: Date
+): T | null {
+  const t = maintenant.getTime();
+  const ordre = (a: T, b: T) => a.coupEnvoi.getTime() - b.coupEnvoi.getTime() || a.j - b.j;
+  const ouverte = liste.filter((d) => !d.suspens && t < d.finDuJour.getTime()).sort(ordre)[0];
+  return ouverte ?? [...liste].sort(ordre).at(-1) ?? null;
 }
 
 /** La première journée de la saison qui n'est ni jouée ni en suspens (la « prochaine » d'un écran) ; undefined s'il n'y en a pas. */
