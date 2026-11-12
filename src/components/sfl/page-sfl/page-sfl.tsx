@@ -21,7 +21,8 @@
 //     trois cartes à titre. Elle ne lit ni la saison ni le joueur connecté ;
 //   · du noir et blanc, sauf ces trois cartes (l'or, le rouge et le bleu
 //     leur sont réservés) ; les tuiles Noirs et Blancs gardent les couleurs
-//     des maillots dans les deux modes ;
+//     des maillots dans les deux modes : celle qui a la couleur de la page
+//     (Noirs en sombre, Blancs en clair) porte un liseré plus net ;
 //   · le thème de l'app, clair ou sombre : rien que des jetons.
 // Les textes sont dans lib/sfl/page-sfl.ts, que relit tools/page-sfl-check.ts.
 //
@@ -37,36 +38,47 @@
 // Trois mises en page, sans défilement horizontal dès 320 px : le téléphone
 // (une colonne, 20 px de marge), la tablette (la même, 560 px au centre), et
 // l'ordinateur dès 960 px (1120 px, le titre à gauche et le contenu à droite ;
-// le haut, les titres et la fin au centre). Sous 390 px, le titre du haut et
-// les phrases se resserrent pour garder leurs lignes. Une carte reçoit sa
-// taille en nombre : les trois cartes à titre prennent la largeur de leur
-// rangée, la carte de saison celle de sa colonne sur ordinateur (useLargeur).
+// le haut, les titres et la fin au centre, les deux boutons l'un sous l'autre
+// dans l'axe). Sous 390 px, le titre du haut et les phrases se resserrent pour
+// garder leurs lignes. Le haut tient dans le premier écran : sur ordinateur,
+// ses marges, son sigle et son titre suivent la hauteur de la fenêtre (un
+// portable de 1366 × 657 montre les boutons) ; sur un téléphone couché (moins
+// de 480 px de haut), il se resserre. Une carte reçoit sa taille en nombre : les trois cartes à
+// titre prennent la largeur de leur rangée (complètes dès qu'elle leur donne
+// 170 px, sur tablette et ordinateur), la carte de saison celle de sa colonne
+// sur ordinateur (useLargeur).
 //
 // Mouvement : sous la ligne de flottaison, chaque section monte de 12 px en
-// fondu, une seule fois. L'état caché n'est posé qu'après le montage (sans
-// JavaScript tout est visible, et le HTML servi porte tout le texte). Avec
-// « Réduire les animations », rien ne bouge. Rien ne tourne en boucle, rien
-// ne suit le défilement : la barre du haut paraît quand les boutons du haut
-// sont sortis de l'écran et s'efface quand ceux du bas y entrent.
+// fondu, une seule fois. L'état caché n'est posé qu'après le montage : le HTML
+// servi porte tout le texte, sans rien de caché (un moteur, l'aperçu d'un lien
+// le lisent). À l'écran, la page se voit une fois le voile de l'intro levé,
+// donc le JavaScript lancé (app-splash.tsx). Avec « Réduire les animations »,
+// rien ne bouge. Rien ne tourne en boucle, rien ne suit le défilement : la
+// barre du haut paraît quand les boutons du haut sont sortis de l'écran et
+// s'efface quand ceux du bas y entrent.
 //
 // Un joueur déjà connecté reste sur la page ; ses boutons deviennent
-// « Ouvrir Bola ». La visite compte dans l'entonnoir de getbola.app comme
-// celle de la page d'accueil (site-visites.ts, étape « site »).
+// « Ouvrir Bola », et ce qui s'ouvre de soi-même dans l'app (cérémonies,
+// invitations) l'attend derrière ce bouton (ApresAccueil). La visite d'un
+// visiteur sans compte entre dans l'entonnoir de getbola.app comme celle de la
+// page d'accueil (site-visites.ts, étape « site ») ; celle d'un joueur
+// connecté n'y entre pas.
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Lock } from "lucide-react";
+import { ArrowUp, Lock } from "lucide-react";
 import { BolaCard, type BolaEdition } from "@/components/sfl/bola-card";
 import { DosCarte } from "@/components/sfl/dos-carte";
 import { LOGO_BOLA, RAYON_CARTE, matiereDe } from "@/components/sfl/finitions-carte";
 import { SigleSfl } from "@/components/sfl/marques-carte";
-import { LISERE_CAMP } from "@/components/sfl/point-maillot";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { useSession } from "@/hooks/use-session";
+import { getSession } from "@/lib/sfl/auth/session";
 import { carteNeutre } from "@/lib/sfl/carte-neutre";
 import { MAILLOTS } from "@/lib/sfl/maillots";
 import {
   BOUTONS_SFL,
+  type BoutonSfl,
   CARTE_SFL,
   CLASSEMENT_SFL,
   DIMANCHE_SFL,
@@ -86,18 +98,34 @@ const TOI = carteNeutre(CARTE_SFL.nom);
 /** La largeur d'une carte à la taille 1, et le rapport de ses côtés. */
 const CARTE = { l: 254, rapport: 1656 / 1024 };
 /**
- * Les trois cartes à titre sur une rangée de téléphone : elles tiennent la
- * largeur de la colonne (0,43 sur un écran de 390), sans passer au palier de
- * la carte complète sur une tablette ; l'écart entre elles.
+ * Les trois cartes à titre sur une rangée : elles tiennent la largeur de la
+ * colonne (0,43 sur un écran de 390). `complete` : la largeur où la carte
+ * montre ses stats (palierCarte, bola-card.tsx) ; dès que la rangée la donne
+ * (une tablette), les cartes sont complètes, jusqu'à leur taille d'ordinateur.
+ * En dessous, elles restent petites (`petite`) : la carte sans stats, grande,
+ * paraît vide. L'écart entre elles.
  */
-const RANGEE = { taille: 0.43, max: 0.66, ecart: 10 };
+const RANGEE = { taille: 0.43, petite: 0.5, complete: 170, grande: 0.8, ecart: 10 };
 /** La hauteur de la barre du haut. */
 const BARRE = 52;
 
 /** La colonne de la page : 20 px de marge sur téléphone, 560 px au centre d'une tablette, 1120 px sur ordinateur. */
 const COLONNE = "mx-auto w-full px-5 min-[720px]:max-w-[600px] min-[960px]:max-w-[1200px] min-[960px]:px-10";
 const ETIQUETTE = "mono-label text-encre-3";
+/** Le sigle du haut : le fichier de SigleSfl, en masque ; sa hauteur est réglée par la feuille de style. */
+const MASQUE_SIGLE = "url(/bola/sfl.svg) center / contain no-repeat";
+/**
+ * Le liseré d'une tuile de camp : celui des pastilles (point-maillot.tsx,
+ * LISERE_CAMP) ; plus net (1,5 px, l'encre à 28 %) pour la tuile qui a la
+ * couleur de la page, qui sinon s'y fond.
+ */
+const LISERE_TUILE = {
+  Noirs: "shadow-[inset_0_0_0_1px_rgba(128,128,128,0.45)] dark:shadow-[inset_0_0_0_1.5px_rgb(var(--foreground-rgb)/0.28)]",
+  Blancs: "shadow-[inset_0_0_0_1.5px_rgb(var(--foreground-rgb)/0.28)] dark:shadow-[inset_0_0_0_1px_rgba(128,128,128,0.45)]",
+} as const;
 const TITRE = "mt-3 text-nom leading-[1.05] font-extrabold tracking-tight text-balance min-[960px]:mt-4 min-[960px]:text-[clamp(40px,3.9vw,56px)] min-[960px]:leading-[1.02]";
+/** Le même titre, quand il ne s'écrit que sur ordinateur (lu, sans être vu, en dessous). */
+const TITRE_ORDINATEUR = "min-[960px]:mt-4 min-[960px]:text-[clamp(40px,3.9vw,56px)] min-[960px]:leading-[1.02] min-[960px]:font-extrabold min-[960px]:tracking-tight min-[960px]:text-balance";
 const AFFICHE = "font-extrabold tracking-tight";
 const FILET = "border-foreground/10";
 /** Une phrase de contenu : 19 px, un peu moins sur un téléphone étroit ; 22 px sur ordinateur. */
@@ -162,7 +190,19 @@ function Carte({
   );
 }
 
-/** Les boutons de la page : un visiteur crée son compte ou se connecte ; un joueur connecté ouvre l'app. */
+/** Un bouton : son texte et son adresse vont ensemble (BOUTONS_SFL). */
+function Bouton({ bouton, className }: { bouton: BoutonSfl; className?: string }) {
+  return (
+    <Link href={bouton.vers} className={className}>
+      {bouton.texte}
+    </Link>
+  );
+}
+
+/**
+ * Les boutons de la page, l'un sous l'autre, dans l'axe : un visiteur crée son
+ * compte ou se connecte ; un joueur connecté ouvre l'app.
+ */
 function Boutons({
   connecte,
   className,
@@ -175,25 +215,13 @@ function Boutons({
   const principal = "flex items-center justify-center py-4 text-lecture font-bold min-[960px]:min-w-[232px] min-[960px]:px-8";
   const discret = "flex items-center justify-center py-3.5 text-ligne font-semibold min-[960px]:px-6";
   return (
-    <div ref={ref} className={cn("flex flex-col gap-2.5 min-[960px]:flex-row min-[960px]:items-center min-[960px]:gap-3", className)}>
+    <div ref={ref} className={cn("flex flex-col gap-2.5 min-[960px]:items-center", className)}>
       {connecte ? (
-        <>
-          <Link href={LIENS_SFL.app} className={cn("bouton-principal", principal)}>
-            {BOUTONS_SFL.ouvrir}
-          </Link>
-          {/* La place du second bouton : la page ne saute pas quand la session arrive. */}
-          <span aria-hidden className={cn("invisible min-[960px]:hidden", discret)}>
-            {BOUTONS_SFL.connecter}
-          </span>
-        </>
+        <Bouton bouton={BOUTONS_SFL.ouvrir} className={cn("bouton-principal", principal)} />
       ) : (
         <>
-          <Link href={LIENS_SFL.inscription} className={cn("bouton-principal bouton--vert", principal)}>
-            {BOUTONS_SFL.creer}
-          </Link>
-          <Link href={LIENS_SFL.connexion} className={cn("bouton-discret", discret)}>
-            {BOUTONS_SFL.connecter}
-          </Link>
+          <Bouton bouton={BOUTONS_SFL.creer} className={cn("bouton-principal bouton--vert", principal)} />
+          <Bouton bouton={BOUTONS_SFL.connecter} className={cn("bouton-discret", discret)} />
         </>
       )}
     </div>
@@ -213,8 +241,11 @@ export function PageSfl() {
   const largeurColonneCarte = useLargeur(colonneCarte);
   const [barre, setBarre] = useState(false);
 
-  // Le haut de l'entonnoir : un visiteur de plus sur getbola.app.
-  useEffect(() => noterSite("site"), []);
+  // Le haut de l'entonnoir : un visiteur de plus sur getbola.app. Un joueur
+  // déjà connecté (ou dont le compte attend) n'en est pas un.
+  useEffect(() => {
+    if (!getSession()) noterSite("site");
+  }, []);
 
   // La barre : entre les boutons du haut (sortis de l'écran) et ceux du bas (pas encore entrés).
   useEffect(() => {
@@ -265,18 +296,21 @@ export function PageSfl() {
     };
   }, []);
 
-  // Les trois cartes à titre : complètes sur ordinateur ; sur téléphone, à la largeur de la colonne.
+  // Les trois cartes à titre : complètes sur ordinateur, et dès que la rangée
+  // leur donne la largeur d'une carte complète (une tablette) ; sinon petites,
+  // à la largeur de la colonne.
+  const place = largeurRangee ? (largeurRangee - RANGEE.ecart * 2) / 3 : null;
+  const titresComplets = ordinateur || (place !== null && place >= RANGEE.complete);
   const tailleTitre = ordinateur
-    ? 0.8
-    : largeurRangee
-      ? Math.min(RANGEE.max, (largeurRangee - RANGEE.ecart * 2) / 3 / CARTE.l)
-      : RANGEE.taille;
+    ? RANGEE.grande
+    : place === null
+      ? RANGEE.taille
+      : Math.min(titresComplets ? RANGEE.grande : RANGEE.petite, place / CARTE.l);
   // La carte de saison : 203 px sur téléphone ; sur ordinateur, 317 px au plus, et
   // moins dans une colonne étroite (le dos dépasse d'elle d'un tiers de sa largeur).
   const tailleCarte = ordinateur
     ? Math.max(0.8, Math.min(1.25, largeurColonneCarte ? largeurColonneCarte / 1.35 / CARTE.l : 1.25))
     : 0.8;
-  const hauteurSigle = ordinateur ? 140 : 76;
 
   return (
     <div
@@ -297,35 +331,46 @@ export function PageSfl() {
       >
         <div className={cn(COLONNE, "flex items-center justify-between")} style={{ height: BARRE }}>
           <SigleSfl hauteur={14} couleur="currentColor" />
-          <Link
-            href={connecte ? LIENS_SFL.app : LIENS_SFL.inscription}
+          <Bouton
+            bouton={connecte ? BOUTONS_SFL.ouvrir : BOUTONS_SFL.creer}
             // La pilule fait 34 px ; sa zone de toucher, 44.
             className={cn(
               "bouton-principal flex h-[34px] items-center px-4 text-petit font-bold before:absolute before:inset-x-0 before:-inset-y-[5px] before:content-['']",
               !connecte && "bouton--vert"
             )}
-          >
-            {connecte ? BOUTONS_SFL.ouvrir : BOUTONS_SFL.creer}
-          </Link>
+          />
         </div>
       </div>
 
-      <main>
-        {/* 1 · Le haut */}
-        <header className={cn(COLONNE, "flex flex-col items-center pt-11 text-center min-[960px]:pt-28")}>
+      {/* Le contenu : la racine de l'app (layout.tsx) porte déjà le <main>. */}
+      <div>
+        {/* 1 · Le haut : sur ordinateur, tout suit la hauteur de la fenêtre (les valeurs d'un écran de 900 px au plus) ; resserré sur un téléphone couché. */}
+        <header className={cn(COLONNE, "flex flex-col items-center pt-11 text-center min-[960px]:pt-[clamp(48px,12.5vh,112px)] [@media(max-height:480px)]:pt-6")}>
           <p className={ETIQUETTE}>{HAUT_SFL.etiquette}</p>
-          <div className="mt-7 min-[960px]:mt-12">
-            <SigleSfl hauteur={hauteurSigle} couleur="currentColor" />
-          </div>
-          <h1 className={cn(AFFICHE, "mt-7 text-[clamp(30px,9.7vw,44px)] leading-[1.04] min-[960px]:mt-12 min-[960px]:text-[clamp(72px,6.7vw,96px)] min-[960px]:leading-none")}>
+          <span
+            role="img"
+            aria-label={HAUT_SFL.sigle}
+            className={cn("mt-7 block aspect-[735/237] h-[76px] bg-current min-[960px]:mt-[clamp(24px,5.4vh,48px)] min-[960px]:h-[clamp(88px,15.6vh,140px)] [@media(max-height:480px)]:mt-4 [@media(max-height:480px)]:h-12")}
+            style={{ mask: MASQUE_SIGLE, WebkitMask: MASQUE_SIGLE }}
+          />
+          <h1
+            className={cn(
+              AFFICHE,
+              "mt-7 text-[clamp(30px,9.7vw,44px)] leading-[1.04] min-[960px]:mt-[clamp(24px,5.4vh,48px)] min-[960px]:text-[clamp(56px,min(6.7vw,11.5vh),96px)] min-[960px]:leading-none [@media(max-height:480px)]:mt-4"
+            )}
+          >
             {HAUT_SFL.titre.map((ligne) => (
               <span key={ligne} className="block whitespace-nowrap">
                 {ligne}
               </span>
             ))}
           </h1>
-          <p className="mt-4 text-titre-fort font-bold text-encre-2 min-[960px]:mt-7 min-[960px]:text-titre-g">{HAUT_SFL.ligne}</p>
-          <Boutons ref={boutonsHaut} connecte={connecte} className="mt-9 w-full min-[720px]:max-w-[420px] min-[960px]:mt-12 min-[960px]:w-auto min-[960px]:max-w-none" />
+          <p className={cn("mt-4 text-titre-fort font-bold text-encre-2 min-[960px]:mt-[clamp(14px,3.2vh,28px)] min-[960px]:text-titre-g [@media(max-height:480px)]:mt-2")}>{HAUT_SFL.ligne}</p>
+          <Boutons
+            ref={boutonsHaut}
+            connecte={connecte}
+            className={cn("mt-9 w-full min-[720px]:max-w-[420px] min-[960px]:mt-[clamp(24px,5.4vh,48px)] min-[960px]:w-auto min-[960px]:max-w-none [@media(max-height:480px)]:mt-5")}
+          />
         </header>
 
         {/* 2 · La semaine */}
@@ -343,9 +388,10 @@ export function PageSfl() {
           <dl className={cn("mt-8 border-b min-[960px]:col-span-7 min-[960px]:mt-1", FILET)}>
             {SEMAINE_SFL.lignes.map((l) => (
               <div key={`${l.jour}${l.heure ?? ""}`} className={cn("flex items-center gap-3 border-t py-4 min-[960px]:gap-8 min-[960px]:py-5", FILET)}>
-                <dt className={cn(ETIQUETTE, "w-[84px] shrink-0 leading-[1.5] min-[960px]:w-32")}>
+                {/* Le jour est du contenu : l'encre des phrases en retrait, son heure à l'encre. */}
+                <dt className="mono-label w-[84px] shrink-0 leading-[1.5] text-encre-2 min-[960px]:w-32">
                   <span className="block">{l.jour}</span>
-                  {l.heure && <span className="block text-encre-2">{l.heure}</span>}
+                  {l.heure && <span className="block text-encre">{l.heure}</span>}
                 </dt>
                 <dd className="flex min-w-0 flex-1 flex-col items-start gap-2.5 min-[960px]:flex-row min-[960px]:items-center min-[960px]:justify-between min-[960px]:gap-3">
                   <span className={PHRASE}>{l.phrase}</span>
@@ -361,7 +407,7 @@ export function PageSfl() {
           </dl>
         </section>
 
-        {/* 3 · Le dimanche : le diptyque est le titre. */}
+        {/* 3 · Le dimanche : sur téléphone le diptyque est le titre ; sur ordinateur le titre s'écrit à gauche, comme ailleurs. */}
         <section
           data-apparait
           aria-labelledby="sfl-dimanche"
@@ -373,27 +419,36 @@ export function PageSfl() {
         >
           <div className="min-[960px]:col-span-5">
             <p className={ETIQUETTE}>{DIMANCHE_SFL.etiquette}</p>
-            <h2 id="sfl-dimanche" className="sr-only">
+            <h2 id="sfl-dimanche" className={cn("sr-only min-[960px]:not-sr-only", TITRE_ORDINATEUR)}>
               {DIMANCHE_SFL.titre}
             </h2>
           </div>
-          <div aria-hidden className="mt-4 min-[960px]:col-span-7 min-[960px]:col-start-6 min-[960px]:row-span-2 min-[960px]:row-start-1 min-[960px]:mt-0">
-            <div className="grid grid-cols-2 gap-2 min-[960px]:gap-3">
-              {DIMANCHE_SFL.camps.map((camp) => (
-                <div
-                  key={camp}
-                  className="flex aspect-[4/5] items-end rounded-tuile p-4 min-[960px]:p-6"
-                  style={{ background: MAILLOTS[camp].fond, color: MAILLOTS[camp].encre, boxShadow: LISERE_CAMP }}
-                >
-                  <span className="titre-lettrage text-[clamp(24px,7.7vw,30px)] leading-none min-[960px]:text-[44px]">{camp}</span>
-                </div>
-              ))}
-            </div>
-            <p className={cn(ETIQUETTE, "mt-3 text-center")}>{DIMANCHE_SFL.contre}</p>
+          <div
+            aria-hidden
+            className="relative mt-4 grid grid-cols-2 gap-2 min-[960px]:col-span-7 min-[960px]:col-start-6 min-[960px]:row-span-2 min-[960px]:row-start-1 min-[960px]:mt-1 min-[960px]:gap-3 min-[960px]:self-start"
+          >
+            {DIMANCHE_SFL.camps.map((camp) => (
+              <div
+                key={camp}
+                className={cn("flex aspect-[4/5] items-end rounded-tuile p-4 min-[720px]:aspect-[5/4] min-[960px]:p-6", LISERE_TUILE[camp], OMBRE.petite)}
+                style={{ background: MAILLOTS[camp].fond, color: MAILLOTS[camp].encre }}
+              >
+                <span className="titre-lettrage text-[clamp(24px,7.7vw,30px)] leading-none min-[960px]:text-[44px]">{camp}</span>
+              </div>
+            ))}
+            {/* « contre », entre les deux camps ; sur ordinateur, le titre le dit. */}
+            <p
+              className={cn(
+                ETIQUETTE,
+                "absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-background px-2.5 py-1 shadow-[0_0_0_1px_rgba(128,128,128,0.45)] min-[960px]:hidden"
+              )}
+            >
+              {DIMANCHE_SFL.contre}
+            </p>
           </div>
           <Phrases
             phrases={DIMANCHE_SFL.phrases}
-            className="mt-7 min-[960px]:col-span-5 min-[960px]:col-start-1 min-[960px]:row-start-2 min-[960px]:mt-0 min-[960px]:self-end min-[960px]:pb-9"
+            className="mt-7 min-[960px]:col-span-5 min-[960px]:col-start-1 min-[960px]:row-start-2 min-[960px]:mt-8"
           />
         </section>
 
@@ -430,7 +485,10 @@ export function PageSfl() {
               {CARTE_SFL.lignes.map((l) => (
                 <div key={l.geste} className={cn("flex items-center justify-between gap-4 border-t py-3.5 min-[960px]:py-[18px]", FILET)}>
                   <dt className="text-titre leading-snug font-bold text-balance min-[960px]:text-titre-fort">{l.geste}</dt>
-                  <dd className={cn(ETIQUETTE, "shrink-0 text-right text-encre-2")}>{l.stat}</dd>
+                  <dd className={cn(ETIQUETTE, "flex shrink-0 items-center gap-1 text-right text-encre-2")}>
+                    <ArrowUp aria-hidden className="size-3" strokeWidth={2.6} />
+                    {l.stat}
+                  </dd>
                 </div>
               ))}
             </dl>
@@ -451,9 +509,9 @@ export function PageSfl() {
             </h2>
           </div>
           <div className="mt-8 min-[960px]:col-span-7 min-[960px]:mt-1">
-            <ul className="grid grid-cols-2 gap-2 min-[960px]:grid-cols-4 min-[960px]:gap-3">
+            <ul className="grid grid-cols-2 gap-2 min-[960px]:grid-cols-4">
               {CLASSEMENT_SFL.bareme.map((t) => (
-                <li key={t.cle} className={cn("rounded-champ border px-4 pt-3.5 pb-3", FILET)}>
+                <li key={t.cle} className={cn("rounded-champ border px-4 pt-3.5 pb-3 min-[960px]:px-2.5", FILET)}>
                   <span className="block font-display text-titre-l leading-none tabular-nums">{pointsLisibles(t.points)}</span>
                   <span className="mt-2 block text-petit leading-tight font-semibold text-encre-2">{t.libelle}</span>
                 </li>
@@ -480,10 +538,12 @@ export function PageSfl() {
             {TITRES_SFL.cartes.map((c) => (
               <div key={c.edition} className="flex flex-col items-center">
                 <Carte lue={c.lue} edition={c.edition} taille={tailleTitre} className={OMBRE.petite} />
-                {/* Sur ordinateur la carte est complète : son étiquette se lit dessus. */}
-                <p aria-hidden className={cn(ETIQUETTE, "mt-4 text-encre-2 min-[960px]:hidden")}>
-                  {c.nom}
-                </p>
+                {/* Une carte complète porte son étiquette : on ne la répète pas dessous. */}
+                {!titresComplets && (
+                  <p aria-hidden className={cn(ETIQUETTE, "mt-4 text-encre-2")}>
+                    {c.nom}
+                  </p>
+                )}
               </div>
             ))}
           </div>
@@ -516,7 +576,7 @@ export function PageSfl() {
           </ol>
           <Boutons ref={boutonsFin} connecte={connecte} className="mt-10 w-full min-[720px]:max-w-[420px] min-[960px]:mt-14 min-[960px]:w-auto min-[960px]:max-w-none" />
         </section>
-      </main>
+      </div>
 
       <footer
         className={cn(COLONNE, "mt-24 min-[960px]:mt-40")}
@@ -536,7 +596,7 @@ export function PageSfl() {
             <Link href={LIENS_SFL.confidentialite} className={cn(ETIQUETTE, ANNEAU, "-my-4 py-4 text-encre-2")}>
               {FIN_SFL.pied.confidentialite}
             </Link>
-            <p className={cn(ETIQUETTE, "text-encre-4")}>{FIN_SFL.pied.droits}</p>
+            <p className={ETIQUETTE}>{FIN_SFL.pied.droits}</p>
           </div>
         </div>
       </footer>

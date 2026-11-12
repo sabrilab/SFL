@@ -2,22 +2,35 @@
 // la Sunday Five League présentée à quelqu'un qui n'a pas de compte, le lien
 // de la bio Instagram de la ligue (12/11/2026).
 //
-// Tout ce qui se lit sur la page est ici, et rien d'autre : le banc
-// tools/page-sfl-check.ts relit ce fichier. Il vérifie que chaque fait suit
-// le code (le barème contre entryPP, les heures contre convocation-temps.ts
-// et revelation.ts, le 75 contre carte-neutre.ts), qu'aucun nom de l'effectif
-// n'y figure, et qu'aucun mot non décidé n'y entre (un prix, une adresse,
-// une heure de coup d'envoi, un chiffre de la ligue).
+// Tout ce qui se lit sur la page est ici, avec l'aperçu de son lien
+// (METADONNEES_SFL) et ses boutons (le texte et l'adresse de chacun) : le banc
+// tools/page-sfl-check.ts relit ce fichier. Ce qu'il tient, et rien de plus :
+//   · les faits que le code sait dire le suivent : le barème (entryPP), les
+//     heures (convocation-temps.ts, revelation.ts), le lundi de la convocation
+//     (vercel.json), le 75 (carte-neutre.ts), ce qui fait monter chaque stat
+//     et la série de trois dimanches (saisie/evolution.ts), les titres votés
+//     (votes.ts), les classements de fin de saison (fin-de-saison.ts), les
+//     trois divisions (divisions.ts) ;
+//   · les phrases de règle que le code ne sait pas dire sont figées dans le
+//     banc : en changer une, c'est la relire contre la règle ;
+//   · aucun nom de l'effectif n'y figure ; aucun nombre hors de ceux de la
+//     page (75, 19 h, Match 1 et 2, D1 à D3, le barème, 2026) ; aucun nom
+//     propre hors d'une liste (donc aucun lieu que Lille) ; aucun mot rejeté
+//     (un prix, « Hippodrome », « prono »…).
 //
 // Le ton est celui du site de la marque : des phrases de deux à cinq mots,
 // au présent, qui tutoient ; ni point d'exclamation, ni texte qui guide.
 // La page est en français seulement (son cadre force lang et dir).
 // Typographie : l'apostrophe courbe du site, des espaces insécables autour
-// des guillemets, devant les deux-points et entre un nombre et son unité ;
+// des guillemets, devant les deux-points, entre un nombre et son unité, et
+// entre un article et son nom là où la ligne les séparait ;
 // un saut de ligne (\n) sépare deux phrases qui ne se suivent pas sur la
 // même ligne.
 //
 // Pur : ni React, ni horloge, ni lecture de la saison.
+
+import type { Metadata } from "next";
+import { CHEMIN_SFL } from "./routes-publiques";
 
 /** Les adresses où mène la page : toutes dans l'app, aucune vers l'extérieur. */
 export const LIENS_SFL = {
@@ -27,22 +40,57 @@ export const LIENS_SFL = {
   app: "/",
 } as const;
 
-/** L'aperçu du lien (titre de l'onglet, description, texte de l'image). */
+/**
+ * L'aperçu du lien (titre de l'onglet, description, texte de l'image). La
+ * description dit « foot » : la page ne l'écrit nulle part (son haut reprend
+ * le texte du site, où le ballon est à l'image), et c'est elle que lisent un
+ * moteur de recherche et l'aperçu d'un lien partagé.
+ */
 export const META_SFL = {
   titre: "SFL · Sunday Five League, Lille",
   description:
-    "Cinq contre cinq, chaque dimanche à Lille. Noirs contre Blancs, trois divisions, le classement Pépite d’Or. Ta carte bouge avec toi.",
+    "Foot à cinq, chaque dimanche à Lille. Noirs contre Blancs, trois divisions, le classement Pépite d’Or. Ta carte bouge avec toi.",
   image: "SFL, Sunday Five League",
 } as const;
 
+/**
+ * Les métadonnées de la route (app/sfl/page.tsx les exporte telles quelles).
+ * La racine (layout.tsx) n'a ni openGraph ni twitter, et la fusion des
+ * métadonnées est superficielle : tout est écrit ici. Les adresses relatives
+ * sont composées avec metadataBase (getbola.app) ; l'image est le fichier
+ * opengraph-image.png posé à côté de la route.
+ */
+export const METADONNEES_SFL: Metadata = {
+  title: { absolute: META_SFL.titre },
+  description: META_SFL.description,
+  alternates: { canonical: CHEMIN_SFL },
+  openGraph: {
+    title: META_SFL.titre,
+    description: META_SFL.description,
+    url: CHEMIN_SFL,
+    siteName: "Bola",
+    locale: "fr_FR",
+    type: "website",
+  },
+  twitter: { card: "summary_large_image", title: META_SFL.titre, description: META_SFL.description },
+};
+
+/** Un bouton : ce qu'il dit, et où il mène. */
+export interface BoutonSfl {
+  texte: string;
+  vers: string;
+}
+
 /** Les boutons : un visiteur, puis un joueur déjà connecté. */
 export const BOUTONS_SFL = {
-  creer: "Créer mon compte",
-  connecter: "Se connecter",
-  ouvrir: "Ouvrir Bola",
-} as const;
+  creer: { texte: "Créer mon compte", vers: LIENS_SFL.inscription },
+  connecter: { texte: "Se connecter", vers: LIENS_SFL.connexion },
+  ouvrir: { texte: "Ouvrir Bola", vers: LIENS_SFL.app },
+} as const satisfies Record<string, BoutonSfl>;
 
 export const HAUT_SFL = {
+  /** Ce qu'un lecteur d'écran dit du sigle. */
+  sigle: "SFL",
   etiquette: "Sunday Five League",
   titre: ["Lille.", "Chaque dimanche."],
   ligne: "Cinq contre cinq.",
@@ -89,14 +137,14 @@ export const CARTE_SFL = {
   nom: "Toi",
   note: 75,
   lue: "Ta carte, 75",
-  /** Ce qui fait monter quoi (saisie/evolution.ts). */
+  /** Ce qui fait monter quoi (saisie/evolution.ts) : `cle` nomme le geste pour le banc. */
   lignes: [
-    { geste: "Un but", stat: "TIR" },
-    { geste: "Une passe décisive", stat: "PAS" },
-    { geste: "Défensive", stat: "DEF" },
-    { geste: "Impact", stat: "DRI" },
-    { geste: "MVP", stat: "Tes deux meilleures" },
-    { geste: "Trois dimanches de suite, à l’heure", stat: "PHY" },
+    { cle: "but", geste: "Un but", stat: "TIR" },
+    { cle: "passe", geste: "Une passe décisive", stat: "PAS" },
+    { cle: "defensive", geste: "Défensive", stat: "DEF" },
+    { cle: "impact", geste: "Impact", stat: "DRI" },
+    { cle: "mvp", geste: "MVP", stat: "Tes deux meilleures" },
+    { cle: "serie", geste: "Trois dimanches de suite, à l’heure", stat: "PHY" },
   ],
   phrases: ["Elle part à 75.", "Elle ne descend jamais."],
 } as const;
@@ -140,7 +188,7 @@ export const TITRES_SFL = {
   ],
   phrases: [
     "Le MVP ne se vote pas.\nIl se lit sur la feuille de match.",
-    "Un Impact et une Défensive par équipe.\nL’équipe d’en face vote.",
+    "Un Impact et une\u00a0Défensive par équipe.\nL’équipe d’en face vote.",
   ],
   saison: {
     etiquette: "En fin de saison",
@@ -169,7 +217,8 @@ export function textesPageSfl(): string[] {
     META_SFL.titre,
     META_SFL.description,
     META_SFL.image,
-    ...Object.values(BOUTONS_SFL),
+    ...Object.values(BOUTONS_SFL).map((b) => b.texte),
+    HAUT_SFL.sigle,
     HAUT_SFL.etiquette,
     ...HAUT_SFL.titre,
     HAUT_SFL.ligne,

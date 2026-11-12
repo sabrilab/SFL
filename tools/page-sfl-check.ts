@@ -1,50 +1,82 @@
 // La page publique getbola.app/sfl (components/sfl/page-sfl, 12/11/2026) : ce
 // que le lien de la bio Instagram ouvre doit rester ouvert, juste et sans
-// joueur réel.
-//   1 · /sfl est ouverte à tous (PUBLIC_ROUTES), sans barre d'onglets
-//       (SANS_BARRE), sans accueil de l'app (SANS_ACCUEIL), sans guide
-//       d'installation (SANS_GUIDE), à l'intro courte (INTRO_COURTE) ; l'intro
-//       pose toujours son signal de fin, que la Map et l'accueil attendent ;
-//   2 · aucune autre adresse de l'app ne commence par /sfl (la porte compare
-//       un début d'adresse) ;
-//   3 · la route est un composant serveur, avec son titre absolu, ses balises
-//       Open Graph et Twitter ;
-//   4 · la page ne mène qu'à /inscription, /connexion, /confidentialite et / :
-//       aucun lien vers l'extérieur ;
-//   5 · elle ne lit ni la saison ni le joueur connecté, et ne montre aucune
-//       carte de joueur réel (ni PlayerCard, ni MiniCarte, ni CarteDe) ;
+// joueur réel. Ce que ce banc tient (durci le 12/11 après un contrôle par
+// mutants : il en laissait passer 23 sur 35) :
+//   1 · la porte : estPublique (lib/sfl/routes-publiques.ts) ouvre /sfl et les
+//       adresses prévues, rien d'autre (chaque dossier de src/app est essayé) ;
+//       /sfl est comparée en entier partout (la porte, la barre d'onglets,
+//       l'accueil, ce qui s'ouvre seul, le guide d'installation, l'intro
+//       courte) ; une page ouverte passe avant l'attente du client (son HTML
+//       est servi entier) ; /SFL en capitales renvoie à /sfl ; l'intro pose
+//       toujours son signal de fin, que la Map et l'accueil attendent ;
+//   2 · aucune autre adresse de l'app ne commence par /sfl ;
+//   3 · la route est un composant serveur qui exporte METADONNEES_SFL telles
+//       quelles ; ces métadonnées sont comparées en entier (titre absolu,
+//       description, adresse canonique, Open Graph, Twitter) ;
+//   4 · chaque bouton mène où il le dit (BOUTONS_SFL : le texte et l'adresse
+//       vont ensemble, un seul composant les pose) ; la page ne mène qu'à
+//       /inscription, /connexion, /confidentialite et / ; aucun lien vers
+//       l'extérieur ; la visite n'est notée qu'à l'étape « site », et jamais
+//       pour un joueur connecté ;
+//   5 · la page n'importe que ce qui est sur une liste : ni Supabase, ni la
+//       saison, ni un hook de joueurs, ni une carte de joueur réel ;
 //   6 · aucun nom de l'effectif embarqué n'apparaît, en mot entier, dans ses
 //       textes ni dans ses sources ;
-//   7 · ses textes : ni point d'exclamation, ni émoji, ni mot non décidé (un
-//       prix, une adresse, une heure de coup d'envoi) ou rejeté ;
-//   8 · ses faits suivent le code : le barème contre entryPP, l'heure de la
-//       révélation contre REGLES_REVELATION, le vendredi 19 h contre
-//       equipesVisibles, le 75 contre la carte neutre ;
+//   7 · ses textes : ni point d'exclamation, ni émoji, ni mot rejeté ; aucun
+//       nombre hors de ceux de la page ; aucun nom propre hors d'une liste
+//       (donc aucun lieu que Lille, aucun prénom) ; aucun texte écrit dans le
+//       composant, ni entre deux balises, ni en chaîne ;
+//   8 · ses faits suivent le code : le barème (entryPP), la révélation
+//       (REGLES_REVELATION), le vendredi 19 h (equipesVisibles), la réponse
+//       jusqu'à vendredi (reponsesOuvertes), le lundi de la convocation
+//       (vercel.json), le 75 (carte neutre), ce qui fait monter chaque stat,
+//       la série de trois dimanches et « ne descend jamais » (evoluer), les
+//       titres votés (CATEGORIES_VOTE), les classements de fin de saison
+//       (CLASSEMENTS), les divisions (DIVISIONS). Les phrases de règle que le
+//       code ne sait pas dire sont figées ici (FIGEES) : en changer une, c'est
+//       la relire contre la règle, puis la recopier ;
 //   9 · le sigle : public/bola/sfl.svg est celui du générateur, les exports le
 //       reprennent sans y toucher ; l'aperçu du lien fait 1200 × 630, moins de
-//       300 ko, avec son texte de remplacement.
+//       300 ko, à l'empreinte de l'image écrite par l'outil, avec son texte de
+//       remplacement ;
+//  10 · le guide d'installation rouvre, hors de l'app hôte, la page affichée
+//       avec la source d'arrivée du visiteur (adresseSortie).
+// Ce qu'il ne tient pas : le rendu (les captures), et ce qu'une chaîne
+// construite à l'exécution pourrait écrire dans la page.
 //   npx tsx tools/page-sfl-check.ts
 import assert from "node:assert/strict";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
+import { adresseSortie, lienSortie } from "../src/lib/pwa/environnement";
 import { carteNeutre } from "../src/lib/sfl/carte-neutre";
-import { equipesVisibles } from "../src/lib/sfl/convocation-temps";
+import { equipesVisibles, reponsesOuvertes } from "../src/lib/sfl/convocation-temps";
+import { DIVISIONS, nomDivision } from "../src/lib/sfl/divisions";
+import { STAT_KEYS, type Stats } from "../src/lib/sfl/engine";
+import { CLASSEMENTS } from "../src/lib/sfl/fin-de-saison";
 import {
+  BOUTONS_SFL,
   CARTE_SFL,
   CLASSEMENT_SFL,
+  DIMANCHE_SFL,
+  FIN_SFL,
   LIENS_SFL,
   META_SFL,
+  METADONNEES_SFL,
   SEMAINE_SFL,
+  TITRES_SFL,
   pointsLisibles,
   textesPageSfl,
   type TuileBareme,
 } from "../src/lib/sfl/page-sfl";
 import { REGLES_REVELATION } from "../src/lib/sfl/revelation";
+import { CHEMIN_SFL, PUBLIC_ROUTES, estPageSfl, estPageSflMalEcrite, estPublique } from "../src/lib/sfl/routes-publiques";
 import { entryPP } from "../src/lib/sfl/saisie/engine";
+import { SERIE, evoluer } from "../src/lib/sfl/saisie/evolution";
 import { seedSaison } from "../src/lib/sfl/saisie/store";
-import type { MatchEntry } from "../src/lib/sfl/saisie/types";
+import type { MatchEntry, Saison } from "../src/lib/sfl/saisie/types";
+import { CATEGORIES_VOTE } from "../src/lib/sfl/votes";
 import { sigleSfl } from "./sigle-sfl";
-import { APERCU_LIEN, composer, sigleSerre } from "./sigle-sfl-exports";
+import { APERCU_LIEN, composer, empreinte, sigleSerre } from "./sigle-sfl-exports";
 
 const RACINE = join(__dirname, "..");
 const lire = (f: string) => readFileSync(join(RACINE, f), "utf8");
@@ -52,33 +84,79 @@ const fautes: string[] = [];
 const verifier = (ok: boolean, message: string) => {
   if (!ok) fautes.push(message);
 };
+const pareil = (a: unknown, b: unknown) => {
+  try {
+    assert.deepStrictEqual(a, b);
+    return true;
+  } catch {
+    return false;
+  }
+};
 
 const ROUTE = "src/app/sfl/page.tsx";
 const PAGE = "src/components/sfl/page-sfl/page-sfl.tsx";
 const TEXTES = "src/lib/sfl/page-sfl.ts";
+const ROUTES = "src/lib/sfl/routes-publiques.ts";
 const ALT = "src/app/sfl/opengraph-image.alt.txt";
-const SOURCES = [ROUTE, PAGE, TEXTES, ALT];
+const SOURCES = [ROUTE, PAGE, TEXTES, ROUTES, ALT];
 
-// 1 · Ouverte, sans barre, sans accueil, sans guide, à l'intro courte.
-/** La liste écrite après `const NOM = [` dans un fichier. */
-function liste(fichier: string, nom: string): string[] {
-  const m = new RegExp(`const ${nom} = \\[([^\\]]*)\\]`).exec(lire(fichier));
-  assert.ok(m, `${fichier} : la liste ${nom} est introuvable`);
-  return [...m[1].matchAll(/"([^"]+)"/g)].map((x) => x[1]);
+// 1 · La porte.
+// Ce qui est ouvert sans compte, et rien d'autre : chaque dossier de src/app est essayé.
+const OUVERTES = new Set(["bienvenue", "inscription", "confidentialite", "sfl"]);
+const dossiers = readdirSync(join(RACINE, "src/app")).filter((n) => statSync(join(RACINE, "src/app", n)).isDirectory());
+assert.ok(dossiers.length > 20 && dossiers.includes("sfl") && dossiers.includes("saisons"), "1 · src/app n'a plus la forme attendue : le contrôle de la porte ne prouve plus rien");
+for (const d of dossiers)
+  verifier(estPublique(`/${d}`) === OUVERTES.has(d), `1 · /${d} ${OUVERTES.has(d) ? "n'est plus ouverte à tous" : "est ouverte à tous"} (estPublique)`);
+for (const ouverte of ["/sfl", "/equipe/abc", "/p/ABC123", "/v/12", "/inscription", "/bienvenue", "/confidentialite"])
+  verifier(estPublique(ouverte), `1 · ${ouverte} n'est plus ouverte à tous`);
+for (const fermee of ["/", "/map", "/s", "/sf", "/sflx", "/sfl-test", "/sfl/abc", "/SFL", "/saisons", "/stats", "/equipe", "/p", "/v", "/admin", "/profil", "", null, undefined])
+  verifier(!estPublique(fermee), `1 · « ${fermee} » est ouverte à tous`);
+assert.deepEqual([...PUBLIC_ROUTES], ["/bienvenue", "/inscription", "/equipe/", "/p/", "/v/", "/confidentialite"], "1 · les débuts d'adresse ouverts à tous ont changé");
+// /sfl, l'adresse entière, à la lettre ; en capitales, on y renvoie.
+assert.equal(CHEMIN_SFL, "/sfl");
+for (const [chemin, page, malEcrite] of [
+  ["/sfl", true, false],
+  ["/SFL", false, true],
+  ["/Sfl", false, true],
+  ["/SFL/", false, true],
+  ["/sfl/", false, true],
+  ["/sflx", false, false],
+  ["/sfl/abc", false, false],
+  ["/SFL/abc", false, false],
+  ["/sfl-test", false, false],
+  ["/", false, false],
+  [null, false, false],
+] as const) {
+  verifier(estPageSfl(chemin) === page, `1 · estPageSfl(${chemin}) ne vaut plus ${page}`);
+  verifier(estPageSflMalEcrite(chemin) === malEcrite, `1 · estPageSflMalEcrite(${chemin}) ne vaut plus ${malEcrite}`);
 }
-for (const [fichier, nom] of [
-  ["src/components/sfl/auth/auth-gate.tsx", "PUBLIC_ROUTES"],
-  ["src/components/layout/bottom-nav.tsx", "SANS_BARRE"],
-  ["src/components/sfl/accueil/accueil.tsx", "SANS_ACCUEIL"],
-  ["src/components/pwa/guide-installation.tsx", "SANS_GUIDE"],
-  ["src/components/sfl/app-splash.tsx", "INTRO_COURTE"],
-] as const)
-  verifier(liste(fichier, nom).includes("/sfl"), `1 · /sfl manque à ${nom} (${fichier})`);
-const guide = lire("src/components/pwa/guide-installation.tsx");
+const porte = lire("src/components/sfl/auth/auth-gate.tsx");
+verifier(!/const PUBLIC_ROUTES\b/.test(porte), "1 · la porte a de nouveau sa propre liste d'adresses ouvertes");
+const laisse = porte.indexOf("if (estPublique(pathname)) return <>{children}</>;");
+verifier(laisse > 0 && laisse < porte.indexOf("if (!isClient) return null;"), "1 · la porte attend le client avant de laisser passer une page ouverte : son HTML servi serait vide");
+verifier(/if \(ok \|\| cancelled \|\| estPublique\(window\.location\.pathname\)\) return;/.test(porte), "1 · la reprise de session ne lit plus estPublique");
 verifier(
-  /if \(!isClient \|\| ferme \|\| SANS_GUIDE\.some\(\(r\) => pathname\?\.startsWith\(r\)\)\) return null;/.test(guide),
-  "1 · le guide d'installation ne s'efface plus sur les pages de SANS_GUIDE"
+  /const malEcrite = estPageSflMalEcrite\(pathname\);/.test(porte) &&
+    /if \(malEcrite\) window\.location\.replace\(CHEMIN_SFL \+ window\.location\.search\);/.test(porte) &&
+    porte.indexOf("if (malEcrite) return null;") > 0 &&
+    porte.indexOf("if (malEcrite) return null;") < laisse,
+  "1 · /SFL, en capitales, ne renvoie plus à /sfl"
 );
+// /sfl comparée en entier dans chaque composant, plus jamais par un début d'adresse.
+for (const [fichier, attendu, quoi] of [
+  ["src/components/layout/bottom-nav.tsx", "if (estPageSfl(pathname) || SANS_BARRE.some((r) => pathname.startsWith(r))) return null;", "la barre d'onglets se montre sur /sfl"],
+  ["src/components/sfl/accueil/accueil.tsx", "const libre = estPageSfl(pathname) || SANS_ACCUEIL.some((r) => pathname?.startsWith(r));", "l'accueil de l'app s'ouvre sur /sfl"],
+  ["src/components/sfl/accueil/accueil.tsx", "if (estPageSfl(pathname)) return null;\n  if (etat !== \"fini\") return null;", "ce qui s'ouvre de soi-même joue sous /sfl (ApresAccueil)"],
+  [
+    "src/components/pwa/guide-installation.tsx",
+    "if (!isClient || ferme || estPageSfl(pathname) || estPageSflMalEcrite(pathname) || SANS_GUIDE.some((r) => pathname?.startsWith(r))) return null;",
+    "le guide d'installation couvre /sfl",
+  ],
+  ["src/components/sfl/app-splash.tsx", "const courte = estPageSfl(window.location.pathname);", "l'intro courte ne reconnaît plus /sfl"],
+] as const)
+  verifier(lire(fichier).includes(attendu), `1 · ${quoi} (${fichier})`);
+for (const fichier of ["src/components/layout/bottom-nav.tsx", "src/components/sfl/accueil/accueil.tsx", "src/components/pwa/guide-installation.tsx", "src/components/sfl/app-splash.tsx", "src/components/sfl/auth/auth-gate.tsx", ROUTES])
+  verifier(!/"\/sfl[^"]*"/.test(lire(fichier).replace('export const CHEMIN_SFL = "/sfl";', "")), `1 · ${fichier} compare de nouveau /sfl par un début d'adresse`);
 const intro = lire("src/components/sfl/app-splash.tsx");
 verifier(/document\.documentElement\.dataset\.splash = "fini"/.test(intro), "1 · l'intro ne pose plus data-splash=\"fini\"");
 verifier(/window\.dispatchEvent\(new Event\(SPLASH_FINI\)\)/.test(intro), "1 · l'intro n'émet plus SPLASH_FINI");
@@ -87,30 +165,101 @@ const courte = intro.indexOf("if (courte) {");
 verifier(courte > 0 && courte < intro.indexOf('await import("@/components/sfl/card-3d-canvas")'), "1 · l'intro courte charge le moteur des cartes 3D");
 
 // 2 · Aucune autre adresse ne commence par /sfl.
-const voisines = readdirSync(join(RACINE, "src/app")).filter((n) => n.startsWith("sfl") && statSync(join(RACINE, "src/app", n)).isDirectory());
+const voisines = dossiers.filter((n) => n.toLowerCase().startsWith("sfl"));
 assert.deepEqual(voisines, ["sfl"], `2 · des adresses commencent par /sfl : ${voisines.join(", ")}`);
 
-// 3 · La route : un composant serveur, avec ses métadonnées.
+// 3 · La route : un composant serveur, qui exporte les métadonnées telles quelles.
 const route = lire(ROUTE);
 verifier(!/^\s*["']use client["']/m.test(route), "3 · la route /sfl est devenue un composant client (plus de métadonnées)");
-for (const attendu of ["title: { absolute:", "openGraph:", "twitter:", 'alternates: { canonical: "/sfl" }', 'card: "summary_large_image"'])
-  verifier(route.includes(attendu), `3 · la route /sfl n'a plus « ${attendu} »`);
+verifier(/^export const metadata: Metadata = METADONNEES_SFL;$/m.test(route), "3 · la route /sfl n'exporte plus METADONNEES_SFL telles quelles");
+verifier(!/generateMetadata/.test(route) && (route.match(/\bmetadata\b/g) ?? []).length === 1, "3 · la route /sfl écrit d'autres métadonnées");
+verifier(/export default function \w+\(\) \{\s*return <PageSfl \/>;\s*\}/.test(route), "3 · la route /sfl ne rend plus la page");
+const TITRE = "SFL · Sunday Five League, Lille";
+const DESCRIPTION = "Foot à cinq, chaque dimanche à Lille. Noirs contre Blancs, trois divisions, le classement Pépite d’Or. Ta carte bouge avec toi.";
+verifier(
+  pareil(METADONNEES_SFL, {
+    title: { absolute: TITRE },
+    description: DESCRIPTION,
+    alternates: { canonical: "/sfl" },
+    openGraph: { title: TITRE, description: DESCRIPTION, url: "/sfl", siteName: "Bola", locale: "fr_FR", type: "website" },
+    twitter: { card: "summary_large_image", title: TITRE, description: DESCRIPTION },
+  }),
+  "3 · les métadonnées de /sfl ont changé (titre, description, adresse, Open Graph ou Twitter)"
+);
+verifier(META_SFL.titre === TITRE && META_SFL.description === DESCRIPTION, "3 · META_SFL ne dit plus ce que disent les métadonnées");
+// Un moteur, un aperçu de lien lisent la description : c'est elle qui dit « foot ».
+verifier(/^Foot à cinq\b/.test(META_SFL.description) && META_SFL.description.length <= 160, "3 · la description du lien ne commence plus par « Foot à cinq », ou dépasse 160 signes");
 
-// 4 · Les liens : quatre adresses de l'app, rien vers l'extérieur.
+// 4 · Les boutons et les liens.
 assert.deepEqual(LIENS_SFL, { inscription: "/inscription", connexion: "/connexion", confidentialite: "/confidentialite", app: "/" }, "4 · les liens de la page ont changé");
+assert.deepEqual(
+  BOUTONS_SFL,
+  {
+    creer: { texte: "Créer mon compte", vers: "/inscription" },
+    connecter: { texte: "Se connecter", vers: "/connexion" },
+    ouvrir: { texte: "Ouvrir Bola", vers: "/" },
+  },
+  "4 · un bouton de la page ne mène plus où il le dit"
+);
 const page = lire(PAGE);
-for (const m of page.matchAll(/href=(\{[^}]*\}|"[^"]*")/g))
-  verifier(m[1].includes("LIENS_SFL."), `4 · un lien de la page n'est pas dans LIENS_SFL : ${m[0]}`);
+/** Le composant sans ses commentaires : ce qui s'exécute. */
+const sansCommentaires = page.replace(/\/\*[\s\S]*?\*\/|^\s*\/\/.*$/gm, "");
+const compte = (motif: RegExp) => (sansCommentaires.match(motif) ?? []).length;
+// Un seul composant pose un bouton : son adresse et son texte viennent du même objet.
+verifier(
+  /function Bouton\(\{ bouton, className \}: \{ bouton: BoutonSfl; className\?: string \}\) \{\s*return \(\s*<Link href=\{bouton\.vers\} className=\{className\}>\s*\{bouton\.texte\}\s*<\/Link>\s*\);\s*\}/.test(page),
+  "4 · le composant Bouton ne pose plus le texte et l'adresse d'un même bouton"
+);
+verifier(compte(/\.vers\b/g) === 1 && compte(/\.texte\b/g) === 1, "4 · le texte ou l'adresse d'un bouton est lu hors du composant Bouton");
+verifier(
+  compte(/BOUTONS_SFL\.creer\b/g) === 2 && compte(/BOUTONS_SFL\.connecter\b/g) === 1 && compte(/BOUTONS_SFL\.ouvrir\b/g) === 2 && compte(/BOUTONS_SFL\b/g) === 6,
+  "4 · les boutons de la page ont changé : « Créer mon compte » (en haut et en bas, et dans la barre), « Se connecter », « Ouvrir Bola »"
+);
+verifier(/bouton=\{connecte \? BOUTONS_SFL\.ouvrir : BOUTONS_SFL\.creer\}/.test(page), "4 · la barre du haut ne porte plus « Créer mon compte » (ou « Ouvrir Bola »)");
+verifier(
+  /\{connecte \? \(\s*<Bouton bouton=\{BOUTONS_SFL\.ouvrir\}[^>]*\/>\s*\) : \(\s*<>\s*<Bouton bouton=\{BOUTONS_SFL\.creer\}[^>]*\/>\s*<Bouton bouton=\{BOUTONS_SFL\.connecter\}[^>]*\/>\s*<\/>\s*\)\}/.test(page),
+  "4 · les boutons du haut et du bas ne sont plus « Créer mon compte » puis « Se connecter »"
+);
+const liens = [...page.matchAll(/href=(\{[^}]*\}|"[^"]*")/g)].map((m) => m[1]).sort();
+assert.deepEqual(liens, ["{LIENS_SFL.app}", "{LIENS_SFL.confidentialite}", "{bouton.vers}"], `4 · les liens de la page ont changé : ${liens.join(" ")}`);
 for (const f of SOURCES) {
   verifier(!/https?:\/\//.test(lire(f)), `4 · ${f} écrit une adresse entière`);
   verifier(!/target=|window\.open|<a\s/.test(lire(f)), `4 · ${f} ouvre un lien hors de l'app`);
 }
+// L'entonnoir : la seule étape notée est « site », et pas pour un joueur connecté.
+verifier(compte(/noterSite\(/g) === 1 && /if \(!getSession\(\)\) noterSite\("site"\);/.test(page), "4 · la page ne note plus sa visite à l'étape « site », pour un visiteur sans compte seulement");
 
-// 5 · Ni la saison, ni le joueur connecté, ni une carte de joueur réel.
+// 5 · Les imports, par liste : ni Supabase, ni la saison, ni les joueurs.
+const imports = (source: string) => [...source.matchAll(/^import\s[^;]*?from\s+"([^"]+)";/gm)].map((m) => m[1]).sort();
+assert.deepEqual(
+  imports(page),
+  [
+    "@/components/sfl/bola-card",
+    "@/components/sfl/dos-carte",
+    "@/components/sfl/finitions-carte",
+    "@/components/sfl/marques-carte",
+    "@/hooks/use-media-query",
+    "@/hooks/use-session",
+    "@/lib/sfl/auth/session",
+    "@/lib/sfl/carte-neutre",
+    "@/lib/sfl/maillots",
+    "@/lib/sfl/page-sfl",
+    "@/lib/sfl/site-visites",
+    "@/lib/utils",
+    "lucide-react",
+    "next/link",
+    "react",
+  ],
+  "5 · la page importe autre chose que sa liste (une lecture de la saison, des joueurs, de la base ?)"
+);
+verifier(compte(/\bimport\b/g) === imports(page).length && !/\brequire\(|\bfetch\(|import\(/.test(page), "5 · la page charge quelque chose hors de ses imports");
+assert.deepEqual(imports(lire(TEXTES)), ["./routes-publiques", "next"], "5 · les textes de la page importent autre chose que le type des métadonnées et l'adresse de la page");
+assert.deepEqual(imports(lire(ROUTES)), [], "5 · les adresses ouvertes importent quelque chose");
+assert.deepEqual(imports(route), ["@/components/sfl/page-sfl/page-sfl", "@/lib/sfl/page-sfl", "next"], "5 · la route importe autre chose que la page et ses métadonnées");
 for (const f of [ROUTE, PAGE, TEXTES])
-  for (const interdit of ["useSeason", "useMyPlayer", "PlayerCard", "MiniCarte", "CarteDe", "photoParNom", "seedSaison"])
+  for (const interdit of ["useSeason", "useMyPlayer", "usePlayers", "supabase", "PlayerCard", "MiniCarte", "CarteDe", "photoParNom", "seedSaison"])
     verifier(!new RegExp(`\\b${interdit}\\b`).test(lire(f)), `5 · ${f} lit ${interdit}`);
-verifier(!/\bphoto=/.test(page), "5 · une carte de la page porte une photo");
+verifier(!/\bphoto=|<img\b|<Image\b|\.webp|\.jpe?g/.test(page), "5 · la page porte une photo ou une image");
 
 // 6 · Aucun nom de l'effectif, en mot entier (les lettres accentuées comptent).
 const motEntier = (mot: string) => new RegExp(`(?<![\\p{L}\\p{N}])${mot.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![\\p{L}\\p{N}])`, "iu");
@@ -127,21 +276,53 @@ assert.ok(motEntier(effectif[0]).test(`Avec ${effectif[0]}.`), "6 · le contrôl
 // 7 · Les textes.
 const INTERDITS = [
   "gratuit", "€", "euro", "prix", "abonnement", "cotisation", "App Store", "télécharge", "Ballon d", "prono", "pari", "Hippodrome", "Marcq",
-  "12h30", "12 h 30", "arbitre", "mixte", "bêta", "SFL Time", "champion", "Il manque", "Flair", "carton",
+  "12h30", "12 h 30", "arbitre", "mixte", "bêta", "SFL Time", "champion", "Il manque", "Flair", "carton", "coup d'envoi",
 ];
 /** Un mot interdit, au début d'un mot (« champion » trouve aussi « championnat »). */
 const debutDeMot = (mot: string) => new RegExp(`(?<![\\p{L}\\p{N}])${mot.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`, "iu");
 const plat = (t: string) => t.replace(/ /g, " ").replace(/’/g, "'");
+/** Les nombres de la page, chacun dans sa forme : tout autre chiffre est une faute. */
+const NOMBRES = [/Match [12](?!\d)/g, /(?<![\p{L}\p{N}])D[123](?!\d)/gu, /(?<!\d)19 h(?!\p{L})/gu, /[+−][123](?!\d)/g, /© 2026(?!\d)/g, /(?<!\d)75(?!\d)/g];
+/**
+ * Les noms propres de la page, quand ils ne commencent pas une phrase : la
+ * ville, la marque, les camps, les titres, les mots de l'app. Un lieu, un
+ * prénom, un nom de plus sont des fautes.
+ */
+const NOMS_PROPRES = new Set([
+  "Lille", "Sunday", "Five", "League", "SFL", "Bola", "Noirs", "Blancs", "Match", "Pépite", "Or", "MVP", "Impact", "Défensive", "Wall", "Fame", "Map",
+  "D1", "D2", "D3",
+]);
+/** Un mot à capitale qui ne commence ni le texte ni une phrase (après un point, deux-points, un point médian, un guillemet ouvrant, une ligne). */
+function nomsPropresDe(t: string): string[] {
+  return [...t.matchAll(/\p{Lu}[\p{L}\p{N}]*/gu)]
+    .filter((m) => {
+      const avant = t.slice(0, m.index);
+      return !(avant.trim() === "" || /[.:·«\n]\s*$/.test(avant) || /[\p{L}\p{N}]$/u.test(avant));
+    })
+    .map((m) => m[0]);
+}
 for (const t of textes) {
   verifier(!t.includes("!"), `7 · un point d'exclamation : « ${t} »`);
   verifier(!/\p{Extended_Pictographic}/u.test(t.replace(/©/g, "")), `7 · un émoji : « ${t} »`);
   verifier(!/'/.test(t), `7 · une apostrophe droite (le site écrit ’) : « ${t} »`);
   for (const mot of INTERDITS) verifier(!debutDeMot(mot).test(plat(t)), `7 · le mot « ${mot} » : « ${t} »`);
+  const sansNombres = NOMBRES.reduce((reste, n) => reste.replace(n, ""), t);
+  verifier(!/\d/.test(sansNombres), `7 · un nombre qui n'est pas de la page (75, 19 h, Match 1 et 2, D1 à D3, le barème, 2026) : « ${t} »`);
+  for (const nom of nomsPropresDe(t)) verifier(NOMS_PROPRES.has(nom), `7 · un nom propre hors de la liste (un lieu, un prénom ?) : « ${nom} » dans « ${t} »`);
 }
-// Tout ce que la page montre vient de son fichier de textes : aucune phrase écrite dans le composant.
+// La preuve que ces deux contrôles voient.
+assert.deepEqual(nomsPropresDe("À Croix."), ["Croix"], "7 · le contrôle des noms propres ne trouve plus rien");
+assert.deepEqual(nomsPropresDe("À toi de jouer.\nSur la Map : « Rejoindre la ligue »."), ["Map"]);
+assert.ok(/\d/.test(NOMBRES.reduce((reste, n) => reste.replace(n, ""), "Coup d’envoi à 13 h.")), "7 · le contrôle des nombres ne trouve plus rien");
+// Tout ce que la page montre vient de son fichier de textes : rien entre deux balises, rien en chaîne.
 for (const m of page.matchAll(/>\s*([A-ZÀ-Ýa-zà-ÿ][^<>{}\n]{3,})\s*</g))
   verifier(false, `7 · un texte écrit dans le composant, hors de ${TEXTES} : « ${m[1].trim()} »`);
-verifier(!/aria-label="/.test(page), `7 · un libellé écrit dans le composant, hors de ${TEXTES}`);
+for (const m of page.matchAll(/(?<![=\w])\{\s*(["'`])((?:(?!\1).)*)\1\s*\}/g))
+  verifier(false, `7 · un texte écrit en chaîne dans le composant, hors de ${TEXTES} : « ${m[2]} »`);
+verifier(!/(aria-label|alt|title|placeholder)="/.test(page), `7 · un libellé écrit dans le composant, hors de ${TEXTES}`);
+// Hors des classes, des commentaires et des imports, le composant n'écrit aucune phrase.
+for (const m of sansCommentaires.matchAll(/"([^"\n]*[\p{Ll}]{3,}[  ][\p{L}][^"\n]*[.!?…])"/gu))
+  verifier(false, `7 · une phrase écrite dans le composant, hors de ${TEXTES} : « ${m[1]} »`);
 
 // 8 · Les faits suivent le code.
 const ligne = (e: Partial<MatchEntry> = {}): MatchEntry => ({
@@ -183,7 +364,7 @@ assert.equal(pointsLisibles(-1), "−1");
 assert.equal(pointsLisibles(2), "+2");
 
 const heure = (h: number) => `${h} h`;
-const [, , vendredi, , dimanche] = SEMAINE_SFL.lignes;
+const [lundi, jusqua, vendredi, , dimanche] = SEMAINE_SFL.lignes;
 // La révélation : le dimanche, à l'heure du code.
 verifier(REGLES_REVELATION.REVELATION.min === 0, "8 · la révélation n'est plus à l'heure pile : la page écrit « 19 h »");
 verifier(dimanche.jour === "Dimanche" && dimanche.heure === heure(REGLES_REVELATION.REVELATION.h), `8 · « ${dimanche.jour} · ${dimanche.heure} » ne suit plus REGLES_REVELATION (${REGLES_REVELATION.REVELATION.h} h)`);
@@ -196,11 +377,105 @@ for (const [avant, apres] of [
   verifier(!equipesVisibles(new Date(avant)), `8 · les équipes sont visibles avant le vendredi 19 h (${avant})`);
   verifier(equipesVisibles(new Date(apres)), `8 · les équipes ne sont pas visibles le vendredi à 19 h (${apres})`);
 }
+// La convocation : elle part le lundi (la tâche planifiée), on y répond jusqu'au vendredi soir.
+const crons = (JSON.parse(lire("vercel.json")) as { crons: { path: string; schedule: string }[] }).crons;
+const convocation = crons.find((c) => c.path === "/api/convocation/cron");
+verifier(lundi.jour === "Lundi" && convocation?.schedule.split(" ")[4] === "1", `8 · « ${lundi.jour} » : la convocation ne part plus le lundi (vercel.json : ${convocation?.schedule})`);
+verifier(
+  jusqua.jour === "Jusqu’à vendredi" && reponsesOuvertes(new Date("2026-11-13T21:30:00Z")) && !reponsesOuvertes(new Date("2026-11-13T23:30:00Z")),
+  `8 · « ${jusqua.jour} » ne suit plus reponsesOuvertes (ouvertes le vendredi soir, closes le samedi)`
+);
 // La carte : 75 partout, comme celle d'un compte neuf.
 const neutre = carteNeutre(CARTE_SFL.nom);
 verifier(Object.values(neutre.stats).every((s) => s === CARTE_SFL.note), `8 · la carte neutre n'est plus à ${CARTE_SFL.note} partout`);
 verifier(CARTE_SFL.phrases[0].includes(String(CARTE_SFL.note)) && CARTE_SFL.lue.includes(String(CARTE_SFL.note)), "8 · la phrase de la carte ne dit plus sa note de départ");
 verifier(/carteNeutre\(CARTE_SFL\.nom\)/.test(page) && /overall=\{CARTE_SFL\.note\}/.test(page), "8 · la page ne montre plus la carte neutre");
+verifier(/<BolaCard name=\{TOI\.name\} position=\{TOI\.poste\} overall=\{CARTE_SFL\.note\} stats=\{TOI\.stats\} edition=\{edition\} size=\{taille\} \/>/.test(page) && compte(/<BolaCard\b/g) === 1, "8 · une carte de la page n'est plus celle d'un compte neuf");
+
+// Ce qui fait monter chaque stat : la saison rejouée par evoluer, un joueur seul, parti de la carte neutre.
+const base = seedSaison();
+/** Une saison d'un joueur : une ligne par dimanche. */
+function saisonDe(dimanches: Partial<MatchEntry>[]): Saison {
+  return {
+    ...base,
+    numero: 1,
+    archives: [],
+    convocations: [],
+    events: [],
+    journees: dimanches.map((_, i) => ({ j: i + 1, date: `${String(4 + 7 * i).padStart(2, "0")}/10/2026`, sflTime: false })),
+    entries: dimanches.map((e, i) => ligne({ j: i + 1, result: "Nul", ...e })),
+  };
+}
+const depart = (): Stats => ({ ...neutre.stats });
+const joueur = (dimanches: Partial<MatchEntry>[]) => {
+  const j = evoluer(saisonDe(dimanches), depart).joueurs.get("x");
+  assert.ok(j, "8 · evoluer ne rend plus le joueur");
+  return j;
+};
+/** Les stats qu'un dimanche fait monter, dans l'ordre. */
+const statsDe = (dimanches: Partial<MatchEntry>[]) => joueur(dimanches).journal[0].faits.map((f) => f.stat);
+assert.deepEqual(
+  CARTE_SFL.lignes.map((l) => l.cle),
+  ["but", "passe", "defensive", "impact", "mvp", "serie"],
+  "8 · les gestes de la carte ont changé"
+);
+const GESTES: Record<(typeof CARTE_SFL.lignes)[number]["cle"], { geste: string; stats: string[] }> = {
+  but: { geste: "Un but", stats: statsDe([{ buts: 1 }]) },
+  passe: { geste: "Une passe décisive", stats: statsDe([{ passes: 1 }]) },
+  defensive: { geste: "Défensive", stats: statsDe([{ def: true }]) },
+  impact: { geste: "Impact", stats: statsDe([{ impact: true }]) },
+  mvp: { geste: "MVP", stats: statsDe([{ mvp: true }]) },
+  serie: { geste: "Trois dimanches de suite, à l’heure", stats: statsDe([{}, {}, {}]) },
+};
+for (const l of CARTE_SFL.lignes) {
+  const code = GESTES[l.cle];
+  verifier(l.geste === code.geste, `8 · le geste « ${l.geste} » a changé (attendu : « ${code.geste} »)`);
+  if (l.cle === "mvp") verifier(code.stats.length === 2 && l.stat === "Tes deux meilleures", `8 · « ${l.geste} → ${l.stat} » ne suit plus evoluer (${code.stats.join(", ")})`);
+  else verifier(code.stats.length === 1 && code.stats[0] === l.stat, `8 · « ${l.geste} → ${l.stat} » ne suit plus evoluer (${code.stats.join(", ") || "rien"})`);
+}
+// « Trois dimanches de suite, à l'heure » : la série du code, ni deux dimanches, ni un retard.
+verifier(SERIE === 3, `8 · la série de présence n'est plus de trois dimanches (${SERIE}) : la page écrit « Trois »`);
+verifier(statsDe([{}, {}]).length === 0, "8 · deux dimanches de suite font déjà monter une stat");
+verifier(!joueur([{}, { retard: true }, {}]).journal.some((d) => d.faits.length > 0), "8 · un retard ne casse plus la série : la page écrit « à l’heure »");
+// « Elle ne descend jamais. » : absences, retards, défaites, rien ne fait baisser une stat.
+const mauvais = joueur([{ buts: 2, def: true }, { statut: "Absence injustifiée", result: null }, { retard: true, result: "Défaite" }, { statut: "Blessure", result: null }, { result: "Défaite" }, { retard: true }, { statut: "Absence injustifiée", result: null }, { result: "Défaite" }]);
+verifier(
+  STAT_KEYS.every((k) => mauvais.officielles[k] >= neutre.stats[k]) && mauvais.majs.every((m) => STAT_KEYS.every((k) => m.stats[k] >= neutre.stats[k])),
+  "8 · une stat est descendue sous son départ : la page écrit « Elle ne descend jamais. »"
+);
+// Les titres : le MVP se lit sur la feuille, les deux autres se votent.
+assert.deepEqual(TITRES_SFL.cartes.map((c) => c.edition), ["mvp", ...CATEGORIES_VOTE], "8 · les titres de la page ne sont plus le MVP et les deux titres votés (CATEGORIES_VOTE)");
+assert.deepEqual(TITRES_SFL.cartes.map((c) => c.nom), ["MVP", "Impact", "Défensive"]);
+// La fin de saison : les classements du code, dans leur ordre.
+const NOMS_CLASSEMENTS: Record<string, string> = { pepite: "Pépite d’Or", buteur: "Buteurs", passeur: "Passeurs", defenseur: "Défenseurs", mvp: "MVP" };
+verifier(
+  TITRES_SFL.saison.phrases[0] === `${CLASSEMENTS.map((c) => NOMS_CLASSEMENTS[c.id] ?? `?${c.id}`).join(". ")}.`,
+  `8 · « ${TITRES_SFL.saison.phrases[0]} » ne suit plus les classements de fin de saison (${CLASSEMENTS.map((c) => c.id).join(", ")})`
+);
+// Les divisions du code.
+assert.deepEqual([...CLASSEMENT_SFL.divisions], DIVISIONS.map(nomDivision), "8 · les divisions de la page ne sont plus celles du code");
+assert.deepEqual([...DIMANCHE_SFL.camps], ["Noirs", "Blancs"]);
+
+// Les phrases de règle que le code ne sait pas dire : figées. En changer une,
+// c'est la relire contre la règle (la mémoire du projet), puis la recopier ici.
+const FIGEES: [string, readonly string[], string[]][] = [
+  ["la semaine", SEMAINE_SFL.lignes.map((l) => `${l.jour}${l.heure ? ` ${l.heure}` : ""} : ${l.phrase}${l.pastille ? ` [${l.pastille}]` : ""}`), [
+    "Lundi : La convocation arrive.",
+    "Jusqu’à vendredi : Une réponse, une seule. [Je viens]",
+    "Vendredi 19 h : Tu découvres ton équipe.",
+    "Dimanche : Tu joues.",
+    "Dimanche 19 h : Points, classement, divisions, titres.",
+  ]],
+  ["le dimanche", DIMANCHE_SFL.phrases, ["Match 1, Match 2.", "Chacun son heure, son lieu, son terrain.", "Les équipes se font seules.\nÉquilibrées.", "La feuille de match se tient en direct."]],
+  ["la carte", CARTE_SFL.phrases, ["Elle part à 75.", "Elle ne descend jamais."]],
+  ["le classement", CLASSEMENT_SFL.phrases, ["Refaites chaque dimanche par le classement.", "Chaque division a son premier.", "La D1 joue le Match 1."]],
+  ["les titres", TITRES_SFL.phrases, ["Le MVP ne se vote pas.\nIl se lit sur la feuille de match.", "Un Impact et une Défensive par équipe.\nL’équipe d’en face vote."]],
+  ["la fin de saison", TITRES_SFL.saison.phrases, ["Pépite d’Or. Buteurs. Passeurs. Défenseurs. MVP.", "Les trois premiers gardent leur écusson.\nPour toujours.", "Chaque saison reste au Wall of Fame."]],
+  ["le chemin", FIN_SFL.etapes, ["Crée ta carte.", "Sur la Map : « Rejoindre la ligue ».", "La ligue te répond."]],
+  ["le barème", CLASSEMENT_SFL.bareme.map((t) => t.libelle), ["Tu viens.", "Tu gagnes.", "Un but.", "Une passe décisive.", "Clean sheet.", "MVP.", "En retard.", "Absent sans prévenir."]],
+];
+for (const [quoi, ecrites, figees] of FIGEES)
+  verifier(pareil([...ecrites], figees), `8 · une phrase de règle a changé (${quoi}) : la relire contre la règle, puis la recopier dans FIGEES\n      écrit : ${JSON.stringify(ecrites)}`);
 
 // 9 · Le sigle et l'aperçu du lien.
 const svg = lire("public/bola/sfl.svg");
@@ -211,14 +486,49 @@ verifier(
   !!trace && composer({ nom: "x", l: 1080, h: 1080, fond: "#08090B", sigle: "#F4F5F2", largeur: 702 }).includes(` d="${trace}"`),
   "9 · une image exportée ne reprend plus le tracé tel quel"
 );
+verifier(/url\(\/bola\/sfl\.svg\)/.test(page), "9 · le sigle du haut de la page n'est plus le fichier du générateur");
+/**
+ * L'empreinte de src/app/sfl/opengraph-image.png, telle que l'écrit
+ * « tools/sigle-sfl-exports.ts --apercu-lien » (qui l'affiche) : le sigle seul,
+ * papier sur encre, à 480 px. Une autre image à cette place est une faute.
+ */
+const EMPREINTE_APERCU = "32aa2eddea0fcc88043b91f046df1725de02f3bb80a481d036eba07c83354ab1";
 verifier(existsSync(APERCU_LIEN), "9 · l'aperçu du lien (opengraph-image.png) manque");
 if (existsSync(APERCU_LIEN)) {
   const png = readFileSync(APERCU_LIEN);
   verifier(png.subarray(1, 4).toString("latin1") === "PNG", "9 · l'aperçu du lien n'est pas un PNG");
   verifier(png.readUInt32BE(16) === 1200 && png.readUInt32BE(20) === 630, `9 · l'aperçu du lien fait ${png.readUInt32BE(16)} × ${png.readUInt32BE(20)}, pas 1200 × 630`);
   verifier(png.length < 300_000, `9 · l'aperçu du lien pèse ${png.length} octets (300 ko au plus)`);
+  verifier(empreinte(png) === EMPREINTE_APERCU, "9 · l'aperçu du lien n'est plus l'image écrite par tools/sigle-sfl-exports.ts --apercu-lien (la refaire, puis recopier son empreinte)");
 }
+const autour = readdirSync(join(RACINE, "src/app/sfl")).sort();
+assert.deepEqual(autour, ["opengraph-image.alt.txt", "opengraph-image.png", "page.tsx"], `9 · le dossier de la route a changé : ${autour.join(", ")}`);
 verifier(existsSync(join(RACINE, ALT)) && lire(ALT).trim() === META_SFL.image, "9 · le texte de remplacement de l'aperçu manque ou ne suit plus META_SFL.image");
 
+// 10 · Hors de l'app hôte (le navigateur d'Instagram), le guide rouvre la page affichée, avec la source d'arrivée.
+for (const [href, chemin, source, attendu] of [
+  // Venu de /sfl par « Créer mon compte » : la page a changé avant l'adresse.
+  ["https://getbola.app/sfl", "/inscription", "l.instagram.com", "https://getbola.app/inscription?utm_source=l.instagram.com"],
+  ["https://getbola.app/sfl?utm_source=instagram", "/inscription", "instagram", "https://getbola.app/inscription?utm_source=instagram"],
+  ["https://getbola.app/", "/connexion", null, "https://getbola.app/connexion"],
+  // La page de l'adresse : sa suite est gardée ; une source déjà écrite reste.
+  ["https://getbola.app/p/ABC123?x=1", "/p/ABC123", "snapchat.com", "https://getbola.app/p/ABC123?x=1&utm_source=snapchat.com"],
+  ["https://getbola.app/inscription?parrain=ABC123&utm_source=snap", "/inscription", "instagram", "https://getbola.app/inscription?parrain=ABC123&utm_source=snap"],
+  ["https://getbola.app/inscription?parrain=ABC123", null, null, "https://getbola.app/inscription?parrain=ABC123"],
+] as const)
+  verifier(adresseSortie(href, chemin, source).href === attendu, `10 · adresseSortie(${href}, ${chemin}, ${source}) rend ${adresseSortie(href, chemin, source).href}, pas ${attendu}`);
+verifier(
+  lienSortie(adresseSortie("https://getbola.app/sfl", "/inscription", "instagram"), "ios") === "x-safari-https://getbola.app/inscription?utm_source=instagram",
+  "10 · le lien « Ouvrir dans Safari » ne porte plus la page affichée et la source"
+);
+const guide = lire("src/components/pwa/guide-installation.tsx");
+verifier(
+  /const sortie = adresseSortie\(window\.location\.href, pathname, sourceArrivee\(\)\);/.test(guide) &&
+    /const lien = lienSortie\(sortie, env\.systeme\);/.test(guide) &&
+    /const lien = sortie\.href;/.test(guide) &&
+    (guide.match(/window\.location\.href/g) ?? []).length === 1,
+  "10 · le guide d'installation ne rouvre plus la page affichée avec la source d'arrivée (bouton et lien copié)"
+);
+
 assert.equal(fautes.length, 0, `\n${fautes.join("\n")}`);
-console.log(`page-sfl : ok (${textes.length} textes, ${effectif.length} noms cherchés, ${CLASSEMENT_SFL.bareme.length} points du barème)`);
+console.log(`page-sfl : ok (${textes.length} textes, ${effectif.length} noms cherchés, ${dossiers.length} adresses essayées à la porte, ${CLASSEMENT_SFL.bareme.length} points du barème, ${CARTE_SFL.lignes.length} gestes rejoués)`);

@@ -12,25 +12,34 @@
 //
 // Teintes : l'encre #08090B et le papier #F4F5F2 de l'app et de son icône.
 // Sobre d'abord : aucun fond imprimé sur les images officielles. Deux
-// variantes en option, sur le noir seulement, portent la rosace guillochée du
-// dos des cartes (RosaceBola) derrière le sigle, à 7 % : ni microtexte, ni
-// rayons, ni or.
+// variantes, sur le noir seulement, portent la rosace guillochée du dos des
+// cartes (RosaceBola) derrière le sigle, à 7 % : ni microtexte, ni rayons, ni
+// or. Elles ne sont écrites qu'à la demande (--print) : le dossier livré ne
+// contient que les images officielles.
 //
 // La photo de profil est rognée en rond par Instagram : le sigle y fait 65 %
 // du carré (702 px sur 1080), sa demi-diagonale tient à 67 % du rayon.
+// L'aperçu du lien (1200 × 630) est rogné en carré par certaines messageries :
+// le sigle y fait 480 px, soit 75 px de marge dans le carré central.
+// Les deux sigles sur fond transparent gardent 16 px de marge : le lissage du
+// bord n'est pas tranché par le cadre.
 //
-//   npx tsx tools/sigle-sfl-exports.ts <dossier>      écrit toutes les images
+//   npx tsx tools/sigle-sfl-exports.ts <dossier>      écrit les images officielles
+//   npx tsx tools/sigle-sfl-exports.ts <dossier> --print  et les deux variantes à rosace
 //   npx tsx tools/sigle-sfl-exports.ts --apercu-lien  réécrit l'aperçu du lien
-//     du dépôt (1200 × 630), que relit tools/page-sfl-check.ts
+//     du dépôt (1200 × 630), dont tools/page-sfl-check.ts garde l'empreinte
+//     (EMPREINTE_APERCU, à recopier de ce que cette commande affiche)
 //   CHROME=/opt/pw-browsers/chromium npx tsx …        avec un Chromium déjà là,
 //     quand celui de Playwright n'est pas à sa version (rien n'est téléchargé)
 //
 // Contrôles joués à chaque écriture : les dimensions de chaque PNG, les marges
 // gauche et droite du sigle égales à 1 px près, et sur les deux profils aucun
 // pixel du sigle hors du cercle. La planche sfl-apercu-rond.png montre les
-// deux profils rognés, de 320 à 40 px : à regarder avant de livrer.
+// deux profils rognés, de 320 à 40 px, sur le blanc et sur le noir
+// d'Instagram : à regarder avant de livrer.
 
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { createElement } from "react";
@@ -66,14 +75,22 @@ const IMAGES: Image[] = [
   { nom: "sfl-couverture-blanc-1500x500.png", l: 1500, h: 500, fond: PAPIER, sigle: ENCRE, largeur: 600 },
   { nom: "sfl-portrait-noir-1080x1350.png", l: 1080, h: 1350, fond: ENCRE, sigle: PAPIER, largeur: 702 },
   { nom: "sfl-portrait-blanc-1080x1350.png", l: 1080, h: 1350, fond: PAPIER, sigle: ENCRE, largeur: 702 },
-  { nom: "sfl-sigle-blanc-transparent-2400.png", l: 2400, h: 656, fond: null, sigle: PAPIER, largeur: 2400 },
-  { nom: "sfl-sigle-encre-transparent-2400.png", l: 2400, h: 656, fond: null, sigle: ENCRE, largeur: 2400 },
-  // En option : la rosace des cartes, sur le noir seulement.
+  // Le sigle de 2400 px, et 16 px de marge transparente autour.
+  { nom: "sfl-sigle-blanc-transparent-2400.png", l: 2432, h: 688, fond: null, sigle: PAPIER, largeur: 2400 },
+  { nom: "sfl-sigle-encre-transparent-2400.png", l: 2432, h: 688, fond: null, sigle: ENCRE, largeur: 2400 },
+];
+
+/** À la demande (--print) : la rosace des cartes, sur le noir seulement. */
+const IMAGES_PRINT: Image[] = [
   { nom: "sfl-portrait-noir-print-1080x1350.png", l: 1080, h: 1350, fond: ENCRE, sigle: PAPIER, largeur: 702, rosace: [302, 497] },
   { nom: "sfl-couverture-noir-print-1500x500.png", l: 1500, h: 500, fond: ENCRE, sigle: PAPIER, largeur: 600, rosace: [260, 460] },
 ];
 
-const LIEN: Image = { nom: "sfl-apercu-lien-1200x630.png", l: 1200, h: 630, fond: ENCRE, sigle: PAPIER, largeur: 600 };
+/** L'aperçu du lien : le sigle à 40 % de la largeur, entier avec sa marge dans une vignette rognée au carré. */
+const LIEN: Image = { nom: "sfl-apercu-lien-1200x630.png", l: 1200, h: 630, fond: ENCRE, sigle: PAPIER, largeur: 480 };
+
+/** L'empreinte d'un fichier : celle que garde le banc pour l'aperçu du lien. */
+export const empreinte = (donnees: Buffer) => createHash("sha256").update(donnees).digest("hex");
 
 /** Le sigle serré tel que le générateur l'écrit : son cadre et son tracé, recopiés sans y toucher. */
 export function sigleSerre(): { cadre: string; l: number; h: number; d: string } {
@@ -168,30 +185,28 @@ async function controler(page: Page, image: Image, png: Buffer): Promise<void> {
   console.log(`  ${image.nom}  ${m.l} × ${m.h}  marges ${m.gauche} | ${m.droite}  ${m.haut} | ${m.bas}${image.rond ? "  rond : rien ne sort" : ""}`);
 }
 
-/** La planche de contrôle : les deux profils rognés en rond, aux tailles où Instagram les montre. */
+/** La planche de contrôle : les deux profils rognés en rond, aux tailles où Instagram les montre, sur son blanc et sur son noir. */
 async function planche(page: Page, profils: Buffer[]): Promise<Buffer> {
   const tailles = [320, 150, 110, 64, 40];
-  const rangees = profils
-    .map(
-      (png) =>
-        `<div style="display:flex;align-items:center;gap:40px">${tailles
-          .map((t) => `<img src="data:image/png;base64,${png.toString("base64")}" style="width:${t}px;height:${t}px;border-radius:50%;display:block">`)
-          .join("")}</div>`
-    )
+  const serie = (png: Buffer) =>
+    tailles
+      .map((t) => `<img src="data:image/png;base64,${png.toString("base64")}" style="width:${t}px;height:${t}px;border-radius:50%;display:block">`)
+      .join("");
+  const bandes = ["#ffffff", "#000000"]
+    .map((fond) => `<div style="display:flex;align-items:flex-end;gap:36px;padding:40px 44px;background:${fond}">${profils.map(serie).join('<span style="width:28px"></span>')}</div>`)
     .join("");
-  await page.setViewportSize({ width: 960, height: 800 });
-  await page.setContent(
-    `<!doctype html><html><body style="margin:0;background:#8f908b"><div id="p" style="display:inline-flex;flex-direction:column;gap:40px;padding:48px">${rangees}</div></body></html>`
-  );
+  await page.setViewportSize({ width: 1800, height: 900 });
+  await page.setContent(`<!doctype html><html><body style="margin:0"><div id="p" style="display:inline-block">${bandes}</div></body></html>`);
   return page.locator("#p").screenshot({ type: "png" });
 }
 
 async function main() {
   const args = process.argv.slice(2);
   const lien = args.includes("--apercu-lien");
+  const images = args.includes("--print") ? [...IMAGES, ...IMAGES_PRINT] : IMAGES;
   const dossier = args.find((a) => !a.startsWith("--"));
   if (!lien && !dossier) {
-    console.error("usage : npx tsx tools/sigle-sfl-exports.ts <dossier> | --apercu-lien");
+    console.error("usage : npx tsx tools/sigle-sfl-exports.ts <dossier> [--print] | --apercu-lien");
     process.exit(1);
   }
   // Chargé ici seulement : le banc relit ce fichier sans lancer de navigateur.
@@ -203,12 +218,12 @@ async function main() {
       const png = await rendre(page, LIEN);
       await controler(page, LIEN, png);
       writeFileSync(APERCU_LIEN, png);
-      console.log(`aperçu du lien écrit dans ${APERCU_LIEN}`);
+      console.log(`aperçu du lien écrit dans ${APERCU_LIEN}\n  empreinte ${empreinte(png)} (EMPREINTE_APERCU, tools/page-sfl-check.ts)`);
     }
     if (dossier) {
       mkdirSync(dossier, { recursive: true });
       const profils: Buffer[] = [];
-      for (const image of IMAGES) {
+      for (const image of images) {
         const png = await rendre(page, image);
         await controler(page, image, png);
         writeFileSync(join(dossier, image.nom), png);
@@ -218,7 +233,7 @@ async function main() {
       copyFileSync(APERCU_LIEN, join(dossier, LIEN.nom));
       writeFileSync(join(dossier, "sfl-apercu-rond.png"), await planche(page, profils));
       writeFileSync(join(dossier, "sfl.svg"), readFileSync(join(__dirname, "..", "public", "bola", "sfl.svg")));
-      console.log(`${IMAGES.length + 3} fichiers écrits dans ${dossier}`);
+      console.log(`${images.length + 3} fichiers écrits dans ${dossier}`);
     }
   } finally {
     await navigateur.close();
