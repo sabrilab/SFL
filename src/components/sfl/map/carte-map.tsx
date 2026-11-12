@@ -814,7 +814,7 @@ export function CarteMap({
       });
       poses.push(m);
       // L'ordre du temps (celui de la page), le joué en dernier : la tête d'un paquet est le prochain.
-      stickersVus.push({ s, el: m.getElement(), rang: stickers.indexOf(s) + (s.etat.genre === "joue" ? stickers.length : 0) });
+      stickersVus.push({ s, el: m.getElement(), rang: stickers.indexOf(s) + (s.etat.genre === "joue" || s.etat.genre === "a-rattraper" ? stickers.length : 0) });
       const el = m.getElement().querySelector<HTMLElement>(".stk");
       // Un message de plus depuis la dernière fois : la bulle saute.
       const nonLus = s.discussion?.nonLus ?? 0;

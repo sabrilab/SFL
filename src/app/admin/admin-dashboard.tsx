@@ -62,6 +62,7 @@ import { mvpAutomatique } from "@/lib/sfl/saisie/mvp";
 import { choixDEquipe, equipesDuJour } from "@/lib/sfl/saisie/equipes";
 import { effectifJouable } from "@/lib/sfl/saisie/effectif";
 import { estBrouillon } from "@/lib/sfl/saisie/brouillon";
+import { A_RATTRAPER, estEnSuspens, SIGNE_SUSPENS } from "@/lib/sfl/saisie/suspens";
 import { PointMaillot } from "@/components/sfl/point-maillot";
 import { saisieStore, seedSaison } from "@/lib/sfl/saisie/store";
 import { SYNC_EVENT } from "@/lib/sfl/saisie/sync";
@@ -770,6 +771,7 @@ export function AdminDashboard({ onglet = "overview", mode = "direct" }: { ongle
                 <div className="flex items-center gap-2">
                   <span className="text-lg font-bold tracking-tight">Journée {meta.j}</span>
                   {estBrouillon(meta) && <span className="mono-label text-encre-2">○ Brouillon</span>}
+                  {estEnSuspens(meta) && <span className="mono-label text-encre-2">{SIGNE_SUSPENS} {A_RATTRAPER}</span>}
                   {meta.sflTime && (
                     <span className="mono-label rounded-full bg-secondary px-2 py-0.5 text-encre-2">SFL Time</span>
                   )}

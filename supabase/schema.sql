@@ -541,6 +541,25 @@ as $$
 $$;
 grant execute on function public.est_brouillon(jsonb) to authenticated;
 
+-- La journée en suspens (12/11/2026, saisie/suspens.ts) : la même règle sur
+-- la clé « suspens ». Absent, null ou false = pas en suspens (toutes les
+-- journées d'avant). Une journée en suspens reste servie aux joueurs
+-- (sans_brouillons et saison_publique ne la retirent pas) mais ne compte
+-- nulle part : pas de vote (fin_du_vote_a), pas de fin des matchs posée ni
+-- retirée (saison_fin_des_matchs), pas de recrue (presences_reelles), pas
+-- de note d'arbitre (noter_arbitre), feuille gelée pour les joueurs
+-- (feuille_hors_jeu). Sa reprise à une autre date fait le ménage de
+-- l'ancienne (saison_reprise, en fin de fichier).
+create or replace function public.est_en_suspens(p_meta jsonb)
+returns boolean
+language sql
+immutable
+set search_path = ''
+as $$
+  select coalesce(p_meta -> 'suspens', 'null'::jsonb) not in ('null'::jsonb, 'false'::jsonb);
+$$;
+grant execute on function public.est_en_suspens(jsonb) to authenticated;
+
 -- Le document sans les journées en brouillon, ni leurs lignes, ni leurs buts
 -- minutés (même résultat que sansBrouillons) ; l'ordre est gardé.
 create or replace function public.sans_brouillons(p_data jsonb)
@@ -3581,8 +3600,10 @@ revoke execute on function public.journee_terminee(jsonb, int) from public, anon
 
 -- La fin du vote d'une journée de la saison en cours : minuit jusqu'à la J4 ;
 -- dès la J5, min(minuit, max(18 h, fin des matchs + 1 h)), et minuit tant que
--- la fin des matchs est inconnue. null : pas de journée publiée et datée.
--- `p_ref` fixe l'année du libellé (« 8 nov. ») ; fin_du_vote prend now().
+-- la fin des matchs est inconnue. null : pas de journée publiée et datée, ou
+-- une journée en suspens (12/11/2026 : pas de vote, ni vote_ouvert, ni
+-- politique de votes_figures). `p_ref` fixe l'année du libellé (« 8 nov. ») ;
+-- fin_du_vote prend now().
 create or replace function public.fin_du_vote_a(p_saison int, p_j int, p_ref timestamptz)
 returns timestamptz
 language plpgsql
@@ -3605,7 +3626,7 @@ begin
     from jsonb_array_elements(case when jsonb_typeof(doc -> 'journees') = 'array' then doc -> 'journees' else '[]'::jsonb end) m
    where m ->> 'j' = p_j::text
    limit 1;
-  if meta is null or public.est_brouillon(meta) then
+  if meta is null or public.est_brouillon(meta) or public.est_en_suspens(meta) then
     return null;
   end if;
   jour := public.date_de_journee(meta ->> 'date', p_ref);
@@ -3699,6 +3720,10 @@ revoke all on public.fins_des_matchs from public, anon, authenticated;
 --     est gardée si elle est à 5 min de l'heure du serveur ; sinon c'est
 --     l'heure du serveur ;
 --   · sinon : aucun (une valeur sans fondement est retirée).
+-- Une journée en suspens (12/11/2026, est_en_suspens) est laissée telle
+-- quelle : ni posé, ni retiré, et fins_des_matchs n'est pas touchée. À sa
+-- reprise, la règle ci-dessus reprend (à une autre date : saison_reprise
+-- efface l'ancienne ligne).
 -- Joue pour publier_saison (l'admin : insert … on conflict, donc deux fois ;
 -- le premier passage pose, le second relit) comme pour sceller_feuille (un
 -- joueur scelle la feuille de son match).
@@ -3730,6 +3755,7 @@ begin
     m := js -> i;
     nj := public.entier_sur(m ->> 'j');
     continue when nj is null or not public.nouveau_regime(numero, nj);
+    continue when public.est_en_suspens(m);
     tampon := null;
     if not public.est_brouillon(m) then
       jour := public.date_de_journee(m ->> 'date', now());
@@ -7249,6 +7275,8 @@ as $$
    where s.id = 1
      -- Une journée en brouillon n'est pas encore jouée pour la ligue (30/10/2026).
      and not public.est_brouillon(jj.meta)
+     -- Ni une journée en suspens (12/11/2026) : la recrue compte au rattrapage.
+     and not public.est_en_suspens(jj.meta)
      and e ->> 'statut' = 'Présent'
      and coalesce(e ->> 'result', '') <> ''
      and lower(coalesce(e ->> 'extraTime', 'false')) not in ('true', '1');
@@ -8497,10 +8525,11 @@ begin
     select 1
     from public.saison s, jsonb_array_elements(s.data -> 'entries') e
     where s.id = 1
-      -- Jamais une journée en brouillon (30/10/2026).
+      -- Jamais une journée en brouillon (30/10/2026), ni en suspens (12/11/2026 :
+      -- l'arbitre se note au rattrapage).
       and not exists (
         select 1 from jsonb_array_elements(s.data -> 'journees') m
-         where (m ->> 'j')::integer = a.j and public.est_brouillon(m)
+         where (m ->> 'j')::integer = a.j and (public.est_brouillon(m) or public.est_en_suspens(m))
       )
       and (e ->> 'j')::integer = a.j
       and lower(e ->> 'player') = lower(v_nom)
@@ -8903,6 +8932,8 @@ revoke execute on function public.compteurs_du_document(jsonb, int, text, text) 
 -- La feuille d'un match peut-elle encore s'écrire, quel que soit le jour ?
 -- null : oui ; sinon le motif.
 --   journee · la journée n'existe pas ;  brouillon · pas (ou plus) publiée ;
+--   suspens · la journée est en suspens (12/11/2026, est_en_suspens) : sa
+--     feuille est gelée pour les joueurs, l'admin passe outre au sceau ;
 --   match · ces deux camps ne forment pas un match de la journée.
 -- Une journée remise en brouillon (avant son coup d'envoi, brouillon.ts) gèle
 -- sa feuille : rien de la composition préparée ne doit passer par une
@@ -8927,6 +8958,9 @@ begin
   end if;
   if public.est_brouillon(meta) then
     return 'brouillon';
+  end if;
+  if public.est_en_suspens(meta) then
+    return 'suspens';
   end if;
   declares := case when jsonb_typeof(meta -> 'matchsDuJour') = 'array' then meta -> 'matchsDuJour' else '[]'::jsonb end;
   if jsonb_array_length(declares) > 0 then
@@ -9775,6 +9809,96 @@ end;
 $$;
 revoke execute on function public.site_vu(text, text, text) from public;
 grant execute on function public.site_vu(text, text, text) to anon, authenticated;
+
+-- ─────────────── La reprise d'une journée en suspens (12/11/2026) ───────────────
+-- Ilyes : « que les joueurs puissent voir que cette journée-là sera
+-- rattrapée ». Une journée en suspens se rattrape à une autre date : l'admin
+-- change sa date, puis la reprend (publier_saison, le seul chemin), ou la
+-- reprend d'abord puis change sa date (la reprise garde la date d'origine,
+-- reprise.date). Au moment où la journée reprise quitte sa date d'origine, et
+-- dans la même transaction, la base fait le ménage de ce qui n'est pas du
+-- nouveau jour, pour cette saison et ce numéro seulement :
+--   · les votes Impact et Défensive (personne ne pourrait revoter, et les
+--     anciens compteraient) ;
+--   · les feuilles en direct (une feuille scellée bloquerait la nouvelle) ;
+--   · la fin des matchs gardée (fins_des_matchs) ;
+--   · les notes d'arbitre données avant le nouveau jour, et leur fermeture,
+--     reposée au mardi minuit qui suit la nouvelle date (comme
+--     heuresDeJournee, missions.ts).
+-- Ce qui est du nouveau jour reste : une reprise faite le soir du rattrapage,
+-- après les matchs, garde la fin des matchs que saison_fin_des_matchs vient
+-- de poser (BEFORE, dans la même écriture) et les feuilles que l'admin a
+-- tenues ce jour-là. Une date illisible : tout le ménage, comme avant.
+-- Rien si la date n'a pas changé, ni pour une journée qui n'était pas en
+-- suspens, ni pour une journée reprise qui a déjà quitté sa date d'origine
+-- (un report du rattrapage est un changement de date ordinaire). Les clés
+-- d'annonce (annonces_envois) ne sont pas libérées.
+-- Additif et rejouable ; une écriture sans « suspens » ni « reprise » ne fait rien.
+create or replace function public.saison_reprise()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  numero int := coalesce(public.entier_sur(new.data ->> 'numero'), 0);
+  r      record;
+  nouveau date;
+begin
+  if coalesce(public.entier_sur(old.data ->> 'numero'), 0) <> numero then
+    return null;                                                      -- une clôture : rien à rattraper
+  end if;
+  for r in
+    select public.entier_sur(n.m ->> 'j') as j, n.m ->> 'date' as date
+      from jsonb_array_elements(case when jsonb_typeof(new.data -> 'journees') = 'array' then new.data -> 'journees' else '[]'::jsonb end) n(m)
+      join jsonb_array_elements(case when jsonb_typeof(old.data -> 'journees') = 'array' then old.data -> 'journees' else '[]'::jsonb end) o(m)
+        on (o.m ->> 'j') = (n.m ->> 'j')
+     where not public.est_en_suspens(n.m)
+       and (
+         -- Reprise : elle était en suspens, et sa date n'est plus celle de la suspension.
+         (public.est_en_suspens(o.m)
+          and (o.m -> 'suspens' ->> 'date') is not null
+          and (n.m ->> 'date') is distinct from (o.m -> 'suspens' ->> 'date'))
+         or
+         -- Reprise d'abord, date changée ensuite : elle était encore à sa date d'origine.
+         (not public.est_en_suspens(o.m)
+          and jsonb_typeof(o.m -> 'reprise') = 'object'
+          and (o.m -> 'reprise' ->> 'date') is not null
+          and (o.m ->> 'date') = (o.m -> 'reprise' ->> 'date')
+          and (n.m -> 'reprise' ->> 'date') is not distinct from (o.m -> 'reprise' ->> 'date')
+          and (n.m ->> 'date') is distinct from (o.m ->> 'date'))
+       )
+  loop
+    continue when r.j is null;
+    -- Le nouveau jour : date_de_journee prend l'année de la référence, moins
+    -- un au-delà d'une semaine ; une référence six mois plus loin lit juste
+    -- toute date de six mois en arrière à six mois en avant (le jour même
+    -- compris : c'est celui qu'a écrit saison_fin_des_matchs).
+    nouveau := public.date_de_journee(r.date, now() + interval '6 months');
+    delete from public.votes_figures v
+     where v.saison = numero and v.j = r.j and (nouveau is null or v.jour is distinct from nouveau);
+    delete from public.feuilles_direct f
+     where f.saison = numero and f.j = r.j
+       and (nouveau is null or (f.debut at time zone 'Europe/Paris')::date is distinct from nouveau);
+    delete from public.fins_des_matchs f
+     where f.saison = numero and f.j = r.j and (nouveau is null or f.jour is distinct from nouveau);
+    delete from public.avis_arbitre av
+     using public.arbitrages a
+     where av.arbitrage_id = a.id and a.saison = numero and a.j = r.j
+       and (nouveau is null or (av.le at time zone 'Europe/Paris')::date < nouveau);
+    if nouveau is not null then
+      update public.arbitrages a
+         set ferme_le = (nouveau + 3)::timestamp at time zone 'Europe/Paris'
+       where a.saison = numero and a.j = r.j;
+    end if;
+  end loop;
+  return null;
+end;
+$$;
+revoke execute on function public.saison_reprise() from public, anon, authenticated;
+drop trigger if exists saison_reprise on public.saison;
+create trigger saison_reprise after update of data on public.saison
+  for each row execute function public.saison_reprise();
 
 -- ─────────────── Droits de table : pas plus que ce que l'API sert (03/11/2026) ───────────────
 -- Supabase donne d'office tous les droits de table à anon et authenticated, et

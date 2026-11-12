@@ -16,9 +16,13 @@
 // depuis une saison filtrée : la règle I8 (integrite.ts) refuse une écriture
 // qui ferait disparaître un brouillon sans « Jeter ».
 //
+// Une journée en suspens (12/11/2026, suspens.ts) ne se remet pas en
+// brouillon : elle reste visible, « à rattraper », jusqu'à sa reprise.
+//
 // Pur : ni base, ni écran.
 
 import { computeJournees, journeeJouee } from "./engine";
+import { estEnSuspens } from "./suspens";
 import type { Journee } from "../engine";
 import type { JourneeMeta, Saison } from "./types";
 
@@ -128,9 +132,12 @@ export function peutRemettreEnBrouillon(s: Saison, j: number, maintenant: Date):
   return raisonDeGarder(s, j, maintenant) === null;
 }
 
-function raisonDeGarder(s: Saison, j: number, maintenant: Date): "absente" | "jouee" | "coup-d-envoi" | null {
+export type RefusBrouillon = "absente" | "suspens" | "jouee" | "coup-d-envoi";
+
+export function raisonDeGarder(s: Saison, j: number, maintenant: Date): RefusBrouillon | null {
   const meta = s.journees.find((m) => m.j === j);
   if (!meta || estBrouillon(meta)) return "absente";
+  if (estEnSuspens(meta)) return "suspens";
   if (journeeJouee(s, j)) return "jouee";
   const envoi = coupDEnvoi(meta, maintenant);
   if (envoi && envoi.getTime() <= maintenant.getTime()) return "coup-d-envoi";
@@ -142,7 +149,7 @@ export function remettreEnBrouillon(
   j: number,
   par: string,
   le: Date
-): { saison: Saison } | { refus: "absente" | "jouee" | "coup-d-envoi" } {
+): { saison: Saison } | { refus: RefusBrouillon } {
   const refus = raisonDeGarder(s, j, le);
   if (refus) return { refus };
   return {

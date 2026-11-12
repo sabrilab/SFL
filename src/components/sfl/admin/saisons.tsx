@@ -15,7 +15,9 @@
 // jamais écrits dans le document, et les votes d'une saison close ne se
 // rechargent plus. La clôture attend donc que les votes soient chargés et que
 // la dernière journée soit révélée (revelation.ts : 19 h dès la J5, minuit
-// jusqu'à la J4).
+// jusqu'à la J4), et qu'aucune journée ne soit en suspens (« J5 à
+// rattraper », saisie/suspens.ts : l'archive compterait tout ce qui est joué) ;
+// la fenêtre le dit alors à la place de ce qui partirait en archive.
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
@@ -27,6 +29,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { cloturerSaison, restaurationPossible, restaurerSaison } from "@/lib/sfl/saisie/mutations";
 import { estBrouillon } from "@/lib/sfl/saisie/brouillon";
+import { A_RATTRAPER, resteUneJourneeEnSuspens, SIGNE_SUSPENS } from "@/lib/sfl/saisie/suspens";
 import { numeroSaison, type Saison } from "@/lib/sfl/saisie/types";
 import { deriveSeason } from "@/lib/sfl/saisie/engine";
 import { appliquerVotes, titresFaibles, votesCharges } from "@/lib/sfl/votes";
@@ -77,9 +80,13 @@ export function Saisons({
     };
   }, [ouvert, saison, votes]);
   const brouillon = saison.journees.find(estBrouillon);
+  // Une journée en suspens se rattrape avant la clôture (12/11/2026, suspens.ts).
+  const enSuspens = resteUneJourneeEnSuspens(saison);
   const bloque = brouillon
     ? `J${brouillon.j} en brouillon`
-    : !charges
+    : enSuspens != null
+      ? `J${enSuspens} à rattraper`
+      : !charges
       ? "Les votes ne sont pas encore chargés."
       : (titres?.attente ?? null);
 
@@ -140,10 +147,17 @@ export function Saisons({
             {/* Un bloc, pas un paragraphe : base-ui remplace l'élément par `render`. */}
             <DialogDescription render={<div />} className="space-y-2 text-left text-ligne">
               <div>
-                <p>
-                  Les {journees} journées et leurs {lignes} lignes partent en archive, lisibles par
-                  toute la ligue dans « {nom || `Saison ${numero}`} ». Rien n&apos;est effacé.
-                </p>
+                {/* Une journée en suspens : la clôture attend son rattrapage, rien ne part en archive. */}
+                {enSuspens != null ? (
+                  <p className="mono-label text-foreground">
+                    {SIGNE_SUSPENS} J{enSuspens} {A_RATTRAPER}
+                  </p>
+                ) : (
+                  <p>
+                    Les {journees} journées et leurs {lignes} lignes partent en archive, lisibles par
+                    toute la ligue dans « {nom || `Saison ${numero}`} ». Rien n&apos;est effacé.
+                  </p>
+                )}
                 <p>
                   Les compteurs, les classements et les cartes de journée repartent de zéro.
                   L&apos;effectif reste ; les cartes de chacun sont à requalifier dans l&apos;onglet Joueurs.

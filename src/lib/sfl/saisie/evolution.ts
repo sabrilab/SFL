@@ -39,10 +39,13 @@
 // placement montent ensemble (lib/sfl/gardien.ts).
 //
 // On compte depuis la Saison 1 (SAISON_DEPART). Les saisons d'avant gardent
-// leurs cartes telles qu'elles étaient. Pur, sans stockage : le moteur
+// leurs cartes telles qu'elles étaient. « Prochaine mise à jour après la Jn »
+// compte les journées à jouer dans l'ordre du calendrier, sans une journée en
+// suspens (saisie/suspens.ts : on ne sait pas quand elle se rattrape). Pur, sans stockage : le moteur
 // (computeStandings, computeBoostCards) le rappelle à chaque dérivation.
 
 import { STAT_KEYS, type StatKey, type Stats } from "../engine";
+import { ordreDuCalendrier } from "../convocation-temps";
 import type { MatchEntry, Saison } from "./types";
 
 export const SAISON_DEPART = 1;
@@ -186,7 +189,15 @@ export function evoluer(
   const jouees = journeesJouees(saison);
   const derniere = jouees.length >= JOURNEES_PAR_MAJ ? jouees[Math.floor(jouees.length / JOURNEES_PAR_MAJ) * JOURNEES_PAR_MAJ - 1] : null;
   const reste = JOURNEES_PAR_MAJ - (jouees.length % JOURNEES_PAR_MAJ);
-  const auCalendrier = [...saison.journees].map((m) => m.j).filter((j) => !jouees.includes(j)).sort((a, b) => a - b);
+  // Les journées à jouer, dans l'ordre du calendrier. Une journée en suspens
+  // n'y est pas : rien ne dit quand elle se rattrape (la règle d'estEnSuspens,
+  // saisie/suspens.ts, écrite ici pour ne pas boucler les imports) ; reprise,
+  // elle y revient à sa date.
+  const enSuspens = (m: Saison["journees"][number]) => m.suspens != null && (m.suspens as unknown) !== false;
+  const auCalendrier = ordreDuCalendrier(
+    saison,
+    saison.journees.filter((m) => !enSuspens(m) && !jouees.includes(m.j)).map((m) => m.j)
+  );
   const calendrier: CalendrierEvolution = {
     jouees,
     avantProchaine: reste,

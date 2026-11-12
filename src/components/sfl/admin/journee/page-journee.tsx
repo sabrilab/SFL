@@ -22,6 +22,13 @@
 // la toucher l'ouvre, pour la reprendre, la libérer ou la rouvrir.
 // Tout le reste de la ligue est derrière ≡ (Ligue), rien n'est perdu.
 //
+// La journée en suspens (Ilyes, 12/11/2026, saisie/suspens.ts) : une fois le
+// coup d'envoi passé, « Suspendre » se tient à côté du geste du moment (avant,
+// dans Quand et Où, au-dessus de « Supprimer la journée ») ; suspendue, la
+// journée porte « ‖ À RATTRAPER » et son motif, son signe ‖ dans la frise, et le
+// geste devient « Reprendre la J5 ». Sa grille reste ouverte : rien n'y
+// compte tant qu'elle est en suspens.
+//
 // Aucune phrase d'aide : la pastille, le pointillé et le libellé de chaque
 // bouton (qui dit son résultat) suffisent. Noir et blanc ; la braise ne sert
 // qu'à « Il manque N ».
@@ -49,6 +56,7 @@ import { isAdmin } from "@/lib/sfl/admin";
 import { TERRAINS_MAX } from "@/lib/sfl/equipes-division";
 import { haptique } from "@/lib/sfl/haptique";
 import { dejaPubliee, estBrouillon, jeterBrouillon } from "@/lib/sfl/saisie/brouillon";
+import { estEnSuspens, SIGNE_SUSPENS } from "@/lib/sfl/saisie/suspens";
 import { computeJournees } from "@/lib/sfl/saisie/engine";
 import { choixDEquipe } from "@/lib/sfl/saisie/equipes";
 import { placementsDeLaJournee } from "@/lib/sfl/saisie/effectif";
@@ -68,7 +76,7 @@ import { FeuilleConsulter } from "./feuille-consulter";
 import { FeuilleDirect } from "./feuille-direct";
 import { FeuilleLigne } from "./feuille-ligne";
 import { FeuillePreparer } from "./feuille-preparer";
-import { compteursEnMots, FeuillePublier, FeuilleRemettre } from "./feuille-publier";
+import { compteursEnMots, FeuillePublier, FeuilleRemettre, FeuilleReprendre, FeuilleSuspendre } from "./feuille-publier";
 import { FeuilleQuandOu } from "./feuille-quand-ou";
 import { Etiquette, Feuille, Pastille, PastilleEtat, Segmente } from "./ui";
 import { leverSuspension, suspendusPour } from "@/lib/sfl/cartons";
@@ -98,6 +106,8 @@ export function PageJournee() {
   const [versLigne, setVersLigne] = useState<"honneurs" | null>(null);
   const [publier, setPublier] = useState(false);
   const [remettre, setRemettre] = useState(false);
+  const [suspendre, setSuspendre] = useState(false);
+  const [reprendre, setReprendre] = useState(false);
   const [enDirect, setEnDirect] = useState(false);
   const [convocation, setConvocation] = useState(false);
   const [arbitre, setArbitre] = useState<number | null>(null);
@@ -127,6 +137,8 @@ export function PageJournee() {
   const etat = etatSaisi === "en-ligne" && direct.feuilles.size > 0 ? "en-direct" : etatSaisi;
   const geste = gesteDuMoment(saison, meta ? j : null, maintenant);
   const par = me ?? "admin";
+  // « Suspendre » : une journée publiée dont le coup d'envoi est passé (avant, il est dans Quand et Où).
+  const peutSuspendre = !!meta && !estBrouillon(meta) && !estEnSuspens(meta) && etat !== "brouillon" && etat !== "en-ligne";
   // La convocation n'est celle de la journée ouverte que si c'est son dimanche :
   // sinon ses « Je viens » et son « Il manque N » parleraient d'un autre jour.
   const convocationDuJour = !!meta && memeDate(presence.jour.replace(/^\D+/, ""), meta.date);
@@ -220,6 +232,8 @@ export function PageJournee() {
           const actif = m.j === j;
           // « ! » : un défaut de la feuille, ou une journée bloquée (une équipe sans résultat, la nuit passée).
           const defaut = verifierFeuille(saison, m.j).some((e) => e.r !== "I5" || estBrouillon(m)) || etatJournee(saison, m.j, maintenant) === "bloquee";
+          // « ‖ » : la journée en suspens, à rattraper.
+          const signe = estBrouillon(m) ? "○" : estEnSuspens(m) ? SIGNE_SUSPENS : defaut ? "!" : "";
           return (
             <button
               key={m.j}
@@ -239,7 +253,7 @@ export function PageJournee() {
               )}
             >
               <span className="font-display text-titre-m leading-none">J{m.j}</span>
-              <span className="mono-label h-3 text-micro leading-3">{estBrouillon(m) ? "○" : defaut ? "!" : ""}</span>
+              <span className="mono-label h-3 text-micro leading-3">{signe}</span>
             </button>
           );
         })}
@@ -309,6 +323,8 @@ export function PageJournee() {
             </Pastille>
             {meta.sflTime && <Pastille onClick={() => setQuandOu(null)}>SFL Time</Pastille>}
           </div>
+          {/* Le motif de la suspension, tel que les joueurs le lisent. */}
+          {etat === "a-rattraper" && meta.suspens?.motif && <p className="mono-label -mt-2 text-encre-2">{meta.suspens.motif}</p>}
 
           {vue === "joueurs" ? (
             vueLigue ? (
@@ -428,41 +444,60 @@ export function PageJournee() {
       {/* Le geste du moment, sous le pouce. */}
       <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border/50 bg-background/95 pb-[calc(env(safe-area-inset-bottom,0px)+10px)] backdrop-blur-xl">
         <div className="shell flex flex-col gap-2 pt-3 sm:max-w-[600px]">
-          {geste.t === "preparer" || geste.t === "apres" ? (
-            <button type="button" onClick={() => setPreparer(true)} className="bouton-principal h-12 text-lecture font-semibold">
-              Préparer la J{geste.t === "apres" ? geste.suivante.j : geste.j} · dim {geste.t === "apres" ? geste.suivante.date : geste.date}
-            </button>
-          ) : geste.t === "corriger" ? (
-            <button type="button" onClick={() => setPublier(true)} className="bouton-secondaire h-12 text-lecture font-semibold">
-              {geste.ecarts.length} à corriger
-            </button>
-          ) : geste.t === "publier" ? (
-            <button type="button" onClick={() => setPublier(true)} className="bouton-principal h-12 text-lecture font-semibold">
-              Publier pour tout le monde
-            </button>
-          ) : geste.t === "revelation" ? (
-            <span className="mono-label flex h-12 items-center justify-center gap-2 rounded-full bg-foreground text-background">
-              ◐ Révélation {aLHeure(geste.heure)}
-            </span>
-          ) : geste.t === "bloquee" ? (
-            <button type="button" onClick={() => setEnDirect(true)} className="bouton-principal h-12 text-lecture font-semibold">
-              {geste.equipes.join(" · ")} sans résultat
-            </button>
-          ) : geste.t === "en-ligne" ? (
-            <div className="flex items-center gap-2">
-              <span className="mono-label flex h-12 flex-1 items-center justify-center gap-2 rounded-full bg-foreground text-background">
-                ● En ligne{geste.le ? ` · ${heureDe(geste.le)}` : ""}
-              </span>
-              <button type="button" onClick={() => setRemettre(true)} className="bouton-discret h-12 px-3 text-ligne font-semibold">
-                Remettre en brouillon
-              </button>
+          <div className="flex items-center gap-2">
+            <div className="flex min-w-0 flex-1 flex-col">
+              {geste.t === "preparer" || geste.t === "apres" ? (
+                <button type="button" onClick={() => setPreparer(true)} className="bouton-principal h-12 text-lecture font-semibold">
+                  Préparer la J{geste.t === "apres" ? geste.suivante.j : geste.j} · dim {geste.t === "apres" ? geste.suivante.date : geste.date}
+                </button>
+              ) : geste.t === "corriger" ? (
+                <button type="button" onClick={() => setPublier(true)} className="bouton-secondaire h-12 text-lecture font-semibold">
+                  {geste.ecarts.length} à corriger
+                </button>
+              ) : geste.t === "publier" ? (
+                <button type="button" onClick={() => setPublier(true)} className="bouton-principal h-12 text-lecture font-semibold">
+                  Publier pour tout le monde
+                </button>
+              ) : geste.t === "revelation" ? (
+                <span className="mono-label flex h-12 items-center justify-center gap-2 rounded-full bg-foreground text-background">
+                  ◐ Révélation {aLHeure(geste.heure)}
+                </span>
+              ) : geste.t === "bloquee" ? (
+                <button type="button" onClick={() => setEnDirect(true)} className="bouton-principal h-12 text-lecture font-semibold">
+                  {geste.equipes.join(" · ")} sans résultat
+                </button>
+              ) : geste.t === "a-rattraper" ? (
+                <div className="flex items-center gap-2">
+                  <span className="mono-label flex h-12 min-w-0 flex-1 items-center justify-center gap-2 rounded-full bg-foreground px-3 text-background">
+                    <span aria-hidden>{SIGNE_SUSPENS}</span>
+                    <span className="truncate">À rattraper</span>
+                  </span>
+                  <button type="button" onClick={() => setReprendre(true)} className="bouton-principal h-12 shrink-0 px-5 text-lecture font-semibold">
+                    Reprendre la J{geste.j}
+                  </button>
+                </div>
+              ) : geste.t === "en-ligne" ? (
+                <div className="flex items-center gap-2">
+                  <span className="mono-label flex h-12 flex-1 items-center justify-center gap-2 rounded-full bg-foreground text-background">
+                    ● En ligne{geste.le ? ` · ${heureDe(geste.le)}` : ""}
+                  </span>
+                  <button type="button" onClick={() => setRemettre(true)} className="bouton-discret h-12 px-3 text-ligne font-semibold">
+                    Remettre en brouillon
+                  </button>
+                </div>
+              ) : (
+                <button type="button" onClick={() => setEnDirect(true)} className="bouton-principal h-12 text-lecture font-semibold">
+                  Direct · Match {geste.match}
+                  {geste.heure ? ` · ${geste.heure}` : ""}
+                </button>
+              )}
             </div>
-          ) : (
-            <button type="button" onClick={() => setEnDirect(true)} className="bouton-principal h-12 text-lecture font-semibold">
-              Direct · Match {geste.match}
-              {geste.heure ? ` · ${geste.heure}` : ""}
-            </button>
-          )}
+            {peutSuspendre && (
+              <button type="button" onClick={() => setSuspendre(true)} className="bouton-discret h-12 shrink-0 px-3 text-ligne font-semibold">
+                Suspendre
+              </button>
+            )}
+          </div>
           <div className="flex items-center justify-between">
             <button type="button" onClick={undo} disabled={!history.length} aria-label="Annuler" className="bouton-discret flex h-10 items-center gap-1.5 px-3 disabled:opacity-30">
               <Undo2 className="size-4" />
@@ -503,6 +538,14 @@ export function PageJournee() {
             matchs={declares}
             focus={quandOu === false ? null : quandOu}
             faire={faire}
+            onSuspendre={
+              etat === "en-ligne"
+                ? () => {
+                    setQuandOu(false);
+                    setSuspendre(true);
+                  }
+                : undefined
+            }
             onJeter={() =>
               setConfirmation({
                 titre: `Jeter le brouillon de la J${j} ?`,
@@ -568,6 +611,20 @@ export function PageJournee() {
           />
           <FeuillePublier key={`pub-${publier}`} open={publier} onOpenChange={setPublier} saison={saison} j={j} par={par} faire={faire} />
           <FeuilleRemettre key={`rem-${remettre}`} open={remettre} onOpenChange={setRemettre} saison={saison} j={j} par={par} faire={faire} />
+          <FeuilleSuspendre key={`sus-${j}-${suspendre}`} open={suspendre} onOpenChange={setSuspendre} saison={saison} j={j} par={par} faire={faire} />
+          <FeuilleReprendre
+            key={`rep-${j}-${reprendre}`}
+            open={reprendre}
+            onOpenChange={setReprendre}
+            saison={saison}
+            j={j}
+            par={par}
+            faire={faire}
+            onDate={() => {
+              setReprendre(false);
+              setQuandOu(null);
+            }}
+          />
           <FeuilleDirect open={enDirect} onOpenChange={setEnDirect} saison={saison} j={j} matchs={matchs} commit={commit} faire={faire} direct={direct} />
           {feuilleOuverte != null && declares[feuilleOuverte - 1] && (
             <FeuilleDuMatch

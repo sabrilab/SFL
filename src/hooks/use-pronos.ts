@@ -6,6 +6,8 @@
 // (ajouterPronos) ; l'app ne propose plus d'en poser.
 // Les pronos se chargent une fois et suivent la base en temps réel, quel que
 // soit le nombre d'écrans qui les lisent (comme les réponses aux missions).
+// La phase vient de phaseDeJournee (pronos.ts) : « a-rattraper » pour une
+// journée en suspens, ses choix gardés pour la reprise.
 
 import { useMemo } from "react";
 import { useMyPlayer } from "@/components/sfl/player-provider";
@@ -22,6 +24,7 @@ import {
   journeeDesPronos,
   partsDe,
   plafondDe,
+  phaseDeJournee,
   pronoRetenu,
   SUJETS_JOUR,
   SUJETS_MATCH,
@@ -30,12 +33,13 @@ import {
   type EtatProno,
   type FlairDeJournee,
   type JourneePronos,
+  type PhaseFlair,
   type Prono,
   type RangFlair,
 } from "@/lib/sfl/pronos";
 import { APERCU_PRONOS, pronosDemo, pronostiquer } from "@/lib/sfl/pronos-store";
 
-export type PhaseProno = "ouvert" | "en-jeu" | "fini";
+export type PhaseProno = PhaseFlair;
 
 export interface SujetVu {
   sujet: string;
@@ -87,7 +91,7 @@ export function usePronosJournee(): MesPronos | null {
     const joueur = quiPronostique(me, p.joueurs);
     if (!joueur) return null;
     const t = maintenant.getTime();
-    const phase: PhaseProno = t < p.coupEnvoi.getTime() ? "ouvert" : t < p.finDuJour.getTime() ? "en-jeu" : "fini";
+    const phase: PhaseProno = phaseDeJournee(p, t);
     const vus = avecDemo(pronos, pronosDemo(p, p.saison, rankPlayers(players).map((x) => x.name), joueur));
     const res = p.joue ? resultatsDeJournee(p, jugee.entries) : new Map<string, string[]>();
     const sujets = new Map<string, SujetVu>();

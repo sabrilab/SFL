@@ -23,6 +23,9 @@
 //
 // La veille du dimanche, toute la ligue apprend dont c'est la journée, par
 // notification (notificationOutsider, /api/outsider/annoncer).
+//
+// Une journée en suspens (12/11/2026, saisie/suspens.ts) n'est pas « le
+// prochain dimanche » : l'annonce et le chapitre d'avant la sautent.
 
 import { ajouterDefis } from "./defis";
 import { jourMoisDuLibelle } from "./convocation-temps";
@@ -49,6 +52,7 @@ import {
 } from "./missions";
 import { computeJournees, deriveSeason, entryPP } from "./saisie/engine";
 import { journeeJouee } from "./saisie/mutations";
+import { journeesEnSuspens, prochaineAJouer } from "./saisie/suspens";
 import { numeroSaison, type Saison } from "./saisie/types";
 import { classables, standingsJusqua } from "./rangs";
 import { appliquerVotes, type VoteFigure } from "./votes";
@@ -196,7 +200,10 @@ export function arcOutsider(saison: Saison, journal: Journal, joueurs: Player[],
   const arc = numeroSaison(saison);
   if (arc !== REGLES_DIVISIONS.saison || j < REGLES_DIVISIONS.depuis) return null;
   const outsiders = outsidersAvant(saison, journal, joueurs, j);
-  const precedent = j - 1 >= REGLES_DIVISIONS.depuis ? chapitreDe(saison, journal, joueurs, j - 1) : null;
+  const enSuspens = new Set(journeesEnSuspens(saison));
+  let avant = j - 1;
+  while (enSuspens.has(avant)) avant--;
+  const precedent = avant >= REGLES_DIVISIONS.depuis ? chapitreDe(saison, journal, joueurs, avant) : null;
   if (!outsiders.length && !precedent) return null;
   return { arc, j, outsiders, chapitre: chapitreDe(saison, journal, joueurs, j, outsiders), precedent };
 }
@@ -215,7 +222,7 @@ export function dimancheAAnnoncer(saison: Saison): number | null {
   if (numeroSaison(saison) !== REGLES_DIVISIONS.saison) return null;
   // Après la dernière journée COMPTÉE de la vue figée (revelation.ts) : un
   // but saisi en direct n'y entre qu'à la révélation, comme les divisions.
-  const j = Math.max(0, ...saison.journees.map((m) => m.j).filter((x) => journeeJouee(saison, x))) + 1;
+  const j = prochaineAJouer(saison);
   return j >= REGLES_DIVISIONS.depuis ? j : null;
 }
 

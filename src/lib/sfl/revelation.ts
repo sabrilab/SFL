@@ -21,6 +21,16 @@
 // La J4 et les journées d'avant gardent l'ancien régime : leurs points
 // comptent dès qu'elles sont jouées, le vote ferme à minuit.
 //
+// La journée en suspens (12/11/2026, saisie/suspens.ts) ne compte jamais,
+// quel que soit son régime : `journeeComptee` la refuse en premier, si bien
+// que `figer` la remet en feuille posée (elle est listée dans
+// `figee.enSuspens`, pas dans `caches` : elle n'attend aucune révélation).
+// Pas de vote (`finDuVote` null), pas de révélation attendue, pas de
+// transition, pas de fin des matchs tenue (`tenirFinDesMatchs` la laisse
+// telle quelle, comme public.saison_fin_des_matchs) ; son état est
+// « a-rattraper », ses libellés « à rattraper ». À la reprise, la règle
+// normale s'applique à sa date.
+//
 // Exemples (dernière feuille → fin du vote · révélation) : 15 h 10 → 18 h ·
 // 19 h ; 17 h 40 → 18 h 40 · 19 h 40 ; 22 h 30 → 23 h 30 · minuit ; 23 h 15 →
 // minuit · minuit ; jamais → minuit · aucune (la journée est « bloquée », et
@@ -58,6 +68,7 @@
 import { estLeJour, estLeJourOuSaNuit, heureDuJour, minuitDuSoir, NUIT_MS } from "./convocation-temps";
 import { journeeJouee, journeeTerminee } from "./saisie/engine";
 import { estBrouillon } from "./saisie/brouillon";
+import { A_RATTRAPER, estEnSuspens } from "./saisie/suspens";
 import { numeroSaison, type JourneeMeta, type MatchEntry, type Saison } from "./saisie/types";
 
 export const REGLES_REVELATION = {
@@ -103,10 +114,11 @@ const metaDe = (s: Pick<Saison, "journees">, j: number) => s.journees.find((m) =
 /**
  * La fin du vote d'une journée. Ancien régime : minuit. Nouveau régime :
  * min(minuit, max(18 h, F + 1 h)), et minuit tant que F est inconnu (la
- * butée). null pour une journée en brouillon ou sans date lisible.
+ * butée). null pour une journée en brouillon, en suspens (pas de vote) ou
+ * sans date lisible.
  */
 export function finDuVote(meta: JourneeMeta, numero: number, ref: Date): Date | null {
-  if (estBrouillon(meta)) return null;
+  if (estBrouillon(meta) || estEnSuspens(meta)) return null;
   const minuit = minuitDuSoir(meta.date, ref);
   if (!minuit) return null;
   if (!nouveauRegime(numero, meta.j)) return minuit;
@@ -120,7 +132,7 @@ export function finDuVote(meta: JourneeMeta, numero: number, ref: Date): Date | 
 /**
  * La révélation d'une journée. Ancien régime : minuit. Nouveau régime :
  * min(minuit, finDuVote + 1 h), et null tant que F est inconnu. null pour
- * une journée en brouillon ou sans date lisible.
+ * une journée en brouillon, en suspens ou sans date lisible.
  */
 export function revelation(meta: JourneeMeta, numero: number, ref: Date): Date | null {
   const fin = finDuVote(meta, numero, ref);
@@ -147,10 +159,13 @@ function avecVote(s: Pick<Saison, "entries">, meta: JourneeMeta): boolean {
  * `votesPrets: false` (un téléphone qui n'a pas encore ses votes) retient
  * une journée avec vote : sans eux, elle serait coupée sans ses Impact et
  * Défensive, puis recoupée une seconde plus tard.
+ * Une journée en suspens ne compte jamais, ancien régime compris
+ * (saisie/suspens.ts) : c'est le point d'entrée unique de la règle.
  */
 export function journeeComptee(s: SaisonLignes, j: number, t: Date, o: { votesPrets?: boolean } = {}): boolean {
   if (!journeeJouee(s, j)) return false;
   const meta = metaDe(s, j);
+  if (meta && estEnSuspens(meta)) return false;
   const numero = numeroSaison(s);
   if (!meta || !nouveauRegime(numero, j)) return true;
   if (o.votesPrets === false && avecVote(s, meta)) return false;
@@ -179,9 +194,12 @@ export function journeesComptees(s: SaisonLignes, t: Date, o: { votesPrets?: boo
  * La première journée jouée qui attend encore sa révélation (le direct ne
  * compte pas encore) ; null sinon. La clôture de saison l'attend : sans
  * elle, l'archive perdrait les Impact et Défensive de la dernière journée.
+ * Une journée en suspens n'attend rien (elle attend sa reprise : la clôture
+ * la refuse à part, resteUneJourneeEnSuspens).
  */
 export function revelationAttendue(s: SaisonLignes, t: Date): number | null {
   const j = s.journees
+    .filter((m) => !estEnSuspens(m))
     .map((m) => m.j)
     .sort((a, b) => a - b)
     .find((x) => journeeJouee(s, x) && !journeeComptee(s, x, t));
@@ -208,7 +226,7 @@ export function titresTombes(s: SaisonLignes, j: number, t: Date): boolean {
   return journeeComptee(s, j, t);
 }
 
-export type EtatRevelation = "a-venir" | "en-direct" | "vote" | "attente" | "revelee" | "bloquee";
+export type EtatRevelation = "a-venir" | "en-direct" | "vote" | "attente" | "revelee" | "bloquee" | "a-rattraper";
 
 /**
  * Où en est une journée, pour l'admin et la frise de la Map :
@@ -218,11 +236,13 @@ export type EtatRevelation = "a-venir" | "en-direct" | "vote" | "attente" | "rev
  *   · vote : les feuilles finies, le vote ouvert ;
  *   · attente : le vote fermé, la révélation pas encore là ;
  *   · revelee : la journée compte ;
- *   · bloquee : la nuit est passée et une feuille n'a jamais été finie.
+ *   · bloquee : la nuit est passée et une feuille n'a jamais été finie ;
+ *   · a-rattraper : la journée est en suspens (saisie/suspens.ts), jouée ou non.
  */
 export function etatRevelation(s: SaisonLignes, j: number, t: Date): EtatRevelation {
-  if (!journeeJouee(s, j)) return "a-venir";
   const meta = metaDe(s, j);
+  if (meta && estEnSuspens(meta)) return "a-rattraper";
+  if (!journeeJouee(s, j)) return "a-venir";
   if (!meta) return "revelee";
   const numero = numeroSaison(s);
   const leJour = estLeJour(meta.date, t);
@@ -242,7 +262,7 @@ export function etatRevelation(s: SaisonLignes, j: number, t: Date): EtatRevelat
  * de vote, une révélation, un minuit, la fin de la nuit (une journée qui
  * devient « bloquée »), ou 17 h (le libellé de la fin du vote, tant que F
  * est inconnu). null s'il n'y en a plus. Le minuteur du SeasonProvider s'y
- * règle.
+ * règle. Les brouillons et les journées en suspens n'en ont aucune.
  */
 export function prochaineTransition(s: SaisonHeures, t: Date): Date | null {
   const numero = numeroSaison(s);
@@ -251,7 +271,7 @@ export function prochaineTransition(s: SaisonHeures, t: Date): Date | null {
     if (d && d.getTime() > t.getTime() && (prochaine == null || d.getTime() < prochaine)) prochaine = d.getTime();
   };
   for (const meta of s.journees) {
-    if (estBrouillon(meta)) continue;
+    if (estBrouillon(meta) || estEnSuspens(meta)) continue;
     garder(finDuVote(meta, numero, t));
     garder(revelation(meta, numero, t));
     const minuit = minuitDuSoir(meta.date, t);
@@ -288,16 +308,22 @@ function posee(e: MatchEntry): MatchEntry {
  * et la saison porte la marque `figee`. Rien à figer : la même référence.
  * Idempotente : une journée figée n'est plus jouée. À appliquer après les
  * votes : figer(appliquerVotes(publiée, …), t).
+ * Une journée en suspens jouée est figée de même, mais listée dans
+ * `figee.enSuspens` et non dans `caches` (« attend sa révélation », que
+ * lisent le récap et les badges) ; non jouée, elle n'a rien à figer.
  */
 export function figer(s: Saison, t: Date, o: { votesPrets?: boolean } = {}): Saison {
-  const caches = [...new Set(s.entries.map((e) => e.j))].filter((j) => journeeJouee(s, j) && !journeeComptee(s, j, t, o)).sort((a, b) => a - b);
-  if (!caches.length) return s;
-  const set = new Set(caches);
+  const figees = [...new Set(s.entries.map((e) => e.j))].filter((j) => journeeJouee(s, j) && !journeeComptee(s, j, t, o)).sort((a, b) => a - b);
+  if (!figees.length) return s;
+  const set = new Set(figees);
+  const suspendues = new Set(s.journees.filter(estEnSuspens).map((m) => m.j));
+  const caches = figees.filter((j) => !suspendues.has(j));
+  const enSuspens = figees.filter((j) => suspendues.has(j));
   return {
     ...s,
     entries: s.entries.map((e) => (set.has(e.j) ? posee(e) : e)),
     ...(s.events ? { events: s.events.filter((ev) => !set.has(ev.j)) } : {}),
-    figee: { a: t.toISOString(), caches },
+    figee: { a: t.toISOString(), caches, ...(enSuspens.length ? { enSuspens } : {}) },
   };
 }
 
@@ -312,13 +338,14 @@ export function figer(s: Saison, t: Date, o: { votesPrets?: boolean } = {}): Sai
  *     plus remplie. Elle revient avec elle ; après la révélation, plus rien
  *     ne la déplace.
  * Seulement les journées du nouveau régime : la J4 et avant ne changent
- * jamais. Même référence si rien ne change.
+ * jamais. Une journée en suspens non plus : ni posée, ni retirée (la base
+ * fait de même). Même référence si rien ne change.
  */
 export function tenirFinDesMatchs(s: Saison, t: Date): Saison {
   const numero = numeroSaison(s);
   let change = false;
   const journees = s.journees.map((m) => {
-    if (estBrouillon(m) || !nouveauRegime(numero, m.j)) return m;
+    if (estBrouillon(m) || estEnSuspens(m) || !nouveauRegime(numero, m.j)) return m;
     if (m.finDesMatchs) {
       const rev = finDesMatchs(m) ? revelation(m, numero, t) : null;
       if (rev && t.getTime() >= rev.getTime()) return m;
@@ -408,10 +435,11 @@ function heureFixeEncore(meta: JourneeMeta, t: Date): boolean {
  * Tant que la fin des matchs est inconnue : « 18 h » avant 17 h (sauf un
  * match prévu à 16 h ou plus tard), puis « une heure après le dernier
  * match » ; le lendemain, « minuit » (la butée : le vote a fermé à minuit).
- * La J4 et avant : « minuit ».
+ * La J4 et avant : « minuit ». Une journée en suspens : « à rattraper ».
  */
 export function libelleFinDuVote(s: SaisonHeures, j: number, t: Date): string {
   const meta = metaDe(s, j);
+  if (meta && estEnSuspens(meta)) return A_RATTRAPER;
   const numero = numeroSaison(s);
   if (!meta || !nouveauRegime(numero, j)) return "minuit";
   const fin = finDuVote(meta, numero, t);
@@ -428,9 +456,11 @@ export function libelleFinDuVote(s: SaisonHeures, j: number, t: Date): string {
  * match prévu à 16 h ou plus tard), puis « deux heures après le dernier
  * match » ; le lendemain, « minuit ». La J4 et avant : « minuit ». Une
  * journée bloquée n'a pas d'heure : l'écran ne la dit pas (etatRevelation).
+ * Une journée en suspens : « à rattraper », sans heure promise.
  */
 export function libelleRevelation(s: SaisonHeures, j: number, t: Date): string {
   const meta = metaDe(s, j);
+  if (meta && estEnSuspens(meta)) return A_RATTRAPER;
   const numero = numeroSaison(s);
   if (!meta || !nouveauRegime(numero, j)) return "minuit";
   const rev = revelation(meta, numero, t);
@@ -452,8 +482,9 @@ export function aLHeure(libelle: string): string {
   return estUneHeure(libelle) ? `à ${libelle}` : libelle;
 }
 
-/** Le verdict des missions et du Flair, en court : « à 19 h », « à minuit », sinon « ce soir ». */
+/** Le verdict des missions et du Flair, en court : « à 19 h », « à minuit », sinon « ce soir » ; « à rattraper » pour une journée en suspens. */
 export function verdictDeJournee(s: SaisonHeures, j: number, t: Date): string {
   const l = libelleRevelation(s, j, t);
+  if (l === A_RATTRAPER) return A_RATTRAPER;
   return estUneHeure(l) ? `à ${l}` : "ce soir";
 }

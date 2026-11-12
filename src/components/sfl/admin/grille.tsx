@@ -25,6 +25,8 @@
 // feuille — de TOUTE la journée, jamais du filtre affiché ; le sélecteur
 // Joueur d'une ligne ne propose que l'effectif qui joue, moins la feuille.
 // Elle s'ouvre sur la prochaine journée à jouer, jamais la dernière jouée.
+// Le sélecteur marque le brouillon (○) et la journée en suspens (‖ · à
+// rattraper, saisie/suspens.ts), qui se saisit comme les autres sans compter.
 //
 // Le composant ne stocke rien : il reçoit la saison et remonte chaque
 // modification par `commit`, qui empile l'historique côté tableau de bord.
@@ -44,6 +46,7 @@ import {
 import { choixDEquipe } from "@/lib/sfl/saisie/equipes";
 import { effectifJouable, placementsDeLaJournee, surLaFeuille } from "@/lib/sfl/saisie/effectif";
 import { estBrouillon } from "@/lib/sfl/saisie/brouillon";
+import { A_RATTRAPER, estEnSuspens, SIGNE_SUSPENS } from "@/lib/sfl/saisie/suspens";
 import { prochaineJournee } from "@/lib/sfl/saisie/etat-journee";
 import { TERRAINS_MAX } from "@/lib/sfl/equipes-division";
 import { ChoisirJoueurs } from "@/components/sfl/admin/choisir-joueurs";
@@ -361,8 +364,8 @@ export function GrilleSaisie({ saison, commit, supprimerLigne }: Props) {
         >
           {journees.map((m) => (
             <option key={m.j} value={m.j} className="bg-white text-[#08090b] dark:bg-[#141414] dark:text-white">
-              {estBrouillon(m) ? "○ " : ""}Journée {m.j} · {m.date}
-              {estBrouillon(m) ? " · brouillon" : ""}
+              {estBrouillon(m) ? "○ " : estEnSuspens(m) ? `${SIGNE_SUSPENS} ` : ""}Journée {m.j} · {m.date}
+              {estBrouillon(m) ? " · brouillon" : estEnSuspens(m) ? ` · ${A_RATTRAPER}` : ""}
             </option>
           ))}
         </select>

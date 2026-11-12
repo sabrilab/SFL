@@ -3,10 +3,14 @@
 // texte exact sous les yeux ; elle ne part qu'une fois par journée (clé
 // `publication-s{n}-j{j}` dans annonces_envois), même si on republie.
 //
+// Une journée en suspens (12/11/2026, saisie/suspens.ts) ne s'annonce pas :
+// rien de nouveau ne part tant qu'elle n'est pas reprise.
+//
 // Pur : partagé par la feuille Publier (l'aperçu) et la route qui envoie.
 
 import { neJouePas } from "./hidden";
 import { estBrouillon } from "./saisie/brouillon";
+import { estEnSuspens } from "./saisie/suspens";
 import { numeroSaison, type Saison } from "./saisie/types";
 
 export type QuiPrevenir = "personne" | "viennent" | "ligue";
@@ -42,8 +46,8 @@ export function destinatairesPublication(saison: Saison, j: number, qui: QuiPrev
   return [...new Set(noms)].filter((n) => !neJouePas(n));
 }
 
-/** La journée peut-elle s'annoncer (publiée, présente) ? */
+/** La journée peut-elle s'annoncer (publiée, présente, pas en suspens) ? */
 export function publicationAnnoncable(saison: Saison, j: number): boolean {
   const meta = saison.journees.find((m) => m.j === j);
-  return !!meta && !estBrouillon(meta);
+  return !!meta && !estBrouillon(meta) && !estEnSuspens(meta);
 }

@@ -7,7 +7,9 @@
 // révélation (revelation.ts : 19 h dès la J5).
 //
 // La vérité vit en base (supabase/schema.sql, public.feuilles_direct) :
-//   · une feuille par match d'une journée SFL publiée, le jour même ; le
+//   · une feuille par match d'une journée SFL publiée (et pas en suspens :
+//     une journée en suspens gèle ses feuilles pour les joueurs,
+//     saisie/suspens.ts, public.feuille_hors_jeu), le jour même ; le
 //     premier joueur du match qui la prend la tient (prendre_feuille : deux
 //     téléphones en même temps, un seul gagne) ;
 //   · il compte buts, passes, arrêts, interceptions et buts contre son camp
@@ -31,6 +33,7 @@
 import type { Journee } from "./engine";
 import { estLeJourOuSaNuit } from "./convocation-temps";
 import { estBrouillon } from "./saisie/brouillon";
+import { estEnSuspens } from "./saisie/suspens";
 import type { MatchEntry, Saison } from "./saisie/types";
 import { numeroSaison } from "./saisie/types";
 import { isPlaceExtraTime } from "./hidden";
@@ -78,6 +81,7 @@ export type Equipes = readonly [string, string];
 export type RefusFeuille =
   | "journee"
   | "brouillon"
+  | "suspens"
   | "pas-du-jour"
   | "match"
   | "terminee"
@@ -95,6 +99,7 @@ export type RefusFeuille =
 export const MOTS_DU_REFUS: Record<RefusFeuille, string> = {
   journee: "Journée introuvable",
   brouillon: "Journée pas encore publiée",
+  suspens: "En suspens",
   "pas-du-jour": "Pas aujourd'hui",
   match: "Match introuvable",
   terminee: "Match terminé",
@@ -264,6 +269,9 @@ export function droitDePrendre(
   const meta = saison.journees.find((m) => m.j === j);
   if (!meta) return "journee";
   if (estBrouillon(meta)) return "brouillon";
+  // La journée en suspens (saisie/suspens.ts) : feuille gelée pour les
+  // joueurs, comme public.feuille_hors_jeu ; l'admin, lui, passe outre.
+  if (estEnSuspens(meta)) return "suspens";
   const declares = meta.matchsDuJour ?? [];
   if (declares.length) {
     if (!declares.some((m) => m.equipes[0] === equipes[0] && m.equipes[1] === equipes[1])) return "match";

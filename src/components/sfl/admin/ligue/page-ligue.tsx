@@ -3,7 +3,9 @@
 // Ligue (≡) : tout ce qui n'est pas la journée, rangé comme les Réglages
 // d'iOS — une ligne par sujet, son compteur en mono à droite. Chaque fonction
 // d'avant le 30/10/2026 a ici sa maison ; le tableau complet (Vue, Saisie,
-// Feuille, Joueurs) reste ouvert derrière, onglet par onglet.
+// Feuille, Joueurs) reste ouvert derrière, onglet par onglet. Le compteur des
+// Saisons dit aussi les brouillons et les journées à rattraper (en suspens,
+// saisie/suspens.ts).
 
 import Link from "next/link";
 import { ChevronRight, Lock } from "lucide-react";
@@ -14,6 +16,7 @@ import { useSaisieAdmin } from "@/hooks/use-saisie-admin";
 import { isAdmin } from "@/lib/sfl/admin";
 import { neJouePas } from "@/lib/sfl/hidden";
 import { estBrouillon } from "@/lib/sfl/saisie/brouillon";
+import { journeesEnSuspens } from "@/lib/sfl/saisie/suspens";
 import { deriveSeason } from "@/lib/sfl/saisie/engine";
 import { numeroSaison } from "@/lib/sfl/saisie/types";
 
@@ -50,6 +53,7 @@ export function PageLigue() {
     );
   const nonJoueurs = saison.roster.filter((r) => neJouePas(r.name)).length;
   const brouillons = saison.journees.filter(estBrouillon).length;
+  const aRattraper = journeesEnSuspens(saison).length;
   const alertes = deriveSeason(saison).alerts.length;
   return (
     <div className="shell flex flex-col gap-5 py-4 sm:max-w-[600px]">
@@ -68,7 +72,7 @@ export function PageLigue() {
       />
       <Groupe
         lignes={[
-          { titre: "Saisons", href: "/admin/tableau", compteur: `Saison ${numeroSaison(saison)} · J${saison.journees.reduce((m, x) => Math.max(m, x.j), 0)}${brouillons ? ` · ${brouillons} brouillon` : ""}` },
+          { titre: "Saisons", href: "/admin/tableau", compteur: `Saison ${numeroSaison(saison)} · J${saison.journees.reduce((m, x) => Math.max(m, x.j), 0)}${brouillons ? ` · ${brouillons} brouillon` : ""}${aRattraper ? ` · ${aRattraper} à rattraper` : ""}` },
           { titre: "Feuilles de match", href: "/admin/tableau?onglet=feuille&mode=revue", compteur: alertes ? `${alertes} alerte${alertes > 1 ? "s" : ""}` : undefined },
           { titre: "Votes", href: "/admin/tableau?onglet=feuille&mode=votes" },
           { titre: "Grille", href: "/admin/tableau?onglet=grille", compteur: "Ordinateur" },

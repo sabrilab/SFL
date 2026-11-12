@@ -28,6 +28,14 @@
 // font ses points — un joueur de D2 n'a jamais plus de points qu'un D1. Le
 // réglage est ici et nulle part ailleurs.
 //
+// Une journée en suspens (12/11/2026, saisie/suspens.ts) ne coupe rien (la
+// vue figée l'a remise en feuille posée), et `pour` la saute : avec la J5 en
+// suspens, ces divisions font jouer la J6, qui n'est pas « en attente ».
+// Les dimanches se rejouent dans l'ordre du calendrier, pas des numéros
+// (ordreDuCalendrier) : une J5 rattrapée après la J7 fait ses mouvements
+// depuis les divisions d'après la J7, et le dernier bilan est le sien ; ceux
+// de la J6 et de la J7, déjà vus, ne bougent pas.
+//
 // L'annonce, jusqu'au soir de la J3 (bas du fichier) : quand elle court, son
 // édition (la semaine, puis le dimanche même), la fenêtre de sa notification
 // (la veille dès 18 h, le dimanche de 9 h au coup d'envoi) et ses phrases,
@@ -40,11 +48,12 @@
 
 import { rankPlayers, type RankedPlayer } from "./engine";
 import { isHidden } from "./hidden";
-import { estLeJour, jourMoisDuLibelle } from "./convocation-temps";
+import { estLeJour, jourMoisDuLibelle, ordreDuCalendrier } from "./convocation-temps";
 import { heureMin } from "./ligue-vierge";
 import { matchsDeJournee, premierCoupDEnvoi } from "./matchs-du-jour";
 import { computeJournees, entryPP } from "./saisie/engine";
 import { journeeJouee } from "./saisie/mutations";
+import { journeesEnSuspens } from "./saisie/suspens";
 import { numeroSaison, type Saison } from "./saisie/types";
 import { classables, standingsJusqua } from "./rangs";
 
@@ -156,7 +165,7 @@ export interface EtatDivisions {
   decoupage: Decoupage;
   /** Les dimanches joués en divisions, dans l'ordre, avec qui monte et qui descend. */
   journees: { j: number; mouvements: Mouvement[] }[];
-  /** La journée que ces divisions font jouer : la dernière comptée + 1. */
+  /** La journée que ces divisions font jouer : la dernière comptée + 1, les journées en suspens sautées. */
   pour: number;
   /** Posé par divisionsDeLaJournee pour une journée plus loin que `pour` : la précédente n'est pas encore révélée. */
   perimee?: true;
@@ -170,7 +179,9 @@ export function etatDivisions(saison: Saison): EtatDivisions | null {
   // but saisi en direct n'y entre qu'à la révélation, et une journée révélée
   // puis rouverte reste d'accord avec les points.
   const comptees = [...new Set(saison.journees.map((m) => m.j))].filter((j) => journeeJouee(saison, j)).sort((a, b) => a - b);
-  const pour = (comptees.at(-1) ?? 0) + 1;
+  const enSuspens = new Set(journeesEnSuspens(saison));
+  let pour = (comptees.at(-1) ?? 0) + 1;
+  while (enSuspens.has(pour)) pour++;
   if (!journeeJouee(saison, J_DECOUPAGE)) {
     const decoupage = decouper(saison);
     return {
@@ -181,14 +192,23 @@ export function etatDivisions(saison: Saison): EtatDivisions | null {
       pour,
     };
   }
-  // Chaque dimanche compté recoupe le Pépite d'Or : le dernier fait les divisions du suivant.
+  // Chaque dimanche compté recoupe le Pépite d'Or : le dernier fait les
+  // divisions du suivant, dans l'ordre du calendrier.
   const decoupage = decouper(saison, comptees.at(-1));
   const actuelle = new Map<string, Division>([...decoupage.parNom].map(([n, p]) => [n, p.division]));
   const journees: EtatDivisions["journees"] = [];
-  const jouees = comptees.filter((j) => j >= REGLES_DIVISIONS.depuis);
-  let avant = jouees.length ? decouper(saison, jouees[0] - 1) : decoupage;
-  for (const j of jouees) {
-    const apres = decouper(saison, j);
+  const ordre = ordreDuCalendrier(saison, comptees);
+  /** Le découpage sur les journées jouées jusqu'à la i-ième du calendrier (comprise). */
+  const jusquA = (i: number) => {
+    const garde = new Set(ordre.slice(0, i + 1));
+    return decouper({ ...saison, entries: saison.entries.filter((e) => garde.has(e.j)) });
+  };
+  const premiere = ordre.findIndex((j) => j >= REGLES_DIVISIONS.depuis);
+  let avant = premiere >= 0 ? jusquA(premiere - 1) : decoupage;
+  for (let i = Math.max(0, premiere); premiere >= 0 && i < ordre.length; i++) {
+    const j = ordre[i];
+    if (j < REGLES_DIVISIONS.depuis) continue;
+    const apres = jusquA(i);
     // Les points de la journée, par joueur ; comptent les présents et les absents sans excuse.
     const points = new Map<string, number>();
     const joue = new Set<string>();

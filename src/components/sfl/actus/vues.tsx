@@ -15,6 +15,11 @@
 // Sur grand écran (dès 768 px) : les Classements au nombre d'or, ma synthèse
 // à gauche (qui reste à l'écran) et tous les classements à droite ; les
 // Matchs en grille, deux terrains de front, trois dès 1280 px.
+// Une journée en suspens (12/11/2026, saisie/suspens.ts) n'est dans aucun
+// chiffre (la vue figée l'ignore) : les classements portent en tête sa
+// marque, « ‖ J5 · À RATTRAPER » (suspens.tsx) ; les Matchs la posent en
+// tête, sa carte (CarteSuspens : la pastille, le motif, ses matchs sans score), pour
+// qu'on ne la croie pas perdue.
 
 import { useRouter } from "next/navigation";
 import { useCollant } from "@/hooks/use-collant";
@@ -27,6 +32,8 @@ import { IlsSeDemarquent } from "@/components/sfl/distinctions";
 import { Classements } from "@/components/sfl/classements";
 import { CarteJournee } from "@/components/sfl/carte-journee";
 import { Nom } from "@/components/sfl/nom";
+import { CarteSuspens, MarqueSuspens } from "@/components/sfl/suspens";
+import { journeesEnSuspens } from "@/lib/sfl/saisie/suspens";
 import { cn } from "@/lib/utils";
 
 /** Les journées jouées : un résultat, un but ou une passe saisis. */
@@ -129,7 +136,14 @@ export function VueClassements({ vote, classement, cle }: { vote?: React.ReactNo
           </section>
         ) : null}
       </div>
-      {played.length === 0 ? <IlsSeDemarquent /> : <Classements me={me} initial={classement} cle={cle} />}
+      {played.length === 0 ? (
+        <IlsSeDemarquent />
+      ) : (
+        <div className="flex min-w-0 flex-col gap-3">
+          <MarqueSuspens className="px-1" />
+          <Classements me={me} initial={classement} cle={cle} />
+        </div>
+      )}
     </div>
   );
 }
@@ -138,8 +152,13 @@ export function VueClassements({ vote, classement, cle }: { vote?: React.ReactNo
 export function VueMatchs({ ouvrir }: { ouvrir?: (j: number) => void }) {
   const router = useRouter();
   const played = useJouees();
+  const { saison } = useSeason();
+  const enSuspens = journeesEnSuspens(saison).flatMap((j) => saison.journees.filter((m) => m.j === j));
   return (
     <div className="flex flex-col gap-3.5 px-5 md:grid md:grid-cols-2 md:items-start md:gap-[var(--fib-21)] md:px-0 xl:grid-cols-3">
+      {enSuspens.map((meta) => (
+        <CarteSuspens key={`suspens-${meta.j}`} meta={meta} />
+      ))}
       {[...played].reverse().map((jn) => (
         <CarteJournee key={jn.j} journee={jn} onOuvrir={() => (ouvrir ? ouvrir(jn.j) : router.push(`/ligue/journee?j=${jn.j}`))} />
       ))}

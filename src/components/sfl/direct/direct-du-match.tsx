@@ -12,6 +12,10 @@
 //     du vote, revelation.ts : il s'ouvre dès que la feuille du match est
 //     remplie, votes.ts).
 // Rien pour un match qui n'a pas de feuille et que je ne joue pas.
+// Une journée en suspens (12/11/2026, saisie/suspens.ts) gèle la feuille :
+// pour un joueur du match, « ‖ En suspens » à la place de « Prendre la
+// feuille » ; une feuille déjà là se lit (son score, sans vote), marquée de
+// même.
 
 import { useState } from "react";
 import Link from "next/link";
@@ -24,6 +28,7 @@ import { voteOuvertA } from "@/lib/sfl/revelation";
 import { maintenant as heureDeLaLigue } from "@/lib/sfl/horloge";
 import { journeeAvecVote } from "@/lib/sfl/votes";
 import { haptique } from "@/lib/sfl/haptique";
+import { SIGNE_SUSPENS } from "@/lib/sfl/saisie/suspens";
 import { cn } from "@/lib/utils";
 import { FeuilleDuMatch, PastilleDirect, TableauDAffichage } from "./feuille-du-match";
 
@@ -83,7 +88,18 @@ export function DirectDuMatch({
     );
   }
 
-  if (!feuille) return null;
+  const gelee = droit === "suspens";
+  if (!feuille) {
+    if (!gelee) return null;
+    const { noirs: n, blancs: b } = joueursDuMatch(saisonLue, j, equipes);
+    if (![...n, ...b].includes(me)) return null;
+    return (
+      <span className="mono-label flex h-14 w-full items-center justify-center gap-2 rounded-full bg-foreground text-background">
+        <span aria-hidden>{SIGNE_SUSPENS}</span>
+        {MOTS_DU_REFUS.suspens}
+      </span>
+    );
+  }
   const score = scoreDeLaFeuille(saisonLue, j, equipes, feuille.compteurs);
   // Le vote du soir, pour qui a joué ce match.
   const jn = journees.find((x) => x.j === j);
@@ -94,7 +110,10 @@ export function DirectDuMatch({
       <div className="glass flex flex-col gap-3 rounded-[22px] px-4 py-3.5">
         <div className="flex items-center justify-between gap-2">
           <PastilleDirect feuille={feuille} />
-          <span className="mono-label text-encre-3">{label}</span>
+          <span className="mono-label text-encre-3">
+            {gelee && <span className="text-encre-2">{SIGNE_SUSPENS} {MOTS_DU_REFUS.suspens} · </span>}
+            {label}
+          </span>
         </div>
         <TableauDAffichage score={score} grand={false} />
         <div className="flex items-center justify-between gap-2">

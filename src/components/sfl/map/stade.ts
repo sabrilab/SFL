@@ -206,7 +206,9 @@ export type EtatSticker =
   | { genre: "complet" }
   /** Un match d'équipe (Team) : les deux sigles, « SF – LC ». */
   | { genre: "equipe"; texte: string }
-  | { genre: "joue" };
+  | { genre: "joue" }
+  /** Une journée en suspens (saisie/suspens.ts) : éteinte, « ‖ à rattraper ». */
+  | { genre: "a-rattraper" };
 
 /**
  * Ce qu'il reste à remplir dans un match ouvert par un joueur (Sabri, 24/10 :
@@ -249,7 +251,7 @@ export interface StickerPlan {
 }
 
 /** Joué, ou complet sans couleur (un match privé) : le stade passe au gris. */
-const eteint = (s: StickerPlan) => s.etat.genre === "joue" || (s.etat.genre === "complet" && !s.remplissage);
+const eteint = (s: StickerPlan) => s.etat.genre === "joue" || s.etat.genre === "a-rattraper" || (s.etat.genre === "complet" && !s.remplissage);
 
 /** Le HTML d'un sticker de match pour MapLibre (le CSS est dans globals.css). */
 export function stickerHtml(s: StickerPlan, choisi: boolean, variante?: VarianteStade): string {
@@ -272,7 +274,7 @@ export function stickerHtml(s: StickerPlan, choisi: boolean, variante?: Variante
           ? `<span class="stk__etiquette stk__etiquette--dedans">tu y es</span>`
           : s.etat.genre === "equipe"
             ? `<span class="stk__etiquette stk__etiquette--inscrits">${echapper(s.etat.texte)}</span>`
-            : `<span class="stk__etiquette stk__etiquette--complet">${s.etat.genre === "joue" ? "joué" : "complet"}</span>`;
+            : `<span class="stk__etiquette stk__etiquette--complet">${s.etat.genre === "joue" ? "joué" : s.etat.genre === "a-rattraper" ? "‖ à rattraper" : "complet"}</span>`;
   // La bulle de la discussion prend la place du badge : qui la voit est du match.
   const bulle = s.discussion ? bulleHtml(s.discussion.nonLus) : "";
   const classes = [s.ligue && `stk--${s.ligue}`, s.remplissage && `stk--${s.remplissage}`, choisi && "stk--choisi", eteint(s) && "stk--eteint"].filter(Boolean);

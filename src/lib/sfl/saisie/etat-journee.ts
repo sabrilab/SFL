@@ -11,6 +11,11 @@
 //   attente    — le vote fermé, la révélation à venir (19 h) ;
 //   revelee    — la journée compte : points et divisions sont entrés ;
 //   bloquee    — le jour passé, une équipe est restée sans résultat.
+// Et un second état stocké (12/11/2026, suspens.ts), qui passe avant tout
+// sauf le brouillon :
+//   a-rattraper — la journée en suspens : visible, elle ne compte nulle part
+//                 jusqu'à « Reprendre la J5 ». Elle n'est jamais ouverte
+//                 d'office et ne compte pas comme bloquée.
 //
 // Le geste du moment : il y en a toujours un, et un seul, en bas de l'écran.
 //
@@ -19,15 +24,17 @@
 import { journeeJouee, journeeTerminee } from "./engine";
 import { etatRevelation, libelleRevelation, nouveauRegime } from "../revelation";
 import { coupDEnvoi, dateDeJournee, estBrouillon } from "./brouillon";
+import { estEnSuspens } from "./suspens";
 import { bloquantsPublication, type Ecart } from "./integrite";
 import { dimancheDeJournee, matchsDeclares } from "./mutations";
 import { numeroSaison, type Saison } from "./types";
 
-export type EtatJournee = "brouillon" | "en-ligne" | "en-direct" | "terminee" | "vote" | "attente" | "revelee" | "bloquee";
+export type EtatJournee = "brouillon" | "en-ligne" | "en-direct" | "terminee" | "vote" | "attente" | "revelee" | "bloquee" | "a-rattraper";
 
 export function etatJournee(s: Saison, j: number, maintenant: Date): EtatJournee {
   const meta = s.journees.find((m) => m.j === j);
   if (!meta || estBrouillon(meta)) return "brouillon";
+  if (estEnSuspens(meta)) return "a-rattraper";
   if (nouveauRegime(numeroSaison(s), j)) {
     const r = etatRevelation(s, j, maintenant);
     if (r !== "a-venir" && r !== "en-direct") return r;
@@ -56,11 +63,13 @@ function aujourdhui(maintenant: Date): number {
  * prochaine à venir (un brouillon compris). Jamais la dernière jouée : le
  * 28/10, la grille rouvrait la J3, déjà jouée, et c'est là qu'ont poussé les
  * matchs 5 et 6. null : aucune journée à venir (le geste est alors
- * « Préparer la J5 »).
+ * « Préparer la J5 »). Une journée en suspens n'est jamais ouverte d'office
+ * (elle attend sa reprise ; la frise la garde à portée).
  */
 export function prochaineJournee(s: Saison, maintenant: Date): number | null {
   const ajd = aujourdhui(maintenant);
   const datees = [...s.journees]
+    .filter((m) => !estEnSuspens(m))
     .map((m) => ({ m, jour: jourDe(m.date, maintenant) }))
     .sort((a, b) => a.m.j - b.m.j);
   const bloquee = datees.filter((x) => !estBrouillon(x.m) && etatJournee(s, x.m.j, maintenant) === "bloquee").at(-1);
@@ -87,6 +96,7 @@ export type Geste =
   | { t: "direct"; j: number; match: number; heure?: string }
   | { t: "revelation"; j: number; heure: string }
   | { t: "bloquee"; j: number; equipes: string[] }
+  | { t: "a-rattraper"; j: number; motif?: string }
   | { t: "apres"; j: number; suivante: { j: number; date: string } };
 
 /** Le geste du moment pour la journée ouverte (`j`, ou null : aucune à venir). */
@@ -99,6 +109,7 @@ export function gesteDuMoment(s: Saison, j: number | null, maintenant: Date): Ge
     const ecarts = bloquantsPublication(s, j);
     return ecarts.length ? { t: "corriger", j, ecarts } : { t: "publier", j };
   }
+  if (etat === "a-rattraper") return { t: "a-rattraper", j, ...(meta.suspens?.motif ? { motif: meta.suspens.motif } : {}) };
   if (etat === "terminee" || etat === "revelee") return { t: "apres", j, suivante: journeeAPreparer(s, maintenant) };
   if (etat === "vote" || etat === "attente") return { t: "revelation", j, heure: libelleRevelation(s, j, maintenant) };
   if (etat === "bloquee") return { t: "bloquee", j, equipes: equipesSansResultat(s, j) };

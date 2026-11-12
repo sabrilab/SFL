@@ -33,6 +33,10 @@
 //       Une alerte seulement, qui ne bloque ni l'écriture ni la publication :
 //       rien ne se réécrit seul dans le passé, l'admin décide, ligne par ligne
 //       ou en recochant la SFL Time de la journée (mutations.ts, updateJournee)
+//   I13 une écriture qui fait disparaître une suspension (suspens.ts) sans
+//       « Reprendre » (une `reprise` posée depuis) : un « Écraser » lancé
+//       depuis une copie d'avant la suspension, comme I8 pour le brouillon.
+//       L'app seulement ; supprimer la journée reste permis
 //
 // Pur.
 
@@ -40,6 +44,7 @@ import { TERRAINS_MAX } from "../equipes-division";
 import { isArbitre, neJouePas } from "../hidden";
 import { suspendusPour } from "../cartons";
 import { estBrouillon } from "./brouillon";
+import { estEnSuspens } from "./suspens";
 import type { MatchDuJour, MatchEntry, Saison } from "./types";
 import { libelleCourt } from "./mutations";
 import { jourMoisDuLibelle } from "../convocation-temps";
@@ -54,6 +59,7 @@ export type Ecart =
   | { r: "I6"; date: string; js: number[] }
   | { r: "I7"; j: number; equipe: string }
   | { r: "I8"; j: number }
+  | { r: "I13"; j: number }
   | { r: "I9"; j: number; joueur: string }
   | { r: "I10" }
   | { r: "I11"; j: number; date: string }
@@ -62,7 +68,7 @@ export type Ecart =
 
 export type Regle = Ecart["r"];
 
-export const BLOQUE_L_ECRITURE: ReadonlySet<Regle> = new Set(["I0", "I1", "I2", "I6", "I8", "I9", "I10", "I11"]);
+export const BLOQUE_L_ECRITURE: ReadonlySet<Regle> = new Set(["I0", "I1", "I2", "I6", "I8", "I9", "I10", "I11", "I13"]);
 export const BLOQUE_LA_PUBLICATION: ReadonlySet<Regle> = new Set(["I0", "I1", "I2", "I3", "I4", "I5", "I6", "I7", "I9", "I11"]);
 
 const cle = (n: string) => n.trim().toLowerCase();
@@ -86,7 +92,8 @@ export function cleEcart(e: Ecart): string {
     case "I6":
       return `I6|${dateCle(e.date)}`;
     case "I8":
-      return `I8|${e.j}`;
+    case "I13":
+      return `${e.r}|${e.j}`;
     case "I10":
       return "I10";
     case "I11":
@@ -115,6 +122,8 @@ export function libelleEcart(e: Ecart): string {
       return `${e.equipe} · résultats`;
     case "I8":
       return `J${e.j} · brouillon perdu`;
+    case "I13":
+      return `J${e.j} · suspens perdu`;
     case "I9":
       return `${e.joueur} · suspendu`;
     case "I10":
@@ -231,6 +240,8 @@ export function ecartsDeLaSaison(s: Saison): Ecart[] {
  * Les seuls écarts que `apres` ajoute à `avant` : un défaut ancien ne bloque
  * jamais. Plus I8 : un brouillon d'`avant` qui disparaît d'`apres` sans être
  * publié ni jeté (`jeter`) — une écriture faite depuis une saison filtrée.
+ * Plus I13 : une journée en suspens d'`avant` qui ne l'est plus dans `apres`
+ * sans reprise posée depuis sa suspension.
  */
 export function nouveauxEcarts(avant: Saison, apres: Saison, opts: { jeter?: number } = {}): Ecart[] {
   const vieux = new Set(ecartsDeLaSaison(avant).map(cleEcart));
@@ -248,6 +259,14 @@ export function nouveauxEcarts(avant: Saison, apres: Saison, opts: { jeter?: num
     for (const m of avant.journees) {
       if (!estBrouillon(m) || m.j === opts.jeter) continue;
       if (!apres.journees.some((x) => x.j === m.j)) out.push({ r: "I8", j: m.j });
+    }
+    for (const m of avant.journees) {
+      if (!estEnSuspens(m)) continue;
+      const x = apres.journees.find((y) => y.j === m.j);
+      if (!x || estEnSuspens(x)) continue;
+      const depuis = Date.parse(m.suspens?.depuis ?? "");
+      const reprise = Date.parse(x.reprise?.le ?? "");
+      if (!(reprise >= depuis)) out.push({ r: "I13", j: m.j });
     }
   }
   return out;

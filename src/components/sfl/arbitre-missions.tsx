@@ -11,6 +11,10 @@
 // verdict, qui tombe le mardi à minuit quand les notes des joueurs ferment.
 // Ce qui change : ce qu'il vise, ses matchs de la journée à la place d'une
 // cible, et la note des joueurs à la place de la feuille.
+//
+// Une journée en suspens (saisie/suspens.ts), passé son coup d'envoi : la
+// phase « a-rattraper », sans verdict ; ses missions attendent le rattrapage
+// (« ‖ À rattraper »), comme celles des joueurs.
 
 import { useState } from "react";
 import { toast } from "sonner";
@@ -20,12 +24,16 @@ import { useMissionsArbitre, type LigneMissionArbitre, type MissionsArbitre } fr
 import { repondreMissionArbitre } from "@/lib/sfl/arbitres";
 import { rangDe, risqueDe, XP_PARFAIT, type Rang } from "@/lib/sfl/missions";
 import { NOM_DE_CODE_ARBITRE, phraseArbitre, type ReponseArbitre } from "@/lib/sfl/missions-arbitre";
+import { A_RATTRAPER, SIGNE_SUSPENS } from "@/lib/sfl/saisie/suspens";
 import { cn } from "@/lib/utils";
 import "./actus/missions.css";
 import "./actus/lune.css";
 
 const CRANS_DU_RANG: Record<Rang, number> = { S: 3, A: 2, B: 1 };
 const signe = (n: number) => (n < 0 ? `−${-n}` : `+${n}`);
+const capitale = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
+/** « ‖ À rattraper ». */
+const ARATTRAPER = `${SIGNE_SUSPENS} ${capitale(A_RATTRAPER)}`;
 
 /** « Dim. 13h00 » : le jour du coup d'envoi, à l'heure de Paris. */
 function limite(d: Date, heure: string): string {
@@ -85,7 +93,13 @@ function Action({ l, mm, attente, repondre }: { l: LigneMissionArbitre; mm: Miss
   if (r !== "acceptee")
     return (
       <div className="flex min-h-12 items-center pl-1">
-        <Tampon ton="gris">{r === "passee" ? "Passée" : "Expirée"}</Tampon>
+        <Tampon ton="gris">{r === "passee" ? "Passée" : mm.phase === "a-rattraper" ? ARATTRAPER : "Expirée"}</Tampon>
+      </div>
+    );
+  if (mm.phase === "a-rattraper")
+    return (
+      <div className="flex min-h-12 items-center pl-1">
+        <span className="mono-label text-white/75">{ARATTRAPER}</span>
       </div>
     );
   const v = l.verdict;
@@ -170,7 +184,7 @@ function Fiche({ l, mm, attente, repondre }: { l: LigneMissionArbitre; mm: Missi
           <div>
             <span className="mono-label text-white/45">{mm.phase === "ouvert" ? "Avant" : "Verdict"}</span>
             <span className="truncate text-lecture leading-[25px] font-bold">
-              {mm.phase === "ouvert" ? limite(d.coupEnvoi, d.heure) : mm.phase === "en-jeu" ? "Mardi 0h" : "Définitif"}
+              {mm.phase === "ouvert" ? limite(d.coupEnvoi, d.heure) : mm.phase === "en-jeu" ? "Mardi 0h" : mm.phase === "a-rattraper" ? capitale(A_RATTRAPER) : "Définitif"}
             </span>
           </div>
         </div>
@@ -216,7 +230,7 @@ export function MissionsArbitre({ nom }: { nom: string }) {
       ))}
       <div className="flex items-baseline justify-between gap-3 px-1">
         <span className="mono-label text-encre-3">
-          {mm.phase === "ouvert" ? "Les trois accomplies" : mm.phase === "en-jeu" ? "Mardi à minuit" : "Ta journée"}
+          {mm.phase === "ouvert" ? "Les trois accomplies" : mm.phase === "en-jeu" ? "Mardi à minuit" : mm.phase === "a-rattraper" ? ARATTRAPER : "Ta journée"}
         </span>
         <span className={cn("mono-label", mm.phase === "fini" && xpJournee < 0 ? "text-[#c8352b] dark:text-[#ff9b9d]" : "text-encre-2")}>
           {mm.phase === "ouvert" ? `+${XP_PARFAIT} XP de bonus` : `${signe(xpJournee)} XP`}

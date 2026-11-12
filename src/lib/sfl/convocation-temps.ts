@@ -13,6 +13,10 @@
 // d'où vient l'heure (état React côté client, new Date() côté serveur).
 // Toutes les lectures se font en Europe/Paris, quel que soit le fuseau de la
 // machine : le serveur de Vercel vit en UTC, les joueurs vivent à Paris.
+//
+// L'ordre du calendrier (ordreDuCalendrier) range les journées par date, pas
+// par numéro : une journée en suspens rattrapée plus tard (12/11/2026) se
+// joue après de plus grands numéros.
 
 export interface InstantParis {
   /** Jour ISO : 1 = lundi … 7 = dimanche. */
@@ -117,6 +121,28 @@ export function jourMoisDuLibelle(libelle: string): { jour: number; mois: number
   if (!m) return null;
   const mois = MOIS_COURTS.findIndex((p) => m[2].startsWith(p));
   return mois < 0 ? null : { jour: Number(m[1]), mois: mois + 1 };
+}
+
+/**
+ * Des numéros de journée dans l'ordre du calendrier : par date, puis par
+ * numéro (une journée en suspens rattrapée le 29/11, saisie/suspens.ts,
+ * vient après la J7 du 22/11). Les
+ * libellés n'ont pas d'année : les mois se comptent depuis celui de la
+ * première journée de la saison (une saison tient en moins d'un an). Une
+ * date illisible garde la place de son numéro, juste après la journée datée
+ * qui la précède. Sans rattrapage, c'est l'ordre des numéros.
+ */
+export function ordreDuCalendrier(s: { journees: readonly { j: number; date?: string | null }[] }, js: readonly number[]): number[] {
+  const metas = [...s.journees].sort((a, b) => a.j - b.j);
+  const debut = metas.map((m) => jourMoisDuLibelle(m.date ?? "")).find((x) => x)?.mois ?? 1;
+  const cle = new Map<number, number>();
+  let avant = -1;
+  for (const m of metas) {
+    const jm = jourMoisDuLibelle(m.date ?? "");
+    if (jm) avant = ((jm.mois - debut + 12) % 12) * 100 + jm.jour;
+    cle.set(m.j, avant);
+  }
+  return [...js].sort((a, b) => (cle.get(a) ?? -1) - (cle.get(b) ?? -1) || a - b);
 }
 
 /**
