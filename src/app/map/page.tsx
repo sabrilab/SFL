@@ -208,6 +208,7 @@ import { useMatchsTeam, type MatchTeam } from "@/hooks/use-matchs-team";
 import type { FondCarte, PointPlan, PossiblePlan, ToiPlan } from "@/components/sfl/map/carte-map";
 import type { TeinteFantome } from "@/components/sfl/map/stade";
 import { idAdminLigue } from "@/lib/sfl/admin-ligue";
+import { estJour, estPelouse } from "@/lib/sfl/mode-pelouse";
 import "./animations.css";
 import "@/components/sfl/map/contrats-map.css";
 
@@ -232,7 +233,7 @@ const teinteFantome = (): TeinteFantome =>
  */
 const ESSAIS = process.env.NEXT_PUBLIC_BOLA_ENV !== "production";
 /** Les styles d'interface à l'essai (?style=N, style-ui/essai.tsx) ont chacun leur plan ; sans style, le plan de l'app ne change pas. */
-const PLAN_DU_STYLE: Record<number, Ambiance> = { 12: "bulle", 13: "nuit-chaleur", 14: "trace", 15: "sticker", 16: "nuit-pelouse", 17: "gravure", 18: "bulle-gomme", 19: "nuit-bulle", 20: "bulle-peche", 21: "bulle-lilas", 22: "bulle-encre", 23: "bulle-verre" };
+const PLAN_DU_STYLE: Record<number, Ambiance> = { 12: "bulle", 13: "nuit-chaleur", 14: "trace", 15: "sticker", 16: "nuit-pelouse", 17: "gravure", 18: "bulle-gomme", 19: "nuit-bulle", 20: "bulle-peche", 21: "bulle-lilas", 22: "bulle-encre", 23: "bulle-verre", 24: "pelouse-craie", 25: "pelouse-gazon", 26: "pelouse-tribune" };
 const ambianceDeLAdresse = (): Ambiance => {
   if (!ESSAIS) return "nuit-encre";
   const q = new URLSearchParams(window.location.search);
@@ -244,6 +245,7 @@ const ambianceDeLAdresse = (): Ambiance => {
       style = Number(localStorage.getItem("bola-style-ui-2") ?? 0);
     } catch {}
   }
+  if (estPelouse(style) && !estJour()) return "nuit-pelouse";
   return PLAN_DU_STYLE[style] ?? "nuit-encre";
 };
 /** Dans un aperçu, /?zones=demo ajoute une zone qui vient de s'ouvrir (Lens) et une zone fermée (Paris), pour voir le récit. */

@@ -50,10 +50,11 @@ import { chaleur, contoursDesZones, FONDU_PAS, voilesEnFondu, type Zone } from "
 export type Ambiance =
   | "jour" | "aube" | "classique" | "territoire" | "nuit" | "encre" | "brume" | "rouge" | "braise" | "nuit-brume" | "nuit-braise" | "nuit-encre"
   | "bulle" | "nuit-chaleur" | "trace" | "sticker" | "nuit-pelouse" | "gravure"
-  | "bulle-gomme" | "nuit-bulle" | "bulle-peche" | "bulle-lilas" | "bulle-encre" | "bulle-verre" | "nuit-verre";
+  | "bulle-gomme" | "nuit-bulle" | "bulle-peche" | "bulle-lilas" | "bulle-encre" | "bulle-verre" | "nuit-verre"
+  | "pelouse-craie" | "pelouse-gazon" | "pelouse-tribune";
 /** Les essais montrés dans l'aperçu (l'encre reste par l'adresse). */
 export const AMBIANCES: Ambiance[] = ["jour", "aube", "nuit-encre", "brume", "rouge", "braise", "nuit-brume", "nuit-braise", "nuit", "territoire", "classique"];
-export const TOUTES_AMBIANCES: Ambiance[] = [...AMBIANCES, "encre", "bulle", "nuit-chaleur", "trace", "sticker", "nuit-pelouse", "gravure", "bulle-gomme", "nuit-bulle", "bulle-peche", "bulle-lilas", "bulle-encre", "bulle-verre", "nuit-verre"];
+export const TOUTES_AMBIANCES: Ambiance[] = [...AMBIANCES, "encre", "bulle", "nuit-chaleur", "trace", "sticker", "nuit-pelouse", "gravure", "bulle-gomme", "nuit-bulle", "bulle-peche", "bulle-lilas", "bulle-encre", "bulle-verre", "nuit-verre", "pelouse-craie", "pelouse-gazon", "pelouse-tribune"];
 /** Les ambiances sur le plan noir. */
 export const estNuit = (a: Ambiance) => a.startsWith("nuit");
 
@@ -259,6 +260,27 @@ const GRAVURE: Palette = {
   texte: "#3d372e", texteRues: "#6f6656", texteEau: "#6f7670", halo: "#fbf8f0",
 };
 
+/* Les jours de la famille Pelouse, styles 24 à 26 (Sabri, 12/11 : le 16, avec
+   un clair pour le jour). Les verts du 16 en positif, l'encre vert profond. */
+const PELOUSE_CRAIE: Palette = {
+  terre: "#f4f1e8", quartier: "#efebe0", parc: "#d3e3c8", bois: "#c6dbba", terrain: "#a9cba9",
+  eau: "#d9e6df", eauBord: "#c3d6cc", rue: "#fffdf7", rueBord: "#d9d3c2", grande: "#ffffff", grandeBord: "#9fb39f",
+  bati: "#e8e4d8", volume: "#fbfaf5", rail: "#c9c3b4", ombre: "rgba(15, 38, 24, 0.3)",
+  texte: "#2c4a35", texteRues: "#5b6e5f", texteEau: "#4c7a68", halo: "#fbfaf5",
+};
+const PELOUSE_GAZON: Palette = {
+  terre: "#dfecd9", quartier: "#d8e7d1", parc: "#bcd9b1", bois: "#acd0a1", terrain: "#8fc08c",
+  eau: "#c7e1da", eauBord: "#b0d3ca", rue: "#f6faf3", rueBord: "#bfd4b6", grande: "#ffffff", grandeBord: "#86ad85",
+  bati: "#d0e2c8", volume: "#eef6ea", rail: "#b5cbad", ombre: "rgba(15, 38, 24, 0.32)",
+  texte: "#1d4a2c", texteRues: "#4f6b55", texteEau: "#3f7563", halo: "#f6faf3",
+};
+const PELOUSE_TRIBUNE: Palette = {
+  terre: "#f6f8f4", quartier: "#f1f4ee", parc: "#d9e8d2", bois: "#cee2c6", terrain: "#b4d3ae",
+  eau: "#e0ebe6", eauBord: "#cddfd6", rue: "#ffffff", rueBord: "#e1e8dc", grande: "#ffffff", grandeBord: "#b9c9b5",
+  bati: "#eaeee6", volume: "#ffffff", rail: "#d2dacd", ombre: "rgba(15, 38, 24, 0.22)",
+  texte: "#33503b", texteRues: "#66786a", texteEau: "#55806f", halo: "#ffffff",
+};
+
 /* Les variations de Bulle, styles 18 à 23 (Sabri, 03/11 : « j'aime le style 12, fais des variations »). */
 const BULLE_GOMME: Palette = {
   terre: "#e6f7ee", quartier: "#ddf3e7", parc: "#a9ecba", bois: "#94e3a8", terrain: "#78d98f",
@@ -304,7 +326,8 @@ const NUIT_VERRE: Palette = {
 };
 const PALETTES: Record<Ambiance, Palette> = { jour: JOUR, aube: AUBE, classique: SNAP, territoire: SNAP, nuit: NUIT, encre: ENCRE, brume: SNAP, rouge: SNAP, braise: SNAP, "nuit-brume": NUIT, "nuit-braise": NUIT, "nuit-encre": TABLEAU,
   bulle: BULLE, "nuit-chaleur": CHALEUR, trace: TRACE, sticker: STICKER, "nuit-pelouse": PELOUSE, gravure: GRAVURE,
-  "bulle-gomme": BULLE_GOMME, "nuit-bulle": NUIT_BULLE, "bulle-peche": BULLE_PECHE, "bulle-lilas": BULLE_LILAS, "bulle-encre": BULLE_ENCRE, "bulle-verre": BULLE_VERRE, "nuit-verre": NUIT_VERRE };
+  "bulle-gomme": BULLE_GOMME, "nuit-bulle": NUIT_BULLE, "bulle-peche": BULLE_PECHE, "bulle-lilas": BULLE_LILAS, "bulle-encre": BULLE_ENCRE, "bulle-verre": BULLE_VERRE, "nuit-verre": NUIT_VERRE,
+  "pelouse-craie": PELOUSE_CRAIE, "pelouse-gazon": PELOUSE_GAZON, "pelouse-tribune": PELOUSE_TRIBUNE };
 
 /** Les halos de chaleur des styles 12 à 17, façon Snap Map, sans or, bleu ni rouge (réservés aux cartes). */
 const HALOS: Partial<Record<Ambiance, unknown[]>> = {

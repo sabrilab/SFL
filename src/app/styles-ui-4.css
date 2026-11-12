@@ -1,0 +1,146 @@
+/* ═══════════════════════ La famille Pelouse (24 à 26) ═══════════════════════
+   Sabri, 12/11/2026 : « j'ai beaucoup aimé le style 16 », mais la barre
+   d'onglets « n'est pas cool » et c'est « un peu trop rectangulaire » : « on
+   aime plus quand il y a les arrondis ». Il veut une version claire et une
+   version sombre qui s'active « le matin ou la nuit » quand on regarde l'app,
+   et des variantes du clair à partir du 16.
+
+   La nuit, les trois styles sont la même Pelouse : html prend data-style="16"
+   (toutes les règles du 16, styles-ui-2.css) et les arrondis d'ici par-dessus.
+   Le jour, html prend data-style="24" (Craie), "25" (Gazon) ou "26" (Tribune) :
+   trois clairs tirés du 16, le même vert profond pour l'encre, les mêmes
+   titres en Anton capitales, les mêmes traits de craie, en positif.
+   html[data-famille="pelouse"] est posé dans les deux cas (style-ui/essai.tsx).
+
+   Rien ici ne touche les cartes de joueurs, les écussons ni les trophées. Ni
+   or, ni bleu, ni rouge : réservés aux cartes MVP, Défensive, Impact. */
+
+/* ───────────── Les arrondis, jour et nuit ───────────── */
+:root[data-famille="pelouse"] .liquid-tabbar {
+  border-radius: 999px !important;
+  height: 64px;
+  padding: 5px;
+}
+:root[data-famille="pelouse"] .liquid-tabbar__lentille {
+  top: 5px;
+  bottom: 5px;
+  left: 5px;
+  width: calc((100% - 10px) / 3);
+  border-radius: 999px !important;
+  background: var(--tabbar-lentille) !important;
+  box-shadow: 0 2px 8px rgba(5, 18, 10, 0.25) !important;
+}
+:root[data-famille="pelouse"] .liquid-tabbar--rond { width: 64px; }
+:root[data-famille="pelouse"] .liquid-tabbar__onglet { color: var(--foreground) !important; }
+:root[data-famille="pelouse"] .liquid-tabbar__onglet[aria-current="page"] { color: var(--tabbar-sur-lentille) !important; }
+:root[data-famille="pelouse"] .liquid-tabbar__libelle { font-weight: 700 !important; letter-spacing: 0.06em; text-transform: uppercase; font-size: 9.5px; }
+:root[data-famille="pelouse"] .liquid-tabbar--rond[data-choisi] { background: var(--tabbar-lentille) !important; color: var(--tabbar-sur-lentille); }
+
+:root[data-famille="pelouse"] :is(.bouton-principal, .bouton-secondaire, .bouton-encre, .bouton-givre) { border-radius: 999px !important; }
+:root[data-famille="pelouse"] .tuile-match { border-radius: 22px !important; }
+:root[data-famille="pelouse"] .tiroir-map { border-radius: 28px 28px 0 0 !important; }
+:root[data-famille="pelouse"] :is(section, a, div)[class*="rounded-[2"]:not(.tuile-match):not([class*="carte"]) { border-radius: 22px; }
+:root[data-famille="pelouse"] .tuile { border-radius: 22px; }
+:root[data-famille="pelouse"] :is(.grp__ville, .vil) { border-radius: 999px !important; padding-inline: 8px; }
+:root[data-famille="pelouse"] .stk__vignette { border-radius: 16px !important; }
+
+/* La nuit : la barre en verre de pelouse, un trait de craie fin, la lentille
+   pleine de craie et l'onglet choisi en vert profond dessus. */
+:root[data-famille="pelouse"].dark .liquid-tabbar {
+  --tabbar-verre: rgba(15, 38, 24, 0.78);
+  --tabbar-lentille: #f3faf1;
+  --tabbar-sur-lentille: #0f2618;
+  border: 1px solid rgba(243, 250, 241, 0.32) !important;
+  box-shadow: inset 0 1px 0 rgba(243, 250, 241, 0.18), 0 13px 34px rgba(0, 0, 0, 0.5) !important;
+}
+:root[data-famille="pelouse"].dark :is(.bouton-secondaire, .bouton-encre, .bouton-givre) { border-width: 1px !important; border-color: rgba(243, 250, 241, 0.5) !important; }
+
+/* ───────────── Le jour : trois clairs tirés du 16 ───────────── */
+:root[data-style="24"], :root[data-style="24"] .surfaces-jour {
+  --background: #f4f1e8; --foreground: #0f2618; --card: #fbfaf5; --card-foreground: #0f2618;
+  --popover: #fbfaf5; --popover-foreground: #0f2618; --primary: #0f2618; --primary-foreground: #f4f1e8;
+  --secondary: #e9e6da; --secondary-foreground: #0f2618; --muted: #e9e6da; --muted-foreground: #5b6e5f;
+  --accent: #e9e6da; --accent-foreground: #0f2618; --border: #cfd6c8; --input: #cfd6c8; --ring: #0f2618;
+  --vert: #a9cba9; --mauve: #e0b3cb; --contraste: #0f2618; --radius: 1.375rem; color-scheme: light;
+  --pl-trait: rgba(15, 38, 24, 0.22); --pl-carte: #fbfaf5; --pl-plein: #0f2618; --pl-sur-plein: #f4f1e8;
+}
+:root[data-style="25"], :root[data-style="25"] .surfaces-jour {
+  --background: #dfecd9; --foreground: #0f2618; --card: #f6faf3; --card-foreground: #0f2618;
+  --popover: #f6faf3; --popover-foreground: #0f2618; --primary: #1d5a32; --primary-foreground: #f6faf3;
+  --secondary: #d2e4cb; --secondary-foreground: #0f2618; --muted: #d2e4cb; --muted-foreground: #4f6b55;
+  --accent: #d2e4cb; --accent-foreground: #0f2618; --border: #b9d1b1; --input: #b9d1b1; --ring: #1d5a32;
+  --vert: #a9cba9; --mauve: #e0b3cb; --contraste: #0f2618; --radius: 1.375rem; color-scheme: light;
+  --pl-trait: rgba(15, 38, 24, 0.14); --pl-carte: #f6faf3; --pl-plein: #1d5a32; --pl-sur-plein: #f6faf3;
+}
+:root[data-style="26"], :root[data-style="26"] .surfaces-jour {
+  --background: #ffffff; --foreground: #0f2618; --card: #f1f5ee; --card-foreground: #0f2618;
+  --popover: #ffffff; --popover-foreground: #0f2618; --primary: #0f2618; --primary-foreground: #ffffff;
+  --secondary: #e8eee4; --secondary-foreground: #0f2618; --muted: #e8eee4; --muted-foreground: #5b6e5f;
+  --accent: #e8eee4; --accent-foreground: #0f2618; --border: #e1e8dc; --input: #d5dfcf; --ring: #0f2618;
+  --vert: #a9cba9; --mauve: #e0b3cb; --contraste: #0f2618; --radius: 1.375rem; color-scheme: light;
+  --pl-trait: transparent; --pl-carte: #f1f5ee; --pl-plein: #0f2618; --pl-sur-plein: #ffffff;
+}
+
+/* Le fond : 24 du papier crème rayé de tonte à peine ; 25 la pelouse tondue,
+   en clair ; 26 blanc, une seule bande de pelouse en haut. */
+:root[data-style="24"] body {
+  background: repeating-linear-gradient(90deg, rgba(15, 38, 24, 0.025) 0 55px, transparent 55px 110px), var(--background);
+}
+:root[data-style="25"] body {
+  background: repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.28) 0 55px, transparent 55px 110px), radial-gradient(90% 50% at 50% -10%, rgba(255, 255, 255, 0.6), transparent 60%), var(--background);
+}
+:root[data-style="26"] body {
+  background: linear-gradient(180deg, #e3eedd 0, rgba(227, 238, 221, 0) 220px), var(--background);
+}
+
+/* La barre d'onglets du jour : une pilule claire, la lentille vert profond. */
+:root:is([data-style="24"], [data-style="25"], [data-style="26"]) .liquid-tabbar {
+  --tabbar-verre: color-mix(in srgb, var(--pl-carte) 88%, transparent);
+  --tabbar-lentille: var(--pl-plein);
+  --tabbar-sur-lentille: var(--pl-sur-plein);
+  color: var(--foreground);
+  border: 1px solid var(--pl-trait) !important;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.9) inset, 0 10px 28px rgba(15, 38, 24, 0.16) !important;
+}
+
+/* Les boutons du jour : le principal plein de vert profond, les autres cerclés. */
+:root:is([data-style="24"], [data-style="25"], [data-style="26"]) :is(.bouton-principal, .bouton-secondaire, .bouton-encre, .bouton-givre) {
+  box-shadow: none !important;
+  background: var(--pl-carte) !important;
+  color: #0f2618 !important;
+  border: 1px solid rgba(15, 38, 24, 0.35) !important;
+  letter-spacing: 0.02em;
+}
+:root:is([data-style="24"], [data-style="25"], [data-style="26"]) :is(.bouton-principal, .bouton-encre) {
+  background: var(--pl-plein) !important;
+  color: var(--pl-sur-plein) !important;
+  border-color: var(--pl-plein) !important;
+}
+
+/* Les blocs et les tuiles du jour : la carte claire, un trait de craie vert. */
+:root:is([data-style="24"], [data-style="25"], [data-style="26"]) .tuile-match { box-shadow: 0 0 0 1px var(--pl-trait), 0 10px 22px rgba(15, 38, 24, 0.14) !important; }
+:root:is([data-style="24"], [data-style="25"], [data-style="26"]) :is(section, a)[class*="rounded-[2"]:not(.tuile-match):not([class*="carte"]) { box-shadow: 0 0 0 1px var(--pl-trait); }
+:root[data-style="26"] :is(section, a)[class*="rounded-[2"]:not(.tuile-match):not([class*="carte"]) { box-shadow: 0 6px 18px rgba(15, 38, 24, 0.07); }
+
+/* Les titres du jour : ceux du 16, en vert profond. */
+:root:is([data-style="24"], [data-style="25"], [data-style="26"]) :is(h1, h2),
+:root:is([data-style="24"], [data-style="25"], [data-style="26"]) :is(section, a)[class*="rounded-[2"] :is(h2, h3) {
+  font-family: var(--font-anton), var(--font-inter), sans-serif;
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+/* La Map du jour : les joueurs cerclés de vert profond, les villes en pilule. */
+:root:is([data-style="24"], [data-style="25"], [data-style="26"]) .jc { border: 2px solid #0f2618; box-shadow: 0 0 0 4px rgba(15, 38, 24, 0.12), 0 6px 12px rgba(15, 38, 24, 0.25); }
+:root:is([data-style="24"], [data-style="25"], [data-style="26"]) .grp__compte { background: #0f2618; color: #f4f1e8; border-color: #f4f1e8; }
+:root:is([data-style="24"], [data-style="25"], [data-style="26"]) :is(.grp__ville, .vil) { background: var(--pl-carte); color: #0f2618; border: 1px solid rgba(15, 38, 24, 0.4); text-transform: uppercase; letter-spacing: 0.04em; }
+:root:is([data-style="24"], [data-style="25"], [data-style="26"]) { --toi-onde: rgba(15, 38, 24, 0.55); }
+:root[data-famille="pelouse"].dark { --radius: 1.375rem; }
+
+/* Un bouton plein qui porte une ligne secondaire (la date sous « Five Lille
+   Sud ») : la ligne prend la couleur du bouton, adoucie. */
+:root:is([data-style="24"], [data-style="25"], [data-style="26"]) :is(.bouton-principal, .bouton-encre) :is(.bouton-sous, [class*="text-encre"], [class*="text-muted"], [class*="text-foreground"]) {
+  color: inherit !important;
+  opacity: 0.72;
+}
