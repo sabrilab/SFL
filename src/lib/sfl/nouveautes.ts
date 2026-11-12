@@ -16,6 +16,14 @@
 // arrivé après la mise en ligne (son accueil fini après) ne la voit pas : son
 // accueil lui a déjà montré l'app telle qu'elle est. Base pas encore migrée
 // (aperçus Vercel) : ce que sait cet appareil.
+//
+// Une nouveauté peut dire où elle se trouve (`ici`) : si l'app s'ouvre déjà
+// sur cette page (le toucher d'une notification qui y mène), l'annonce ne
+// vient pas la couvrir, elle est notée vue.
+//
+// Le filtre des dates et du public (nouveautesEnCours) et « déjà sur place »
+// (estSurPlace) sont purs : tools/nouveautes-check.ts les vérifie, avec le
+// registre.
 
 import { supabase } from "@/lib/supabase";
 
@@ -30,13 +38,16 @@ export interface Nouveaute {
   ligueSeulement?: boolean;
   /** Pour les joueurs Bola seulement (hors de la SFL) : le symétrique de ligueSeulement. */
   bolaSeulement?: boolean;
+  /** La page où elle se trouve : ouverte dessus, l'app ne l'annonce pas (elle est vue). */
+  ici?: string;
 }
 
 /** Les nouveautés annoncées, de la plus ancienne à la plus récente. */
 export const NOUVEAUTES: readonly Nouveaute[] = [
   { id: "journees-et-blessures", le: "2026-10-27T00:45:00+01:00", jusquAu: "2026-11-24T00:00:00+01:00", ligueSeulement: true },
-  // Parrainage paliers, réponse scellée, missions dans Ma carte : pour tous (le
-  // drapeau vaut pour la nouveauté entière, pas pour une diapo).
+  // Réponse scellée, missions dans Ma carte : pour tous (le drapeau vaut pour
+  // la nouveauté entière, pas pour une diapo). Sa première diapo, « Invite.
+  // Monte. », est partie le 12/11 : le parrainage a son annonce à lui, plus bas.
   { id: "nouveautes-27-10", le: "2026-10-27T19:40:00+01:00", jusquAu: "2026-11-24T19:40:00+01:00" },
   // Confirmer ou infirmer le résultat d'un match Bola (28/10) : pour tous. À
   // recaler sur l'heure de mise en ligne.
@@ -45,7 +56,37 @@ export const NOUVEAUTES: readonly Nouveaute[] = [
   // missions perso (28/10) : pour les joueurs Bola. À recaler sur l'heure de
   // mise en ligne.
   { id: "carte-bola", le: "2026-10-28T21:00:00+01:00", jusquAu: "2026-11-25T21:00:00+01:00", bolaSeulement: true },
+  // Le parrainage, annoncé pour de bon (12/11) : ton lien ouvre ta carte, une
+  // recrue = +100 XP, la carte Fondateur à 10. Pour tous ; le bouton mène à
+  // Inviter. À recaler sur l'heure de mise en ligne.
+  { id: "parrainage", le: "2026-11-12T21:15:00+01:00", jusquAu: "2026-12-10T21:15:00+01:00", ici: "/parrainage" },
 ];
+
+/**
+ * Les nouveautés à annoncer à cet instant à ce public, de la plus ancienne à
+ * la plus récente : mises en ligne, pas encore périmées, et pour lui.
+ * `ligue` : un joueur de la ligue ; `bola` : un joueur Bola, hors de la SFL
+ * (un arbitre n'est ni l'un ni l'autre).
+ */
+export function nouveautesEnCours(
+  liste: readonly Nouveaute[],
+  instant: Date,
+  qui: { ligue: boolean; bola: boolean }
+): Nouveaute[] {
+  const t = instant.getTime();
+  return liste.filter(
+    (n) =>
+      t >= Date.parse(n.le) &&
+      t < Date.parse(n.jusquAu) &&
+      (qui.ligue || !n.ligueSeulement) &&
+      (qui.bola || !n.bolaSeulement)
+  );
+}
+
+/** L'app est-elle ouverte sur la page `ici` (ou une page en dessous) ? */
+export function estSurPlace(chemin: string, ici: string): boolean {
+  return chemin === ici || chemin.startsWith(`${ici}/`);
+}
 
 const cleIci = (id: string, nom: string) => `bola-nouveaute-${id}-${nom}`;
 
@@ -79,15 +120,16 @@ async function lireProfil(): Promise<{ uid: string; vues: string[]; accueil: str
  * sans être joueur Bola).
  */
 export async function nouveauteAMontrer(nom: string, ligue: boolean, bola = false, maintenant = new Date()): Promise<Nouveaute | null> {
-  const t = maintenant.getTime();
-  const enCours = NOUVEAUTES.filter(
-    (n) =>
-      t >= Date.parse(n.le) &&
-      t < Date.parse(n.jusquAu) &&
-      (ligue || !n.ligueSeulement) &&
-      (bola || !n.bolaSeulement) &&
-      !vueIci(n.id, nom)
-  );
+  const chemin = window.location.pathname;
+  const enCours = nouveautesEnCours(NOUVEAUTES, maintenant, { ligue, bola }).filter((n) => {
+    if (vueIci(n.id, nom)) return false;
+    // Déjà sur sa page : on ne la couvre pas, elle est vue.
+    if (n.ici && estSurPlace(chemin, n.ici)) {
+      void noterNouveauteVue(n.id, nom);
+      return false;
+    }
+    return true;
+  });
   if (!enCours.length) return null;
   const profil = await lireProfil();
   for (const n of enCours) {

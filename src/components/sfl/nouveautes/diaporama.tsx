@@ -11,6 +11,12 @@
 // une ligne qui disent pourquoi. On glisse du doigt ou au bouton ; la
 // dernière ferme, ou mène où la nouveauté se trouve. Fermer d'une façon ou
 // d'une autre, c'est l'avoir vue : elle ne revient pas.
+//
+// Sur la dernière diapo, « C'est compris » est le geste principal et `aller`
+// le geste discret, dessous. Une nouveauté dont le but est d'y aller
+// (`aller.principal`, le parrainage : « Inviter ») les inverse : son geste
+// passe en principal, au ton mauve (la famille « les autres »), et « C'est
+// compris » en discret.
 
 import { useEffect, useId, useState, type ReactNode } from "react";
 import { AnimatePresence, motion, useReducedMotion, type PanInfo } from "motion/react";
@@ -44,8 +50,11 @@ export function Diaporama({
   onFini,
 }: {
   diapos: Diapo[];
-  /** Le second geste de la dernière diapo : là où la nouveauté se trouve. */
-  aller?: { label: string; href: string };
+  /**
+   * Le second geste de la dernière diapo : là où la nouveauté se trouve.
+   * `principal` : c'est lui le geste principal, « C'est compris » passe dessous.
+   */
+  aller?: { label: string; href: string; principal?: boolean };
   onFini: () => void;
 }) {
   const reduit = useReducedMotion();
@@ -68,6 +77,13 @@ export function Diaporama({
   }
 
   const decale = reduit ? 0 : 70;
+
+  function yAller() {
+    onFini();
+    if (aller) router.push(aller.href);
+  }
+  // La dernière diapo d'une nouveauté où l'on va : son geste d'abord.
+  const allerDAbord = derniere && !!aller?.principal;
 
   return (
     <motion.div
@@ -125,17 +141,16 @@ export function Diaporama({
         className="mx-auto flex w-full max-w-[420px] shrink-0 flex-col items-center gap-[5px] px-[21px] pt-[8px]"
         style={{ paddingBottom: "max(env(safe-area-inset-bottom), 21px)" }}
       >
-        <BoutonPrincipal onClick={derniere ? onFini : () => vers(i + 1)}>{derniere ? "C'est compris" : "Suivant"}</BoutonPrincipal>
+        {allerDAbord ? (
+          <BoutonPrincipal ton="mauve" onClick={yAller}>
+            {aller?.label}
+          </BoutonPrincipal>
+        ) : (
+          <BoutonPrincipal onClick={derniere ? onFini : () => vers(i + 1)}>{derniere ? "C'est compris" : "Suivant"}</BoutonPrincipal>
+        )}
         {/* La même hauteur à chaque diapo : le bouton ne saute pas. */}
         <div className={derniere && aller ? undefined : "invisible"} aria-hidden={!(derniere && aller)}>
-          <BoutonDiscret
-            onClick={() => {
-              onFini();
-              if (aller) router.push(aller.href);
-            }}
-          >
-            {aller?.label ?? " "}
-          </BoutonDiscret>
+          <BoutonDiscret onClick={allerDAbord ? onFini : yAller}>{allerDAbord ? "C'est compris" : (aller?.label ?? " ")}</BoutonDiscret>
         </div>
       </div>
     </motion.div>
