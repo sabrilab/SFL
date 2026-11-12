@@ -24,10 +24,11 @@ import { ConsentementObligatoire } from "@/components/sfl/confidentialite/consen
 /**
  * Pages ouvertes à tous : le lien d'accueil personnel envoyé par l'admin, la
  * création de compte, le lien d'invitation d'une équipe (mode Team), le lien
- * d'un parrain (/p/code), le lien d'une vidéo (/v/id, sans la vidéo) et la
- * politique de confidentialité.
+ * d'un parrain (/p/code), le lien d'une vidéo (/v/id, sans la vidéo), la
+ * politique de confidentialité et la présentation de la ligue (/sfl, le lien
+ * de sa bio Instagram, 12/11/2026 ; aucune autre adresse ne commence ainsi).
  */
-const PUBLIC_ROUTES = ["/bienvenue", "/inscription", "/equipe/", "/p/", "/v/", "/confidentialite"];
+const PUBLIC_ROUTES = ["/bienvenue", "/inscription", "/equipe/", "/p/", "/v/", "/confidentialite", "/sfl"];
 
 export function AuthGate({ children }: { children: React.ReactNode }) {
   const isClient = useIsClient();

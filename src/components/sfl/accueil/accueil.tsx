@@ -121,7 +121,7 @@ const OBLIGATOIRES: Etape[] = ["motdepasse", "accord", "identite", "sexe", "nais
 const ON_Y_REVIENT: Etape[] = ["identite", "sexe", "naissance", "gabarit", "pied", "poste", "ville"];
 
 /** Pas d'accueil sur les pages qui ont leur propre parcours, ou pas de compte (AuthGate, PUBLIC_ROUTES). */
-const SANS_ACCUEIL = ["/confidentialite", "/inscription", "/bienvenue", "/equipe/", "/p/", "/v/"];
+const SANS_ACCUEIL = ["/confidentialite", "/inscription", "/bienvenue", "/equipe/", "/p/", "/v/", "/sfl"];
 
 /** Au plus, le temps d'une lecture ; au-delà, on fait sans. */
 const ATTENTE_MS = 4500;

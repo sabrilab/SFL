@@ -23,7 +23,9 @@
 // depuis le 27/10 (Sabri : « l'installation, je le fais uniquement quand
 // quelqu'un veut télécharger et qu'il veut se connecter »), le visiteur
 // découvre Bola d'abord ; le guide vient quand il touche « Créer ma carte »
-// ou « Se connecter » (/inscription, /connexion).
+// ou « Se connecter » (/inscription, /connexion). La présentation de la ligue
+// (/sfl, 12/11) suit la même règle : c'est le lien de la bio Instagram, il
+// s'ouvre dans le navigateur d'Instagram, où le guide aurait couvert la page.
 //
 // Depuis le 02/11/2026 (Sabri : la création du compte « la plus fluide
 // possible depuis getbola.app »), dans un vrai navigateur, il ne coupe plus
@@ -46,6 +48,9 @@ interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
   userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
 }
+
+/** Les pages qu'on lit d'abord : la politique, et la présentation de la ligue. Jamais de guide dessus. */
+const SANS_GUIDE = ["/confidentialite", "/sfl"];
 
 const CLE_FAIT = "bola-guide-installation";
 const CLE_PLUS_TARD = "bola-guide-plus-tard";
@@ -94,7 +99,7 @@ export function GuideInstallation() {
     };
   }, []);
 
-  if (!isClient || ferme || pathname?.startsWith("/confidentialite")) return null;
+  if (!isClient || ferme || SANS_GUIDE.some((r) => pathname?.startsWith(r))) return null;
   const env = lireEnvironnement();
   if (env.systeme === "autre" || env.installee) return null;
   // La page d'accueil (AuthGate : « / » sans session, hors de l'app installée)

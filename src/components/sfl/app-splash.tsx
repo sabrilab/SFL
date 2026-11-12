@@ -19,6 +19,13 @@
 // quoi qu'il arrive : un chunk introuvable (hors ligne) ne bloque plus l'app.
 // Jusqu'au 24/10, l'écran portait le logo qui pulsait, « sunday five league »
 // et une barre de progression ; et en mode clair, le logo blanc sur le blanc.
+//
+// Sur une page qui n'a ni carte 3D ni Map (INTRO_COURTE : la présentation de
+// la ligue, /sfl, le lien de la bio Instagram, 12/11), l'intro est courte : le
+// logo se pose, la page n'attend que ses polices, puis le voile se lève. Ni
+// chunk three.js, ni shaders, ni vignettes : la 3D chauffera à sa première
+// carte. Le signal de fin est posé comme ailleurs : la Map et l'accueil
+// l'attendent après une navigation interne, qui ne rejoue pas l'intro.
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
@@ -37,6 +44,10 @@ const PHOTOS_MAX_MS = 1500;
 const MAX_MS = 9000;
 /** Le logo posé, on attend encore tant avant de montrer le filet de progression. */
 const FILET_MS = 450;
+/** Les pages à l'intro courte : rien à préchauffer, les polices seulement. */
+const INTRO_COURTE = ["/sfl"];
+/** Sur ces pages, le voile n'attend pas les polices au-delà. */
+const POLICES_MAX_MS = 1500;
 
 // Poids de chaque étape (somme = 100) — le préchauffage des shaders est
 // la part la plus lourde, c'est aussi celle qui évite le plus de latence
@@ -103,8 +114,16 @@ export function AppSplash() {
       resolveShaders.current = resolve;
     });
 
+    // Lu au montage : l'intro ne joue qu'une fois, sur la page où l'on arrive.
+    const courte = INTRO_COURTE.some((r) => window.location.pathname.startsWith(r));
+
     async function run() {
       const fontsP = document.fonts.ready.then(() => bump(WEIGHTS.fonts));
+      if (courte) {
+        await Promise.race([fontsP, new Promise<void>((r) => setTimeout(r, POLICES_MAX_MS))]);
+        bump(100);
+        return;
+      }
 
       // Les vignettes de la Map, telles que ses piles les demanderont : le
       // cache du navigateur les lui rendra sans attendre.
