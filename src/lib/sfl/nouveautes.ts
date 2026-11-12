@@ -18,12 +18,16 @@
 // (aperçus Vercel) : ce que sait cet appareil.
 //
 // Une nouveauté peut dire où elle se trouve (`ici`) : si l'app s'ouvre déjà
-// sur cette page (le toucher d'une notification qui y mène), l'annonce ne
-// vient pas la couvrir, elle est notée vue.
+// sur cette page (le toucher d'une notification qui y mène), rien ne vient la
+// couvrir à cette ouverture, ni elle (elle est notée vue), ni une plus
+// ancienne pas encore vue (elle viendra à l'ouverture suivante).
 //
-// Le filtre des dates et du public (nouveautesEnCours) et « déjà sur place »
-// (estSurPlace) sont purs : tools/nouveautes-check.ts les vérifie, avec le
-// registre.
+// Tout le choix est pur : le filtre des dates et du public
+// (nouveautesEnCours), « déjà sur place » (estSurPlace), ce qu'il faut
+// montrer et noter à cette ouverture (choisirNouveaute), et les deux boutons
+// de la dernière diapo (gestesDeFin, que lit diaporama.tsx).
+// tools/nouveautes-check.ts les vérifie, avec le registre. Ce fichier ne lit
+// la base et l'appareil que dans nouveauteAMontrer et noterNouveauteVue.
 
 import { supabase } from "@/lib/supabase";
 
@@ -88,6 +92,84 @@ export function estSurPlace(chemin: string, ici: string): boolean {
   return chemin === ici || chemin.startsWith(`${ici}/`);
 }
 
+/** Ce qu'une ouverture de l'app fait des nouveautés. */
+export interface ChoixNouveaute {
+  /** Celle à montrer à cette ouverture, ou null. */
+  aMontrer: Nouveaute | null;
+  /** Celles à noter vues sans les montrer (sur l'appareil et dans la base) : l'app est ouverte sur leur page. */
+  aNoterVues: string[];
+  /** Celles que la base dit vues (sur un autre téléphone) : cet appareil s'en souvient aussi. */
+  aRetenir: string[];
+}
+
+/**
+ * Le choix d'une ouverture, sans rien lire ni écrire.
+ * `chemin` : la page où l'app s'ouvre. `vueIci` : cet appareil l'a-t-il déjà
+ * vue ? `profil` : ce que la base sait du joueur (ses nouveautés vues, la fin
+ * de son accueil), ou null si elle n'a pas répondu.
+ *   · ouverte sur la page d'une nouveauté en cours : rien à montrer, et
+ *     celle-là est notée vue si elle ne l'était pas ;
+ *   · sinon la plus ancienne pas encore vue, ni ici ni dans la base, et mise
+ *     en ligne après la fin de l'accueil du joueur.
+ */
+export function choisirNouveaute(
+  liste: readonly Nouveaute[],
+  instant: Date,
+  qui: { ligue: boolean; bola: boolean },
+  chemin: string,
+  vueIci: (id: string) => boolean,
+  profil: { vues: readonly string[]; accueil: string | null } | null
+): ChoixNouveaute {
+  const enCours = nouveautesEnCours(liste, instant, qui);
+  const surPlace = enCours.filter((n) => n.ici !== undefined && estSurPlace(chemin, n.ici));
+  if (surPlace.length) {
+    return { aMontrer: null, aNoterVues: surPlace.filter((n) => !vueIci(n.id)).map((n) => n.id), aRetenir: [] };
+  }
+  const aRetenir: string[] = [];
+  for (const n of enCours) {
+    if (vueIci(n.id)) continue;
+    if (profil?.vues.includes(n.id)) {
+      aRetenir.push(n.id);
+      continue;
+    }
+    // Arrivé après : son accueil lui a montré l'app telle qu'elle est.
+    if (profil?.accueil && Date.parse(profil.accueil) > Date.parse(n.le)) continue;
+    return { aMontrer: n, aNoterVues: [], aRetenir };
+  }
+  return { aMontrer: null, aNoterVues: [], aRetenir };
+}
+
+/** Le second geste de la dernière diapo : là où la nouveauté se trouve. */
+export interface Aller {
+  label: string;
+  href: string;
+  /** C'est lui le geste principal, « C'est compris » passe dessous (le parrainage : « Inviter »). */
+  principal?: boolean;
+}
+
+/** Ce que fait un bouton du diaporama : la diapo suivante, fermer, ou fermer et aller à la page. */
+export type GesteNouveaute = "suivant" | "fermer" | "aller";
+
+/**
+ * Les deux boutons du bas d'une diapo. Avant la dernière : « Suivant », seul.
+ * Sur la dernière : « C'est compris » ferme, et le geste de la nouveauté mène
+ * à sa page, dessous ; une nouveauté dont le but est d'y aller
+ * (`aller.principal`) les inverse, son geste en principal au ton mauve.
+ */
+export function gestesDeFin(
+  derniere: boolean,
+  aller?: Aller
+): {
+  principal: { label: string; geste: GesteNouveaute; ton: "vert" | "mauve" };
+  discret: { label: string; geste: GesteNouveaute } | null;
+} {
+  if (!derniere) return { principal: { label: "Suivant", geste: "suivant", ton: "vert" }, discret: null };
+  const compris = { label: "C'est compris", geste: "fermer" } as const;
+  if (!aller) return { principal: { ...compris, ton: "vert" }, discret: null };
+  const yAller = { label: aller.label, geste: "aller" } as const;
+  return aller.principal ? { principal: { ...yAller, ton: "mauve" }, discret: compris } : { principal: { ...compris, ton: "vert" }, discret: yAller };
+}
+
 const cleIci = (id: string, nom: string) => `bola-nouveaute-${id}-${nom}`;
 
 function vueIci(id: string, nom: string): boolean {
@@ -120,31 +202,20 @@ async function lireProfil(): Promise<{ uid: string; vues: string[]; accueil: str
  * sans être joueur Bola).
  */
 export async function nouveauteAMontrer(nom: string, ligue: boolean, bola = false, maintenant = new Date()): Promise<Nouveaute | null> {
-  const chemin = window.location.pathname;
-  const enCours = nouveautesEnCours(NOUVEAUTES, maintenant, { ligue, bola }).filter((n) => {
-    if (vueIci(n.id, nom)) return false;
-    // Déjà sur sa page : on ne la couvre pas, elle est vue.
-    if (n.ici && estSurPlace(chemin, n.ici)) {
-      void noterNouveauteVue(n.id, nom);
-      return false;
-    }
-    return true;
-  });
-  if (!enCours.length) return null;
-  const profil = await lireProfil();
-  for (const n of enCours) {
-    if (profil?.vues.includes(n.id)) {
-      // Vue sur un autre téléphone : celui-ci s'en souvient aussi.
-      try {
-        window.localStorage.setItem(cleIci(n.id, nom), "base");
-      } catch {}
-      continue;
-    }
-    // Arrivé après : son accueil lui a montré l'app telle qu'elle est.
-    if (profil?.accueil && Date.parse(profil.accueil) > Date.parse(n.le)) continue;
-    return n;
+  const choisir = (profil: { vues: readonly string[]; accueil: string | null } | null) =>
+    choisirNouveaute(NOUVEAUTES, maintenant, { ligue, bola }, window.location.pathname, (id) => vueIci(id, nom), profil);
+  // Sans la base d'abord : sur place, ou plus rien à voir ici, elle n'est pas lue.
+  const ici = choisir(null);
+  for (const id of ici.aNoterVues) void noterNouveauteVue(id, nom);
+  if (!ici.aMontrer) return null;
+  const choix = choisir(await lireProfil());
+  // Vue sur un autre téléphone : celui-ci s'en souvient aussi.
+  for (const id of choix.aRetenir) {
+    try {
+      window.localStorage.setItem(cleIci(id, nom), "base");
+    } catch {}
   }
-  return null;
+  return choix.aMontrer;
 }
 
 /** La nouveauté est vue : sur cet appareil, et dans la base. */

@@ -8,6 +8,7 @@
 
 import type { ReactNode } from "react";
 import type { Player } from "@/lib/sfl/engine";
+import type { Aller } from "@/lib/sfl/nouveautes";
 import { Diaporama, type Diapo } from "./diaporama";
 import { diaposJourneesEtBlessures } from "./journees-et-blessures";
 import { diaposNouveautes2710 } from "./nouveautes-27-10";
@@ -15,7 +16,7 @@ import { diaposConfirmerResultats } from "./confirmer-resultats";
 import { diaposCarteBola } from "./carte-bola";
 import { diaposParrainage } from "./parrainage";
 
-const DIAPOS: Record<string, { diapos: (player: Player) => Diapo[]; aller?: { label: string; href: string; principal?: boolean } }> = {
+const DIAPOS: Record<string, { diapos: (player: Player) => Diapo[]; aller?: Aller }> = {
   "journees-et-blessures": { diapos: diaposJourneesEtBlessures, aller: { label: "Voir Ma carte", href: "/profil" } },
   "nouveautes-27-10": { diapos: diaposNouveautes2710, aller: { label: "Voir Ma carte", href: "/profil/xp?vue=autres" } },
   "confirmer-resultats": { diapos: diaposConfirmerResultats, aller: { label: "Voir Bola", href: "/ligue-vierge" } },

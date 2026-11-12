@@ -15,17 +15,23 @@
 //      « Recrue · 1er match », +100 (lib/sfl/recrues.ts).
 //   3. « À 10, la carte Fondateur. » : ma carte dans les trois skins des
 //      recrues (PALIERS_RECRUES), petite, moyenne, grande au nombre d'or :
-//      Recruteur à 3, Filigrane à 5, Fondateur à 10 avec sa ligne de série.
+//      Recruteur à 3, Filigrane à 5, Fondateur à 10 ; sous chacune son
+//      chiffre et son nom, et sous « Fondateur » son numéro, « N° 001 / 500 ».
 //      Le numéro : le mien si j'en ai un, sinon le prochain à poser (le plus
-//      haut numéro que la ligue porte, plus un), et celui de l'exemple
-//      (skins-recrues.ts, 097) tant que la base n'a pas répondu.
+//      haut numéro posé, plus un), et celui de l'exemple (097) tant que la
+//      base n'a pas répondu.
 //
-// Rien n'est lu ni écrit de plus : ni code de parrainage créé, ni partage
-// noté (c'est la page Inviter qui le fait). Boucle douce ; « Réduire les
-// animations » : chaque visuel montre son état final, immobile. La scène du
-// diaporama est noire en clair comme en sombre (diaporama.tsx) : encre et
-// papier seulement, l'or, le bleu et le rouge restent aux cartes MVP,
-// Défensive et Impact.
+// Les titres, les lignes, ce que dit la carte de la diapo 1 et le numéro de
+// la diapo 3 sont composés dans lib/sfl/annonce-parrainage.ts, depuis la
+// table des paliers : rien n'est écrit en dur ici, et le banc le vérifie.
+//
+// Aucune écriture : ni code de parrainage créé, ni partage noté (c'est la
+// page Inviter qui le fait). Une seule lecture : la diapo 3 relit les recrues
+// de la ligue (use-recrues.ts, comme Ma carte et Inviter) pour le numéro.
+// Boucle douce ; « Réduire les animations » : chaque visuel montre son état
+// final, immobile. La scène du diaporama est noire en clair comme en sombre
+// (diaporama.tsx) : encre et papier seulement, l'or, le bleu et le rouge
+// restent aux cartes MVP, Défensive et Impact.
 
 import { useEffect, useState } from "react";
 import { motion, useReducedMotion } from "motion/react";
@@ -33,37 +39,20 @@ import { ANTON } from "@/components/sfl/actus/ecran";
 import { Mini } from "@/components/sfl/passe-bola";
 import { PlayerCard } from "@/components/sfl/player-card";
 import { useJoueurBola } from "@/components/sfl/player-provider";
-import {
-  FONDATEURS_MAX,
-  numeroFondateur,
-  PALIERS_RECRUES,
-  XP_RECRUE,
-  type FinitionRecrue,
-} from "@/components/sfl/skins-recrues";
+import { XP_RECRUE, type FinitionRecrue } from "@/components/sfl/skins-recrues";
 import { useHabillage } from "@/hooks/use-habillage";
 import { useIdentites } from "@/hooks/use-identites";
 import { useRecrues } from "@/hooks/use-recrues";
+import { lignesInvitation, numeroAnnonce, numeroSeul, paliersSkins, textesParrainage } from "@/lib/sfl/annonce-parrainage";
 import type { Player } from "@/lib/sfl/engine";
 import { useCourt, type Diapo } from "./diaporama";
 
 export function diaposParrainage(player: Player): Diapo[] {
+  const [lien, recrue, cartes] = textesParrainage();
   return [
-    {
-      visuel: <TonLienOuvreTaCarte player={player} />,
-      titre: "Ramène tes potes.",
-      ligne: "Ton lien ouvre ta carte. Ils créent leur compte, et ils jouent.",
-    },
-    {
-      visuel: <RecruesQuiComptent />,
-      titre: `Une recrue, +${XP_RECRUE} XP.`,
-      ligne: "Elle compte dès son premier match joué. Sans plafond.",
-    },
-    {
-      visuel: <TroisCartes player={player} />,
-      titre: "À 10, la carte Fondateur.",
-      // Des espaces insécables : « à 10 : » ne se coupe pas, les deux-points ne partent pas seuls à la ligne.
-      ligne: `Recruteur à 3, Filigrane à 5. Fondateur à\u00a010\u00a0: numérotée sur ${FONDATEURS_MAX}, jamais réémise.`,
-    },
+    { visuel: <TonLienOuvreTaCarte player={player} />, ...lien },
+    { visuel: <RecruesQuiComptent />, ...recrue },
+    { visuel: <TroisCartes player={player} />, ...cartes },
   ];
 }
 
@@ -76,7 +65,7 @@ function TonLienOuvreTaCarte({ player }: { player: Player }) {
   const reduit = useReducedMotion();
   const court = useCourt();
   const bola = useJoueurBola();
-  const nom = useIdentites().nom(player.name);
+  const { invite, offert } = lignesInvitation(useIdentites().nom(player.name), bola);
   return (
     <div className="flex flex-col items-center" aria-hidden>
       <motion.div
@@ -95,10 +84,8 @@ function TonLienOuvreTaCarte({ player }: { player: Player }) {
         transition={{ ...ressort, delay: reduit ? 0 : 0.35 }}
         className="mt-[21px] flex flex-col items-center gap-[8px] [@media(max-height:739px)]:mt-[13px] [@media(max-height:739px)]:gap-[5px]"
       >
-        {/* En chaîne : SWC mange l'espace d'un texte JSX qui suit une expression. */}
-        <span className="text-lecture font-semibold text-white/85">{`${nom} t'invite.`}</span>
-        {/* Le lien d'un joueur de la SFL offre Bola Team (la page Inviter). */}
-        {!bola && <span className="mono-label text-etiquette text-white/50">Bola Team offert un mois</span>}
+        <span className="text-lecture font-semibold text-white/85">{invite}</span>
+        {offert && <span className="mono-label text-etiquette text-white/50">{offert}</span>}
       </motion.div>
     </div>
   );
@@ -153,9 +140,6 @@ function RecruesQuiComptent() {
 
 /* --------------------------- 3. Les trois cartes --------------------------- */
 
-/** Le numéro d'exemple : celui de skins-recrues.ts (« N° 097 / 500 »). */
-const NUMERO_EXEMPLE = 97;
-
 /** Les largeurs des trois cartes, petite, moyenne, grande : la suite du nombre d'or. */
 const LARGEURS: Record<FinitionRecrue, { ample: number; court: number }> = {
   recruteur: { ample: 55, court: 42 },
@@ -172,51 +156,45 @@ function TroisCartes({ player }: { player: Player }) {
   const base = { cran: porte.cran, rang: porte.rang };
   // Mon numéro si j'en ai un ; sinon le prochain à poser, quand la base a répondu.
   const mien = recrues.ligue.find((r) => r.nom === player.name)?.fondateur ?? null;
-  const plusHaut = recrues.ligue.reduce((m, r) => Math.max(m, r.fondateur ?? 0), 0);
-  const numero = mien ?? (recrues.charge ? Math.min(FONDATEURS_MAX, plusHaut + 1) : NUMERO_EXEMPLE);
-  const paliers = PALIERS_RECRUES.filter((p): p is typeof p & { finition: FinitionRecrue } => !!p.finition);
+  const numero = numeroAnnonce(mien, recrues.charge, recrues.plusHaut);
   return (
-    <div className="flex flex-col items-end" aria-hidden>
-      <ol className="flex items-end gap-[13px] [@media(max-height:739px)]:gap-[8px]">
-        {paliers.map((p, k) => {
-          const l = court ? LARGEURS[p.finition].court : LARGEURS[p.finition].ample;
-          const h = Math.round((l * 1656) / 1024);
-          return (
-            <motion.li
-              key={p.n}
-              initial={reduit ? false : { opacity: 0, y: 14 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ ...ressort, delay: reduit ? 0 : 0.1 + 0.22 * k }}
-              className="flex flex-col items-center gap-[8px]"
-            >
-              {/* Le rayon de la carte (92 sur 1024), à sa taille. */}
-              <span className="relative block overflow-hidden" style={{ width: l, height: h, borderRadius: Math.round((l * 92) / 1024) }}>
-                <Mini
-                  player={player}
-                  habillage={{ ...base, finition: p.finition, fondateur: p.finition === "fondateur" ? numero : undefined }}
-                  l={l}
-                  h={h}
-                />
+    // La place du numéro, posé sous « Fondateur » : les trois cartes restent alignées par le bas.
+    <ol className="flex items-end gap-[13px] pb-[21px] [@media(max-height:739px)]:gap-[8px]" aria-hidden>
+      {paliersSkins().map((p, k) => {
+        const l = court ? LARGEURS[p.finition].court : LARGEURS[p.finition].ample;
+        const h = Math.round((l * 1656) / 1024);
+        return (
+          <motion.li
+            key={p.n}
+            initial={reduit ? false : { opacity: 0, y: 14 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ ...ressort, delay: reduit ? 0 : 0.1 + 0.22 * k }}
+            className="relative flex flex-col items-center gap-[8px]"
+          >
+            {/* Le rayon de la carte (92 sur 1024), à sa taille. */}
+            <span className="relative block overflow-hidden" style={{ width: l, height: h, borderRadius: Math.round((l * 92) / 1024) }}>
+              <Mini
+                player={player}
+                habillage={{ ...base, finition: p.finition, fondateur: p.finition === "fondateur" ? numero : undefined }}
+                l={l}
+                h={h}
+              />
+            </span>
+            <span className="flex flex-col items-center gap-[5px]">
+              <span className="text-titre-m leading-none text-white tabular-nums [@media(max-height:739px)]:text-titre-fort" style={{ fontFamily: ANTON }}>
+                {p.n}
               </span>
-              <span className="flex flex-col items-center gap-[5px]">
-                <span className="text-titre-m leading-none text-white tabular-nums [@media(max-height:739px)]:text-titre-fort" style={{ fontFamily: ANTON }}>
-                  {p.n}
-                </span>
-                <span className="mono-label text-etiquette text-white/50">{p.titre}</span>
+              <span className="mono-label text-etiquette text-white/50">{p.titre}</span>
+            </span>
+            {/* Son numéro, seul, centré sous « Fondateur ». */}
+            {p.finition === "fondateur" && (
+              <span className="mono-label absolute top-full left-1/2 mt-[5px] -translate-x-1/2 text-etiquette whitespace-nowrap text-white/70">
+                {numeroSeul(numero)}
               </span>
-            </motion.li>
-          );
-        })}
-      </ol>
-      {/* La ligne de série, sous la Fondateur. */}
-      <motion.span
-        initial={reduit ? false : { opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: reduit ? 0 : 0.4, delay: reduit ? 0 : 0.1 + 0.22 * paliers.length }}
-        className="mono-label mt-[13px] text-etiquette whitespace-nowrap text-white/70 [@media(max-height:739px)]:mt-[8px]"
-      >
-        {numeroFondateur(numero)}
-      </motion.span>
-    </div>
+            )}
+          </motion.li>
+        );
+      })}
+    </ol>
   );
 }
