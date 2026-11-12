@@ -26,7 +26,6 @@ const PAGES_SFL: [racine: string, vers: string][] = [
   ["/vestiaire", "/"],
   ["/discussions", "/"],
   ["/collection", "/profil"],
-  ["/boutique", "/profil"],
   ["/duel", "/profil"],
 ];
 
