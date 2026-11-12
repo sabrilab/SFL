@@ -22,6 +22,8 @@ export const ETATS: Record<EtatJournee, { signe: string; libelle: string }> = {
   attente: { signe: "◐", libelle: "Révélation" },
   revelee: { signe: "✓", libelle: "Révélée" },
   bloquee: { signe: "!", libelle: "Bloquée" },
+  // La journée en suspens (12/11/2026, saisie/suspens.ts) : « ‖ À RATTRAPER ».
+  "a-rattraper": { signe: "‖", libelle: "À rattraper" },
 };
 
 /** `○ BROUILLON`, `● EN LIGNE · 18:42`, `◉ EN DIRECT`, `✓ TERMINÉE`. */

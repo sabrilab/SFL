@@ -8,6 +8,7 @@ import { labelDateFr, prochainDimanche } from "../convocation-temps";
 import { equipesDuMatch, equipesDuMatchSuivant } from "./equipes";
 import { dejaSurLaFeuille, jouable } from "./effectif";
 import { resteUnBrouillon } from "./brouillon";
+import { resteUneJourneeEnSuspens } from "./suspens";
 import { revelationAttendue } from "../revelation";
 import { maintenant } from "../horloge";
 import { suspendusPour } from "../cartons";
@@ -629,6 +630,10 @@ export function cloturerSaison(
   // Jamais tant qu'une journée attend en brouillon (30/10) : elle partirait
   // en archive sans que la ligue l'ait jamais vue.
   if (resteUnBrouillon(saison)) return saison;
+  // Ni tant qu'une journée est en suspens (12/11/2026, suspens.ts) : elle doit
+  // être rattrapée avant, sans quoi l'archive, qui compte tout ce qui est
+  // joué, la compterait.
+  if (resteUneJourneeEnSuspens(saison) != null) return saison;
   // Ni avant la dernière révélation (revelation.ts) : l'archive y perdrait ses titres votés.
   if (revelationAttendue(saison, maintenant()) != null) return saison;
   const numero = numeroSaison(saison);

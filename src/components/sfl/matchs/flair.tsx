@@ -24,7 +24,8 @@
 // sur une page (Ma carte → Le Flair), pour qui ne joue pas : le blessé, le
 // remplaçant, la tribune, dont le plafond monte (PLAFOND_TRIBUNE).
 // Tout ferme au premier coup d'envoi de la journée ; le verdict tombe avec la
-// feuille remplie, définitif à la révélation (19 h ; minuit jusqu'à la J4). Les règles et l'XP ne changent pas
+// feuille remplie, définitif à la révélation (19 h ; minuit jusqu'à la J4 ;
+// une journée en suspens, saisie/suspens.ts : « à rattraper », sans verdict). Les règles et l'XP ne changent pas
 // (lib/sfl/pronos.ts) : l'XP va au Niveau XP et au passe, jamais aux points
 // Pépite. Le Flair ne vit que sur la journée en cours (usePronosJournee) :
 // une feuille d'une autre journée n'en a pas.
@@ -55,6 +56,7 @@ import {
 } from "@/lib/sfl/pronos";
 import { cn } from "@/lib/utils";
 import { BLANCS, NOIRS, Pouls } from "@/components/sfl/actus/missions";
+import { A_RATTRAPER, SIGNE_SUSPENS } from "@/lib/sfl/saisie/suspens";
 import "./flair.css";
 
 const NOM_CAMP: Record<Camp, string> = { noirs: "Noirs", nul: "Nul", blancs: "Blancs" };
@@ -420,6 +422,10 @@ function EnTete({ mp, id, titre, sujets }: { mp: MesPronos; id: string; titre: s
           <span className={cn("mono-label shrink-0", gagne ? "text-[#9fe0a8]" : "text-white/55")}>
             {mp.phase === "en-jeu" ? `Verdict ${mp.p.verdict} · ` : ""}+{gagne} XP
           </span>
+        ) : mp.phase === "a-rattraper" ? (
+          <span className="mono-label shrink-0 text-white/80">
+            {SIGNE_SUSPENS} {A_RATTRAPER}
+          </span>
         ) : (
           <span className="mono-label flex shrink-0 items-center gap-2 text-white/80">
             <Pouls bat={mp.phase === "en-jeu"} /> {mp.phase === "en-jeu" ? "En jeu" : "Fermé"}
@@ -443,7 +449,7 @@ function Pied({ mp }: { mp: MesPronos }) {
   return (
     <p className="mono-label text-white/45">
       {`Toute la journée · ${mp.plafond} XP au plus${tribune ? " depuis la tribune" : ""} · `}
-      {mp.phase === "ouvert" ? "ferme au premier coup d'envoi" : `définitif ${mp.p.verdict}`}
+      {mp.phase === "ouvert" ? "ferme au premier coup d'envoi" : mp.phase === "a-rattraper" ? A_RATTRAPER : `définitif ${mp.p.verdict}`}
     </p>
   );
 }

@@ -14,6 +14,10 @@
 // présence sous la carte. Les terrains vivent dans la saison
 // (`saison.terrains`) ; l'admin donne l'adresse de chaque match juste sous la
 // carte.
+// Une journée en suspens (12/11/2026, saisie/suspens.ts) garde sa carte,
+// marquée « ‖ À rattraper », et sa fiche finit sur une seule étape « ‖ En
+// suspens · à rattraper » (et son motif) à la place de la feuille, des votes
+// et des divisions.
 //
 // La discussion d'un match (22/10) : sur le plan, une bulle de messages au
 // coin de son sticker, rouge avec ce que je n'ai pas lu (Sabri : « comme une
@@ -147,6 +151,7 @@ import { ContratsSur } from "@/components/sfl/map/contrats-sur";
 import { cleVille, type ContratPlan, type VillePlan } from "@/components/sfl/map/joueurs";
 import { useMaintenant, useMissionsDeLaLigue } from "@/hooks/use-missions";
 import { etatRevelation, finDuVote, libelleFinDuVote, libelleRevelation, nouveauRegime } from "@/lib/sfl/revelation";
+import { estEnSuspens, libelleSuspens, SIGNE_SUSPENS } from "@/lib/sfl/saisie/suspens";
 import { TOUTES_AMBIANCES, type Ambiance } from "@/components/sfl/map/ambiances";
 import { calculerZones, dansContour, numeroZone, type Foyer, type VilleZone, type Zone } from "@/lib/sfl/zones";
 import { maVille, villeOuLigue } from "@/lib/sfl/villes";
@@ -592,7 +597,10 @@ export default function MapPage() {
           const dedans = ici.includes(player.name);
           // La convocation du dimanche : on y répond pour toute la journée.
           const commeConvocation = convoquee && !separe;
-          const { etat, texte } = joue
+          // La journée en suspens (saisie/suspens.ts) : « ‖ À rattraper », jouée ou non.
+          const { etat, texte } = estEnSuspens(m)
+            ? { etat: { genre: "a-rattraper" } as EtatSticker, texte: `${SIGNE_SUSPENS} À rattraper` }
+            : joue
             ? { etat: { genre: "joue" } as EtatSticker, texte: dedans ? "Joué · tu y étais" : "Joué" }
             : commeConvocation
               ? etatLigue(p.mine === "present", p.presents.length)
@@ -1386,6 +1394,17 @@ export default function MapPage() {
     const fin = meta ? finDuVote(meta, saison.numero ?? 0, instant) : null;
     const votesClos = joue && (fin ? instant.getTime() >= fin.getTime() : (ecartJours(choisi.dateLabel, aujourdhui) ?? 0) < 0);
     const j = choisi.j;
+    // La journée en suspens (saisie/suspens.ts) : la feuille, les votes et
+    // les divisions laissent place à une seule étape, sans heure promise.
+    const suspens = libelleSuspens(meta);
+    if (suspens) {
+      return [
+        { nom: "Convocation", sous: "le lundi", faite: convocation },
+        { nom: "Les équipes", sous: "vendredi 19 h", faite: joue || feuille.length > 0 },
+        { nom: "Coup d'envoi", sous: choisi.heure, faite: joue || enDirect || (ecartJours(choisi.dateLabel, aujourdhui) ?? 1) < 0 },
+        { nom: `${SIGNE_SUSPENS} ${suspens.etat}`, sous: suspens.motif, faite: false },
+      ];
+    }
     // La feuille est faite quand chaque match a son résultat, pas au premier but.
     const feuilleFaite = j != null ? journeeTerminee(saison, j) : joue;
     // Les divisions à la révélation, dès la J5 (revelation.ts) ; une journée
@@ -1434,7 +1453,9 @@ export default function MapPage() {
     ? `${signes} CONTRAT${signes > 1 ? "S" : ""} EN JEU`
     : n
       ? `${n} MATCH${n > 1 ? "S" : ""} OUVERT${n > 1 ? "S" : ""}`
-      : "MATCH JOUÉ";
+      : affiches.some((m) => m.etat.genre === "a-rattraper")
+        ? `${SIGNE_SUSPENS} À RATTRAPER`
+        : "MATCH JOUÉ";
   // Le titre suit le zoom (31/10) : de près la commune, plus loin la zone
   // où l'on est, de très loin Bola tout entier ; il ne ment plus quand on
   // voit la mer du Nord.

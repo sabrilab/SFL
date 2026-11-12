@@ -1,6 +1,7 @@
 "use client";
 
 // Les résultats des votes Impact / Défensive, pour l'admin (Feuille → Votes).
+// Une journée en suspens (saisie/suspens.ts) n'a pas de vote : « à rattraper ».
 //
 // Sabri, 25/10 : « Est-ce que tu peux montrer dans l'espace admin les
 // résultats des votes ? » Côté joueurs, les voix restent cachées tant que le
@@ -108,7 +109,9 @@ export function ResultatsVotes({ j }: { j?: number } = {}) {
   const etat = etatRevelation(saison, jn.j, t);
   const pastille = ouvert
     ? `Ouvert jusqu'à ${libelleFinDuVote(saison, jn.j, t)}`
-    : etat === "revelee"
+    : etat === "a-rattraper"
+      ? "Pas de vote · à rattraper"
+      : etat === "revelee"
       ? "Révélé"
       : etat === "bloquee"
         ? "Bloqué"

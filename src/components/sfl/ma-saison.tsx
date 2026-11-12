@@ -18,7 +18,8 @@
 // dimanche dans les Actus (/ligue#j2), pas l'ancien récap ; ses points et sa
 // place, le Pépite d'Or ; un point fort, son classement (?classement=buts),
 // sa place en pastille, pleine sur le podium. Le haut dit jusqu'où va la
-// saison lue : « Saison 1 · après J2 ».
+// saison lue : « Saison 1 · après J2 » ; une journée en suspens
+// (saisie/suspens.ts) n'y entre pas, et se dit dessous : « ‖ J5 · À RATTRAPER ».
 // Noir et blanc : seuls ses titres du jour portent la couleur de leur carte
 // (or, rouge, bleu : teinte-carte.ts). Calcul dans lib/sfl/fiche-joueur.ts
 // (dimanchesDe, ficheJoueur).
@@ -41,6 +42,7 @@ import {
 } from "@/lib/sfl/fiche-joueur";
 import { ordinal } from "@/lib/sfl/fin-de-saison";
 import { journeeJouee } from "@/lib/sfl/saisie/mutations";
+import { MarqueSuspens } from "@/components/sfl/suspens";
 import { titreEnGrand } from "@/lib/sfl/titres-ecrans";
 import { cn } from "@/lib/utils";
 
@@ -242,6 +244,7 @@ export function MaSaison({
           {apres > 0 && ` · après J${apres}`}
         </span>
       </div>
+      <MarqueSuspens className="-mt-1 px-1" />
 
       <DernierDimanche d={dernier} rang={rangs.get(dernier.j)} />
 

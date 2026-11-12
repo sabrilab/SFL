@@ -6,7 +6,9 @@
 // 30/10, chaque lettre tapée d'une date partait à toute la ligue). En bas,
 // « Jeter le brouillon » pour une journée que la ligue n'a jamais vue, sinon
 // « Supprimer la journée » — l'un et l'autre confirmés, rattrapables par la
-// corbeille.
+// corbeille. Une journée en ligne avant son coup d'envoi a aussi, au-dessus,
+// « Suspendre la J5 » (12/11/2026, saisie/suspens.ts : les travaux annoncés
+// la veille), qui ouvre son glissé.
 
 import { useState } from "react";
 import { reglerMatch, updateJournee } from "@/lib/sfl/saisie/mutations";
@@ -28,6 +30,7 @@ export function FeuilleQuandOu({
   faire,
   onJeter,
   onSupprimer,
+  onSuspendre,
 }: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
@@ -39,6 +42,8 @@ export function FeuilleQuandOu({
   faire: (f: (s: Saison) => Saison, label: string) => boolean;
   onJeter: () => void;
   onSupprimer: () => void;
+  /** « Suspendre la J5 », pour une journée en ligne avant son coup d'envoi. */
+  onSuspendre?: () => void;
 }) {
   const meta = saison.journees.find((m) => m.j === j);
   const [date, setDate] = useState(meta?.date ?? "");
@@ -72,6 +77,11 @@ export function FeuilleQuandOu({
           <button type="button" onClick={enregistrer} className="bouton-principal h-12 text-lecture font-semibold">
             Enregistrer
           </button>
+          {onSuspendre && (
+            <button type="button" onClick={onSuspendre} className="bouton-discret h-10 text-ligne font-semibold">
+              Suspendre la J{j}
+            </button>
+          )}
           {dejaPubliee(meta) ? (
             <button type="button" onClick={onSupprimer} className="bouton-discret h-10 text-ligne font-semibold">
               Supprimer la journée

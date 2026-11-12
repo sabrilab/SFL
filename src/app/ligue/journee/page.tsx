@@ -14,6 +14,10 @@
 // /saisons/N), relu dans son archive, sans les prochaines journées ; la
 // flèche ramène à cette saison.
 // Le récap lui-même vit dans feed/journee-recap.tsx.
+// Une journée en suspens (12/11/2026, saisie/suspens.ts) garde sa capsule,
+// « ‖ à rattraper » au lieu de ses buts ; ouverte, sa carte (suspens.tsx :
+// la date, la pastille, le motif, ses matchs sans score) prend la place du
+// récap, qui n'a rien à compter.
 
 import Link from "next/link";
 import { BoutonRetour } from "@/components/layout/bouton-retour";
@@ -22,6 +26,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useSeason } from "@/components/sfl/season-provider";
 import { labelDateFr, prochainDimanche } from "@/lib/sfl/convocation-temps";
 import { JourneeRecap } from "@/components/sfl/feed/journee-recap";
+import { CarteSuspens } from "@/components/sfl/suspens";
+import { A_RATTRAPER, estEnSuspens, SIGNE_SUSPENS } from "@/lib/sfl/saisie/suspens";
 import { Ecarts } from "@/components/sfl/ecarts";
 import { SaisonArchiveProvider } from "@/components/sfl/season-provider";
 import { journeeJouee, saisonDepuisArchive } from "@/lib/sfl/saisie/mutations";
@@ -112,6 +118,11 @@ function Ligue({ saisonClose }: { saisonClose?: { numero: number; nom: string } 
     [journees, saison.entries]
   );
   const latestJ = played[played.length - 1]?.j ?? journees[0]?.j ?? 1;
+  // Les journées en suspens de la saison en cours : leur capsule reste, à rattraper.
+  const capsulesJ = useMemo(() => {
+    const suspendues = saisonClose ? [] : journees.filter((x) => !played.some((p) => p.j === x.j) && estEnSuspens(saison.journees.find((m) => m.j === x.j)));
+    return [...played, ...suspendues].sort((a, b) => a.j - b.j);
+  }, [played, journees, saison.journees, saisonClose]);
 
   // La saison passée, pour son dernier récap tant que rien n'est joué.
   const derniereArchive = saison.archives?.[saison.archives.length - 1];
@@ -125,10 +136,17 @@ function Ligue({ saisonClose }: { saisonClose?: { numero: number; nom: string } 
   const [selectedJ, setSelectedJ] = useState<number | null>(Number.isInteger(jDemandee) && jDemandee > 0 ? jDemandee : null);
   // Une journée qui attend sa révélation (revelation.ts) n'a pas encore de récap : la dernière comptée.
   const currentJ = selectedJ != null && !saison.figee?.caches.includes(selectedJ) ? selectedJ : latestJ;
+  const metaCourante = saison.journees.find((m) => m.j === currentJ);
+  const courantEnSuspens = !saisonClose && estEnSuspens(metaCourante);
   const [opening, setOpening] = useState<number | null>(null);
 
   const openJournee = (j: number) => {
     if (j === currentJ || opening !== null) return;
+    // Une journée en suspens n'a pas de récap à dérouler : sa carte, tout de suite.
+    if (estEnSuspens(saison.journees.find((m) => m.j === j))) {
+      setSelectedJ(j);
+      return;
+    }
     setOpening(j);
   };
   const onReveal = useCallback(() => {
@@ -165,8 +183,9 @@ function Ligue({ saisonClose }: { saisonClose?: { numero: number; nom: string } 
             : "-mx-5 overflow-x-auto px-5 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         )}
       >
-        {[...played].reverse().map((jn) => {
+        {[...capsulesJ].reverse().map((jn) => {
           const active = jn.j === currentJ;
+          const suspendue = estEnSuspens(saison.journees.find((m) => m.j === jn.j));
           const buts = (jn.matches ?? []).reduce(
             (s, m) => s + m.teamA.score + m.teamB.score,
             0
@@ -197,7 +216,7 @@ function Ligue({ saisonClose }: { saisonClose?: { numero: number; nom: string } 
                   active ? "bouton-sous" : "text-encre-4"
                 )}
               >
-                {buts} buts
+                {suspendue ? `${SIGNE_SUSPENS} ${A_RATTRAPER}` : `${buts} buts`}
               </span>
             </button>
           );
@@ -271,7 +290,7 @@ function Ligue({ saisonClose }: { saisonClose?: { numero: number; nom: string } 
         </>
       ) : (
         <>
-          {played.length > 0 && <div className="-mt-1 lg:hidden">{capsules(false)}</div>}
+          {capsulesJ.length > 0 && <div className="-mt-1 lg:hidden">{capsules(false)}</div>}
 
           {/* Sur ordinateur, au nombre d'or : le récap dans la grande colonne,
               les journées et les prochaines dans la petite, à côté. */}
@@ -280,9 +299,11 @@ function Ligue({ saisonClose }: { saisonClose?: { numero: number; nom: string } 
                 Borné en largeur : au-delà, une ligne de texte devient illisible. */}
             <div className="mesure flex min-w-0 flex-col gap-6 lg:col-start-1 lg:row-start-1 lg:max-w-none">
               {/* Les joueurs d'abord, en cartes ; puis les écarts, où la saison se raconte. */}
-              {played.length > 0 && <ALHonneur j={currentJ} />}
-              <Ecarts />
-              {played.length === 0 && derniereArchive && !saisonClose ? (
+              {played.length > 0 && !courantEnSuspens && <ALHonneur j={currentJ} />}
+              {!courantEnSuspens && <Ecarts />}
+              {courantEnSuspens && metaCourante ? (
+                <CarteSuspens meta={metaCourante} />
+              ) : played.length === 0 && derniereArchive && !saisonClose ? (
                 // Rien de joué cette saison : le dernier récap de la saison
                 // passée, en attendant le premier de la nouvelle.
                 <>
@@ -299,7 +320,7 @@ function Ligue({ saisonClose }: { saisonClose?: { numero: number; nom: string } 
             </div>
 
             <aside className="flex min-w-0 flex-col gap-6 lg:col-start-2 lg:row-start-1 lg:gap-[var(--fib-34)]">
-              {played.length > 0 && <div className="hidden lg:block">{capsules(true)}</div>}
+              {capsulesJ.length > 0 && <div className="hidden lg:block">{capsules(true)}</div>}
               {/* 16 · Les prochaines journées (pas dans une saison close) */}
               {!saisonClose && (
                 <section className="mesure lg:max-w-none">

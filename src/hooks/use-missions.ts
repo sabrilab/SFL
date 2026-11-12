@@ -13,6 +13,8 @@
 // Les XP S (lib/sfl/xp-s.ts) sortent du même calcul (journalCompletAvecS) :
 // useXpS les lit, au plus haut avec le dernier bilan du serveur quand le
 // calcul de l'appareil est incomplet.
+// Une journée en suspens (saisie/suspens.ts) est en phase « a-rattraper »
+// passé son coup d'envoi (phaseDeJournee, pronos.ts) : ni verdict ni XP.
 
 import { createContext, useContext, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { useMyPlayer } from "@/components/sfl/player-provider";
@@ -24,6 +26,7 @@ import { useListePronos } from "@/hooks/use-liste-pronos";
 import { useRecrues } from "@/hooks/use-recrues";
 import { useVotes } from "@/hooks/use-votes";
 import { HORLOGE_EVENT, maintenantMs } from "@/lib/sfl/horloge";
+import { phaseDeJournee, type PhaseFlair } from "@/lib/sfl/pronos";
 import {
   aJoue,
   bilanDe,
@@ -227,10 +230,13 @@ export function useSaisonJugee(maintenant: Date) {
   return { saison, jugee, votes };
 }
 
-/** Avant le coup d'envoi, jusqu'à la révélation (finDuJour), puis fini. */
+/**
+ * Avant le coup d'envoi, jusqu'à la révélation (finDuJour), puis fini ; une
+ * journée en suspens, passé son coup d'envoi : « a-rattraper » (ni verdict
+ * ni XP avant la reprise, saisie/suspens.ts).
+ */
 function phaseDe(d: DimancheMissions, maintenant: Date): Phase {
-  const t = maintenant.getTime();
-  return t < d.coupEnvoi.getTime() ? "ouvert" : t < d.finDuJour.getTime() ? "en-jeu" : "fini";
+  return phaseDeJournee(d, maintenant.getTime());
 }
 
 /** Celui dont l'écran montre les missions : moi si je suis sur la feuille ; dans un aperçu, sinon, un joueur de la feuille. */
@@ -260,7 +266,7 @@ export interface LigneMission {
   verdict: Verdict;
 }
 
-export type Phase = "ouvert" | "en-jeu" | "fini";
+export type Phase = PhaseFlair;
 
 export interface MesMissions {
   d: DimancheMissions;

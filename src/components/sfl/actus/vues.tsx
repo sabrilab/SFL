@@ -15,6 +15,9 @@
 // Sur grand écran (dès 768 px) : les Classements au nombre d'or, ma synthèse
 // à gauche (qui reste à l'écran) et tous les classements à droite ; les
 // Matchs en grille, deux terrains de front, trois dès 1280 px.
+// Une journée en suspens (12/11/2026, saisie/suspens.ts) n'est dans aucun
+// chiffre (la vue figée l'ignore) : les classements portent en tête sa
+// marque, « ‖ J5 · À RATTRAPER » (suspens.tsx).
 
 import { useRouter } from "next/navigation";
 import { useCollant } from "@/hooks/use-collant";
@@ -27,6 +30,7 @@ import { IlsSeDemarquent } from "@/components/sfl/distinctions";
 import { Classements } from "@/components/sfl/classements";
 import { CarteJournee } from "@/components/sfl/carte-journee";
 import { Nom } from "@/components/sfl/nom";
+import { MarqueSuspens } from "@/components/sfl/suspens";
 import { cn } from "@/lib/utils";
 
 /** Les journées jouées : un résultat, un but ou une passe saisis. */
@@ -129,7 +133,14 @@ export function VueClassements({ vote, classement, cle }: { vote?: React.ReactNo
           </section>
         ) : null}
       </div>
-      {played.length === 0 ? <IlsSeDemarquent /> : <Classements me={me} initial={classement} cle={cle} />}
+      {played.length === 0 ? (
+        <IlsSeDemarquent />
+      ) : (
+        <div className="flex min-w-0 flex-col gap-3">
+          <MarqueSuspens className="px-1" />
+          <Classements me={me} initial={classement} cle={cle} />
+        </div>
+      )}
     </div>
   );
 }

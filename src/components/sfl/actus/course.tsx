@@ -43,6 +43,12 @@
 // ?exploit=… (la notification d'une félicitation) descend jusqu'à sa rubrique,
 // #j2 (un dimanche touché dans Ma saison) jusqu'à ce dimanche.
 //
+// Une journée en suspens (12/11/2026, saisie/suspens.ts) ne compte nulle part,
+// donc n'a ni terrain ni scènes dans le fil (la vue figée l'ignore) ; la
+// frise des dimanches la dit « J5 · à rattraper » et mène à sa carte, en tête
+// du fil (suspens.tsx : la date, l'état, le motif, ses matchs sans score) ; le
+// direct ne la monte pas ; les classements portent sa marque (vues.tsx).
+//
 // Le présent et le passé (Sabri, 24/10 : le Wall of Fame « dans la section
 // Actu », avec de quoi voir « le passé ou le présent ») : le bouton de la
 // saison, à côté de la loupe (epoques.tsx), déroule la saison en cours, les
@@ -85,6 +91,8 @@ import { MeteoMatch } from "@/components/sfl/meteo-match";
 import { dateIsoDuLibelle, joursJusquA } from "@/lib/sfl/meteo";
 import { estLeJourOuSaNuit } from "@/lib/sfl/convocation-temps";
 import { journeeComptee, verdictDeJournee } from "@/lib/sfl/revelation";
+import { A_RATTRAPER, estEnSuspens, journeesEnSuspens } from "@/lib/sfl/saisie/suspens";
+import { CarteSuspens } from "@/components/sfl/suspens";
 import { journeeTerminee } from "@/lib/sfl/saisie/engine";
 import { useMaintenant } from "@/hooks/use-missions";
 import { annonceEnCours, J_DECOUPAGE, nomDivision, type Division } from "@/lib/sfl/divisions";
@@ -661,13 +669,18 @@ function Convocation({ p, className }: { p: ReturnType<typeof usePresence>; clas
  * journée compte (revelation.ts). Le point rouge et « En direct » tant qu'un
  * match se joue ; les matchs finis, l'heure de la révélation (« J5 · 19 h »).
  * Le jour passé (et sa nuit, jusqu'à 1 h), plus rien : une journée bloquée
- * se règle dans l'admin, pas dans le fil.
+ * se règle dans l'admin, pas dans le fil. Une journée en suspens
+ * (saisie/suspens.ts) n'a pas de direct : elle n'est pas montée.
  */
 function EnDirect({ ouvrir, sauf }: { ouvrir: (j: number) => void; sauf?: number }) {
   const { journeesDirect: journees, saisonLue } = useSeason();
   const maintenant = useMaintenant();
   const live = journees.find(
-    (j) => (j.matches?.length ?? 0) > 0 && estLeJourOuSaNuit(j.date, maintenant) && !journeeComptee(saisonLue, j.j, maintenant)
+    (j) =>
+      (j.matches?.length ?? 0) > 0 &&
+      estLeJourOuSaNuit(j.date, maintenant) &&
+      !journeeComptee(saisonLue, j.j, maintenant) &&
+      !estEnSuspens(saisonLue.journees.find((m) => m.j === j.j))
   );
   // Le dimanche en tête du fil a déjà son terrain, qui se remplit de même.
   if (!live || live.j === sauf) return null;
@@ -998,9 +1011,21 @@ function EpoqueEnCours({ epoques, vue, onVue, classement, exploit }: PropsEpoque
   const isoDernier = une?.journee?.date ? dateIsoDuLibelle(une.journee.date, aujourdhui) : null;
   const ecart = isoDernier ? joursJusquA(isoDernier, aujourdhui) : null;
   const recapDabord = ecart != null && ecart <= 0 && ecart >= -3;
-  const etapeSemaine: Etape = { id: aVenir ? `j${prochain}` : "semaine", label: aVenir ? `J${prochain}` : "Semaine", sous: aVenir ? "à venir" : null };
+  // Le dimanche de la convocation en suspens (saisie/suspens.ts) : « J5 · à rattraper ».
+  const prochainEnSuspens = aVenir && estEnSuspens(saison.journees.find((m) => m.j === prochain));
+  const etapeSemaine: Etape = {
+    id: aVenir ? `j${prochain}` : "semaine",
+    label: aVenir ? `J${prochain}` : "Semaine",
+    sous: aVenir ? (prochainEnSuspens ? A_RATTRAPER : "à venir") : null,
+  };
   const etapeUne: Etape[] = une ? [{ id: `j${une.j}`, label: `J${une.j}`, sous: une.journee?.date ?? null }] : [];
+  // Les journées en suspens (saisie/suspens.ts), jamais dans le fil des dimanches joués :
+  // leur carte « à rattraper » en tête, et leur puce dans le rail.
+  const enSuspens = journeesEnSuspens(saison)
+    .filter((j) => j !== (aVenir ? prochain : -1) && !dimanches.some((d) => d.j === j))
+    .sort((a, b) => b - a);
   const etapes: Etape[] = [
+    ...enSuspens.map((j) => ({ id: `j${j}`, label: `J${j}`, sous: A_RATTRAPER })),
     ...(recapDabord ? [...etapeUne, etapeSemaine] : [etapeSemaine, ...etapeUne]),
     ...avantes.map((d) => ({ id: `j${d.j}`, label: `J${d.j}`, sous: d.journee?.date ?? null })),
   ];
@@ -1071,6 +1096,14 @@ function EpoqueEnCours({ epoques, vue, onVue, classement, exploit }: PropsEpoque
           {/* Le jour du match, la feuille qui se remplit, avant tout le reste. */}
           {/* Son lien mène à la feuille en direct (la Map), pas au récap, qui attend la révélation. */}
           <EnDirect ouvrir={() => router.push("/map")} sauf={recapDabord ? une?.j : undefined} />
+          {enSuspens.map((j) => {
+            const meta = saison.journees.find((m) => m.j === j);
+            return meta ? (
+              <section key={j} id={`j${j}`} className="scroll-mt-[60px] px-5 md:px-0">
+                <CarteSuspens meta={meta} />
+              </section>
+            ) : null;
+          })}
           {recapDabord ? (
             <>
               {leDernier}

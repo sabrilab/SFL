@@ -11,7 +11,8 @@
 //     (ma-carte/rubriques.tsx) lisent les mêmes (useMonFlair).
 // La même fiche noire que sur la feuille (flair.css), dans les deux modes :
 // ni or, ni bleu, ni rouge (cartes MVP / Défensive / Impact) ; le juste en
-// vert, le raté barré.
+// vert, le raté barré. Une journée en suspens (saisie/suspens.ts) se lit
+// « ‖ à rattraper », sans verdict ni XP : ses choix sont gardés pour la reprise.
 
 import { FORMAT_CARTE } from "@/components/sfl/mini-carte";
 import { PlayerCard } from "@/components/sfl/player-card";
@@ -20,6 +21,7 @@ import { BLANCS, NOIRS, Pouls } from "@/components/sfl/actus/missions";
 import { useIdentites } from "@/hooks/use-identites";
 import { useMonFlair } from "@/hooks/use-pronos";
 import { NOM_ECART, type ChoixFlair, type FlairDeJournee } from "@/lib/sfl/pronos";
+import { A_RATTRAPER, SIGNE_SUSPENS } from "@/lib/sfl/saisie/suspens";
 import { cn } from "@/lib/utils";
 import "@/components/sfl/matchs/flair.css";
 
@@ -97,6 +99,13 @@ function EtatJournee({ f }: { f: FlairDeJournee }) {
     return (
       <span className="mono-label flex shrink-0 items-center gap-2 text-white/80">
         <Pouls bat={false} /> Ouvert
+      </span>
+    );
+  // La journée en suspens (saisie/suspens.ts) : ni verdict ni XP avant sa reprise.
+  if (f.phase === "a-rattraper")
+    return (
+      <span className="mono-label shrink-0 text-white/80">
+        {SIGNE_SUSPENS} {A_RATTRAPER}
       </span>
     );
   if (!f.juges)

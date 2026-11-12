@@ -81,7 +81,10 @@ export function cartonsDeLaSaison(saison: Saison): Map<string, CartonsDuJoueur> 
   const depuis = debutDesCartons(numero);
   const out = new Map<string, CartonsDuJoueur>();
   if (depuis == null) return out;
-  // Ce que la ligue voit : jamais une journée en brouillon.
+  // Ce que la ligue voit : jamais une journée en brouillon. Une journée en
+  // suspens (saisie/suspens.ts) garde ses cartons (décision D3 du 12/11 : le
+  // retard a eu lieu, la discipline ne dépend pas du score) ; seul son −1
+  // attend la reprise, avec la vue figée.
   const publiees = new Set(saison.journees.filter((m) => !estBrouillon(m)).map((m) => m.j));
   // Un retard par joueur et par journée au plus (sa ligne de présent).
   const retards = new Map<string, { joueur: string; js: Set<number> }>();

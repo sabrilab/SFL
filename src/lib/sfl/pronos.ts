@@ -35,6 +35,9 @@
 // que jouer le dimanche : jamais plus que jouer ; PLAFOND_TRIBUNE pour qui
 // n'est pas sur la feuille.
 //
+// Une journée en suspens (saisie/suspens.ts) garde ses pronos sans les juger :
+// sa phase est « a-rattraper » (phaseDeJournee), jugée à la reprise.
+//
 // Pur : ni React ni réseau. Les pronos arrivent en paramètres (pronos-store.ts).
 
 import { heureDuJour } from "./convocation-temps";
@@ -157,6 +160,8 @@ export interface JourneePronos {
   /** « à 19 h », « à minuit », « ce soir » (missions.ts, heuresDeJournee). */
   verdict: string;
   joue: boolean;
+  /** La journée est en suspens (saisie/suspens.ts) : ses pronos sont gardés, jugés à la reprise. */
+  suspens: boolean;
   matchs: MatchProno[];
   /** Tous les joueurs de la feuille, masqués exclus. */
   joueurs: string[];
@@ -195,6 +200,7 @@ export function pronosDeJournee(
     finDuJour: d.finDuJour,
     verdict: d.verdict,
     joue: d.joue,
+    suspens: d.suspens,
     matchs,
     joueurs: matchs.flatMap((m) => [...m.noirs, ...m.blancs]),
     camps: d.camps,
@@ -520,7 +526,15 @@ export function ajouterPronos(
 // lignesPronos : posé avant le coup d'envoi, plafond par journée, acquis à
 // la révélation (ou à la clôture).
 
-export type PhaseFlair = "ouvert" | "en-jeu" | "fini";
+/** « a-rattraper » : la journée en suspens, après son coup d'envoi (ni verdict ni XP avant la reprise). */
+export type PhaseFlair = "ouvert" | "en-jeu" | "fini" | "a-rattraper";
+
+/** La phase d'une journée de pronos ou de missions à l'instant t (la même règle pour les deux). */
+export function phaseDeJournee(p: { coupEnvoi: Date; finDuJour: Date; suspens: boolean }, t: number): PhaseFlair {
+  if (t < p.coupEnvoi.getTime()) return "ouvert";
+  if (p.suspens) return "a-rattraper";
+  return t < p.finDuJour.getTime() ? "en-jeu" : "fini";
+}
 
 export interface ChoixFlair {
   sujet: string;
@@ -600,7 +614,7 @@ export function flairsDuJoueur(
     const p = pronosDeJournee(lue, numero, j, reference);
     if (!p) continue;
     const t = maintenant.getTime();
-    const phase: PhaseFlair = close ? "fini" : t < p.coupEnvoi.getTime() ? "ouvert" : t < p.finDuJour.getTime() ? "en-jeu" : "fini";
+    const phase: PhaseFlair = close ? "fini" : phaseDeJournee(p, t);
     const res = p.joue ? resultatsDeJournee(p, lue.entries) : new Map<string, string[]>();
     const choix: ChoixFlair[] = miens
       .filter((x) => x.j === j)

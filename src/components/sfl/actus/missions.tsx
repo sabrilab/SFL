@@ -22,6 +22,8 @@
 // à mesure que la feuille se remplit et devient définitif à la révélation
 // (19 h ; minuit jusqu'à la J4). L'XP va
 // au Niveau XP et au passe de la saison (Ma carte), jamais aux points Pépite.
+// Une journée en suspens (saisie/suspens.ts) garde ses missions et leurs
+// réponses, sans verdict ni XP : « ‖ À rattraper » jusqu'à sa reprise.
 //
 // Toute la ligue voit les missions acceptées, sous les fiches (Contrats en
 // jeu, contrats-en-jeu.tsx) : dès que quelqu'un signe un contrat contre toi,
@@ -46,6 +48,7 @@ import {
   type Rang,
   type Reponse,
 } from "@/lib/sfl/missions";
+import { A_RATTRAPER, SIGNE_SUSPENS } from "@/lib/sfl/saisie/suspens";
 import { InsigneLune, ViseurLune } from "./lune";
 import { cn } from "@/lib/utils";
 import { ANTON } from "./ecran";
@@ -129,6 +132,8 @@ export function Pouls({ bat }: { bat: boolean }) {
 /** En haut à droite : le compte à rebours, puis le match en cours, puis le verdict. */
 function Moment({ mm }: { mm: MesMissions }) {
   if (mm.phase === "ouvert") return <CompteARebours fin={mm.d.coupEnvoi} />;
+  // La journée en suspens (saisie/suspens.ts) : ni match en cours, ni verdict.
+  if (mm.phase === "a-rattraper") return <span className="mono-label shrink-0 text-encre-2">{SIGNE_SUSPENS} {capitale(A_RATTRAPER)}</span>;
   if (mm.phase === "en-jeu" && !mm.d.joue)
     return (
       <span className="mono-label flex shrink-0 items-center gap-2 text-encre-2">
@@ -320,7 +325,7 @@ function Champs({ l, mm }: { l: LigneMission; mm: MesMissions }) {
       <div>
         <span className="mono-label text-white/45">{mm.phase === "ouvert" ? "Avant" : "Verdict"}</span>
         <span className="truncate text-lecture leading-[25px] font-bold">
-          {mm.phase === "ouvert" ? limite(mm.d.coupEnvoi, mm.d.heure) : mm.phase === "en-jeu" ? capitale(mm.d.verdict) : "Définitif"}
+          {mm.phase === "ouvert" ? limite(mm.d.coupEnvoi, mm.d.heure) : mm.phase === "en-jeu" || mm.phase === "a-rattraper" ? capitale(mm.d.verdict) : "Définitif"}
         </span>
       </div>
     </div>
@@ -414,7 +419,7 @@ function Action({ l, mm, attente, repondre }: { l: LigneMission; mm: MesMissions
       <div className="flex min-h-12 flex-wrap items-center gap-x-3 gap-y-1.5 pl-1">
         <span className="fiche__ton flex items-center gap-2">
           <Pouls bat={mm.phase === "en-jeu"} />
-          <span className="mono-label">{mm.phase === "fini" ? "En attente de la feuille" : "En jeu"}</span>
+          <span className="mono-label">{mm.phase === "fini" ? "En attente de la feuille" : mm.phase === "a-rattraper" ? capitale(A_RATTRAPER) : "En jeu"}</span>
         </span>
         {detail}
       </div>

@@ -37,12 +37,19 @@
 // qui suit la prime ; et accepter engage : une mission acceptée puis ratée
 // coûte la moitié de sa prime. Passer ne coûte rien.
 //
+// Une journée en suspens (12/11/2026, saisie/suspens.ts) garde ses missions
+// et leurs réponses, mais rien n'y est jugé : pas de verdict (`finDuJour`
+// repoussé à JAMAIS, `verdict` « à rattraper »), pas d'XP, pas de « Dimanche
+// joué » (la vue figée ne la voit pas jouée), et ses félicitations attendent
+// la reprise. Rien n'est effacé : tout est jugé au rattrapage.
+//
 // Pur : ni React ni réseau. Les réponses et les votes arrivent en paramètres.
 
 import { computeJournees, computeStandings, entryPP } from "./saisie/engine";
 import { anneeProche, dateDeParis } from "./convocation-temps";
 import { revelation, verdictDeJournee } from "./revelation";
 import { journeeJouee } from "./saisie/mutations";
+import { estEnSuspens } from "./saisie/suspens";
 import { isHidden } from "./hidden";
 import { matchsDeJournee, premierCoupDEnvoi } from "./matchs-du-jour";
 import { ovr, type Player } from "./engine";
@@ -177,6 +184,8 @@ export interface DimancheMissions {
   verdict: string;
   /** La feuille porte des résultats. */
   joue: boolean;
+  /** La journée est en suspens (saisie/suspens.ts) : rien n'y est jugé avant sa reprise. */
+  suspens: boolean;
   /** Le vote Impact et Défensive a lieu ce jour-là (journée au MVP calculé). */
   vote: boolean;
   /** Les points Pépite de chacun avant ce dimanche. */
@@ -312,6 +321,9 @@ export function defiDuDimanche(j: number): "gagnez" | "deux-passes" | "record" {
   return (["gagnez", "deux-passes", "record"] as const)[j % 3];
 }
 
+/** La fin d'une journée en suspens : jamais (le plus grand instant d'une Date). */
+export const JAMAIS = new Date(8.64e15);
+
 /**
  * Les missions d'une journée ; null tant que ses équipes ne sont pas faites.
  * `passe` : les lignes des saisons d'avant (archives), pour les seuils et les
@@ -326,18 +338,23 @@ export function defiDuDimanche(j: number): "gagnez" | "deux-passes" | "record" {
  * heures différentes : tout ferme au premier coup d'envoi (« passe devant »
  * se joue sur tous les matchs ; à 15h, on connaîtrait déjà le match de 13h).
  * Les missions d'arbitre s'en servent aussi (missions-arbitre.ts).
+ * Une journée en suspens n'a pas de fin : finDuJour vaut JAMAIS, son verdict
+ * se lit « à rattraper ».
  */
 export function heuresDeJournee(s: SaisonLue, j: number, reference: Date) {
   const meta = s.journees.find((m) => m.j === j);
   const journee = computeJournees(s as Saison).find((x) => x.j === j);
   if (!meta || !journee?.matches?.length) return null;
+  const suspens = estEnSuspens(meta);
   const jm = jourMois(meta.date);
   const heureJournee = heureDe(s, j);
   const heure = premierCoupDEnvoi(matchsDeJournee(journee, [], { heure: heureJournee, lieu: null }), heureJournee);
   const [h, min] = lireHeure(heure);
   const annee = jm ? anneeProche(jm.jour, jm.mois, reference) : 2026;
   const coupEnvoi = jm ? dateDeParis(annee, jm.mois, jm.jour, h, min) : new Date(0);
-  const finDuJour = jm
+  const finDuJour = suspens
+    ? JAMAIS
+    : jm
     ? (revelation(meta, (s as Partial<Saison>).numero ?? 0, reference) ?? dateDeParis(annee, jm.mois, jm.jour + 1))
     : new Date(0);
   /** Le mardi à minuit : deux jours pour noter l'arbitre. */
@@ -345,7 +362,7 @@ export function heuresDeJournee(s: SaisonLue, j: number, reference: Date) {
   // À l'écran, l'heure que dit la frise (« à 19 h ») : finDuJour vaut minuit
   // tant que la fin des matchs est inconnue, mais le verdict tombera plus tôt.
   const verdict = verdictDeJournee(s as Pick<Saison, "numero" | "journees">, j, reference);
-  return { meta, journee, heure, coupEnvoi, finDuJour, finDesNotes, verdict };
+  return { meta, journee, heure, coupEnvoi, finDuJour, finDesNotes, verdict, suspens };
 }
 
 export function missionsDeJournee(
@@ -357,7 +374,7 @@ export function missionsDeJournee(
 ): DimancheMissions | null {
   const heures = heuresDeJournee(s, j, reference);
   if (!heures) return null;
-  const { meta, journee, heure, coupEnvoi, finDuJour, verdict } = heures;
+  const { meta, journee, heure, coupEnvoi, finDuJour, verdict, suspens } = heures;
 
   const avant = pointsAvant(s, j);
   const notes = new Map<string, number>(
@@ -452,6 +469,7 @@ export function missionsDeJournee(
     finDuJour,
     verdict,
     joue: journeeJouee(s, j),
+    suspens,
     vote: !!journee.mvpAuto,
     avant,
     duels,
@@ -796,9 +814,12 @@ export function journalXp(
   const vues = new Set<string>();
   const parExploit = new Map<string, number>();
   const donnees = new Map<string, number>();
+  // Une félicitation d'une journée en suspens attend sa reprise (gardée en base).
+  const enSuspens = (saison: number, j: number) =>
+    estEnSuspens(saisons.find((x) => x.numero === saison)?.lue.journees.find((m) => m.j === j));
   for (const f of felicitations) {
     const cle = `${f.de}|${f.a}|${f.exploit}`;
-    if (f.de === f.a || isHidden(f.de) || vues.has(cle)) continue;
+    if (f.de === f.a || isHidden(f.de) || vues.has(cle) || enSuspens(f.saison, f.j)) continue;
     vues.add(cle);
     const e = `${f.a}|${f.saison}|${f.j}|${f.exploit}`;
     parExploit.set(e, (parExploit.get(e) ?? 0) + 1);

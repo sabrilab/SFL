@@ -28,6 +28,10 @@
 // font ses points — un joueur de D2 n'a jamais plus de points qu'un D1. Le
 // réglage est ici et nulle part ailleurs.
 //
+// Une journée en suspens (12/11/2026, saisie/suspens.ts) ne coupe rien (la
+// vue figée l'a remise en feuille posée), et `pour` la saute : avec la J5 en
+// suspens, ces divisions font jouer la J6, qui n'est pas « en attente ».
+//
 // L'annonce, jusqu'au soir de la J3 (bas du fichier) : quand elle court, son
 // édition (la semaine, puis le dimanche même), la fenêtre de sa notification
 // (la veille dès 18 h, le dimanche de 9 h au coup d'envoi) et ses phrases,
@@ -45,6 +49,7 @@ import { heureMin } from "./ligue-vierge";
 import { matchsDeJournee, premierCoupDEnvoi } from "./matchs-du-jour";
 import { computeJournees, entryPP } from "./saisie/engine";
 import { journeeJouee } from "./saisie/mutations";
+import { journeesEnSuspens } from "./saisie/suspens";
 import { numeroSaison, type Saison } from "./saisie/types";
 import { classables, standingsJusqua } from "./rangs";
 
@@ -156,7 +161,7 @@ export interface EtatDivisions {
   decoupage: Decoupage;
   /** Les dimanches joués en divisions, dans l'ordre, avec qui monte et qui descend. */
   journees: { j: number; mouvements: Mouvement[] }[];
-  /** La journée que ces divisions font jouer : la dernière comptée + 1. */
+  /** La journée que ces divisions font jouer : la dernière comptée + 1, les journées en suspens sautées. */
   pour: number;
   /** Posé par divisionsDeLaJournee pour une journée plus loin que `pour` : la précédente n'est pas encore révélée. */
   perimee?: true;
@@ -170,7 +175,9 @@ export function etatDivisions(saison: Saison): EtatDivisions | null {
   // but saisi en direct n'y entre qu'à la révélation, et une journée révélée
   // puis rouverte reste d'accord avec les points.
   const comptees = [...new Set(saison.journees.map((m) => m.j))].filter((j) => journeeJouee(saison, j)).sort((a, b) => a - b);
-  const pour = (comptees.at(-1) ?? 0) + 1;
+  const enSuspens = new Set(journeesEnSuspens(saison));
+  let pour = (comptees.at(-1) ?? 0) + 1;
+  while (enSuspens.has(pour)) pour++;
   if (!journeeJouee(saison, J_DECOUPAGE)) {
     const decoupage = decouper(saison);
     return {

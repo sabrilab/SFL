@@ -57,7 +57,7 @@ import {
 import { XP_MATCH_ARBITRE } from "@/lib/sfl/missions-arbitre";
 import { XP_RECRUE } from "@/components/sfl/skins-recrues";
 import { PLAFOND_JOURNEE } from "@/lib/sfl/pronos";
-import { journeeJouee } from "@/lib/sfl/saisie/mutations";
+import { premiereAVenir } from "@/lib/sfl/saisie/suspens";
 import { cn } from "@/lib/utils";
 
 const xp = (n: number) => `${n.toLocaleString("fr-FR")} XP`;
@@ -200,7 +200,8 @@ const JOURNEE_SFL = new Set(["flair", "recues", "donnees"]);
 /** La prochaine journée, quand ses missions ne sont pas encore là. */
 function Attente() {
   const { saison } = useSeason();
-  const j = saison.journees.find((m) => !journeeJouee(saison, m.j));
+  // La prochaine journée à jouer : jamais une journée en suspens (saisie/suspens.ts).
+  const j = premiereAVenir(saison);
   return (
     <section className="flex flex-col gap-1.5 px-5">
       <span className="mono-label text-white/45">{j ? `J${j.j} · ${j.date}` : "Fin de saison"}</span>

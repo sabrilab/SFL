@@ -82,6 +82,19 @@ export interface JourneeMeta {
   /** Sa dernière publication (« En ligne · 18:42 »), gardée si on la remet en brouillon. */
   publiee?: { le: string; par: string };
   /**
+   * La journée en suspens (12/11/2026, Ilyes : « que les joueurs puissent
+   * voir que cette journée-là sera rattrapée ») : visible par tous, avec ses
+   * équipes et ses matchs, elle ne compte nulle part et se lit « En suspens ·
+   * à rattraper » jusqu'à « Reprendre ». `date` : sa date au moment de la
+   * suspension (rattrapée à une autre date, la base fait le ménage de
+   * l'ancienne) ; `motif` : une ligne lue par les joueurs. Absent, null ou
+   * false : comme avant. La même règle en base : public.est_en_suspens
+   * (supabase/schema.sql), saisie/suspens.ts ici.
+   */
+  suspens?: { depuis: string; par: string; date: string; motif?: string };
+  /** Sa dernière reprise, gardée comme `publiee`. */
+  reprise?: { le: string; par: string };
+  /**
    * La fin des matchs (ISO) : l'instant où la dernière feuille du jour a été
    * remplie (02/11/2026, revelation.ts). Posé par la base
    * (public.saison_fin_des_matchs), jamais déplacé ; l'app le propose, la
@@ -203,9 +216,11 @@ export interface Saison {
    * Seulement sur une vue figée (revelation.ts, figer) : les journées jouées
    * dont les points attendent la révélation, remises en feuille posée. Une
    * saison qui porte ce champ ne s'écrit jamais (saisieStore.save, et
-   * public.feuille_saine en base).
+   * public.feuille_saine en base). `enSuspens` : les journées en suspens
+   * (saisie/suspens.ts), remises en feuille posée elles aussi, mais qui
+   * n'attendent pas leur révélation : elles ne sont pas dans `caches`.
    */
-  figee?: { a: string; caches: number[] };
+  figee?: { a: string; caches: number[]; enSuspens?: number[] };
   /**
    * Les suspensions de carton rouge que l'admin a levées (01/11/2026,
    * lib/sfl/cartons.ts) : le joueur peut jouer la journée `j`. Les cartons
