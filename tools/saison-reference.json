@@ -20,6 +20,25 @@
       }
     },
     {
+      "nom": "Adel",
+      "poste": "—",
+      "pp": 0,
+      "matchs": 0,
+      "buts": 0,
+      "passes": 0,
+      "mvp": 0,
+      "impact": 0,
+      "def": 0,
+      "stats": {
+        "VIT": 75,
+        "TIR": 75,
+        "PAS": 75,
+        "DRI": 75,
+        "DEF": 75,
+        "PHY": 75
+      }
+    },
+    {
       "nom": "Adil",
       "poste": "MDC",
       "pp": 13,
@@ -324,6 +343,25 @@
       }
     },
     {
+      "nom": "Guillaume",
+      "poste": "DG",
+      "pp": 0,
+      "matchs": 0,
+      "buts": 0,
+      "passes": 0,
+      "mvp": 0,
+      "impact": 0,
+      "def": 0,
+      "stats": {
+        "VIT": 75,
+        "TIR": 75,
+        "PAS": 75,
+        "DRI": 75,
+        "DEF": 75,
+        "PHY": 75
+      }
+    },
+    {
       "nom": "Hasbi",
       "poste": "G",
       "pp": 0,
@@ -368,6 +406,25 @@
       "matchs": 2,
       "buts": 7,
       "passes": 4,
+      "mvp": 0,
+      "impact": 0,
+      "def": 0,
+      "stats": {
+        "VIT": 75,
+        "TIR": 75,
+        "PAS": 75,
+        "DRI": 75,
+        "DEF": 75,
+        "PHY": 75
+      }
+    },
+    {
+      "nom": "Houssyne",
+      "poste": "G",
+      "pp": 0,
+      "matchs": 0,
+      "buts": 0,
+      "passes": 0,
       "mvp": 0,
       "impact": 0,
       "def": 0,
@@ -704,6 +761,25 @@
       }
     },
     {
+      "nom": "Miken",
+      "poste": "—",
+      "pp": 0,
+      "matchs": 0,
+      "buts": 0,
+      "passes": 0,
+      "mvp": 0,
+      "impact": 0,
+      "def": 0,
+      "stats": {
+        "VIT": 75,
+        "TIR": 75,
+        "PAS": 75,
+        "DRI": 75,
+        "DEF": 75,
+        "PHY": 75
+      }
+    },
+    {
       "nom": "Moussa",
       "poste": "DC/MDC",
       "pp": 20,
@@ -853,6 +929,44 @@
         "DRI": 78,
         "DEF": 79,
         "PHY": 80
+      }
+    },
+    {
+      "nom": "Sebovic",
+      "poste": "—",
+      "pp": 0,
+      "matchs": 0,
+      "buts": 0,
+      "passes": 0,
+      "mvp": 0,
+      "impact": 0,
+      "def": 0,
+      "stats": {
+        "VIT": 75,
+        "TIR": 75,
+        "PAS": 75,
+        "DRI": 75,
+        "DEF": 75,
+        "PHY": 75
+      }
+    },
+    {
+      "nom": "Selim",
+      "poste": "—",
+      "pp": 0,
+      "matchs": 0,
+      "buts": 0,
+      "passes": 0,
+      "mvp": 0,
+      "impact": 0,
+      "def": 0,
+      "stats": {
+        "VIT": 75,
+        "TIR": 75,
+        "PAS": 75,
+        "DRI": 75,
+        "DEF": 75,
+        "PHY": 75
       }
     },
     {
@@ -1195,6 +1309,25 @@
         "DRI": 80,
         "DEF": 88,
         "PHY": 85
+      }
+    },
+    {
+      "nom": "Ziad",
+      "poste": "MDC",
+      "pp": 0,
+      "matchs": 0,
+      "buts": 0,
+      "passes": 0,
+      "mvp": 0,
+      "impact": 0,
+      "def": 0,
+      "stats": {
+        "VIT": 75,
+        "TIR": 75,
+        "PAS": 75,
+        "DRI": 75,
+        "DEF": 75,
+        "PHY": 75
       }
     }
   ],

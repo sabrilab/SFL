@@ -215,10 +215,14 @@ export function computeStandings(saison: Saison, evolution: Evolution = evolutio
     }
   }
 
-  // Joueurs du roster évalués mais qui n'ont pas encore joué : présents à 0
-  // dans les classements « showAll » (OVR, présences, discipline).
+  // Joueurs du roster qui n'ont pas encore joué : présents à 0 dans les
+  // classements « showAll » (OVR, présences, discipline), dans la recherche
+  // et derrière leur carte sur la feuille de match. Une fiche non évaluée
+  // (base null) compte comme 75 partout (toStats), elle n'exclut plus le
+  // joueur : Yazid, inscrit sur la feuille de la J5 sans évaluation ni
+  // journée comptée, était introuvable et sa carte ne s'ouvrait pas (12/11/2026).
   for (const r of saison.roster) {
-    if (!agg.has(r.name) && r.base && r.profil !== "En attente") agg.set(r.name, emptyAgg());
+    if (!agg.has(r.name) && r.profil !== "En attente") agg.set(r.name, emptyAgg());
   }
 
   const players: Player[] = [...agg.entries()].map(([name, a]) => {
