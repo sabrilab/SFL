@@ -17,6 +17,9 @@
 // mise à jour officielle ; son journal date chaque match au lieu de « J4 ».
 // Un gardien (poste G, 31/10) lit ses stats de gardien et son barème à lui
 // (lib/sfl/gardien.ts).
+// L'affichage ne sait pas à qui est la note (NoteEvolution, 12/11/2026) :
+// MaNote lui donne ma carte ; la fiche d'un joueur de Bola Club, la sienne
+// (club/fiche-joueur-club.tsx), sur les matchs de son club.
 // Le but : que chacun puisse refaire le calcul, et donc croire sa note.
 // Noir et blanc, en currentColor et en opacités (clair comme sombre) ; les
 // chiffres en Anton, les étiquettes en Inter capitales.
@@ -93,11 +96,8 @@ export function MaNote() {
   const cal = evolution.calendrier;
   // Un gardien de la ligue lit ses stats de gardien (lib/sfl/gardien.ts).
   const gardien = !joueurBola && estGardien(player.poste);
-  const enDirect = useMemo(() => (ev ? plus(ev.officielles, ev.enAttente) : null), [ev]);
   if (!evolution.actif && !joueurBola) return null;
 
-  const note = ovr(player.stats);
-  const gagne = enDirect ? ovr(enDirect) - note : 0;
   const prochaine =
     cal.prochaineApresJ != null
       ? `après la J${cal.prochaineApresJ}`
@@ -105,7 +105,67 @@ export function MaNote() {
   const reste = cal.prochaineApresJ != null ? `dans ${cal.avantProchaine} ${cal.avantProchaine > 1 ? "journées" : "journée"}` : null;
 
   return (
-    <section aria-label="Ma note" className="flex flex-col gap-[var(--fib-21)]">
+    <NoteEvolution
+      nom="Ma note"
+      note={ovr(player.stats)}
+      ev={ev}
+      gardien={gardien}
+      maj={joueurBola ? null : { prochaine, reste }}
+      serie={joueurBola ? "Série" : "Série de présence"}
+      journal={joueurBola ? "Mes matchs" : "Mes dimanches"}
+      date={joueurBola}
+      vide={joueurBola ? "Ta note bouge dès ton premier match validé." : "Ta note bougera dès ton premier dimanche joué."}
+    >
+      {!joueurBola && !horsSfl && <Bareme gardien={gardien} />}
+    </NoteEvolution>
+  );
+}
+
+/**
+ * La note qui évolue, sans savoir à qui elle est : la note officielle et ce
+ * qui est gagné depuis, la prochaine mise à jour, les six jauges, la série,
+ * le journal. MaNote la remplit avec ma carte (SFL ou Bola) ; Bola Club,
+ * avec la carte d'un joueur du club (club/fiche-joueur-club.tsx).
+ */
+export function NoteEvolution({
+  nom,
+  note,
+  ev,
+  gardien,
+  maj,
+  serie,
+  journal,
+  date,
+  majLe,
+  vide,
+  children,
+}: {
+  /** Le nom de la section, pour le lecteur d'écran. */
+  nom: string;
+  /** La note officielle. */
+  note: number;
+  ev: EvolutionJoueur | null | undefined;
+  gardien: boolean;
+  /** La prochaine mise à jour officielle ; null : la carte bouge à chaque match. */
+  maj: { prochaine: string; reste: string | null } | null;
+  /** « Série de présence ». */
+  serie: string;
+  /** Le titre du journal : « Mes dimanches ». */
+  journal: string;
+  /** Le journal date chaque ligne (un match) au lieu de « J4 ». */
+  date?: boolean;
+  /** Ce qui suit « Mise à jour · » dans le journal ; absent : « après J4 ». */
+  majLe?: (apresJ: number) => string;
+  /** Sans évolution encore. */
+  vide: string;
+  /** Sous le journal : le barème. */
+  children?: React.ReactNode;
+}) {
+  const enDirect = useMemo(() => (ev ? plus(ev.officielles, ev.enAttente) : null), [ev]);
+  const gagne = enDirect ? ovr(enDirect) - note : 0;
+
+  return (
+    <section aria-label={nom} className="flex flex-col gap-[var(--fib-21)]">
       <div className="flex items-end justify-between gap-4 border-b border-foreground/10 pb-[var(--fib-13)]">
         <div className="flex items-baseline gap-2">
           <span style={{ ...NOMBRE, fontSize: 64 }} className="tabular-nums">
@@ -117,11 +177,11 @@ export function MaNote() {
             </span>
           )}
         </div>
-        {!joueurBola && (
+        {maj && (
           <div className="flex flex-col items-end gap-1 text-right">
             <span className="mono-label text-[10px] text-foreground/55">Mise à jour officielle</span>
-            <span className="text-[15px] font-semibold">{prochaine}</span>
-            {reste && <span className="font-mono text-[11px] text-foreground/45">{reste}</span>}
+            <span className="text-[15px] font-semibold">{maj.prochaine}</span>
+            {maj.reste && <span className="font-mono text-[11px] text-foreground/45">{maj.reste}</span>}
           </div>
         )}
       </div>
@@ -135,29 +195,39 @@ export function MaNote() {
           </div>
 
           <div className="flex items-center justify-between gap-3">
-            <span className="mono-label text-[10px] text-foreground/55">{joueurBola ? "Série" : "Série de présence"}</span>
-            <span className="flex items-center gap-1.5" aria-label={`${joueurBola ? "Série" : "Série de présence"} : ${ev.serie} sur ${SERIE}`}>
+            <span className="mono-label text-[10px] text-foreground/55">{serie}</span>
+            <span className="flex items-center gap-1.5" aria-label={`${serie} : ${ev.serie} sur ${SERIE}`}>
               {Array.from({ length: SERIE }, (_, i) => (
                 <span key={i} className={cn("size-2.5 rounded-full", i < ev.serie ? "bg-foreground" : "bg-foreground/15")} />
               ))}
             </span>
           </div>
 
-          <Journal ev={ev} bola={joueurBola} gardien={gardien} />
+          <Journal ev={ev} titre={journal} date={date} majLe={majLe} gardien={gardien} />
         </>
       ) : (
-        <p className="text-[15px] text-foreground/60">
-          {joueurBola ? "Ta note bouge dès ton premier match validé." : "Ta note bougera dès ton premier dimanche joué."}
-        </p>
+        <p className="text-[15px] text-foreground/60">{vide}</p>
       )}
 
-      {!joueurBola && !horsSfl && <Bareme gardien={gardien} />}
+      {children}
     </section>
   );
 }
 
 /** Mes dimanches et mes mises à jour, mêlés, du plus récent au plus ancien. */
-function Journal({ ev, bola, gardien }: { ev: EvolutionJoueur; bola?: boolean; gardien: boolean }) {
+function Journal({
+  ev,
+  titre,
+  date,
+  majLe,
+  gardien,
+}: {
+  ev: EvolutionJoueur;
+  titre: string;
+  date?: boolean;
+  majLe?: (apresJ: number) => string;
+  gardien: boolean;
+}) {
   type Ligne = { j: number; ordre: number; node: React.ReactNode };
   const lignes: Ligne[] = [];
   for (const m of ev.majs) {
@@ -167,7 +237,7 @@ function Journal({ ev, bola, gardien }: { ev: EvolutionJoueur; bola?: boolean; g
       node: (
         <li key={`maj-${m.apresJ}`} className="flex items-center justify-between gap-3 rounded-2xl bg-foreground py-3 pr-4 pl-4 text-background">
           <span className="flex flex-col gap-0.5">
-            <span className="mono-label text-[10px] opacity-60">Mise à jour · après J{m.apresJ}</span>
+            <span className="mono-label text-[10px] opacity-60">Mise à jour · {majLe ? majLe(m.apresJ) : `après J${m.apresJ}`}</span>
             <span className="text-[13px] font-semibold">{listeGains(m.gains, gardien)}</span>
           </span>
           <span style={{ ...NOMBRE, fontSize: 30 }} className="tabular-nums">
@@ -184,7 +254,7 @@ function Journal({ ev, bola, gardien }: { ev: EvolutionJoueur; bola?: boolean; g
       node: (
         <li key={`j-${d.j}`} className="flex flex-col gap-1.5 border-b border-foreground/10 py-3 last:border-0">
           <span className="flex items-baseline justify-between gap-3">
-            {bola ? (
+            {date ? (
               <span className="text-[14px] font-semibold">{d.date}</span>
             ) : (
               <span className="text-[14px] font-semibold">
@@ -215,7 +285,7 @@ function Journal({ ev, bola, gardien }: { ev: EvolutionJoueur; bola?: boolean; g
   lignes.sort((a, b) => b.j - a.j || b.ordre - a.ordre);
   return (
     <div className="flex flex-col gap-2">
-      <h2 className="mono-label text-[10px] text-foreground/55">{bola ? "Mes matchs" : "Mes dimanches"}</h2>
+      <h2 className="mono-label text-[10px] text-foreground/55">{titre}</h2>
       <ul className="flex flex-col gap-1">{lignes.map((l) => l.node)}</ul>
     </div>
   );
