@@ -144,7 +144,9 @@ export async function lireInteresses(nom: string | null): Promise<{ lignes: Lign
         return interet ? [{ ...interet, nom: profil?.name ?? "?" }] : [];
       });
   const essai = APERCU && nom ? (lireApercu()[nom] ?? null) : null;
-  const echec: EchecLecture | null = !error ? null : erreurSansTable((error as { code?: string }).code) ? "sans-table" : "autre";
+  const code = (error as { code?: string } | null)?.code;
+  // PGRST200 : le lien vers les profils n'est pas connu de l'API, donc la table non plus.
+  const echec: EchecLecture | null = !error ? null : erreurSansTable(code) || code === "PGRST200" ? "sans-table" : "autre";
   // Un essai sur le téléphone se montre même sans la table : c'est lui qu'on est venu voir.
   if (echec === "autre" || (echec && !essai)) return { lignes: [], echec };
   return { lignes: avecEssai(lignes, essai && nom ? { ...essai, nom } : null), echec: null };

@@ -227,6 +227,10 @@ async function banc() {
   assert.ok(requetes[0].chemin.includes("profiles") && requetes[0].methode === "GET");
   repondre = () => ({ status: 404, body: { code: "PGRST205", message: "Could not find the table" } });
   assert.deepEqual(await p.lireInteresses("Léo"), { lignes: [], echec: "sans-table" });
+  for (const code of ["42P01", "PGRST200"]) {
+    repondre = () => ({ status: 400, body: { code, message: "table ou lien inconnu" } });
+    assert.deepEqual(await p.lireInteresses("Léo"), { lignes: [], echec: "sans-table" }, code);
+  }
   repondre = () => ({ status: 500, body: { code: "XX000", message: "panne" } });
   assert.deepEqual(await p.lireInteresses("Léo"), { lignes: [], echec: "autre" });
   // Dans un aperçu : l'essai du téléphone s'ajoute, même sans la table ; jamais sur une autre panne.
