@@ -5,7 +5,8 @@
    cartes. Le ton ne fait qu'une lueur dans le verre, le filet, l'étiquette et
    les coins de coupe, ceux de la carte (le vocabulaire de l'impression) :
    jamais d'aplat. En clair, la même lueur sur le papier, l'étiquette dans la
-   teinte sombre du ton. */
+   teinte sombre du ton. Bola Plus (12/11) a la sienne, sans image : la rosace
+   du dos de la carte. */
 
 .tuile {
   --t: 222 227 236;
@@ -160,6 +161,46 @@
 .tuile--inviter {
   --t: 224 179 203;
   --t-sombre: #6e2c52;
+}
+
+/* Bola Plus (la précommande, 12/11/2026 : sfl/bola-plus.tsx) : l'argent de
+   « Mes cartes » et, pour objet, à la place d'une image, la rosace guillochée
+   du dos de la carte et sa lune, à l'encre de la page, qui débordent du bord
+   droit. Comme pour une tuile à objet, le coin de coupe d'en haut s'efface :
+   l'emblème le remplace ; celui d'en bas reste. Ni couleur ni aplat. */
+.tuile--plus {
+  --t: 214 220 230;
+  --t-sombre: #3d434d;
+}
+.tuile--plus::before {
+  display: none;
+}
+.tuile__embleme {
+  position: absolute;
+  z-index: -1;
+  top: 50%;
+  right: -34px;
+  width: 132px;
+  height: 132px;
+  translate: 0 -50%;
+  pointer-events: none;
+  color: var(--foreground);
+}
+/* « C'est noté », à gauche de l'emblème. */
+.tuile__note {
+  flex-shrink: 0;
+  margin-right: 86px;
+}
+/* Un écran étroit (320 px) : l'emblème plus petit, les mots tiennent sur la ligne. */
+@media (max-width: 350px) {
+  .tuile__embleme {
+    right: -30px;
+    width: 104px;
+    height: 104px;
+  }
+  .tuile__note {
+    margin-right: 54px;
+  }
 }
 
 /* Le Flair : la fiche noire de la feuille de match (matchs/flair.css), dans

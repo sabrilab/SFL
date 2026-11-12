@@ -22,6 +22,8 @@
 //      « Personnaliser ma carte » (le skin, les signes et le badge, au choix :
 //      personnaliser-carte.tsx, 24/10) et, à côté, « Inviter », mon lien de
 //      parrainage (parrainage/page.tsx, 24/10), en tuiles à objet (31/10) ;
+//      dessous, sur toute la largeur, « Bola Plus », la précommande
+//      (sfl/bola-plus.tsx, 12/11 : /profil/bola-plus) ;
 //   2. le reste, en résumé (Sabri, 24/10 : « plus agréable à parcourir » ;
 //      « si on veut approfondir dans une rubrique, on puisse y aller ») : une
 //      liste groupée comme les Réglages d'un iPhone, une rangée par rubrique,
@@ -65,6 +67,7 @@ import { AppartenancesJoueur } from "@/components/sfl/badge-sfl";
 import { ProfilePhoto } from "@/components/sfl/profile-photo";
 import { ChoixBadge } from "@/components/sfl/choix-badge";
 import { PersonnaliserCarte } from "@/components/sfl/personnaliser-carte";
+import { TuileBolaPlus } from "@/components/sfl/bola-plus";
 import { PremiersPas } from "@/components/sfl/ma-carte/premiers-pas";
 import { CarteOfficielle } from "@/components/sfl/carte-officielle";
 import { classesTuile, ObjetDeTuile, RubriquesMaCarte, useMaCarte } from "@/components/sfl/ma-carte/rubriques";
@@ -253,6 +256,8 @@ function ProfilJoueurPage() {
               <ObjetDeTuile ton="inviter" />
               <span className="mt-auto text-[16px] leading-[1.15] font-bold tracking-[-0.2px]">Inviter</span>
             </Link>
+            {/* Bola Plus, la précommande : sur toute la largeur, elle ouvre sa page (sfl/bola-plus.tsx, 12/11) */}
+            <TuileBolaPlus />
           </div>
           {/* Je suis blessé, ou remis : mes journées manquées se lisent sur mon profil (blessure.tsx) */}
           {!bola && <BoutonBlessure nom={player.name} />}

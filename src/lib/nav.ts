@@ -76,6 +76,8 @@ const PARENTS: [string, Parent][] = [
   ["/profil/cartes", MA_CARTE],
   ["/profil/flair", MA_CARTE],
   ["/profil/entraineur", MA_CARTE],
+  // Bola Plus, la précommande (sfl/bola-plus.tsx).
+  ["/profil/bola-plus", MA_CARTE],
   ["/reglages", MA_CARTE],
   ["/collection", MA_CARTE],
   ["/carte", MA_CARTE],
@@ -112,6 +114,7 @@ const TITRES: [string, string][] = [
   ["/profil/cartes", "Mes cartes"],
   ["/profil/flair", "Le Flair"],
   ["/profil/entraineur", "Entraîneur"],
+  ["/profil/bola-plus", "Bola Plus"],
   ["/profil", "Ma carte"],
   ["/reglages", "Réglages"],
   ["/collection", "Collection"],
