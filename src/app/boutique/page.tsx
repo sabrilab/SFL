@@ -1,253 +1,177 @@
 "use client";
 
-// La boutique Bola (Sabri, 30/10 : « tu fais une boutique, comme ça on va
-// mieux voir ce que ça donne »). Huit pièces Tapstitch marquées aux fichiers
-// officiels, en noir et blanc (lib/boutique/produits.ts).
+// L'accueil de la boutique Bola (Sabri, 12/11/2026 : « refais la boutique
+// comme ces exemples-là », deux grandes boutiques de foot en référence de
+// mise en page ; tout le reste est à Bola : nos photos, nos mots, noir et
+// blanc). Le catalogue est celui du 30/10 (lib/boutique/produits.ts), le
+// rangement est dans lib/boutique/catalogue.ts.
 //
-// En tête, la photo portée du survêt Olympe ; dessous, les trois lignes
-// (Match, Vestiaire, Fondateurs) en filtre, puis la grille : photo portée,
-// nom, prix, pastilles des coloris. Une pièce touchée s'ouvre en fiche :
-// les photos portées puis les deux faces à plat du coloris choisi, en
-// défilé horizontal ; coloris, tailles, et ce qui est imprimé où.
+// De haut en bas :
+//   · l'en-tête : retour, « Boutique », les favoris, les Ballons ;
+//   · le hero : trois photos portées plein cadre qu'on fait défiler au doigt
+//     (rien ne défile seul), sans dégradé ni texte posé dessus ; dessous, un
+//     titre court, un seul bouton « Voir » et l'indicateur « 1/3 », qui
+//     voyage avec sa diapo ;
+//   · les rayons en liens texte, qui défilent au doigt ;
+//   · trois grands panneaux : Match, Vestiaire, Fondateurs ;
+//   · « Acheter par camp » : Noirs, Blancs ;
+//   · trois blocs : pour le match, le vestiaire, l'entraînement ;
+//   · la réassurance : livraison, retours, paiement en plusieurs fois, tous
+//     « Bientôt » tant que rien n'est branché.
+// Chaque lien ouvre la grille (/boutique/articles) sur un rayon, ou une
+// fiche. Aucun sous-titre, aucune promo, rien de payable.
 //
-// Rien n'est payable : le bouton de la fiche reste « Bientôt » tant que la
-// commande Tapstitch et le paiement ne sont pas branchés. Pas de texte
-// d'aide : la fiche se lit comme celle d'une boutique.
+// Sur ordinateur (≥ 1024), les trois diapos du hero tiennent côte à côte,
+// comme les panneaux et les blocs.
 
-import { useMemo, useState } from "react";
 import Image from "next/image";
-import { BoutonRetour } from "@/components/layout/bouton-retour";
-import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
-import { cn } from "@/lib/utils";
-import { LIGNES, PRODUITS, type Ligne, type Produit } from "@/lib/boutique/produits";
+import Link from "next/link";
+import { EnTeteBoutique } from "@/components/boutique/en-tete";
+import { Rail } from "@/components/boutique/rail";
+import { Tuile } from "@/components/boutique/tuile";
+import { adresseFiche, adresseGrille, type Rayon } from "@/lib/boutique/catalogue";
 
-const UNE = PRODUITS.find((p) => p.id === "survet-olympe")!;
+const HERO = [
+  { photo: "/boutique/porte-survet.webp", titre: "Collection 01", vers: adresseGrille() },
+  { photo: "/boutique/porte-maillot-noir.webp", titre: "Noirs contre Blancs", vers: adresseGrille({ rayon: "maillots" }) },
+  { photo: "/boutique/porte-dos-de-carte.webp", titre: "Ta carte dans le dos", vers: adresseFiche("t-shirt-dos-de-carte") },
+];
 
-function Pastilles({ produit, actif }: { produit: Produit; actif?: number }) {
+const RAYONS_ACCUEIL: [titre: string, rayon: Rayon][] = [
+  ["Maillots", "maillots"],
+  ["Vestiaire", "vestiaire"],
+  ["Survêts", "survets"],
+  ["Fondateurs", "fondateurs"],
+  ["Tout", "tout"],
+];
+
+const PANNEAUX: { photo: string; titre: string; rayon: Rayon }[] = [
+  { photo: "/boutique/porte-maillot-blanc-dos.webp", titre: "Match", rayon: "maillots" },
+  { photo: "/boutique/porte-raglan-blanc.webp", titre: "Vestiaire", rayon: "vestiaire" },
+  { photo: "/boutique/porte-sweat-noir.webp", titre: "Fondateurs", rayon: "fondateurs" },
+];
+
+const CAMPS = [
+  { titre: "Noirs", vue: "/boutique/a-plat-rt0082-black-front.webp", couleur: "Noir" },
+  { titre: "Blancs", vue: "/boutique/a-plat-rt0082-white-front.webp", couleur: "Blanc" },
+] as const;
+
+const BLOCS: { photo: string; titre: string; rayon: Rayon }[] = [
+  { photo: "/boutique/porte-dimanche-noir.webp", titre: "Pour le match", rayon: "maillots" },
+  { photo: "/boutique/porte-polo-blanc.webp", titre: "Pour le vestiaire", rayon: "vestiaire" },
+  { photo: "/boutique/porte-survet-dos.webp", titre: "Pour l'entraînement", rayon: "survets" },
+];
+
+const REASSURANCE = ["Livraison", "Retours", "Paiement en plusieurs fois"];
+
+/* ---------------------------------- le hero -------------------------------- */
+
+function Hero() {
   return (
-    <span className="flex gap-1.5">
-      {produit.coloris.map((c, i) => (
-        <span
-          key={c.nom}
-          className={cn(
-            "size-3 rounded-full border border-contraste/25",
-            actif === i && "ring-2 ring-foreground ring-offset-2 ring-offset-background",
-          )}
-          style={{ background: c.teinte }}
-        />
-      ))}
-    </span>
-  );
-}
-
-/* --------------------------------- la fiche -------------------------------- */
-
-function Fiche({ produit }: { produit: Produit }) {
-  const [coloris, setColoris] = useState(0);
-  const [taille, setTaille] = useState<string | null>(null);
-  // Les photos portées montrent le premier coloris : un autre choisi passe ses vues à plat devant.
-  const aPlat = produit.coloris[coloris].aPlat;
-  const vues = coloris === 0 ? [...produit.porte, ...aPlat] : [...aPlat, ...produit.porte];
-
-  return (
-    <div className="flex flex-col gap-5 pt-[4.5rem] pb-2">
-      <div key={coloris} className="-mx-4 flex snap-x snap-mandatory gap-2.5 overflow-x-auto px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        {vues.map((src) => (
-          <div
-            key={src}
-            className={cn(
-              "relative aspect-[4/5] w-[82%] shrink-0 snap-center overflow-hidden rounded-[22px] sm:w-[70%]",
-              src.includes("a-plat") && "bg-white",
-            )}
-          >
-            <Image
-              src={src}
-              alt=""
-              fill
-              sizes="(max-width: 640px) 82vw, 320px"
-              className={src.includes("a-plat") ? "object-contain" : "object-cover"}
-            />
-          </div>
-        ))}
-      </div>
-
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <span className="mono-label text-foreground/40">{produit.ligne}</span>
-          <SheetTitle className="mt-1 text-[24px] leading-tight font-black tracking-tight">
-            {produit.nom}
-          </SheetTitle>
-        </div>
-        <span className="shrink-0 text-[22px] font-extrabold tracking-tight tabular-nums">
-          {produit.euros} €
-        </span>
-      </div>
-
-      {produit.coloris.length > 1 && (
-        <div className="flex gap-2">
-          {produit.coloris.map((c, i) => (
-            <button
-              key={c.nom}
-              onClick={() => setColoris(i)}
-              className={cn(
-                "flex items-center gap-2 rounded-full px-3.5 py-2 text-[13px] font-semibold",
-                i === coloris ? "bg-foreground text-background" : "glass-soft text-foreground/72",
-              )}
-            >
-              <span
-                className="size-3 rounded-full border border-contraste/25"
-                style={{ background: c.teinte }}
-              />
-              {c.nom}
-            </button>
-          ))}
-        </div>
-      )}
-
-      <div className="flex flex-wrap gap-2">
-        {produit.tailles.map((t) => (
-          <button
-            key={t}
-            onClick={() => setTaille(t)}
-            className={cn(
-              "min-w-12 rounded-full px-3 py-2.5 text-[13px] font-bold tabular-nums",
-              t === taille ? "bg-foreground text-background" : "glass-soft text-foreground/72",
-            )}
-          >
-            {t}
-          </button>
-        ))}
-      </div>
-
-      <button
-        disabled
-        className="rounded-full bg-foreground py-[15px] text-center text-[15px] font-bold text-background opacity-40"
-      >
-        Bientôt
-      </button>
-
-      <dl className="flex flex-col gap-3 border-t border-contraste/8 pt-4 text-[13.5px]">
-        <div>
-          <dt className="mono-label text-foreground/40">Marquage</dt>
-          {produit.marquage.map((m) => (
-            <dd key={m} className="mt-1 font-medium">
-              {m}
-            </dd>
-          ))}
-        </div>
-        <div>
-          <dt className="mono-label text-foreground/40">Matière</dt>
-          <dd className="mt-1 font-medium">{produit.matiere}</dd>
-        </div>
-        <div className="flex gap-8">
-          <div>
-            <dt className="mono-label text-foreground/40">Fabrication</dt>
-            <dd className="mt-1 font-medium">1 à 3 jours</dd>
-          </div>
-          <div>
-            <dt className="mono-label text-foreground/40">Réf.</dt>
-            <dd className="mt-1 font-medium tabular-nums">{produit.tapstitch}</dd>
-          </div>
-        </div>
-      </dl>
-    </div>
-  );
-}
-
-/* --------------------------------- l'écran -------------------------------- */
-
-export default function Boutique() {
-  const [ligne, setLigne] = useState<Ligne | null>(null);
-  const [ouvert, setOuvert] = useState<Produit | null>(null);
-  const [visible, setVisible] = useState(false);
-  const liste = useMemo(
-    () => (ligne ? PRODUITS.filter((p) => p.ligne === ligne) : PRODUITS),
-    [ligne],
-  );
-  const ouvrir = (p: Produit) => {
-    setOuvert(p);
-    setVisible(true);
-  };
-
-  return (
-    <div className="shell flex flex-col gap-4 py-4 sm:py-8">
-      <div className="flex items-center gap-3">
-        <BoutonRetour />
-        <h1 className="text-[30px] font-black tracking-tight">Boutique</h1>
-      </div>
-
-      <button
-        onClick={() => ouvrir(UNE)}
-        className="relative aspect-[4/5] w-full overflow-hidden rounded-[28px] text-left sm:aspect-[16/9]"
-      >
-        <Image
-          src={UNE.porte[0]}
-          alt=""
-          fill
-          priority
-          sizes="(max-width: 640px) 100vw, 900px"
-          className="object-cover object-[50%_30%]"
-        />
-        <span className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/70 to-transparent" />
-        <span className="absolute inset-x-5 bottom-5 flex items-end justify-between gap-3 text-white">
-          <span>
-            <span className="mono-label text-white/60">Collection 01</span>
-            <span className="mt-1 block text-[26px] leading-none font-black tracking-tight">
-              {UNE.nom}
-            </span>
-          </span>
-          <span className="text-[20px] font-extrabold tabular-nums">{UNE.euros} €</span>
-        </span>
-      </button>
-
-      <div className="-mx-5 flex gap-2 overflow-x-auto px-5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        {[null, ...LIGNES].map((l) => (
-          <button
-            key={l ?? "tout"}
-            onClick={() => setLigne(l)}
-            className={cn(
-              "shrink-0 rounded-full px-[15px] py-2.5 text-[13px]",
-              l === ligne
-                ? "bg-foreground font-bold text-background"
-                : "glass-soft font-semibold text-foreground/72",
-            )}
-          >
-            {l ?? "Tout"}
-          </button>
-        ))}
-      </div>
-
-      <div className="grid grid-cols-2 items-start gap-x-[11px] gap-y-5 lg:grid-cols-4">
-        {liste.map((p) => (
-          <button key={p.id} onClick={() => ouvrir(p)} className="flex flex-col text-left">
-            <span className="relative block aspect-[4/5] overflow-hidden rounded-[22px]">
+    <section aria-label="À la une" className="-mx-5 lg:mx-0">
+      <Rail className="lg:grid lg:grid-cols-3 lg:gap-3 lg:overflow-visible">
+        {HERO.map((d, i) => (
+          <Link key={d.titre} href={d.vers} className="flex w-full shrink-0 snap-center flex-col">
+            <span className="relative block aspect-[4/5]">
               <Image
-                src={p.porte[0]}
+                src={d.photo}
                 alt=""
                 fill
-                sizes="(max-width: 1024px) 50vw, 25vw"
+                priority={i === 0}
+                sizes="(max-width: 1023px) 100vw, 33vw"
                 className="object-cover"
               />
             </span>
-            <span className="mt-2.5 block px-1 text-[14px] leading-[1.3] font-bold tracking-tight">
-              {p.nom}
+            <span className="flex flex-col gap-4 px-5 pt-5 lg:px-0">
+              <span className="titre-lettrage text-nom leading-[0.95] text-balance lg:text-titre-g">{d.titre}</span>
+              <span className="flex items-center justify-between">
+                <span className="bouton-principal px-7 py-3 text-lecture font-bold">Voir</span>
+                {/* L'indicateur voyage avec sa diapo : il dit toujours vrai, sans rien écouter. */}
+                <span aria-hidden className="mono-label text-encre-3 lg:hidden">
+                  {i + 1}/{HERO.length}
+                </span>
+              </span>
             </span>
-            <span className="mt-1.5 flex items-center justify-between px-1">
-              <span className="text-[15px] font-extrabold tabular-nums">{p.euros} €</span>
-              <Pastilles produit={p} />
-            </span>
-          </button>
+          </Link>
         ))}
+      </Rail>
+    </section>
+  );
+}
+
+/* --------------------------------- l'écran --------------------------------- */
+
+export default function Boutique() {
+  return (
+    <div className="shell flex flex-col gap-10 py-4 sm:py-8">
+      <div className="flex flex-col gap-4">
+        <EnTeteBoutique titre="Boutique" />
+        <Hero />
       </div>
 
-      <Sheet open={visible} onOpenChange={setVisible} titre="la boutique">
-        <SheetContent
-          side="bottom"
-          className="mx-auto max-h-[calc(100dvh-24px)] w-full gap-0 overflow-y-auto rounded-t-[28px] px-4 pb-[calc(env(safe-area-inset-bottom,0px)+18px)] sm:max-w-lg"
-        >
-          {ouvert && <Fiche key={ouvert.id} produit={ouvert} />}
-        </SheetContent>
-      </Sheet>
+      <nav aria-label="Rayons" className="-mx-5 -my-3 lg:mx-0">
+        <Rail className="snap-none gap-7 px-5 lg:px-0">
+          {RAYONS_ACCUEIL.map(([titre, rayon]) => (
+            <Link key={rayon} href={adresseGrille({ rayon })} className="flex min-h-11 shrink-0 items-center text-lecture font-semibold">
+              {titre}
+            </Link>
+          ))}
+        </Rail>
+      </nav>
+
+      <section aria-label="Collections" className="-mx-5 lg:mx-0">
+        <Rail className="gap-2 px-5 [scroll-padding-inline:20px] lg:grid lg:grid-cols-3 lg:gap-3 lg:overflow-visible lg:px-0">
+          {PANNEAUX.map((p) => (
+            <Link key={p.titre} href={adresseGrille({ rayon: p.rayon })} className="flex w-[82%] shrink-0 snap-start flex-col lg:w-auto">
+              <span className="relative block aspect-[4/5] overflow-hidden rounded-[2px]">
+                <Image src={p.photo} alt="" fill sizes="(max-width: 1023px) 82vw, 33vw" className="object-cover" />
+              </span>
+              <span className="flex items-center justify-between gap-3 pt-4">
+                <span className="titre-lettrage text-titre-m leading-none">{p.titre}</span>
+                <span className="bouton-secondaire px-5 py-2.5 text-ligne font-semibold">Voir</span>
+              </span>
+            </Link>
+          ))}
+        </Rail>
+      </section>
+
+      <section className="flex flex-col gap-4">
+        <h2 className="titre-lettrage text-titre">Acheter par camp</h2>
+        <div className="-mx-5 grid grid-cols-2 gap-0.5 sm:mx-0 sm:gap-3 lg:max-w-2xl">
+          {CAMPS.map((c) => (
+            <Link key={c.titre} href={adresseGrille({ filtres: { couleurs: [c.couleur] } })} className="flex flex-col">
+              <Tuile src={c.vue} sizes="(max-width: 1023px) 50vw, 500px" />
+              <span className="px-5 pt-3 text-lecture font-bold sm:px-1">{c.titre}</span>
+            </Link>
+          ))}
+        </div>
+      </section>
+
+      <section aria-label="Par usage" className="grid gap-9 lg:grid-cols-3 lg:gap-3">
+        {BLOCS.map((b) => (
+          <Link key={b.titre} href={adresseGrille({ rayon: b.rayon })} className="-mx-5 flex flex-col sm:mx-0">
+            <span className="relative block aspect-[4/5] overflow-hidden sm:rounded-[2px]">
+              <Image src={b.photo} alt="" fill sizes="(max-width: 1023px) 100vw, 33vw" className="object-cover" />
+            </span>
+            <span className="flex flex-col items-start gap-2 px-5 pt-4 sm:px-0">
+              <span className="text-titre-fort leading-tight font-black tracking-tight">{b.titre}</span>
+              <span className="text-lecture font-semibold underline underline-offset-4">Voir</span>
+            </span>
+          </Link>
+        ))}
+      </section>
+
+      <ul className="grid grid-cols-3 border-y border-contraste/8">
+        {REASSURANCE.map((r, i) => (
+          <li
+            key={r}
+            className={`flex flex-col items-center justify-center gap-1.5 px-2 py-5 text-center ${i > 0 ? "border-l border-contraste/8" : ""}`}
+          >
+            <span className="text-corps leading-tight font-semibold">{r}</span>
+            <span className="mono-label text-encre-3">Bientôt</span>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

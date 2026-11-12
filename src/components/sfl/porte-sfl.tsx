@@ -5,9 +5,9 @@
 // pages de la ligue du dimanche. Un lien partagé, une notification ou un
 // vieil onglet qui y mène l'emmène chez Bola : les Actus de Bola, la Map
 // pour le Vestiaire et les Discussions (le salon et la convocation de la
-// SFL), Ma carte pour la Collection et la Boutique (les cartes et le
-// maillot de la SFL ; /duel mène à la Collection). Le reste (Map, Ma carte,
-// Bola, Bola Team, ses messages) est à lui.
+// SFL), Ma carte pour la Collection (les cartes de la SFL ; /duel mène à la
+// Collection). Le reste (Map, Ma carte, Bola, Bola Team, ses messages, la
+// Boutique depuis le catalogue du 30/10) est à lui.
 //
 // Tant que la base n'a pas dit s'il est un joueur Bola (la toute première
 // ouverture d'un compte), une page de la SFL reste couverte : on ne la lui

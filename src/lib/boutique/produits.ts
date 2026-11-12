@@ -10,8 +10,17 @@
 // col, les coutures, le zip ni les manches. Les photos « portées » sont
 // générées (deux mannequins fixes, Magnific) à partir de ces visuels à plat.
 // Prix proposés, en euros : rien n'est encore payable.
+//
+// Pour la vitrine (12/11/2026 : accueil, grille filtrable, fiche produit),
+// chaque pièce dit aussi sa catégorie (le filtre), son type (la ligne sous le
+// nom), son badge et sa description : une phrase tirée de ce qui est écrit
+// ici, rien d'inventé. Les rayons, les filtres et le tri sont dans
+// catalogue.ts. Mesures, entretien, livraison et retours n'ont pas été lus :
+// la fiche les marque « Bientôt ».
 
 export type Ligne = "Match" | "Vestiaire" | "Fondateurs";
+export type Categorie = "Maillots" | "T-shirts" | "Polos" | "Survêts" | "Sweats";
+export type Badge = "Nouveau" | "Fondateurs";
 
 export interface Coloris {
   nom: "Noir" | "Blanc";
@@ -25,6 +34,12 @@ export interface Produit {
   id: string;
   nom: string;
   ligne: Ligne;
+  categorie: Categorie;
+  /** La ligne sous le nom : « Maillot manches courtes ». */
+  type: string;
+  badge?: Badge;
+  /** Une phrase, tirée du marquage et de la matière. */
+  description: string;
   euros: number;
   /** Les photos portées, la première fait la vignette. */
   porte: string[];
@@ -45,6 +60,10 @@ export const PRODUITS: Produit[] = [
     id: "maillot-noirs-blancs",
     nom: "Maillot Noirs / Blancs",
     ligne: "Match",
+    categorie: "Maillots",
+    type: "Maillot manches courtes",
+    badge: "Nouveau",
+    description: "Le maillot du dimanche, dans le camp des Noirs ou des Blancs.",
     euros: 35,
     porte: ["/boutique/porte-maillot-noir.webp", "/boutique/porte-maillot-blanc-dos.webp"],
     coloris: [
@@ -60,6 +79,10 @@ export const PRODUITS: Produit[] = [
     id: "maillot-dimanche",
     nom: "Maillot « Dimanche »",
     ligne: "Match",
+    categorie: "Maillots",
+    type: "Maillot coupe ample",
+    badge: "Nouveau",
+    description: "Le logo Bola en grand, pour la ville.",
     euros: 35,
     porte: ["/boutique/porte-dimanche-noir.webp"],
     coloris: [
@@ -75,6 +98,10 @@ export const PRODUITS: Produit[] = [
     id: "maillot-phases",
     nom: "Maillot « Phases »",
     ligne: "Match",
+    categorie: "Maillots",
+    type: "Maillot empiècement filet",
+    badge: "Nouveau",
+    description: "Les six phases du ballon, du noir au blanc, dans le dos.",
     euros: 35,
     porte: ["/boutique/porte-phases-dos.webp"],
     coloris: [{ nom: "Noir", teinte: NOIR, aPlat: plat("rt0057", "black") }],
@@ -87,6 +114,10 @@ export const PRODUITS: Produit[] = [
     id: "t-shirt-dos-de-carte",
     nom: "T-shirt « Dos de carte »",
     ligne: "Vestiaire",
+    categorie: "T-shirts",
+    type: "T-shirt",
+    badge: "Nouveau",
+    description: "Le dos de ta carte Bola, imprimé en grand.",
     euros: 39,
     porte: ["/boutique/porte-dos-de-carte.webp"],
     coloris: [
@@ -102,6 +133,10 @@ export const PRODUITS: Produit[] = [
     id: "raglan-le-ballon-parle",
     nom: "Raglan « Le ballon parle »",
     ligne: "Vestiaire",
+    categorie: "T-shirts",
+    type: "T-shirt raglan",
+    badge: "Nouveau",
+    description: "Le ballon parle : une phrase devant, une au dos.",
     euros: 35,
     porte: ["/boutique/porte-raglan-blanc.webp"],
     coloris: [
@@ -117,6 +152,10 @@ export const PRODUITS: Produit[] = [
     id: "polo-club",
     nom: "Polo « Club »",
     ligne: "Vestiaire",
+    categorie: "Polos",
+    type: "Polo col contrasté",
+    badge: "Nouveau",
+    description: "Le polo du club, logo au cœur.",
     euros: 45,
     porte: ["/boutique/porte-polo-blanc.webp"],
     coloris: [
@@ -132,6 +171,10 @@ export const PRODUITS: Produit[] = [
     id: "survet-olympe",
     nom: "Survêt « Olympe »",
     ligne: "Vestiaire",
+    categorie: "Survêts",
+    type: "Survêtement veste et pantalon",
+    badge: "Nouveau",
+    description: "La veste et le pantalon, le symbole en grand au dos.",
     euros: 99,
     porte: ["/boutique/porte-survet.webp", "/boutique/porte-survet-dos.webp"],
     coloris: [
@@ -150,6 +193,10 @@ export const PRODUITS: Produit[] = [
     id: "sweat-fondateurs",
     nom: "Sweat Fondateurs",
     ligne: "Fondateurs",
+    categorie: "Sweats",
+    type: "Sweat col rond",
+    badge: "Fondateurs",
+    description: "Réservé aux fondateurs, numéroté sur 500.",
     euros: 65,
     porte: ["/boutique/porte-sweat-noir.webp"],
     coloris: [
@@ -164,3 +211,6 @@ export const PRODUITS: Produit[] = [
 ];
 
 export const LIGNES: Ligne[] = ["Match", "Vestiaire", "Fondateurs"];
+export const CATEGORIES: Categorie[] = ["Maillots", "T-shirts", "Polos", "Survêts", "Sweats"];
+
+export const produitDe = (id: string): Produit | undefined => PRODUITS.find((p) => p.id === id);
