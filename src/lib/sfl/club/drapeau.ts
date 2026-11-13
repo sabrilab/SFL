@@ -3,8 +3,10 @@
 // drapeau, le même que les démonstrations de l'aperçu (ligue-vierge-demo.ts,
 // next.config.ts : NEXT_PUBLIC_BOLA_ENV vaut « production » sur la seule
 // production Vercel). Vrai en aperçu et en développement, faux en
-// production, sans variable à créer : en production, /club répond 404,
-// l'entrée du menu des ligues n'existe pas, et rien d'autre ne lit le club.
+// production, sans variable à créer : en production, /club affiche la page
+// introuvable de l'app sans rien servir du club, l'entrée du menu des ligues
+// n'existe pas, et rien d'autre ne lit le club (tools/club-drapeau-check.ts
+// le garde).
 
 export const BOLA_CLUB = process.env.NEXT_PUBLIC_BOLA_ENV !== "production";
 

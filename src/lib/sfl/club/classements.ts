@@ -9,10 +9,15 @@
 //     du dernier match. Sur la saison, c'est la carte en direct moins la
 //     carte de départ ;
 //   · assiduité : les présences (à l'heure ou en retard) sur les séances
-//     passées où le joueur était attendu, matchs et entraînements, en % ;
+//     passées où l'appel du joueur a été fait, matchs et entraînements :
+//     « 16 / 17 », rangées au pourcentage ; sans ligne d'appel, une séance ne
+//     compte ni pour ni contre lui ;
 //   · buteurs : les buts des matchs joués.
-// La période : le mois du jour de la démo, ou toute la saison. Les ex æquo
-// partagent leur rang (1, 1, 3). Pur.
+// La période : le mois du jour de la démo, ou toute la saison. À valeur
+// égale, on départage : la progression par la note de la carte, l'assiduité
+// par le nombre de présences puis le moins de retards, les buteurs par les
+// passes décisives. Seuls ceux que rien ne départage partagent leur rang
+// (1, 1, 3). Pur.
 
 import { STAT_KEYS } from "@/lib/sfl/engine";
 import { seancePassee } from "./regles";
@@ -61,23 +66,26 @@ export function progression(club: Club, id: string, periode: Periode): number {
 
 export interface Assiduite {
   presents: number;
+  /** Parmi les présents, ceux arrivés en retard. */
+  retards: number;
   total: number;
   /** En %, arrondi ; null sans séance. */
   pct: number | null;
 }
 
-/** Les séances passées où le joueur était attendu, dans l'ordre. */
+/** Les séances passées où le joueur était attendu et où son appel a été fait, dans l'ordre. */
 export function seancesDe(club: Pick<Club, "seances" | "jour">, id: string): Seance[] {
   return club.seances
-    .filter((s) => seancePassee(s, club.jour) && s.convoques.includes(id))
+    .filter((s) => seancePassee(s, club.jour) && s.convoques.includes(id) && s.appel[id] !== undefined)
     .sort((a, b) => a.jour.localeCompare(b.jour) || a.heure.localeCompare(b.heure) || a.id.localeCompare(b.id));
 }
 
 export function assiduite(club: Pick<Club, "seances" | "jour">, id: string, periode: Periode): Assiduite {
   const dedans = dansLaPeriode(club, periode);
   const seances = seancesDe(club, id).filter((s) => dedans(s.jour));
-  const presents = seances.filter((s) => (s.appel[id] ?? "absent") !== "absent").length;
-  return { presents, total: seances.length, pct: seances.length ? Math.round((presents / seances.length) * 100) : null };
+  const presents = seances.filter((s) => s.appel[id] !== "absent").length;
+  const retards = seances.filter((s) => s.appel[id] === "retard").length;
+  return { presents, retards, total: seances.length, pct: seances.length ? Math.round((presents / seances.length) * 100) : null };
 }
 
 export function buts(club: Pick<Club, "seances" | "jour">, id: string, periode: Periode): number {
@@ -85,67 +93,98 @@ export function buts(club: Pick<Club, "seances" | "jour">, id: string, periode: 
   return club.seances.reduce((s, x) => s + (x.genre === "match" && x.score !== null && dedans(x.jour) ? (x.stats[id]?.buts ?? 0) : 0), 0);
 }
 
+export function passes(club: Pick<Club, "seances" | "jour">, id: string, periode: Periode): number {
+  const dedans = dansLaPeriode(club, periode);
+  return club.seances.reduce((s, x) => s + (x.genre === "match" && x.score !== null && dedans(x.jour) ? (x.stats[id]?.passes ?? 0) : 0), 0);
+}
+
 export interface LigneClassee {
   membre: Membre;
   valeur: number;
   /** « +4 », « 94 % », « 9 ». */
   libelle: string;
-  /** Les ex æquo partagent leur rang. */
+  /** Ceux que rien ne départage partagent leur rang. */
   rang: number;
 }
 
-/** Range par valeur décroissante (à égalité : le nom), et donne les rangs, ex æquo compris. */
-export function ranger(lignes: { membre: Membre; valeur: number; libelle: string }[]): LigneClassee[] {
-  const tri = [...lignes].sort(
-    (a, b) => b.valeur - a.valeur || a.membre.nom.localeCompare(b.membre.nom, "fr") || a.membre.prenom.localeCompare(b.membre.prenom, "fr"),
-  );
+type ARanger = { membre: Membre; valeur: number; libelle: string; /** Ce qui départage à valeur égale, le plus grand d'abord. */ departage?: number[] };
+
+/** Range par valeur décroissante, puis par ce qui départage (enfin le nom), et donne les rangs : seuls les vrais ex æquo le partagent. */
+export function ranger(lignes: ARanger[]): LigneClassee[] {
+  const ecart = (a: ARanger, b: ARanger) => {
+    if (b.valeur !== a.valeur) return b.valeur - a.valeur;
+    const n = Math.max(a.departage?.length ?? 0, b.departage?.length ?? 0);
+    for (let i = 0; i < n; i++) {
+      const d = (b.departage?.[i] ?? 0) - (a.departage?.[i] ?? 0);
+      if (d) return d;
+    }
+    return 0;
+  };
+  const tri = [...lignes].sort((a, b) => ecart(a, b) || a.membre.nom.localeCompare(b.membre.nom, "fr") || a.membre.prenom.localeCompare(b.membre.prenom, "fr"));
   const out: LigneClassee[] = [];
-  tri.forEach((l, i) => out.push({ ...l, rang: i > 0 && tri[i - 1].valeur === l.valeur ? out[i - 1].rang : i + 1 }));
+  tri.forEach(({ membre, valeur, libelle }, i) => out.push({ membre, valeur, libelle, rang: i > 0 && ecart(tri[i - 1], tri[i]) === 0 ? out[i - 1].rang : i + 1 }));
   return out;
 }
 
+/** « 16 / 17 » : les présences sur les séances appelées. */
+const presences = (a: Assiduite) => `${a.presents} / ${a.total}`;
+
 const signe = (n: number) => (n > 0 ? `+${n}` : String(n));
+
+/** Un classement a son podium tant que trois joueurs au plus se partagent la première place ; au-delà il n'aurait pas de sens. */
+export const aUnPodium = (lignes: readonly LigneClassee[]) => lignes.length > 0 && lignes[3]?.rang !== 1;
 
 /** Un classement interne : les joueurs donnés, sur la période. Sans séance (assiduité) ou sans but, un joueur n'y est pas. */
 export function classementClub(club: Club, membres: readonly Membre[], classement: ClassementClub, periode: Periode): LigneClassee[] {
+  const cartes = cartesDuClub(club);
+  const note = (id: string) => cartes.get(id)?.note ?? 0;
   if (classement === "progression")
-    return ranger(membres.map((membre) => ({ membre, valeur: progression(club, membre.id, periode) })).map((l) => ({ ...l, libelle: signe(l.valeur) })));
+    return ranger(
+      membres.map((membre) => ({ membre, valeur: progression(club, membre.id, periode) })).map((l) => ({ ...l, libelle: signe(l.valeur), departage: [note(l.membre.id)] })),
+    );
   if (classement === "assiduite")
     return ranger(
       membres
         .map((membre) => ({ membre, a: assiduite(club, membre.id, periode) }))
         .filter((l) => l.a.pct !== null)
-        .map((l) => ({ membre: l.membre, valeur: l.a.pct!, libelle: `${l.a.pct} %` })),
+        .map((l) => ({ membre: l.membre, valeur: l.a.pct!, libelle: presences(l.a), departage: [l.a.presents, -l.a.retards] })),
     );
   return ranger(
     membres
       .map((membre) => ({ membre, valeur: buts(club, membre.id, periode) }))
       .filter((l) => l.valeur > 0)
-      .map((l) => ({ ...l, libelle: String(l.valeur) })),
+      .map((l) => ({ ...l, libelle: String(l.valeur), departage: [passes(club, l.membre.id, periode)] })),
   );
 }
 
-/** L'effectif trié : la note de la carte officielle, la progression du mois, les présences ou les buts de la saison. */
+/** L'effectif trié : la note de la carte officielle, la progression du mois, les présences ou les buts de la saison ; à égalité, la meilleure note d'abord. */
 export function trierEffectif(club: Club, membres: readonly Membre[], tri: TriEffectif): LigneClassee[] {
   const cartes = cartesDuClub(club);
   if (tri === "note") return ranger(membres.map((membre) => ({ membre, valeur: cartes.get(membre.id)?.note ?? 0 })).map((l) => ({ ...l, libelle: String(l.valeur) })));
+  const note = (id: string) => cartes.get(id)?.note ?? 0;
   if (tri === "progression")
-    return ranger(membres.map((membre) => ({ membre, valeur: progression(club, membre.id, "mois") })).map((l) => ({ ...l, libelle: signe(l.valeur) })));
+    return ranger(
+      membres.map((membre) => ({ membre, valeur: progression(club, membre.id, "mois") })).map((l) => ({ ...l, libelle: signe(l.valeur), departage: [note(l.membre.id)] })),
+    );
   if (tri === "presences")
     return ranger(
       membres.map((membre) => {
         const a = assiduite(club, membre.id, "saison");
-        return { membre, valeur: a.pct ?? -1, libelle: a.pct === null ? "—" : `${a.pct} %` };
+        return { membre, valeur: a.pct ?? -1, libelle: a.pct === null ? "—" : presences(a), departage: [a.presents, -a.retards, note(membre.id)] };
       }),
     );
-  return ranger(membres.map((membre) => ({ membre, valeur: buts(club, membre.id, "saison") })).map((l) => ({ ...l, libelle: String(l.valeur) })));
+  return ranger(
+    membres
+      .map((membre) => ({ membre, valeur: buts(club, membre.id, "saison") }))
+      .map((l) => ({ ...l, libelle: String(l.valeur), departage: [passes(club, l.membre.id, "saison"), note(l.membre.id)] })),
+  );
 }
 
 /** Les quatre lignes de postes du filtre de l'effectif. */
 export const LIGNES_POSTES = [
-  { id: "gardiens", label: "Gardiens", postes: ["G"] },
-  { id: "defenseurs", label: "Défenseurs", postes: ["DG", "DC", "DD"] },
-  { id: "milieux", label: "Milieux", postes: ["MDC", "MC"] },
-  { id: "attaquants", label: "Attaquants", postes: ["AG", "AT", "AD"] },
+  { id: "gardiens", label: "Gardiens", court: "G", postes: ["G"] },
+  { id: "defenseurs", label: "Défenseurs", court: "DÉF", postes: ["DG", "DC", "DD"] },
+  { id: "milieux", label: "Milieux", court: "MIL", postes: ["MDC", "MC"] },
+  { id: "attaquants", label: "Attaquants", court: "ATT", postes: ["AG", "AT", "AD"] },
 ] as const;
 export type LignePoste = (typeof LIGNES_POSTES)[number]["id"];

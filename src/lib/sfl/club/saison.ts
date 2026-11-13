@@ -10,7 +10,8 @@
 //   · les matchs seulement : but → 1 cran de TIR, passe décisive → 1 cran de
 //     PAS, MVP → 2 crans sur ses deux meilleures stats, 3 matchs de suite
 //     présent et à l'heure → 3 crans de PHY ; un gardien suit son barème
-//     (lib/sfl/gardien.ts), un match sans but encaissé compris. Les
+//     (lib/sfl/gardien.ts), un match sans but encaissé compris (pour le
+//     seul gardien dans la cage : le premier gardien présent de la feuille). Les
 //     entraînements comptent pour l'assiduité (classements.ts), pas pour la
 //     carte ;
 //   · le MVP est choisi par l'app sur la feuille du match (saisie/mvp.ts,
@@ -48,6 +49,8 @@ export function matchsJoues(club: Pick<Club, "seances">): Seance[] {
 /** La feuille d'un match, telle que le moteur la lit : une ligne par convoqué. `j` : la journée à écrire. */
 export function lignesDuMatch(club: Pick<Club, "membres">, s: Seance, j = 1): MatchEntry[] {
   const poste = new Map(club.membres.map((m) => [m.id, m.poste]));
+  // Un seul gardien garde la cage : le premier gardien présent de la feuille prend le match sans but encaissé.
+  const dansLaCage = s.convoques.find((id) => estGardien(poste.get(id)) && (s.appel[id] ?? "absent") !== "absent");
   const lignes = s.convoques.map((id): MatchEntry => {
     const etat = s.appel[id] ?? "absent";
     const present = etat !== "absent";
@@ -60,7 +63,7 @@ export function lignesDuMatch(club: Pick<Club, "membres">, s: Seance, j = 1): Ma
       sflTime: false,
       buts: present ? (s.stats[id]?.buts ?? 0) : 0,
       passes: present ? (s.stats[id]?.passes ?? 0) : 0,
-      cleanSheet: present && estGardien(poste.get(id)) && s.score?.eux === 0,
+      cleanSheet: id === dansLaCage && s.score?.eux === 0,
       mvp: false,
       impact: false,
       def: false,

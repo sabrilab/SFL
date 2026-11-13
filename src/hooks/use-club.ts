@@ -5,16 +5,15 @@
 // compte connecté : la présidente (admin), l'entraîneur des U13 et des U17,
 // un joueur des U17, le parent d'un U13. `agir` applique un changement
 // (lib/sfl/club/mutations.ts) et dit un refus comme l'app dit ses erreurs.
-// useClubDuMenu : l'entrée du club dans le menu des ligues (choix-ligue.tsx),
-// seulement sous le drapeau et une fois /club ouvert sur ce téléphone.
+// L'entrée du club dans le menu des ligues a son fichier à elle, léger
+// (hooks/use-club-menu.ts) : celui-ci tire la démo et le moteur des cartes.
 
 import { useCallback, useMemo, useSyncExternalStore } from "react";
 import { toast } from "sonner";
-import { BOLA_CLUB } from "@/lib/sfl/club/drapeau";
 import type { Resultat } from "@/lib/sfl/club/mutations";
 import { droits } from "@/lib/sfl/club/regles";
 import { cartesDuClub } from "@/lib/sfl/club/saison";
-import { agirSurLeClub, clubOuvert, ecouterClub, ecouterMarqueur, etatClub, etatClubServeur, moiDe } from "@/lib/sfl/club/store";
+import { agirSurLeClub, ecouterClub, etatClub, etatClubServeur, moiDe } from "@/lib/sfl/club/store";
 import type { Club, Moi } from "@/lib/sfl/club/types";
 
 export function useClub() {
@@ -30,15 +29,4 @@ export function useClub() {
     return refus === null;
   }, []);
   return { club, role, moi, droits: d, cartes, agir };
-}
-
-const jamais = () => false;
-const rien = () => () => {};
-const pasDeClub = () => null;
-
-/** Le club à montrer dans le menu des ligues ; null hors du drapeau, ou tant que /club n'a pas été ouvert ici. */
-export function useClubDuMenu(): Pick<Club, "nom" | "initiales" | "blason"> | null {
-  const ouvert = useSyncExternalStore(BOLA_CLUB ? ecouterMarqueur : rien, BOLA_CLUB ? clubOuvert : jamais, jamais);
-  const etat = useSyncExternalStore(ecouterClub, ouvert ? etatClub : pasDeClub, pasDeClub);
-  return ouvert && etat ? etat.club : null;
 }

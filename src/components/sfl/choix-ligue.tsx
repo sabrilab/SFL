@@ -20,7 +20,8 @@
 // Bola Club (12/11/2026, lib/sfl/club/drapeau.ts) : un joueur licencié dans
 // un club a « simplement un onglet club en plus ». Sous le drapeau, et une
 // fois /club ouvert sur ce téléphone, le menu a une troisième ligne : le
-// club, son écusson et son nom (LigneClubDuMenu). Sinon, rien ne change.
+// club, son écusson et son nom (LigneClubDuMenu). Sinon, rien ne change, et
+// rien du club n'est chargé (hooks/use-club-menu.ts).
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
@@ -28,7 +29,7 @@ import { ChevronDown } from "lucide-react";
 import { BoutonRecherche } from "@/components/layout/bouton-recherche";
 import { cn } from "@/lib/utils";
 import { useHorsSfl } from "@/hooks/use-hors-sfl";
-import { useClubDuMenu } from "@/hooks/use-club";
+import { useClubDuMenu } from "@/hooks/use-club-menu";
 import { Ecusson } from "@/components/sfl/equipe/ecusson";
 import { fondDe, type Blason } from "@/lib/sfl/blason";
 
@@ -167,7 +168,10 @@ export function LigneClubDuMenu({
         actif ? "bg-foreground/[0.08] text-foreground" : "text-encre-2"
       )}
     >
-      <Ecusson initiales={club.initiales} fond={fondDe(club.blason)} blason={club.blason} taille={24} />
+      {/* L'écusson répète le club : le lecteur d'écran lit son nom une fois. */}
+      <span aria-hidden className="grid shrink-0">
+        <Ecusson initiales={club.initiales} fond={fondDe(club.blason)} blason={club.blason} taille={24} />
+      </span>
       <span className="titre-lettrage text-[15px] leading-none">{club.nom}</span>
     </Link>
   );

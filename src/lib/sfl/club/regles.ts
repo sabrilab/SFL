@@ -13,8 +13,17 @@
 //     règle est posée et testée ; la messagerie du club n'est pas construite) ;
 //   · les licences : actives + invitations + accords en attente ≤ total ;
 //     une licence libérée redevient libre, le joueur garde son compte, sa
-//     carte et son historique (« Bola gratuit ») ;
-//   · le surclassement ne va que vers une catégorie plus âgée.
+//     carte et son historique (« Bola gratuit ») et sort du club : sans
+//     licence active, on ne lit, ne gère ni ne répond plus rien (il reste à
+//     chacun sa propre fiche) ;
+//   · un joueur ou un parent ne voit des autres que les licenciés actifs de
+//     sa catégorie : un compte qui attend l'accord d'un parent ne paraît que
+//     devant le staff, le joueur et son parent ;
+//   · le surclassement va vers la catégorie d'âge juste au-dessus, du même
+//     côté (un U13 en U17, jamais en Seniors) ; on ne déplace pas un joueur
+//     dans une catégorie qu'il a passé l'âge de jouer ;
+//   · une séance est passée par sa date (un match, par son score) : l'appel
+//     et les stats s'ouvrent le jour même, pas avant.
 // Les mêmes règles en base, pour ce qui y vit (supabase/schema.sql :
 // club_licences_garde, est_du_club, role_club). Ni React ni réseau.
 
@@ -61,6 +70,8 @@ export function compteLicences(club: Pick<Club, "licences" | "licencesTotal">): 
 }
 
 export const licenceDe = (club: Pick<Club, "licences">, compte: string) => club.licences.find((l) => l.compte === compte) ?? null;
+/** Ce compte (un joueur, un staff) porte une licence active du club. */
+export const licenceActive = (club: Pick<Club, "licences">, compte: string) => licenceDe(club, compte)?.statut === "active";
 
 export const categorieDe = (club: Pick<Club, "categories">, id: string | null) => club.categories.find((c) => c.id === id) ?? null;
 export const membreDe = (club: Pick<Club, "membres">, id: string) => club.membres.find((m) => m.id === id) ?? null;
@@ -69,15 +80,22 @@ export const membreDe = (club: Pick<Club, "membres">, id: string) => club.membre
 export const estDeLaCategorie = (m: Pick<Membre, "categorie" | "surclasseEn">, categorie: string) =>
   m.categorie === categorie || m.surclasseEn === categorie;
 
-/** Les catégories où un joueur peut être surclassé : plus âgées que la sienne, du même côté (féminines ou non). */
+/**
+ * Où un joueur peut être surclassé : la catégorie d'âge juste au-dessus de la
+ * sienne, du même côté (féminines ou non). Un U13 monte en U17, pas en
+ * Seniors ; deux catégories du même âge au-dessus sont proposées toutes deux.
+ */
 export function surclassementsPossibles(m: Pick<Membre, "categorie">, categories: readonly Categorie[]): Categorie[] {
   const sienne = categories.find((c) => c.id === m.categorie);
   if (!sienne || sienne.ageMax === null) return [];
   const age = sienne.ageMax;
-  return categories
-    .filter((c) => c.id !== sienne.id && !!c.feminine === !!sienne.feminine && (c.ageMax === null || c.ageMax > age))
-    .sort((a, b) => a.ordre - b.ordre);
+  const plusAgees = categories.filter((c) => c.id !== sienne.id && !!c.feminine === !!sienne.feminine && (c.ageMax === null || c.ageMax > age));
+  const suivante = Math.min(...plusAgees.map((c) => c.ageMax ?? Infinity));
+  return plusAgees.filter((c) => (c.ageMax ?? Infinity) === suivante).sort((a, b) => a.ordre - b.ordre);
 }
+
+/** Un joueur a l'âge d'une catégorie : elle n'a pas de limite, ou il ne l'a pas dépassée. */
+export const aLAgeDe = (m: Pick<Membre, "naissance">, c: Pick<Categorie, "ageMax">, jour: string) => c.ageMax === null || ageLe(m.naissance, jour) <= c.ageMax;
 
 /** L'âge limite que dit un nom de catégorie : « U13 » → 13 ; sinon aucune. */
 export function ageMaxDuNom(nom: string): number | null {
@@ -86,6 +104,8 @@ export function ageMaxDuNom(nom: string): number | null {
 }
 
 export interface Droits {
+  /** Il porte une licence active (lui, ou l'enfant du parent) : sans elle, il n'est plus du club. */
+  actif: boolean;
   /** Tout le club : licences, catégories, staff, écusson. */
   administre: boolean;
   /** Les catégories qu'il lit (effectif, classements, actus). */
@@ -98,6 +118,8 @@ export interface Droits {
   litNotes: (m: Membre) => boolean;
   /** L'évolution et les présences de ce joueur : son staff, lui-même, son parent. */
   voitFiche: (m: Membre) => boolean;
+  /** Ce joueur paraît devant lui (effectif, classements, carte) : lui-même toujours ; le staff voit tout licencié (actif, ou en attente d'accord) ; un joueur ou un parent, les licenciés actifs de sa catégorie. Une licence rendue : plus personne. */
+  voitJoueur: (m: Membre) => boolean;
   /** Répondre à une convocation pour ce joueur : lui-même, ou son parent. */
   repond: (m: Membre) => boolean;
   /** Celui pour qui il répond (le joueur, ou l'enfant du parent) ; null pour le staff. */
@@ -106,29 +128,51 @@ export interface Droits {
 
 /** Qui voit et fait quoi (le tableau des rôles de la demande). */
 export function droits(club: Club, moi: Moi): Droits {
-  const admin = moi.role === "admin" && club.staff.some((s) => s.id === moi.id && s.role === "admin");
-  const entraineur = moi.role === "entraineur" && club.staff.some((s) => s.id === moi.id && s.role === "entraineur");
   const enfant = moi.role === "parent" ? (club.parents.find((p) => p.id === moi.id)?.enfant ?? null) : null;
   const joueur = moi.role === "joueur" ? membreDe(club, moi.id) : enfant ? membreDe(club, enfant) : null;
+  // La licence qui fait de lui un membre : la sienne, ou celle de l'enfant d'un parent.
+  const actif = licenceActive(club, joueur ? joueur.id : moi.id);
+  const admin = actif && moi.role === "admin" && club.staff.some((s) => s.id === moi.id && s.role === "admin");
+  const entraineur = actif && moi.role === "entraineur" && club.staff.some((s) => s.id === moi.id && s.role === "entraineur");
+  const staff = admin || entraineur;
   const gere = (categorie: string) =>
     admin || (entraineur && !!categorieDe(club, categorie)?.entraineurs.includes(moi.id));
   const gereJoueur = (m: Membre) => gere(m.categorie) || (m.surclasseEn !== null && gere(m.surclasseEn));
+  const lit = (categorie: string) => staff || (actif && !!joueur && estDeLaCategorie(joueur, categorie));
+  const voitFiche = (m: Membre) => gereJoueur(m) || joueur?.id === m.id;
   return {
+    actif,
     administre: admin,
-    lit: (categorie) => admin || entraineur || (!!joueur && estDeLaCategorie(joueur, categorie)),
+    lit,
     gere,
     gereJoueur,
     litNotes: gereJoueur,
-    voitFiche: (m) => gereJoueur(m) || joueur?.id === m.id,
-    repond: (m) => joueur?.id === m.id,
+    voitFiche,
+    voitJoueur: (m) => {
+      if (joueur?.id === m.id) return true;
+      const statut = licenceDe(club, m.id)?.statut;
+      if (staff) return statut === "active" || statut === "attente_accord";
+      return statut === "active" && (lit(m.categorie) || (m.surclasseEn !== null && lit(m.surclasseEn)));
+    },
+    repond: (m) => actif && joueur?.id === m.id,
     joueur,
   };
 }
 
-/** Une séance est passée : un match joué, un entraînement d'avant aujourd'hui (ou dont l'appel est fait). */
+/**
+ * Une séance est passée : un match, quand son score est saisi ; un
+ * entraînement, le lendemain de sa date. Toucher l'appel d'une séance ne la
+ * fait pas passer.
+ */
 export function seancePassee(s: Seance, jour: string): boolean {
-  return s.genre === "match" ? s.score !== null : s.jour < jour || Object.keys(s.appel).length > 0;
+  return s.genre === "match" ? s.score !== null : s.jour < jour;
 }
+
+/** L'appel et les stats d'une séance s'ouvrent le jour même, pas avant. */
+export const seanceOuverte = (s: Pick<Seance, "jour">, jour: string) => s.jour <= jour;
+
+/** Une séance à venir : on y convoque encore, on y répond encore. */
+export const seanceAVenir = (s: Seance, jour: string) => !seancePassee(s, jour) && s.jour >= jour;
 
 /** Les réponses à une convocation : présents, absents, sans réponse. */
 export function compteReponses(s: Pick<Seance, "convoques" | "reponses">) {

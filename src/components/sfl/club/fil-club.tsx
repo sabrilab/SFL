@@ -4,15 +4,21 @@
 // voir les actus du club »). Le fil de lib/sfl/club/actus.ts, une fiche par
 // publication, la plus proche d'abord :
 //   · la convocation d'un match ou d'un entraînement à venir : où, quand, et
-//     le compte des réponses ; un joueur (ou son parent) y répond « Présent »
-//     ou « Absent » ; l'entraîneur de la catégorie l'ouvre ;
+//     le compte des réponses dès qu'il y en a une ; un joueur (ou son parent)
+//     y répond « Présent » ou « Absent » ; l'entraîneur de la catégorie
+//     l'ouvre ;
 //   · le dernier résultat de chaque catégorie : le score en Anton, les
-//     buteurs, le MVP du match en carte moyenne ;
+//     buteurs, le ou les MVP du match côte à côte, en cartes moyennes, le nom
+//     dessous ;
 //   · les cartes qui montent : les joueurs dont la carte officielle vient de
-//     changer, en cartes moyennes, et ce qu'elles ont pris (« TIR +1 ») ;
+//     changer, en cartes moyennes, le nom dessous, et ce qu'elles ont pris,
+//     un gain par ligne (« TIR +1 ») ;
 //   · les annonces du staff, signées.
-// L'entraîneur (dans ses catégories) et l'admin publient une annonce depuis
-// la tête du fil. Rien n'est envoyé : ni notification, ni message.
+// L'entraîneur (dans ses catégories) et l'admin, depuis la tête du fil,
+// publient une annonce et convoquent : un match ou un entraînement à créer
+// (lib/sfl/club/mutations.ts, creerSeance), où tous les licenciés actifs de
+// la catégorie sont convoqués. Rien n'est envoyé : ni notification, ni
+// message.
 
 import Link from "next/link";
 import { useState } from "react";
@@ -22,18 +28,37 @@ import { useClub } from "@/hooks/use-club";
 import { STAT_KEYS, type StatKey } from "@/lib/sfl/engine";
 import { abrege, estGardien } from "@/lib/sfl/gardien";
 import { filDuClub, jourLong, jourMoyen, type Publication } from "@/lib/sfl/club/actus";
-import { publierAnnonce, repondreConvocation } from "@/lib/sfl/club/mutations";
+import { creerSeance, publierAnnonce, repondreConvocation } from "@/lib/sfl/club/mutations";
 import { categorieDe, compteReponses, membreDe } from "@/lib/sfl/club/regles";
 import { nomCourt, type Seance } from "@/lib/sfl/club/types";
 import { cn } from "@/lib/utils";
 import { CarteClub } from "./carte-club";
-import { CHAMP, Feuille, FICHE, NOMBRE, Puces } from "./puces";
+import { CHAMP, Feuille, FICHE, NOMBRE, Puces, Segment } from "./puces";
 import { useCategorieChoisie } from "./rail-categories";
 
 const pluriel = (n: number, un: string, plusieurs: string) => `${n} ${n > 1 ? plusieurs : un}`;
 
-/** « FC Démo – AS Exemple », ou « Entraînement ». */
-export const titreSeance = (club: { nom: string }, s: Seance) => (s.genre === "match" ? `${club.nom} – ${s.adversaire}` : "Entraînement");
+/** « FC Démo – AS Exemple », ou « Entraînement » ; le tiret ne commence jamais une ligne. */
+export const titreSeance = (club: { nom: string }, s: Seance) => (s.genre === "match" ? `${club.nom}\u00a0– ${s.adversaire}` : "Entraînement");
+
+/** « 9 présents · 2 absents · 2 sans réponse ». */
+export const compteDit = (n: ReturnType<typeof compteReponses>) =>
+  [pluriel(n.presents, "présent", "présents"), pluriel(n.absents, "absent", "absents"), `${n.sansReponse} sans réponse`].join(" · ");
+
+/** Une carte moyenne et, dessous, le nom du joueur (« Timéo B. »), puis ce qu'on en dit. */
+function CarteNommee({ id, children }: { id: string; children?: React.ReactNode }) {
+  const { club } = useClub();
+  const m = membreDe(club, id);
+  return (
+    <div className="flex w-[86px] shrink-0 flex-col items-center gap-2">
+      <CarteClub id={id} format="moyenne" />
+      <span className="flex max-w-full flex-col items-center gap-1">
+        <span className="max-w-full truncate text-corps font-semibold">{m ? nomCourt(m) : ""}</span>
+        {children}
+      </span>
+    </div>
+  );
+}
 
 function Etiquette({ genre, categorie }: { genre: string; categorie: string | null }) {
   const { club } = useClub();
@@ -56,9 +81,8 @@ function Convocation({ p }: { p: Extract<Publication, { genre: "convocation" }> 
         <h2 className="text-titre-fort leading-tight font-bold tracking-tight">{titreSeance(club, s)}</h2>
         <span className="text-corps text-encre-2">{`${jourLong(s.jour)} · ${s.heure} · ${s.lieu}`}</span>
       </div>
-      <span className="mono-label text-encre-3">
-        {[pluriel(n.presents, "présent", "présents"), pluriel(n.absents, "absent", "absents"), `${n.sansReponse} sans réponse`].join(" · ")}
-      </span>
+      {/* Tant que personne n'a répondu, il n'y a rien à compter. */}
+      {n.presents + n.absents > 0 && <span className="mono-label text-encre-3">{compteDit(n)}</span>}
       {joueur && (
         <div className="grid grid-cols-2 gap-2">
           {(
@@ -124,15 +148,11 @@ function Resultat({ p }: { p: Extract<Publication, { genre: "resultat" }> }) {
         <span className="text-corps text-encre-2">{p.buteurs.map((b) => `${nom(b.id)}${b.buts > 1 ? ` ×${b.buts}` : ""}`).join(" · ")}</span>
       )}
       {p.mvp.length > 0 && (
-        <div className="flex flex-wrap gap-x-5 gap-y-3 border-t border-foreground/[0.08] pt-3">
+        <div className="flex flex-wrap gap-3 border-t border-foreground/[0.08] pt-3">
           {p.mvp.map((id) => (
-            <div key={id} className="flex items-center gap-3">
-              <CarteClub id={id} format="moyenne" />
-              <span className="flex flex-col gap-1">
-                <span className="mono-label text-encre-3">MVP</span>
-                <span className="text-lecture font-semibold">{nom(id)}</span>
-              </span>
-            </div>
+            <CarteNommee key={id} id={id}>
+              <span className="mono-label text-encre-3">MVP</span>
+            </CarteNommee>
           ))}
         </div>
       )}
@@ -140,10 +160,8 @@ function Resultat({ p }: { p: Extract<Publication, { genre: "resultat" }> }) {
   );
 }
 
-const gains = (g: Partial<Record<StatKey, number>>, gardien: boolean) =>
-  STAT_KEYS.filter((k) => g[k])
-    .map((k) => `${abrege(k, gardien)} +${g[k]}`)
-    .join(" · ");
+/** « TIR +1 », « PHY +2 » : un gain par ligne, jamais coupé entre le sigle et le chiffre. */
+const gains = (g: Partial<Record<StatKey, number>>, gardien: boolean) => STAT_KEYS.filter((k) => g[k]).map((k) => `${abrege(k, gardien)}\u00a0+${g[k]}`);
 
 function CartesQuiMontent({ p }: { p: Extract<Publication, { genre: "cartes" }> }) {
   const { club } = useClub();
@@ -156,10 +174,13 @@ function CartesQuiMontent({ p }: { p: Extract<Publication, { genre: "cartes" }> 
         {p.cartes.map((c) => {
           const m = membreDe(club, c.id);
           return (
-            <div key={c.id} className="flex shrink-0 flex-col items-center gap-2">
-              <CarteClub id={c.id} format="moyenne" />
-              <span className="mono-label max-w-[86px] text-center leading-snug text-encre-2">{gains(c.gains, estGardien(m?.poste))}</span>
-            </div>
+            <CarteNommee key={c.id} id={c.id}>
+              {gains(c.gains, estGardien(m?.poste)).map((g) => (
+                <span key={g} className="mono-label whitespace-nowrap text-encre-2">
+                  {g}
+                </span>
+              ))}
+            </CarteNommee>
           );
         })}
       </div>
@@ -218,13 +239,81 @@ function Publier({ depart }: { depart: string | null }) {
   );
 }
 
+const GENRES: { id: Seance["genre"]; label: string }[] = [
+  { id: "match", label: "Match" },
+  { id: "entrainement", label: "Entraînement" },
+];
+
+/** Convoquer : créer un match ou un entraînement d'une de ses catégories ; ses licenciés actifs y sont convoqués. */
+function Convoquer({ depart }: { depart: string | null }) {
+  const { club, droits, agir } = useClub();
+  const [ouvert, setOuvert] = useState(false);
+  const miennes = club.categories.filter((c) => droits.gere(c.id)).sort((a, b) => a.ordre - b.ordre);
+  const [genre, setGenre] = useState<Seance["genre"]>("match");
+  const [cible, setCible] = useState<string | null>(null);
+  const [jour, setJour] = useState("");
+  const [heure, setHeure] = useState("");
+  const [lieu, setLieu] = useState<string | null>(null);
+  const [adversaire, setAdversaire] = useState("");
+  if (!miennes.length) return null;
+  const categorie = cible ?? (depart && miennes.some((c) => c.id === depart) ? depart : miennes[0].id);
+  // Le lieu et l'heure habituels de la catégorie : ceux de sa dernière séance du même genre.
+  const derniere = club.seances.filter((s) => s.categorie === categorie && s.genre === genre && s.lieu !== "À l'extérieur").at(-1);
+  const lieuDit = lieu ?? derniere?.lieu ?? "";
+  const heureDite = heure || (derniere ? derniere.heure.replace("h", ":") : "");
+  const convoquer = () => {
+    if (!agir((c, moi) => creerSeance(c, moi, { genre, categorie, jour, heure: heureDite.replace(":", "h"), lieu: lieuDit, adversaire }))) return;
+    navigator.vibrate?.([10, 40, 18]);
+    toast.success("Convocation créée");
+    setJour("");
+    setHeure("");
+    setLieu(null);
+    setAdversaire("");
+    setOuvert(false);
+  };
+  return (
+    <>
+      <button type="button" onClick={() => setOuvert(true)} className="bouton-secondaire flex h-11 items-center justify-center gap-2 text-lecture font-semibold">
+        <Plus className="size-4" strokeWidth={2.4} />
+        Convoquer
+      </button>
+      <Feuille titre="Convocation" open={ouvert} onOpenChange={setOuvert}>
+        <Segment nom="Genre" choix={GENRES} actif={genre} onChange={setGenre} />
+        <Puces nom="Catégorie" choix={miennes.map((c) => ({ id: c.id, label: c.nom }))} actif={categorie} onChange={setCible} className="-mx-5" />
+        {genre === "match" && (
+          <input aria-label="Adversaire" placeholder="Adversaire" value={adversaire} onChange={(e) => setAdversaire(e.target.value)} maxLength={40} className={CHAMP} />
+        )}
+        <div className="grid grid-cols-[1fr_auto] gap-2">
+          <input aria-label="Jour" type="date" min={club.jour} value={jour} onChange={(e) => setJour(e.target.value)} className={cn(CHAMP, "min-w-0")} />
+          <input aria-label="Heure" type="time" value={heureDite} onChange={(e) => setHeure(e.target.value)} className={cn(CHAMP, "w-[8.75rem]")} />
+        </div>
+        <input aria-label="Lieu" placeholder="Lieu" value={lieuDit} onChange={(e) => setLieu(e.target.value)} maxLength={60} className={CHAMP} />
+        <button
+          type="button"
+          disabled={!jour || !heureDite || !lieuDit.trim() || (genre === "match" && !adversaire.trim())}
+          onClick={convoquer}
+          className="bouton-principal h-12 text-[15px] font-semibold"
+        >
+          Convoquer
+        </button>
+      </Feuille>
+    </>
+  );
+}
+
 export function FilClub() {
-  const { club, moi, role } = useClub();
+  const { club, moi, droits } = useClub();
   const [categorie] = useCategorieChoisie();
   const fil = filDuClub(club, moi, categorie);
+  const ecrit = droits.administre || club.categories.some((c) => droits.gere(c.id));
   return (
     <div className="flex flex-col gap-3 px-5">
-      {(role === "admin" || role === "entraineur") && <Publier depart={categorie} />}
+      {ecrit && (
+        <div className="grid grid-cols-2 gap-2">
+          <Publier depart={categorie} />
+          <Convoquer depart={categorie} />
+        </div>
+      )}
       {fil.map((p) =>
         p.genre === "convocation" ? (
           <Convocation key={p.id} p={p} />

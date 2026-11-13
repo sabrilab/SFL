@@ -126,7 +126,7 @@ function Staff() {
     <section className="flex flex-col gap-3">
       <TitreSection
         droite={
-          <Link href="/club/categories" className="bouton-secondaire px-3.5 py-2 text-corps font-semibold">
+          <Link href="/club/categories" className="bouton-secondaire relative px-3.5 py-2 text-corps font-semibold after:absolute after:inset-x-0 after:-inset-y-1 after:content-['']">
             Ajouter
           </Link>
         }

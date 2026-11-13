@@ -1,11 +1,14 @@
 "use client";
 
 // Les petits contrôles de Bola Club, ceux de l'app : les puces d'un filtre
-// (les pilules de la Ligue vierge : la choisie en bouton principal, les
-// autres cerclées), le segment de verre (les onglets des Actus), le compteur
+// (celles du rail des Actus : la choisie à l'encre pleine, noire en clair,
+// blanche en sombre, les autres cerclées), le segment de verre (les onglets
+// des Actus), le compteur
 // − / + d'une saisie rapide, et le gabarit d'une page enfant (le retour et
 // son titre, comme une rubrique de Ma carte) et celui d'une feuille (ui/
-// sheet.tsx : son titre, son contenu). Noir et blanc, en currentColor.
+// sheet.tsx : son titre, son contenu). Noir et blanc, en currentColor. Un
+// contrôle dessiné sous 44 px garde son dessin et prend une cible de 44 px
+// (CIBLE).
 
 import { Minus, Plus } from "lucide-react";
 import { BoutonRetour } from "@/components/layout/bouton-retour";
@@ -14,6 +17,17 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { cn } from "@/lib/utils";
 
 export const NOMBRE = { fontFamily: ANTON, lineHeight: 0.9 } as const;
+
+/** Un contrôle de 36 px de haut se touche sur 44 px : la cible déborde de 4 px, sans changer le dessin. */
+export const CIBLE = "relative after:absolute after:-inset-y-1 after:inset-x-0 after:content-['']";
+
+/** Une puce : la choisie à l'encre pleine, les autres cerclées (le dessin du rail des Actus). */
+export const puce = (choisie: boolean) =>
+  cn(
+    CIBLE,
+    "shrink-0 rounded-full px-4 py-2 text-corps font-semibold whitespace-nowrap transition-colors",
+    choisie ? "bg-foreground text-background" : "text-encre-2 ring-1 ring-foreground/[0.14] ring-inset",
+  );
 
 /** Un filtre en puces, qu'on fait défiler quand elles ne tiennent pas. */
 export function Puces<T extends string>({
@@ -24,7 +38,8 @@ export function Puces<T extends string>({
   className,
 }: {
   nom: string;
-  choix: readonly { id: T; label: string }[];
+  /** `nom` : ce que lit le lecteur d'écran quand le libellé est abrégé (« DÉF » : « Défenseurs ») ; `sous` : une étiquette à côté (« Tous 60 »), comme sur le rail. */
+  choix: readonly { id: T; label: string; nom?: string; sous?: string }[];
   actif: T;
   onChange: (id: T) => void;
   className?: string;
@@ -33,7 +48,7 @@ export function Puces<T extends string>({
     <div
       role="tablist"
       aria-label={nom}
-      className={cn("flex gap-2 overflow-x-auto px-5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden", className)}
+      className={cn("-my-1 flex gap-2 overflow-x-auto px-5 py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden", className)}
     >
       {choix.map((c) => (
         <button
@@ -41,10 +56,12 @@ export function Puces<T extends string>({
           type="button"
           role="tab"
           aria-selected={actif === c.id}
+          aria-label={c.nom ? (c.sous ? `${c.nom}, ${c.sous}` : c.nom) : undefined}
           onClick={() => onChange(c.id)}
-          className={cn("shrink-0 px-4 py-2 text-corps font-semibold whitespace-nowrap", actif === c.id ? "bouton-principal" : "bouton-secondaire text-encre-2")}
+          className={cn(puce(actif === c.id), c.sous && "flex items-baseline gap-1.5")}
         >
           {c.label}
+          {c.sous && <span className={cn("mono-label text-etiquette", actif === c.id ? "text-background/65" : "text-encre-3")}>{c.sous}</span>}
         </button>
       ))}
     </div>
@@ -75,7 +92,7 @@ export function Segment<T extends string>({
           aria-selected={actif === c.id}
           onClick={() => onChange(c.id)}
           className={cn(
-            "min-w-0 flex-1 py-2 font-semibold whitespace-nowrap",
+            "relative min-w-0 flex-1 py-2 font-semibold whitespace-nowrap after:absolute after:inset-x-0 after:-inset-y-1.5 after:content-['']",
             // À quatre, les libellés se serrent pour tenir sur un petit téléphone.
             choix.length > 3 ? "px-0.5 text-petit tracking-tight" : "px-2 text-corps",
             actif === c.id ? "bouton-principal" : "bouton-discret text-muted-foreground",
@@ -90,7 +107,8 @@ export function Segment<T extends string>({
 
 /** Un compteur − / + : les buts, les passes, le score. */
 export function Compteur({ nom, valeur, onChange, max = 20, grand = false }: { nom: string; valeur: number; onChange: (n: number) => void; max?: number; grand?: boolean }) {
-  const rond = cn("bouton-secondaire grid shrink-0 place-items-center", grand ? "size-11" : "size-9");
+  // Le petit rond garde ses 36 px, sa cible en fait 44.
+  const rond = cn("bouton-secondaire grid shrink-0 place-items-center", grand ? "size-11" : "relative size-9 after:absolute after:-inset-1 after:content-['']");
   return (
     <span role="group" aria-label={nom} className="flex items-center gap-1.5">
       <button type="button" aria-label={`${nom} : un de moins`} disabled={valeur <= 0} onClick={() => onChange(valeur - 1)} className={rond}>
@@ -107,12 +125,13 @@ export function Compteur({ nom, valeur, onChange, max = 20, grand = false }: { n
 }
 
 /** Une page enfant du club : le retour, son titre, son contenu (le gabarit d'une rubrique de Ma carte). */
-export function PageEnfant({ titre, sous, children }: { titre: string; sous?: string; children: React.ReactNode }) {
+export function PageEnfant({ titre, sur, sous, children }: { titre: string; /** Au-dessus du titre : la catégorie d'une séance. */ sur?: string; sous?: string; children: React.ReactNode }) {
   return (
     <div className="mx-auto flex w-full max-w-xl flex-col gap-[var(--fib-21)] px-5 py-4 sm:py-8 lg:max-w-2xl">
       <div className="flex items-center gap-3">
         <BoutonRetour />
         <div className="flex min-w-0 flex-col gap-1">
+          {sur && <span className="mono-label text-encre-2">{sur}</span>}
           <h1 className="text-[30px] leading-[1.05] font-bold tracking-tight text-balance">{titre}</h1>
           {sous && <span className="mono-label text-encre-3">{sous}</span>}
         </div>

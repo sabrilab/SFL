@@ -13,17 +13,19 @@ import { useState } from "react";
 import { ChevronDown } from "lucide-react";
 import { useClub } from "@/hooks/use-club";
 import { creerCategorie, deplacerJoueur, rangerEntraineur, renommerCategorie } from "@/lib/sfl/club/mutations";
+import { aLAgeDe } from "@/lib/sfl/club/regles";
 import { nomComplet, type Categorie, type Membre } from "@/lib/sfl/club/types";
 import { cn } from "@/lib/utils";
 import { CarteClub } from "./carte-club";
-import { CHAMP, Feuille, FICHE, PageEnfant } from "./puces";
+import { CHAMP, CIBLE, Feuille, FICHE, PageEnfant } from "./puces";
 
-const BOUTON_LIGNE = "bouton-secondaire shrink-0 px-3.5 py-2 text-corps font-semibold";
+const BOUTON_LIGNE = cn(CIBLE, "bouton-secondaire shrink-0 px-3.5 py-2 text-corps font-semibold");
 
 function FicheCategorie({ c, onDeplacer, onRenommer, onStaff }: { c: Categorie; onDeplacer: (m: Membre) => void; onRenommer: () => void; onStaff: () => void }) {
   const { club, droits } = useClub();
   const [ouverte, setOuverte] = useState(false);
-  const joueurs = club.membres.filter((m) => m.categorie === c.id);
+  // Les licenciés de la catégorie : un joueur dont la licence est rendue n'y est plus.
+  const joueurs = club.membres.filter((m) => m.categorie === c.id && droits.voitJoueur(m));
   const staff = club.staff.filter((s) => c.entraineurs.includes(s.id));
   const autres = club.categories.some((x) => x.id !== c.id && droits.gere(x.id));
   return (
@@ -116,7 +118,7 @@ export function Categories() {
             <span className="text-lecture font-semibold">{nomComplet(deplace)}</span>
             <div className="flex flex-col gap-2">
               {miennes
-                .filter((c) => c.id !== deplace.categorie)
+                .filter((c) => c.id !== deplace.categorie && aLAgeDe(deplace, c, club.jour))
                 .map((c) => (
                   <button
                     key={c.id}
@@ -130,7 +132,7 @@ export function Categories() {
                     className="bouton-secondaire flex h-12 items-center justify-between px-5 text-[15px] font-semibold"
                   >
                     {c.nom}
-                    <span className="mono-label text-encre-3">{`${club.membres.filter((x) => x.categorie === c.id).length} joueurs`}</span>
+                    <span className="mono-label text-encre-3">{`${club.membres.filter((x) => x.categorie === c.id && droits.voitJoueur(x)).length} joueurs`}</span>
                   </button>
                 ))}
             </div>

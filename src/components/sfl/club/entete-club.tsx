@@ -4,7 +4,9 @@
 // haut »), le même sous ses trois onglets : l'écusson et le nom du club, qui
 // déroulent les ligues comme le sigle des Actus (choix-ligue.tsx : SFL,
 // Bola, le club) ; à droite, selon le point de vue, le rond de l'admin
-// (« Gérer le club ») ou celui de l'entraîneur (« Catégories ») ; dessous,
+// (« Gérer le club ») ou celui de l'entraîneur (« Catégories »), et pour un
+// joueur sa carte (pour un parent, celle de son enfant), qui mène à sa
+// fiche : sa carte et son évolution ; dessous,
 // les onglets de verre des Actus : Actus, Effectif, Classements ; puis le
 // rail des catégories, collé en haut. Un parent lit le nom de son enfant
 // sous l'en-tête. Les couleurs du club ne vivent que sur l'écusson : tout le
@@ -20,6 +22,7 @@ import { useClub } from "@/hooks/use-club";
 import { fondDe } from "@/lib/sfl/blason";
 import { nomComplet } from "@/lib/sfl/club/types";
 import { cn } from "@/lib/utils";
+import { CarteClub } from "./carte-club";
 import { RailCategories } from "./rail-categories";
 
 export type OngletClub = "actus" | "effectif" | "classements";
@@ -56,7 +59,10 @@ function MenuDuClub() {
         onClick={() => setOuvert((o) => !o)}
         className="flex max-w-full items-center gap-2.5 py-0.5 text-foreground"
       >
-        <Ecusson initiales={club.initiales} fond={fondDe(club.blason)} blason={club.blason} taille={40} />
+        {/* Le nom suit : l'écusson ne le répète pas au lecteur d'écran. */}
+        <span aria-hidden className="grid shrink-0">
+          <Ecusson initiales={club.initiales} fond={fondDe(club.blason)} blason={club.blason} taille={40} />
+        </span>
         <span className="titre-lettrage truncate text-[22px] leading-none">{club.nom}</span>
         <ChevronDown className={cn("size-[18px] shrink-0 opacity-50 transition-transform", ouvert && "rotate-180")} />
       </button>
@@ -96,12 +102,20 @@ export function PageClub({ onglet, children }: { onglet: OngletClub; children: R
         <div className="flex items-center justify-between gap-3 px-5">
           <MenuDuClub />
           {droits.administre ? (
-            <Link href="/club/admin" aria-label="Gérer le club" className="bouton-secondaire grid size-10 shrink-0 place-items-center">
+            <Link href="/club/admin" aria-label="Gérer le club" className="bouton-secondaire grid size-11 shrink-0 place-items-center">
               <Settings className="size-[18px]" strokeWidth={2.2} />
             </Link>
           ) : role === "entraineur" ? (
-            <Link href="/club/categories" aria-label="Catégories" className="bouton-secondaire grid size-10 shrink-0 place-items-center">
+            <Link href="/club/categories" aria-label="Catégories" className="bouton-secondaire grid size-11 shrink-0 place-items-center">
               <Layers className="size-[18px]" strokeWidth={2.2} />
+            </Link>
+          ) : droits.joueur ? (
+            <Link
+              href={`/club/joueur/${droits.joueur.id}`}
+              aria-label={role === "parent" ? `La carte de ${nomComplet(droits.joueur)}` : "Ma carte"}
+              className="shrink-0 transition-transform active:scale-95"
+            >
+              <CarteClub id={droits.joueur.id} format="petite" inerte />
             </Link>
           ) : null}
         </div>

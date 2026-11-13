@@ -10,18 +10,24 @@
 //     ma-note.tsx, NoteEvolution), sur les matchs de son club : sa note, ce
 //     qui est gagné depuis la dernière mise à jour, les six jauges, sa série,
 //     ses matchs (lib/sfl/club/saison.ts : le vrai moteur des cartes) ;
-//   · Présences : ses séances passées, une pastille chacune (pleine :
-//     présent ; cerclée : en retard ; vide : absent) ;
+//   · Présences : « 14 présents · 2 retards · 1 absent », puis ses séances
+//     passées, une pastille chacune (pleine : présent ; cerclée : en retard ;
+//     vide : absent) ;
 //   · Notes privées, datées et signées : seuls le staff de sa catégorie et
 //     l'admin les lisent et en ajoutent ;
 //   · Poste et Surclassement, en puces ; « Déplacer » vers une autre
 //     catégorie ; pour l'admin, « Libérer la licence » : la licence redevient
 //     libre, le joueur garde son compte et sa carte (« Bola gratuit »).
 // Le joueur lui-même, ou son parent, y lit sa carte, son évolution et ses
-// présences : ni les notes privées, ni les réglages. Tout autre point de vue
-// n'y a que la carte.
+// présences : ni les notes privées, ni les réglages. Un coéquipier (licencié
+// actif de la même catégorie) n'y a que la carte. Tout autre point de vue, ou
+// un joueur inconnu, est renvoyé à l'effectif : la carte, l'âge et l'accord
+// parental d'un joueur ne s'ouvrent pas par l'adresse (regles.ts,
+// voitJoueur). « Accord parental en attente » ne se lit que du staff, du
+// joueur et de son parent.
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { NoteEvolution } from "@/components/sfl/ma-carte/ma-note";
 import { useClub } from "@/hooks/use-club";
@@ -30,13 +36,13 @@ import { estGardien } from "@/lib/sfl/gardien";
 import { POSTES } from "@/lib/sfl/inscription";
 import { assiduite, seancesDe } from "@/lib/sfl/club/classements";
 import { ajouterNote, changerPoste, deplacerJoueur, libererLicence, surclasser } from "@/lib/sfl/club/mutations";
-import { accordParentalRequis, ageLe, categorieDe, licenceDe, membreDe, surclassementsPossibles } from "@/lib/sfl/club/regles";
+import { aLAgeDe, accordParentalRequis, ageLe, categorieDe, licenceDe, membreDe, surclassementsPossibles } from "@/lib/sfl/club/regles";
 import { nomComplet, nomCourt, type Membre } from "@/lib/sfl/club/types";
 import { cn } from "@/lib/utils";
 import { CarteClub } from "./carte-club";
-import { CHAMP, Feuille, NOMBRE, PageEnfant, TitreSection } from "./puces";
+import { CHAMP, Feuille, NOMBRE, PageEnfant, puce, TitreSection } from "./puces";
 
-const PUCE = "shrink-0 px-3.5 py-2 text-corps font-semibold whitespace-nowrap";
+const pluriel = (n: number, un: string, plusieurs: string) => `${n} ${n > 1 ? plusieurs : un}`;
 
 function Presences({ m }: { m: Membre }) {
   const { club } = useClub();
@@ -44,14 +50,23 @@ function Presences({ m }: { m: Membre }) {
   const a = assiduite(club, m.id, "saison");
   return (
     <section className="flex flex-col gap-3">
-      <TitreSection droite={a.pct !== null && <span className="mono-label text-encre-3">{a.pct} %</span>}>Présences</TitreSection>
+      <TitreSection>Présences</TitreSection>
       <span style={{ ...NOMBRE, fontSize: 40 }} className="tabular-nums">
         {a.presents}
         <span className="text-foreground/30"> / {a.total}</span>
       </span>
+      {a.total > 0 && (
+        <span className="mono-label text-encre-3">
+          {[
+            pluriel(a.presents - a.retards, "présent", "présents"),
+            pluriel(a.retards, "retard", "retards"),
+            pluriel(a.total - a.presents, "absent", "absents"),
+          ].join(" · ")}
+        </span>
+      )}
       <ul className="flex flex-wrap gap-1.5" aria-label="Séances">
         {seances.map((s) => {
-          const etat = s.appel[m.id] ?? "absent";
+          const etat = s.appel[m.id];
           return (
             <li
               key={s.id}
@@ -115,8 +130,11 @@ function Reglages({ m }: { m: Membre }) {
   const [deplacer, setDeplacer] = useState(false);
   const [liberer, setLiberer] = useState(false);
   const possibles = surclassementsPossibles(m, club.categories);
-  const destinations = club.categories.filter((c) => c.id !== m.categorie && droits.gere(c.id)).sort((a, b) => a.ordre - b.ordre);
+  // Où le déplacer : ses autres catégories, celles dont il a encore l'âge.
+  const destinations = club.categories.filter((c) => c.id !== m.categorie && droits.gere(c.id) && aLAgeDe(m, c, club.jour)).sort((a, b) => a.ordre - b.ordre);
   const licence = licenceDe(club, m.id);
+  // Sa licence rendue, il n'est plus du club : il n'y a plus rien à régler.
+  if (!licence) return droits.administre ? <span className="mono-label py-3 text-center text-encre-3">Bola gratuit</span> : null;
   return (
     <>
       <section className="flex flex-col gap-3">
@@ -130,7 +148,7 @@ function Reglages({ m }: { m: Membre }) {
               aria-checked={m.poste === p.id}
               aria-label={p.label}
               onClick={() => agir((c, moi) => changerPoste(c, moi, m.id, p.id))}
-              className={cn(PUCE, m.poste === p.id ? "bouton-principal" : "bouton-secondaire text-encre-2")}
+              className={puce(m.poste === p.id)}
             >
               {p.id}
             </button>
@@ -149,7 +167,7 @@ function Reglages({ m }: { m: Membre }) {
                 role="radio"
                 aria-checked={m.surclasseEn === c.id}
                 onClick={() => agir((k, moi) => surclasser(k, moi, m.id, c.id))}
-                className={cn(PUCE, m.surclasseEn === c.id ? "bouton-principal" : "bouton-secondaire text-encre-2")}
+                className={puce(m.surclasseEn === c.id)}
               >
                 {c.nom}
               </button>
@@ -164,14 +182,11 @@ function Reglages({ m }: { m: Membre }) {
             Déplacer
           </button>
         )}
-        {droits.administre &&
-          (licence ? (
-            <button type="button" onClick={() => setLiberer(true)} className="bouton-discret h-11 text-lecture font-semibold text-encre-2">
-              Libérer la licence
-            </button>
-          ) : (
-            <span className="mono-label py-3 text-center text-encre-3">Bola gratuit</span>
-          ))}
+        {droits.administre && (
+          <button type="button" onClick={() => setLiberer(true)} className="bouton-discret h-11 text-lecture font-semibold text-encre-2">
+            Libérer la licence
+          </button>
+        )}
       </div>
 
       <Feuille titre="Déplacer" open={deplacer} onOpenChange={setDeplacer}>
@@ -189,7 +204,7 @@ function Reglages({ m }: { m: Membre }) {
               className="bouton-secondaire flex h-12 items-center justify-between px-5 text-[15px] font-semibold"
             >
               {c.nom}
-              <span className="mono-label text-encre-3">{`${club.membres.filter((x) => x.categorie === c.id).length} joueurs`}</span>
+              <span className="mono-label text-encre-3">{`${club.membres.filter((x) => x.categorie === c.id && droits.voitJoueur(x)).length} joueurs`}</span>
             </button>
           ))}
         </div>
@@ -221,9 +236,16 @@ function Reglages({ m }: { m: Membre }) {
 
 export function FicheJoueurClub({ id }: { id: string }) {
   const { club, cartes, droits } = useClub();
+  const router = useRouter();
   const m = membreDe(club, id);
   const carte = cartes.get(id);
-  if (!m || !carte) return <PageEnfant titre="Joueur">{null}</PageEnfant>;
+  // Un joueur inconnu, ou que ce point de vue ne voit pas : retour à l'effectif, sans rien montrer de lui.
+  // (L'admin garde la fiche d'un joueur dont il vient de rendre la licence : « Bola gratuit ».)
+  const ferme = !m || !carte || !(droits.voitJoueur(m) || droits.administre);
+  useEffect(() => {
+    if (ferme) router.replace("/club/effectif");
+  }, [ferme, router]);
+  if (ferme) return null;
   const gardien = estGardien(m.poste);
   const cat = categorieDe(club, m.categorie);
   const surclasse = categorieDe(club, m.surclasseEn);
@@ -238,7 +260,7 @@ export function FicheJoueurClub({ id }: { id: string }) {
         <div className="flex flex-col items-center gap-2">
           <span className="mono-label text-encre-2">{`${cat?.nom ?? ""} · ${m.poste} · ${ageLe(m.naissance, club.jour)} ans`}</span>
           {surclasse && <span className="mono-label rounded-full px-3 py-1.5 ring-1 ring-foreground/20 ring-inset">Surclassé en {surclasse.nom}</span>}
-          {attente && <span className="mono-label rounded-full px-3 py-1.5 text-encre-2 ring-1 ring-foreground/20 ring-inset">Accord parental en attente</span>}
+          {attente && voit && <span className="mono-label rounded-full px-3 py-1.5 text-encre-2 ring-1 ring-foreground/20 ring-inset">Accord parental en attente</span>}
         </div>
       </div>
 

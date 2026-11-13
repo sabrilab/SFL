@@ -2,17 +2,20 @@
 // club : résultats du week-end par catégorie, convocations, cartes qui
 // montent, annonces du staff »). Ce qu'un rôle y lit : l'admin et les
 // entraîneurs, tout le club ; un joueur (ou son parent), le club et sa
-// catégorie. Le rail filtre sur une catégorie ; une annonce à tout le club
-// reste sous chaque catégorie.
+// catégorie ; sans licence active, plus rien. Le rail filtre sur une
+// catégorie ; une annonce à tout le club reste sous chaque catégorie.
 //
 // L'ordre : ce qui vient d'abord, le plus proche en tête (les convocations
 // des séances à venir) ; puis ce qui est passé, le plus récent en tête : les
 // annonces, le dernier résultat de chaque catégorie, et ses cartes qui
 // montent (les joueurs dont la carte officielle a changé à ce match-là).
-// Pur.
+// Sous « Tout », le staff ne garde en tête que la prochaine séance de
+// chacune des catégories qu'il entraîne : les résultats du week-end suivent
+// aussitôt ; toutes les convocations d'une catégorie se lisent sous sa puce.
+// Un joueur garde toutes les siennes. Pur.
 
 import { STAT_KEYS, type StatKey } from "@/lib/sfl/engine";
-import { droits, seancePassee } from "./regles";
+import { categorieDe, droits, seanceAVenir } from "./regles";
 import { cartesDuClub, matchsJoues, mvpsDe } from "./saison";
 import type { Annonce, Club, Moi, Seance } from "./types";
 
@@ -47,13 +50,20 @@ export function filDuClub(club: Club, moi: Moi, categorie: string | null): Publi
   const avenir: Publication[] = [];
   const passe: Publication[] = [];
 
-  for (const s of club.seances) {
-    if (seancePassee(s, club.jour) || s.jour < club.jour || !visible(s.categorie)) continue;
+  if (!d.actif) return [];
+  const aVenir = club.seances
+    .filter((s) => seanceAVenir(s, club.jour))
+    .sort((a, b) => a.jour.localeCompare(b.jour) || a.heure.localeCompare(b.heure) || a.id.localeCompare(b.id));
+  const vues = new Set<string>();
+  for (const s of aVenir) {
+    if (!visible(s.categorie)) continue;
     // Un joueur ne lit que les convocations qui le concernent (sa catégorie, ou celle où il est surclassé et convoqué).
     if (d.joueur && !s.convoques.includes(d.joueur.id) && d.joueur.categorie !== s.categorie) continue;
+    // Le staff, sous « Tout » : la prochaine séance de chaque catégorie qu'il entraîne.
+    if (!d.joueur && categorie === null && (!categorieDe(club, s.categorie)?.entraineurs.includes(moi.id) || vues.has(s.categorie))) continue;
+    vues.add(s.categorie);
     avenir.push({ genre: "convocation", id: `c-${s.id}`, jour: s.jour, categorie: s.categorie, seance: s });
   }
-  avenir.sort((a, b) => a.jour.localeCompare(b.jour) || a.id.localeCompare(b.id));
 
   for (const a of club.annonces) {
     if (visible(a.categorie)) passe.push({ genre: "annonce", id: a.id, jour: a.jour, categorie: a.categorie, annonce: a });
