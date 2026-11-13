@@ -9,7 +9,7 @@
 // et le parcours des comptes de moins de 90 jours (./parcours.ts), puis
 // passe le tout à la vue (`vue.tsx`), rangée selon le funnel AARRR :
 // acquisition, activation, rétention, revenu, recommandation. Les blocs qui
-// lisent leurs propres tables (vidéos, Bola Agent, parrainage, packs en XP,
+// lisent leurs propres tables (vidéos, trash talk, Bola Agent, parrainage, packs en XP,
 // accords) lui sont donnés à part, et elle les range dans leur étape.
 // Rien n'est agrégé en base, donc rien à maintenir quand on ajoute un type
 // d'événement.
@@ -28,6 +28,7 @@ import { AccordsStats } from "./confidentialite";
 import { assemblerReperes, lireReperes } from "./lectures";
 import { ParrainageStats } from "./parrainage";
 import { VideosStats } from "./videos";
+import { TrashTalkAdmin } from "./trash-talk";
 import { ActiviteVue, type DonneesActivite } from "./vue";
 import { lireParcours } from "./parcours";
 import { FENETRE_ACTIVATION } from "./activation";
@@ -241,6 +242,7 @@ export default function ActivitePage() {
       error={error}
       blocs={{
         videos: (public_, admins) => <VideosStats public={public_} admins={admins} />,
+        trashTalk: () => <TrashTalkAdmin />,
         agent: (public_, admins) => <AgentStats public={public_} admins={admins} />,
         parrainage: () => <ParrainageStats />,
         revenu: (depuis, actifs, garde) => <Revenu depuis={depuis} actifs={actifs} garde={garde} />,
