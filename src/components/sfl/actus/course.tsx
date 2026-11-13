@@ -111,6 +111,7 @@ import { ligneDuRendezVous } from "@/lib/sfl/matchs-du-jour";
 import { legendes, saisonsPalmares, type SaisonPalmares } from "@/lib/sfl/palmares";
 import { cn } from "@/lib/utils";
 import { ANTON } from "./ecran";
+import { Rail } from "./rail";
 import { VoteDuJour } from "./fil";
 import { DivisionsApres } from "./divisions-apres";
 import { CouvertureRubrique, RubriqueActu, RubriqueBesoin, RubriqueEnjeux, RubriqueRival, RubriqueToi } from "./pelouse";
@@ -825,7 +826,9 @@ interface Etape {
  * Le rail des journées, collé en haut pendant qu'on parcourt le fil (Sabri,
  * 26/10 : que ce soit « facile […] de bien s'y retrouver », « en
  * reconnaissance des différentes journées ») : J4 à venir, puis J3, J2, J1.
- * Celle qu'on lit est à l'encre pleine ; en toucher une y descend.
+ * Celle qu'on lit est à l'encre pleine ; en toucher une y descend. La rangée
+ * de puces elle-même : actus/rail.tsx (la même sert au rail des catégories de
+ * Bola Club).
  */
 function RailJournees({ etapes, deplier }: { etapes: Etape[]; deplier?: (id: string) => void }) {
   const [active, setActive] = useState(etapes[0]?.id);
@@ -875,36 +878,7 @@ function RailJournees({ etapes, deplier }: { etapes: Etape[]; deplier?: (id: str
     );
   };
   if (etapes.length < 2) return null;
-  return (
-    <nav
-      aria-label="Journées"
-      className="sticky top-0 z-30 -my-3 border-b border-foreground/[0.08] bg-background/85 backdrop-blur-xl md:-my-[var(--fib-13,13px)] md:rounded-full md:border md:px-1.5"
-    >
-      <div ref={rail} className="flex gap-1.5 overflow-x-auto px-5 py-2 [scrollbar-width:none] md:px-0">
-        {etapes.map((e) => {
-          const ici = e.id === active;
-          return (
-            <button
-              key={e.id}
-              type="button"
-              data-etape={e.id}
-              aria-current={ici ? "true" : undefined}
-              onClick={() => aller(e.id)}
-              className={cn(
-                "flex h-9 shrink-0 items-baseline gap-1.5 rounded-full px-3.5 pt-[7px] transition-colors duration-300",
-                ici ? "bg-foreground text-background" : "text-encre-3 ring-1 ring-foreground/[0.12] ring-inset",
-              )}
-            >
-              <span className="text-titre leading-none" style={{ fontFamily: ANTON }}>
-                {e.label}
-              </span>
-              {e.sous && <span className={cn("mono-label text-etiquette", ici ? "text-background/65" : "text-encre-3")}>{e.sous}</span>}
-            </button>
-          );
-        })}
-      </div>
-    </nav>
-  );
+  return <Rail ref={rail} nom="Journées" puces={etapes} active={active} onChoisir={aller} />;
 }
 
 /** Vendredi ou samedi, heure de Paris : les deux jours avant le match. */

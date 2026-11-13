@@ -30,7 +30,9 @@ export const NAV_ITEMS: NavItem[] = [
 const SOUS_PAGES: Record<string, string[]> = {
   "/": ["/map"],
   "/profil": ["/carte", "/collection", "/duel", "/reglages", "/avatar", "/boutique", "/admin", "/parrainage"],
-  "/ligue": ["/palmares", "/saisons", "/stats", "/ligue-vierge", "/bola-team"],
+  // /club : Bola Club, le club d'un licencié, à côté de la SFL et de Bola
+  // (lib/sfl/club/drapeau.ts : l'adresse n'existe pas en production).
+  "/ligue": ["/palmares", "/saisons", "/stats", "/ligue-vierge", "/bola-team", "/club"],
 };
 
 /** L'onglet de la page courante, par son href ; null hors des onglets. */
@@ -65,6 +67,7 @@ export interface Parent {
 
 const MA_CARTE: Parent = { href: "/profil", titre: "Ma carte" };
 const REGLAGES: Parent = { href: "/reglages", titre: "Réglages" };
+const CLUB: Parent = { href: "/club", titre: "FC Démo" };
 
 /** Les pages enfants, de la plus précise à la plus large (la première qui va l'emporte). */
 const PARENTS: [string, Parent][] = [
@@ -90,6 +93,11 @@ const PARENTS: [string, Parent][] = [
   // La liste des messages privés (une conversation donne son parent elle-même : messages/conversation.tsx).
   ["/messages", { href: "/vestiaire", titre: "Vestiaire" }],
   ["/recherche", { href: "/", titre: "Map" }],
+  // Bola Club : les pages enfants du club (la fiche d'un joueur, les catégories, une séance, l'admin).
+  ["/club/joueur", CLUB],
+  ["/club/categories", CLUB],
+  ["/club/seance", CLUB],
+  ["/club/admin", CLUB],
 ];
 
 /** Le parent d'une page enfant ; null pour une racine. */
@@ -124,6 +132,11 @@ const TITRES: [string, string][] = [
   ["/admin/design", "Design"],
   ["/admin", "Admin"],
   ["/map", "Map"],
+  ["/club/joueur", "Joueur"],
+  ["/club/categories", "Catégories"],
+  ["/club/seance", "Séance"],
+  ["/club/admin", "Admin du club"],
+  ["/club", "FC Démo"],
 ];
 
 export function titreDe(url: string): string | null {
