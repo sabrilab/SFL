@@ -19,6 +19,12 @@
 //   · « post »  360 × 450, l'image à partager 1080 × 1350 ;
 //   · « story » 360 × 640, l'image à partager 1080 × 1920, plus d'air en haut
 //     et en bas (là où une story pose ses propres boutons).
+// La phrase tient toujours dans sa place : son corps part de sa longueur et
+// se réduit tant qu'un mot dépasse la ligne ou que les lignes débordent
+// (corpsDuTexte, lib/sfl/trash-talk.ts). La une, en capitales accentuées,
+// garde de l'air entre ses lignes et entre ses mots ; un joueur cité y est
+// souligné d'un filet fin, décollé des lettres. Aucune ligne ne commence par
+// un deux-points ou un point d'interrogation (espacesInsecables).
 // CadreVisuel met un visuel à la largeur de sa place.
 
 import { useEffect, useRef, useState, type CSSProperties } from "react";
@@ -29,6 +35,8 @@ import { useIdentites } from "@/hooks/use-identites";
 import {
   corpsDuTexte,
   decouperCitations,
+  espacesInsecables,
+  INTERLIGNE,
   ligneDEdition,
   ligneDuPost,
   type FormatTrashTalk,
@@ -133,14 +141,14 @@ function Tweet({ s, gabarit, affiche }: { s: SujetVisuel; gabarit: GabaritTrashT
         <p
           style={{
             margin: 0,
-            font: `600 ${corps}px/1.16 ${INTER}`,
+            font: `600 ${corps}px/${INTERLIGNE.tweet} ${INTER}`,
             letterSpacing: "-0.03em",
             color: "rgba(255,255,255,0.86)",
             opacity: s.eteint ? 0.28 : 1,
             overflowWrap: "anywhere",
           }}
         >
-          {decouperCitations(s.texte).map((m, i) =>
+          {decouperCitations(espacesInsecables(s.texte)).map((m, i) =>
             m.cite ? (
               <span key={i} style={{ color: BLANC, fontWeight: 800 }}>
                 {m.texte}
@@ -214,17 +222,26 @@ function Une({ s, gabarit, affiche }: { s: SujetVisuel; gabarit: GabaritTrashTal
         <p
           style={{
             margin: 0,
-            font: `900 ${corps}px/0.98 ${INTER}`,
-            letterSpacing: "-0.045em",
+            font: `900 ${corps}px/${INTERLIGNE.une} ${INTER}`,
+            letterSpacing: "-0.03em",
+            wordSpacing: "0.14em",
             textTransform: "uppercase",
             opacity: s.eteint ? 0.22 : 1,
             overflowWrap: "anywhere",
           }}
         >
           «&nbsp;
-          {decouperCitations(s.texte).map((m, i) =>
+          {decouperCitations(espacesInsecables(s.texte)).map((m, i) =>
             m.cite ? (
-              <span key={i} style={{ boxShadow: `inset 0 -${Math.max(2, Math.round(corps * 0.09))}px 0 ${ENCRE}` }}>
+              <span
+                key={i}
+                style={{
+                  textDecorationLine: "underline",
+                  textDecorationThickness: Math.max(1.5, Math.round(corps * 0.05 * 2) / 2),
+                  textUnderlineOffset: Math.max(2, Math.round(corps * 0.07)),
+                  textDecorationSkipInk: "none",
+                }}
+              >
                 {m.texte}
               </span>
             ) : (

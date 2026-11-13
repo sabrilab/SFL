@@ -10,15 +10,19 @@
 //     âge, « Partager » si son image peut sortir de l'app, et « ⋯ » :
 //     Signaler (tout membre), Masquer (un joueur cité, l'admin), Remettre
 //     (l'admin), Retirer (l'auteur). Un post masqué ne reste visible que de
-//     son auteur et de l'admin, éteint, sous l'étiquette « Masqué » ;
+//     son auteur et de l'admin, éteint, l'étiquette « Masqué » à la place de
+//     « Partager » ;
 //   · écrire : une feuille, le vrai visuel qui se compose pendant la frappe,
 //     Tweet ou La une, la phrase (180 caractères), « @ » pour citer un joueur
-//     (un écran de la même fenêtre), Publier ;
+//     (un écran de la même fenêtre, l'effectif par ordre de nom), Publier ;
+//     on revient sur son post, en tête du bloc. « Écrire » s'éteint au
+//     troisième post de la journée ;
 //   · partager : deux images faites par le code, Story (1080 × 1920) et Post
 //     (1080 × 1350), préparées à l'ouverture de la feuille pour que le geste
 //     parte tout de suite (lib/sfl/image-a-partager.ts). Mon post, sans mon
 //     accord hors-app : la ligne « Tu n'apparais pas dans les visuels. »
-//     (video.tsx) à la place.
+//     (video.tsx) à la place ; si, une fois signée, l'image ne peut toujours
+//     pas sortir (un joueur cité n'a pas signé), la feuille se referme.
 // Aucune notification, à personne. Sans les tables : en production, rien
 // n'est monté ; ailleurs, mes posts restent sur ce téléphone.
 
@@ -42,6 +46,7 @@ import {
   direRefus,
   gestesPossibles,
   ilYA,
+  limiteAtteinte,
   lireTrashTalks,
   LONGUEUR_PHRASE,
   longueurPhrase,
@@ -72,6 +77,8 @@ export interface TrashTalks {
   admin: boolean;
   /** Mon accord hors-app, tel que ce téléphone le connaît. */
   horsApp: boolean;
+  /** Je peux signer la charte hors-app ici même (la condition d'InvitationVisuels, video.tsx). */
+  aSigner: boolean;
   saison: number;
   recharger: () => void;
 }
@@ -89,13 +96,16 @@ export function useTrashTalks(): TrashTalks | null {
   const nom = session?.server && !session.enAttente && !bola ? session.name : null;
   const admin = !!session?.admin;
   const { accord } = useAccord(nom);
-  const horsApp = !!accord?.horsApp && !accord.enAttente && accordValable(accord.version);
+  const valable = !!accord && !accord.enAttente && accordValable(accord.version);
+  const horsApp = valable && !!accord.horsApp;
+  const aSigner = valable && !accord.horsApp;
   const [lu, setLu] = useState<{ etat: EtatTrashTalk; posts: TrashTalk[]; moi: string | null } | null>(null);
   const charger = useCallback(() => {
     if (!nom || numero <= 0) return;
     lireTrashTalks(numero, { admin, horsApp })
       .then(setLu)
-      .catch(() => {});
+      // Le bloc ne se monte pas, mais l'erreur se lit dans la console et le suivi d'erreurs.
+      .catch((e) => console.error("Trash talk : lecture impossible", e));
   }, [nom, numero, admin, horsApp]);
   useEffect(() => {
     let vivant = true;
@@ -105,8 +115,8 @@ export function useTrashTalks(): TrashTalks | null {
     };
   }, [charger]);
   return useMemo(
-    () => (nom && lu && lu.etat !== "absent" ? { ...lu, admin, horsApp, saison: numero, recharger: charger } : null),
-    [nom, lu, admin, horsApp, numero, charger]
+    () => (nom && lu && lu.etat !== "absent" ? { ...lu, admin, horsApp, aSigner, saison: numero, recharger: charger } : null),
+    [nom, lu, admin, horsApp, aSigner, numero, charger]
   );
 }
 
@@ -130,6 +140,15 @@ export function BlocTrashTalk({ tt, j, ecrire, className }: { tt: TrashTalks | n
   const [partageId, setPartage] = useState<number | null>(null);
   const [maintenant] = useState(() => Date.now());
   const posts = useMemo(() => (tt ? postsDuFil(tt.posts, j, tt.moi, tt.admin) : []), [tt, j]);
+  // Après « Publier » : dès que le nouveau post arrive en tête, la piste y revient
+  // (sans cela l'aimantation garde sous le doigt le post qu'on regardait).
+  const vientDePublier = useRef(false);
+  const enTete = posts[0]?.id;
+  useEffect(() => {
+    if (!vientDePublier.current || enTete === undefined) return;
+    vientDePublier.current = false;
+    piste.current?.scrollTo({ left: 0, behavior: "instant" });
+  }, [enTete]);
   if (!tt || (!ecrire && posts.length === 0)) return null;
   const partage = partageId === null ? null : (posts.find((p) => p.id === partageId) ?? null);
 
@@ -166,7 +185,12 @@ export function BlocTrashTalk({ tt, j, ecrire, className }: { tt: TrashTalks | n
           </span>
         )}
         {ecrire && (
-          <button type="button" onClick={() => setSaisie(true)} className="bouton-secondaire ml-auto flex h-9 items-center gap-1.5 px-3.5 text-corps font-semibold">
+          <button
+            type="button"
+            disabled={limiteAtteinte(tt.posts, j, tt.moi)}
+            onClick={() => setSaisie(true)}
+            className="bouton-secondaire ml-auto flex h-9 items-center gap-1.5 px-3.5 text-corps font-semibold disabled:opacity-40"
+          >
             <PenLine className="size-[15px]" strokeWidth={1.9} />
             Écrire
           </button>
@@ -180,30 +204,28 @@ export function BlocTrashTalk({ tt, j, ecrire, className }: { tt: TrashTalks | n
             ref={piste}
             onScroll={suivre}
             aria-roledescription="carrousel"
-            className="flex snap-x snap-mandatory overflow-x-auto overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            className="flex snap-x snap-mandatory overflow-x-auto overscroll-x-contain [scrollbar-width:none] md:max-w-[400px] [&::-webkit-scrollbar]:hidden"
           >
             {posts.map((p) => (
-              <div key={p.id} className="relative w-full shrink-0 snap-center px-5 md:px-0">
-                <CadreVisuel sujet={sujetDe(p)} className={cn("rounded-[22px] ring-1 ring-foreground/10", p.masque && "opacity-30 grayscale")} />
-                {p.masque && (
-                  <span className="mono-label absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-foreground px-3 py-1.5 text-background">Masqué</span>
-                )}
+              <div key={p.id} className="w-full shrink-0 snap-center px-5 md:px-0">
+                <CadreVisuel sujet={sujetDe(p)} className={cn("rounded-[22px] ring-1 ring-foreground/10", p.masque && "opacity-60 grayscale dark:opacity-45")} />
               </div>
             ))}
           </div>
           {vu && (
-            <div className="flex min-h-11 items-center gap-1 pt-1.5 pr-1.5 pl-5 md:pl-1">
+            <div className="flex min-h-11 items-center pt-1 pr-1 pl-5 md:max-w-[400px] md:pl-1">
               <p className="min-w-0 flex-1 truncate text-ligne">
                 <span className="font-semibold">{identite.nom(vu.nom)}</span>
                 <span className="text-encre-3"> · {ilYA(vu.at, maintenant)}</span>
               </p>
-              {(vu.partageable || (mien && !tt.horsApp)) && !vu.masque && (
-                <button type="button" aria-label="Partager" onClick={() => setPartage(vu.id)} className="bouton-discret bouton--mauve grid size-9 shrink-0 place-items-center">
+              {vu.masque && <span className="mono-label mx-1.5 shrink-0 rounded-full bg-foreground px-2.5 py-1 text-background">Masqué</span>}
+              {(vu.partageable || (mien && tt.aSigner)) && !vu.masque && (
+                <button type="button" aria-label="Partager" onClick={() => setPartage(vu.id)} className="bouton-discret bouton--mauve grid size-11 shrink-0 place-items-center">
                   <Share className="size-[18px]" strokeWidth={1.8} />
                 </button>
               )}
               {gestes.length > 0 && (
-                <button type="button" aria-label="Plus" onClick={() => setMenu(vu)} className="bouton-discret grid size-9 shrink-0 place-items-center">
+                <button type="button" aria-label="Plus" onClick={() => setMenu(vu)} className="bouton-discret grid size-11 shrink-0 place-items-center">
                   <Ellipsis className="size-[20px]" strokeWidth={1.8} />
                 </button>
               )}
@@ -215,14 +237,14 @@ export function BlocTrashTalk({ tt, j, ecrire, className }: { tt: TrashTalks | n
       <Sheet open={!!menu} onOpenChange={(o) => !o && setMenu(null)}>
         <SheetContent side="bottom" className="mx-auto w-full rounded-t-[28px] px-4 pb-[calc(env(safe-area-inset-bottom,0px)+1rem)] sm:max-w-md">
           <SheetTitle className="sr-only">Trash talk</SheetTitle>
-          <div className="flex flex-col gap-1.5 pt-14">
+          <div className="flex flex-col gap-1.5 pt-12">
             {menu &&
               gestesPossibles(menu, tt.moi, tt.admin).map((g) => (
                 <button
                   key={g}
                   type="button"
                   onClick={() => void faire(g, menu)}
-                  className={cn("flex h-[52px] items-center rounded-[18px] bg-card px-4 text-left text-lecture font-semibold transition-transform active:scale-[0.98]", g === "retirer" && "text-destructive")}
+                  className={cn("flex h-[52px] items-center rounded-[18px] bg-secondary px-4 text-left text-lecture font-semibold transition-transform active:scale-[0.98]", g === "retirer" && "text-destructive")}
                 >
                   {LIBELLES[g]}
                 </button>
@@ -239,9 +261,8 @@ export function BlocTrashTalk({ tt, j, ecrire, className }: { tt: TrashTalks | n
           j={j}
           match={ecrire.match}
           onPublie={() => {
+            vientDePublier.current = true;
             tt.recharger();
-            piste.current?.scrollTo({ left: 0 });
-            setRang(0);
           }}
         />
       )}
@@ -339,7 +360,7 @@ function SaisieTrashTalk({
               className="block w-full resize-none bg-transparent text-[16px] leading-snug outline-none placeholder:text-encre-4"
             />
             <div className="flex items-center justify-between">
-              <button type="button" aria-label="Citer un joueur" onClick={() => setCitation(true)} className="bouton-discret -ml-2 grid size-9 place-items-center">
+              <button type="button" aria-label="Citer un joueur" onClick={() => setCitation(true)} className="bouton-discret -my-1 -ml-3 grid size-11 place-items-center">
                 <AtSign className="size-[18px]" strokeWidth={1.9} />
               </button>
               <span className="mono-label text-encre-3">
@@ -347,7 +368,7 @@ function SaisieTrashTalk({
               </span>
             </div>
           </div>
-          <button type="button" disabled={!propre || envoi} onClick={() => void publier()} className="bouton-principal h-12 w-full text-lecture font-semibold disabled:opacity-40">
+          <button type="button" disabled={!propre || envoi} onClick={() => void publier()} className="bouton-principal bouton--vert h-12 w-full text-lecture font-semibold disabled:opacity-40">
             Publier
           </button>
         </div>
@@ -366,13 +387,13 @@ function SaisieTrashTalk({
   );
 }
 
-/** « Citer un joueur » : un écran de la fenêtre de saisie ; la recherche tolérante, une ligne par joueur en petite carte. */
+/** « Citer un joueur » : un écran de la fenêtre de saisie ; l'effectif par ordre de nom, la recherche tolérante, une ligne par joueur en petite carte. */
 function CiterUnJoueur({ open, onOpenChange, sauf, onChoisir }: { open: boolean; onOpenChange: (o: boolean) => void; sauf: string; onChoisir: (p: Profil) => void }) {
   const identite = useIdentites();
-  const [profils, setProfils] = useState<Profil[]>([]);
+  const [profils, setProfils] = useState<Profil[] | null>(null);
   const [q, setQ] = useState("");
   useEffect(() => {
-    if (!open || profils.length) return;
+    if (!open || profils) return;
     let vivant = true;
     listerProfils()
       .then((l) => vivant && setProfils(l))
@@ -380,11 +401,11 @@ function CiterUnJoueur({ open, onOpenChange, sauf, onChoisir }: { open: boolean;
     return () => {
       vivant = false;
     };
-  }, [open, profils.length]);
+  }, [open, profils]);
   const lignes = useMemo(
     () =>
       chercherTolerant(
-        profils.filter((p) => p.name !== sauf),
+        (profils ?? []).filter((p) => p.name !== sauf).sort((a, b) => identite.nom(a.name).localeCompare(identite.nom(b.name), "fr", { sensitivity: "base" })),
         (p) => [p.name, identite.nom(p.name), p.username.replace(/^@/, "")],
         q.replace(/^@/, "")
       ).slice(0, 40),
@@ -419,6 +440,7 @@ function CiterUnJoueur({ open, onOpenChange, sauf, onChoisir }: { open: boolean;
                 </span>
               </button>
             ))}
+            {profils && lignes.length === 0 && <p className="px-1 pt-2 text-corps text-encre-3">Aucun joueur.</p>}
           </div>
         </div>
       </SheetContent>
@@ -436,7 +458,9 @@ const IMAGES = [
 /**
  * La feuille « Partager » : les deux images, préparées dès qu'elle s'ouvre ;
  * en toucher une ouvre la feuille de partage du téléphone avec le fichier
- * seul. Mon post, sans mon accord hors-app : la ligne qui le fait signer.
+ * seul. Mon post, sans mon accord hors-app : la ligne qui le fait signer ;
+ * signée, le fil est relu, et la feuille se referme si l'image ne peut
+ * toujours pas sortir (un joueur cité n'a pas signé).
  */
 function PartagerTrashTalk({ post, tt, onFermer }: { post: TrashTalk; tt: TrashTalks; onFermer: () => void }) {
   const refs = useRef<(HTMLDivElement | null)[]>([]);
@@ -445,11 +469,16 @@ function PartagerTrashTalk({ post, tt, onFermer }: { post: TrashTalk; tt: TrashT
   const pret = post.partageable;
   const { recharger } = tt;
 
-  // Mon accord signé ici même : on relit, le post devient partageable.
+  // Mon accord signé ici même : on relit ; le post devient partageable, ou la feuille n'a plus rien à dire.
   const signe = tt.horsApp;
+  const avantRelecture = useRef<TrashTalk[] | null>(null);
   useEffect(() => {
-    if (!pret && signe) recharger();
-  }, [pret, signe, recharger]);
+    if (pret || !signe) return;
+    if (avantRelecture.current === null) {
+      avantRelecture.current = tt.posts;
+      recharger();
+    } else if (avantRelecture.current !== tt.posts) onFermer();
+  }, [pret, signe, tt.posts, recharger, onFermer]);
 
   useEffect(() => {
     if (!pret) return;

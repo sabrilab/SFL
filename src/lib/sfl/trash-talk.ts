@@ -12,11 +12,13 @@
 //     (components/sfl/actus/trash-talk.tsx), et se partage en image, Story
 //     9:16 ou Post 4:5 (lib/sfl/image-a-partager.ts) ;
 //   · les garde-fous vivent en base (supabase/schema.sql, « Trash talk ») :
-//     trois posts par joueur et par journée, un joueur en sourdine n'écrit
-//     pas, un joueur cité (@pseudo) masque le post pour tous, trois
+//     trois publications par joueur et par journée (un post retiré compte
+//     encore), un joueur en sourdine n'écrit pas, un joueur cité (@pseudo,
+//     même suivi d'un point : « @sami. ») masque le post pour tous, trois
 //     signalements le masquent en attendant l'admin, l'admin masque, remet
-//     ou retire (Admin → Activité → Trash talk). Rien ne sort de l'app sans
-//     l'accord hors-app de l'auteur et de chaque joueur cité
+//     ou retire (Admin → Activité → Trash talk) ; un post remis par l'admin
+//     ne se masque plus que par lui. Rien ne sort de l'app sans l'accord
+//     hors-app de l'auteur et de chaque joueur cité
 //     (trash_talk_partageable). Aucune notification, à personne.
 //
 // Sans les tables (un aperçu, avant la migration) : hors production, mes
@@ -36,12 +38,10 @@ export type MotifMasque = "cite" | "signalements" | "admin";
 export type GabaritTrashTalk = "fil" | "story" | "post";
 
 export const LONGUEUR_PHRASE = 180;
-/** Par joueur et par journée ; la base refuse le quatrième. */
+/** Publications par joueur et par journée, retirées comprises ; la base refuse la quatrième. */
 export const POSTS_PAR_JOURNEE = 3;
 /** À ce nombre de signalements distincts, la base masque le post en attendant l'admin. */
 export const SIGNALEMENTS_QUI_MASQUENT = 3;
-/** Les joueurs cités qu'un post retient (les suivants ne sont que du texte). */
-export const CITES_AU_PLUS = 5;
 
 export interface TrashTalk {
   id: number;
@@ -61,6 +61,8 @@ export interface TrashTalk {
   vises: string[];
   /** null : visible de tous. */
   masque: MotifMasque | null;
+  /** L'admin l'a remis après un masquage : lui seul peut encore le masquer. */
+  remis: boolean;
   at: number;
   /** L'auteur et chaque cité ont signé la charte hors-app : l'image peut sortir. */
   partageable: boolean;
@@ -92,23 +94,32 @@ export interface Morceau {
   cite: boolean;
 }
 
-/** La phrase découpée autour de ses @pseudo (la même règle que le Vestiaire et la base). */
+/** Un pseudo cité sans la ponctuation qui le suit : « @sami. » en fin de phrase cite sami. */
+const sansFin = (pseudo: string) => pseudo.replace(/[._-]+$/, "");
+
+/**
+ * La phrase découpée autour de ses @pseudo (la règle du Vestiaire et de la
+ * base) ; le point, le tiret ou le soulignement qui ferme un pseudo reste
+ * dans la phrase, hors de la citation.
+ */
 export function decouperCitations(texte: string): Morceau[] {
   const out: Morceau[] = [];
   let fin = 0;
   for (const m of texte.matchAll(/@[a-z0-9_.-]{2,30}/gi)) {
     const i = m.index ?? 0;
+    const cite = sansFin(m[0]);
+    if (cite.length < 3) continue;
     if (i > fin) out.push({ texte: texte.slice(fin, i), cite: false });
-    out.push({ texte: m[0], cite: true });
-    fin = i + m[0].length;
+    out.push({ texte: cite, cite: true });
+    fin = i + cite.length;
   }
   if (fin < texte.length) out.push({ texte: texte.slice(fin), cite: false });
   return out;
 }
 
-/** Les pseudos qu'un post retient : les cinq premiers cités. */
+/** Les pseudos qu'un post cite, sans leur ponctuation de fin, sans doublon (la base les résout en comptes). */
 export function pseudosVises(texte: string): string[] {
-  return pseudosCites(texte).slice(0, CITES_AU_PLUS);
+  return [...new Set(pseudosCites(texte).map(sansFin).filter((p) => p.length >= 2))];
 }
 
 /** Ajoute @pseudo à la phrase, séparé d'une espace ; rien si la place manque. */
@@ -171,14 +182,66 @@ export function palierDeLongueur(n: number): 0 | 1 | 2 | 3 {
   return n <= 40 ? 0 : n <= 80 ? 1 : n <= 130 ? 2 : 3;
 }
 
-/** Corps de la phrase, pour un visuel large de 360 : plus elle est courte, plus elle est grande. */
+/** Corps de départ de la phrase, pour un visuel large de 360 : plus elle est courte, plus elle est grande. */
 const CORPS: Record<FormatTrashTalk, Record<GabaritTrashTalk, [number, number, number, number]>> = {
   tweet: { fil: [36, 29, 24, 20], post: [36, 29, 24, 20], story: [42, 34, 28, 23] },
   une: { fil: [42, 33, 27, 22], post: [42, 33, 27, 22], story: [48, 38, 31, 25] },
 };
+/** L'interligne de la phrase ; la une, en capitales accentuées, a besoin d'air entre ses lignes. */
+export const INTERLIGNE: Record<FormatTrashTalk, number> = { tweet: 1.16, une: 1.06 };
+/** La place de la phrase dans chaque visuel (largeur, hauteur), marges et habillage retirés. */
+const PLACE: Record<FormatTrashTalk, Record<GabaritTrashTalk, [number, number]>> = {
+  tweet: { fil: [308, 262], post: [308, 262], story: [304, 344] },
+  une: { fil: [304, 218], post: [304, 218], story: [300, 304] },
+};
+/**
+ * La largeur d'un signe, en part du corps, un peu au-dessus de la moyenne
+ * mesurée (Inter 600 en bas de casse : 0,47 ; Inter 900 en capitales : 0,62).
+ */
+export const CHASSE: Record<FormatTrashTalk, number> = { tweet: 0.52, une: 0.66 };
+/** En dessous, la phrase ne se lit plus : un mot sans fin se coupe plutôt. */
+const CORPS_MINIMAL: Record<FormatTrashTalk, number> = { tweet: 14, une: 13 };
 
+/**
+ * La phrase telle que les visuels la composent : l'espace qui précède « : »,
+ * « ; », « ! », « ? » et « » », et celle qui suit « « », ne se coupent pas
+ * (jamais une ligne qui commence par un deux-points).
+ */
+export function espacesInsecables(texte: string): string {
+  return texte.replace(/ ([:;!?»])/g, "\u00a0$1").replace(/« /g, "«\u00a0");
+}
+
+/** Le nombre de lignes d'une phrase coupée aux espaces, `parLigne` signes par ligne ; null si un mot ne tient pas sur une ligne. */
+export function lignesDeLaPhrase(mots: string[], parLigne: number): number | null {
+  let lignes = 1;
+  let reste = parLigne;
+  for (const mot of mots) {
+    const n = longueurPhrase(mot);
+    if (n > parLigne) return null;
+    if (n <= reste) reste -= n + 1;
+    else {
+      lignes += 1;
+      reste = parLigne - n - 1;
+    }
+  }
+  return lignes;
+}
+
+/**
+ * Le corps de la phrase : celui de son palier de longueur, réduit point par
+ * point tant qu'elle ne tient pas dans sa place (un mot plus long que la
+ * ligne, 180 capitales à la une) ; jamais sous le corps minimal.
+ */
 export function corpsDuTexte(texte: string, format: FormatTrashTalk, gabarit: GabaritTrashTalk): number {
-  return CORPS[format][gabarit][palierDeLongueur(longueurPhrase(texte))];
+  const [largeur, hauteur] = PLACE[format][gabarit];
+  // La une pose la phrase entre guillemets : « et » comptent dans le premier et le dernier mot.
+  const mots = espacesInsecables(format === "une" ? `«${texte}»` : texte).split(" ").filter(Boolean);
+  let corps = CORPS[format][gabarit][palierDeLongueur(longueurPhrase(texte))];
+  for (; corps > CORPS_MINIMAL[format]; corps -= 1) {
+    const lignes = lignesDeLaPhrase(mots, Math.floor(largeur / (corps * CHASSE[format])));
+    if (lignes !== null && lignes * corps * INTERLIGNE[format] <= hauteur) break;
+  }
+  return corps;
 }
 
 const paris = (o: Intl.DateTimeFormatOptions) => new Intl.DateTimeFormat("fr-FR", { timeZone: "Europe/Paris", ...o });
@@ -217,14 +280,15 @@ export type Geste = "signaler" | "masquer" | "remettre" | "retirer";
 /**
  * Ce que le menu « ⋯ » d'un post propose, selon qui regarde. La base a le
  * dernier mot (RLS, trash_talk_masquer, trash_talk_remettre) : ceci n'est
- * que ce qu'on montre.
+ * que ce qu'on montre. Un post remis par l'admin : un joueur cité ne le
+ * masque plus, il le signale comme les autres.
  */
-export function gestesPossibles(post: Pick<TrashTalk, "joueur" | "vises" | "masque" | "signale">, moi: string | null, admin: boolean): Geste[] {
+export function gestesPossibles(post: Pick<TrashTalk, "joueur" | "vises" | "masque" | "remis" | "signale">, moi: string | null, admin: boolean): Geste[] {
   if (!moi) return [];
   if (post.joueur === moi) return admin && post.masque ? ["remettre", "retirer"] : ["retirer"];
   if (admin) return [post.masque ? "remettre" : "masquer"];
   if (post.masque) return [];
-  if (post.vises.includes(moi)) return ["masquer"];
+  if (post.vises.includes(moi) && !post.remis) return ["masquer"];
   return post.signale ? [] : ["signaler"];
 }
 
@@ -247,9 +311,14 @@ export function postsDuFil(posts: TrashTalk[], j: number, moi: string | null, ad
 /** « Masqué · cité » : l'état d'un post, pour l'admin. */
 export const MOTIFS: Record<MotifMasque, string> = { cite: "Masqué · cité", signalements: "Masqué · signalements", admin: "Masqué · admin" };
 
-/** L'ordre de l'admin : ce qui demande un regard d'abord (signalé ou masqué), puis le plus récent. */
+/** J'ai déjà mes trois posts sur cette journée (les masqués comptent ; la base compte aussi les retirés). */
+export function limiteAtteinte(posts: TrashTalk[], j: number, moi: string | null): boolean {
+  return !!moi && posts.filter((p) => p.j === j && p.joueur === moi).length >= POSTS_PAR_JOURNEE;
+}
+
+/** L'ordre de l'admin : ce qui demande un regard d'abord (masqué, ou signalé et pas encore remis), puis le plus récent. */
 export function ordreAdmin(posts: TrashTalk[]): TrashTalk[] {
-  const urgent = (p: TrashTalk) => (p.masque || p.signalements > 0 ? 1 : 0);
+  const urgent = (p: TrashTalk) => (p.masque || (p.signalements > 0 && !p.remis) ? 1 : 0);
   return [...posts].sort((a, b) => urgent(b) - urgent(a) || b.id - a.id);
 }
 
@@ -262,12 +331,7 @@ export function direRefus(e: unknown): string | null {
   return null;
 }
 
-/* ───────────────────────────── La base ───────────────────────────── */
-
-/** Hors production, sans les tables : mes posts restent sur ce téléphone. */
-export const DEMO_TRASH_TALK = process.env.NEXT_PUBLIC_BOLA_ENV !== "production";
-const CLE_DEMO = "bola-trash-talk-demo";
-const MOI_DEMO = "moi";
+/* ───────────────────────────── La lecture ───────────────────────────── */
 
 /** « base » : les tables sont là ; « demo » : un aperçu sans table ; « absent » : rien à montrer. */
 export type EtatTrashTalk = "base" | "demo" | "absent";
@@ -279,9 +343,15 @@ export interface LectureTrashTalk {
   moi: string | null;
 }
 
-const COLONNES = "id, joueur, saison, j, match, format, texte, vises, masque_le, masque_motif, created_at, profiles ( name, username )";
+/**
+ * trash_talks a deux liens vers profiles (son auteur, et qui l'a masqué) :
+ * la jointure nomme le sien, sans quoi l'API refuse de choisir (PGRST201).
+ */
+export const COLONNES =
+  "id, joueur, saison, j, match, format, texte, vises, masque_le, masque_motif, remis_le, created_at, profiles!trash_talks_joueur_fkey ( name, username )";
 
-interface Ligne {
+/** Une ligne de trash_talks, telle que l'API la rend. */
+export interface LigneTrashTalk {
   id: number;
   joueur: string;
   saison: number;
@@ -292,9 +362,63 @@ interface Ligne {
   vises: string[] | null;
   masque_le: string | null;
   masque_motif: MotifMasque | null;
+  remis_le?: string | null;
   created_at: string;
   profiles: { name: string; username: string } | { name: string; username: string }[] | null;
 }
+
+/**
+ * Une ligne de la base devient un post, avec ce que j'en sais : `partageables`,
+ * les posts dont l'image peut sortir (la base le dit) ; `signalements`, ceux
+ * que je peux lire (les miens ; tous pour l'admin, qui seul en voit le compte).
+ */
+export function postDeLigne(
+  l: LigneTrashTalk,
+  { moi, admin, partageables, signalements }: { moi: string | null; admin: boolean; partageables: ReadonlySet<number>; signalements: { post: number; joueur: string }[] }
+): TrashTalk {
+  const p = Array.isArray(l.profiles) ? l.profiles[0] : l.profiles;
+  const recus = signalements.filter((s) => Number(s.post) === l.id);
+  const masque = l.masque_le ? (l.masque_motif ?? "admin") : null;
+  return {
+    id: l.id,
+    joueur: l.joueur,
+    nom: p?.name ?? "?",
+    pseudo: (p?.username ?? "").replace(/^@/, ""),
+    saison: l.saison,
+    j: l.j,
+    match: l.match,
+    format: l.format,
+    texte: l.texte,
+    vises: l.vises ?? [],
+    masque,
+    remis: !!l.remis_le,
+    at: Date.parse(l.created_at),
+    partageable: !masque && partageables.has(l.id),
+    signale: !!moi && recus.some((s) => s.joueur === moi),
+    signalements: admin ? recus.length : 0,
+  };
+}
+
+const MOI_DEMO = "moi";
+
+/**
+ * Sans les tables : en production, rien à montrer ; ailleurs (un aperçu),
+ * mes posts gardés sur ce téléphone. Un post qui cite un joueur n'y sort
+ * jamais de l'app : personne n'a pu demander l'accord du cité.
+ */
+export function lectureSansTable(production: boolean, gardes: TrashTalk[], saison: number, horsApp: boolean, moi: string | null): LectureTrashTalk {
+  if (production) return { etat: "absent", posts: [], moi };
+  const posts = gardes
+    .filter((p) => p.saison === saison)
+    .map((p) => ({ ...p, remis: false, partageable: !p.masque && peutSortir(horsApp, pseudosVises(p.texte).map(() => null)) }));
+  return { etat: "demo", posts, moi: MOI_DEMO };
+}
+
+/* ───────────────────────────── La base ───────────────────────────── */
+
+/** Hors production, sans les tables : mes posts restent sur ce téléphone. */
+export const DEMO_TRASH_TALK = process.env.NEXT_PUBLIC_BOLA_ENV !== "production";
+const CLE_DEMO = "bola-trash-talk-demo";
 
 function demoLire(): TrashTalk[] {
   try {
@@ -318,6 +442,7 @@ async function monCompte(): Promise<string | null> {
  * Les posts d'une saison (les 300 derniers), avec ce que j'en sais : lesquels
  * peuvent sortir de l'app, lesquels j'ai signalés. `admin` : tous les
  * signalements, comptés. `horsApp` : mon accord, pour mes posts d'un aperçu.
+ * Lève toute erreur de lecture autre que « pas de table ».
  */
 export async function lireTrashTalks(saison: number, { admin = false, horsApp = false }: { admin?: boolean; horsApp?: boolean } = {}): Promise<LectureTrashTalk> {
   const sb = supabase();
@@ -325,13 +450,9 @@ export async function lireTrashTalks(saison: number, { admin = false, horsApp = 
   const { data, error } = await sb.from("trash_talks").select(COLONNES).eq("saison", saison).order("id", { ascending: false }).limit(300);
   if (error) {
     if (!erreurSansTable(error.code)) throw error;
-    if (!DEMO_TRASH_TALK) return { etat: "absent", posts: [], moi };
-    const posts = demoLire()
-      .filter((p) => p.saison === saison)
-      .map((p) => ({ ...p, partageable: peutSortir(horsApp, pseudosVises(p.texte).map(() => null)) }));
-    return { etat: "demo", posts, moi: MOI_DEMO };
+    return lectureSansTable(!DEMO_TRASH_TALK, DEMO_TRASH_TALK ? demoLire() : [], saison, horsApp, moi);
   }
-  const lignes = (data ?? []) as Ligne[];
+  const lignes = (data ?? []) as unknown as LigneTrashTalk[];
   const ids = lignes.map((l) => l.id);
   // Ce qui suit n'empêche jamais de lire : au pire, rien ne se partage et rien n'est dit signalé.
   const [partageables, signalements] = await Promise.all([
@@ -350,28 +471,7 @@ export async function lireTrashTalks(saison: number, { admin = false, horsApp = 
           )
       : Promise.resolve([] as { post: number; joueur: string }[]),
   ]);
-  const posts = lignes.map((l): TrashTalk => {
-    const p = Array.isArray(l.profiles) ? l.profiles[0] : l.profiles;
-    const recus = signalements.filter((s) => Number(s.post) === l.id);
-    return {
-      id: l.id,
-      joueur: l.joueur,
-      nom: p?.name ?? "?",
-      pseudo: (p?.username ?? "").replace(/^@/, ""),
-      saison: l.saison,
-      j: l.j,
-      match: l.match,
-      format: l.format,
-      texte: l.texte,
-      vises: l.vises ?? [],
-      masque: l.masque_le ? (l.masque_motif ?? "admin") : null,
-      at: Date.parse(l.created_at),
-      partageable: partageables.has(l.id),
-      signale: recus.some((s) => s.joueur === moi),
-      signalements: admin ? recus.length : 0,
-    };
-  });
-  return { etat: "base", posts, moi };
+  return { etat: "base", posts: lignes.map((l) => postDeLigne(l, { moi, admin, partageables, signalements })), moi };
 }
 
 export interface NouveauTrashTalk {
@@ -402,6 +502,7 @@ export async function publierTrashTalk(n: NouveauTrashTalk, demo: boolean, auteu
         texte,
         vises: [],
         masque: null,
+        remis: false,
         at: Date.now(),
         partageable: false,
         signale: false,

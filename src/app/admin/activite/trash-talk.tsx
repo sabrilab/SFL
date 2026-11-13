@@ -4,8 +4,9 @@
 // lib/sfl/trash-talk.ts) : les posts de la saison, ceux qui demandent un
 // regard d'abord (signalés ou masqués), puis les plus récents. Par ligne : la
 // phrase, son auteur, sa journée, le nombre de signalements, l'état (« Masqué
-// · cité », « Masqué · signalements », « Masqué · admin »), et trois gestes :
-// Masquer, Remettre, Retirer. Personne n'est prévenu, ni l'auteur ni la
+// · cité », « Masqué · signalements », « Masqué · admin », « Remis »), et
+// trois gestes : Masquer, Remettre, Retirer. Un post remis garde ses
+// signalements et ne se masque plus tout seul. Personne n'est prévenu, ni l'auteur ni la
 // ligue. Sans les tables en base, le bloc n'est pas monté.
 
 import { useCallback, useEffect, useState } from "react";
@@ -26,7 +27,7 @@ export function TrashTalkAdmin() {
     if (numero <= 0) return;
     lireTrashTalks(numero, { admin: true })
       .then((l) => setPosts(l.etat === "base" ? ordreAdmin(l.posts) : null))
-      .catch(() => {});
+      .catch((e) => console.error("Trash talk : lecture impossible", e));
   }, [numero]);
   useEffect(() => {
     let vivant = true;
@@ -66,7 +67,7 @@ export function TrashTalkAdmin() {
                     {p.signalements} signalement{p.signalements > 1 ? "s" : ""}
                   </span>
                 )}
-                {p.masque && <span className="text-foreground">{MOTIFS[p.masque]}</span>}
+                {p.masque ? <span className="text-foreground">{MOTIFS[p.masque]}</span> : p.remis && <span>Remis</span>}
               </p>
               <div className="flex gap-1.5">
                 {p.masque ? (
