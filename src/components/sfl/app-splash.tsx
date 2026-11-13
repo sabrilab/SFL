@@ -19,10 +19,22 @@
 // quoi qu'il arrive : un chunk introuvable (hors ligne) ne bloque plus l'app.
 // Jusqu'au 24/10, l'écran portait le logo qui pulsait, « sunday five league »
 // et une barre de progression ; et en mode clair, le logo blanc sur le blanc.
+//
+// Sur la présentation de la ligue (/sfl, le lien de la bio Instagram, 12/11 ;
+// estPageSfl, l'adresse entière), qui n'a ni carte 3D ni Map, l'intro est
+// courte : le logo se pose, la page n'attend que ses polices, puis le voile se
+// lève. Elle saute le préchauffage : ni moteur des cartes 3D (card-3d-canvas),
+// ni shaders, ni vignettes ; la 3D chauffera à sa première carte. Elle
+// n'allège pas la page pour autant : ses cartes importent three.js (bola-card
+// → insigne-carte → badge-3d), et le voile est dans le HTML servi, donc la
+// page ne se voit qu'une fois le JavaScript lancé. Le signal de fin est posé comme
+// ailleurs : la Map et l'accueil l'attendent après une navigation interne, qui
+// ne rejoue pas l'intro.
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { photoMiniature, photosPartagees } from "@/lib/sfl/photos";
+import { estPageSfl } from "@/lib/sfl/routes-publiques";
 import { jouerIntro, PLACES, TRACES, type Intro } from "./intro-bola";
 
 const CardCanvas = dynamic(() => import("./card-3d-canvas").then((m) => m.CardCanvas), {
@@ -37,6 +49,8 @@ const PHOTOS_MAX_MS = 1500;
 const MAX_MS = 9000;
 /** Le logo posé, on attend encore tant avant de montrer le filet de progression. */
 const FILET_MS = 450;
+/** Sur la présentation de la ligue (l'intro courte), le voile n'attend pas les polices au-delà. */
+const POLICES_MAX_MS = 1500;
 
 // Poids de chaque étape (somme = 100) — le préchauffage des shaders est
 // la part la plus lourde, c'est aussi celle qui évite le plus de latence
@@ -103,8 +117,16 @@ export function AppSplash() {
       resolveShaders.current = resolve;
     });
 
+    // Lu au montage : l'intro ne joue qu'une fois, sur la page où l'on arrive.
+    const courte = estPageSfl(window.location.pathname);
+
     async function run() {
       const fontsP = document.fonts.ready.then(() => bump(WEIGHTS.fonts));
+      if (courte) {
+        await Promise.race([fontsP, new Promise<void>((r) => setTimeout(r, POLICES_MAX_MS))]);
+        bump(100);
+        return;
+      }
 
       // Les vignettes de la Map, telles que ses piles les demanderont : le
       // cache du navigateur les lui rendra sans attendre.

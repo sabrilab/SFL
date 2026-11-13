@@ -12,6 +12,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useIsClient } from "@/hooks/use-is-client";
 import { useSession } from "@/hooks/use-session";
 import { bootstrapServerSession, inscriptionSocialeEnCours } from "@/lib/sfl/auth/session";
+import { CHEMIN_SFL, estPageSflMalEcrite, estPublique } from "@/lib/sfl/routes-publiques";
 import { LoginScreen } from "./login-screen";
 import { LandingSite } from "./landing-site";
 import { lireEnvironnement } from "@/lib/pwa/environnement";
@@ -21,13 +22,8 @@ import { NouveauMotDePasse } from "./nouveau-mot-de-passe";
 import { useJoueurInconnu } from "@/components/sfl/player-provider";
 import { ConsentementObligatoire } from "@/components/sfl/confidentialite/consentement";
 
-/**
- * Pages ouvertes à tous : le lien d'accueil personnel envoyé par l'admin, la
- * création de compte, le lien d'invitation d'une équipe (mode Team), le lien
- * d'un parrain (/p/code), le lien d'une vidéo (/v/id, sans la vidéo) et la
- * politique de confidentialité.
- */
-const PUBLIC_ROUTES = ["/bienvenue", "/inscription", "/equipe/", "/p/", "/v/", "/confidentialite"];
+// Les pages ouvertes à tous sont dans lib/sfl/routes-publiques.ts (estPublique),
+// que relit tools/page-sfl-check.ts.
 
 export function AuthGate({ children }: { children: React.ReactNode }) {
   const isClient = useIsClient();
@@ -45,7 +41,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
       .then(async (ok) => {
         // Revenu de Google ou Apple sans avoir fini son inscription (app
         // fermée en route) : la suite est sur l'inscription.
-        if (ok || cancelled || PUBLIC_ROUTES.some((r) => window.location.pathname.startsWith(r))) return;
+        if (ok || cancelled || estPublique(window.location.pathname)) return;
         if (await inscriptionSocialeEnCours()) router.replace("/inscription");
       })
       .finally(() => {
@@ -56,9 +52,20 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
     };
   }, [router]);
 
+  // getbola.app/SFL, en capitales comme le sigle : la présentation de la ligue.
+  // Le serveur ne connaît que /sfl ; on y repart en gardant la suite de
+  // l'adresse (?utm_source=…), par un vrai chargement : la page arrive avec
+  // son aperçu de lien et son intro courte.
+  const malEcrite = estPageSflMalEcrite(pathname);
+  useEffect(() => {
+    if (malEcrite) window.location.replace(CHEMIN_SFL + window.location.search);
+  }, [malEcrite]);
+  if (malEcrite) return null;
+
   // Avant hydratation (et pendant la reprise de session) on ne rend rien :
-  // ni flash de contenu privé, ni formulaire qui clignote.
-  if (PUBLIC_ROUTES.some((r) => pathname?.startsWith(r))) return <>{children}</>;
+  // ni flash de contenu privé, ni formulaire qui clignote. Une page ouverte à
+  // tous passe avant ce test : son HTML est servi entier.
+  if (estPublique(pathname)) return <>{children}</>;
   if (!isClient) return null;
   if (!session && !bootstrapped) return null;
   if (!session && pathname === "/" && !lireEnvironnement().installee) return <LandingSite />;

@@ -23,7 +23,14 @@
 // depuis le 27/10 (Sabri : « l'installation, je le fais uniquement quand
 // quelqu'un veut télécharger et qu'il veut se connecter »), le visiteur
 // découvre Bola d'abord ; le guide vient quand il touche « Créer ma carte »
-// ou « Se connecter » (/inscription, /connexion).
+// ou « Se connecter » (/inscription, /connexion). La présentation de la ligue
+// (/sfl, 12/11) suit la même règle : c'est le lien de la bio Instagram, il
+// s'ouvre dans le navigateur d'Instagram, où le guide aurait couvert la page.
+// Le bouton « Ouvrir dans Safari » et « Copier le lien » rouvrent la page
+// affichée (l'inscription, pas la page d'où l'on vient) et portent la source
+// d'arrivée du visiteur (lib/pwa/environnement.ts, adresseSortie) : dans
+// Safari, il est un visiteur neuf, et l'entonnoir d'acquisition perdait
+// qu'il venait d'Instagram.
 //
 // Depuis le 02/11/2026 (Sabri : la création du compte « la plus fluide
 // possible depuis getbola.app »), dans un vrai navigateur, il ne coupe plus
@@ -39,13 +46,22 @@ import { Check, Copy, Ellipsis, EllipsisVertical, Share, SquarePlus } from "luci
 import { useEtatAccueil } from "@/hooks/use-accueil";
 import { useIsClient } from "@/hooks/use-is-client";
 import { useSession } from "@/hooks/use-session";
-import { lienSortie, lireEnvironnement, type Environnement } from "@/lib/pwa/environnement";
+import { adresseSortie, lienSortie, lireEnvironnement, type Environnement } from "@/lib/pwa/environnement";
 import { codeGarde } from "@/lib/sfl/parrainage";
+import { estPageSfl, estPageSflMalEcrite } from "@/lib/sfl/routes-publiques";
+import { sourceArrivee } from "@/lib/sfl/site-visites";
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
   userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
 }
+
+/**
+ * Les pages qu'on lit d'abord : jamais de guide dessus. La politique, et la
+ * présentation de la ligue (/sfl, comparée en entier : estPageSfl ; écrite en
+ * capitales, la porte y renvoie avant qu'on ait rien vu).
+ */
+const SANS_GUIDE = ["/confidentialite"];
 
 const CLE_FAIT = "bola-guide-installation";
 const CLE_PLUS_TARD = "bola-guide-plus-tard";
@@ -94,7 +110,7 @@ export function GuideInstallation() {
     };
   }, []);
 
-  if (!isClient || ferme || pathname?.startsWith("/confidentialite")) return null;
+  if (!isClient || ferme || estPageSfl(pathname) || estPageSflMalEcrite(pathname) || SANS_GUIDE.some((r) => pathname?.startsWith(r))) return null;
   const env = lireEnvironnement();
   if (env.systeme === "autre" || env.installee) return null;
   // La page d'accueil (AuthGate : « / » sans session, hors de l'app installée)
@@ -142,8 +158,11 @@ export function GuideInstallation() {
     if (outcome === "accepted") fait();
   }
 
+  // L'adresse à rouvrir dans le navigateur : la page affichée, et d'où vient le visiteur.
+  const sortie = adresseSortie(window.location.href, pathname, sourceArrivee());
+
   async function copier() {
-    const lien = window.location.href;
+    const lien = sortie.href;
     try {
       await navigator.clipboard.writeText(lien);
     } catch {
@@ -181,6 +200,7 @@ export function GuideInstallation() {
         {env.appHote ? (
           <SortieApp
             env={env}
+            sortie={sortie}
             navigateur={navigateur}
             copie={copie}
             onCopier={copier}
@@ -214,17 +234,20 @@ export function GuideInstallation() {
 
 function SortieApp({
   env,
+  sortie,
   navigateur,
   copie,
   onCopier,
 }: {
   env: Environnement;
+  /** L'adresse à rouvrir hors de l'app hôte (adresseSortie). */
+  sortie: URL;
   navigateur: string;
   copie: boolean;
   onCopier: () => void;
 }) {
   const ios = env.systeme === "ios";
-  const lien = lienSortie(new URL(window.location.href), env.systeme);
+  const lien = lienSortie(sortie, env.systeme);
   const dans = env.appHote === "une app" ? "cette app" : env.appHote;
 
   const etapes: Etape[] = ios

@@ -67,6 +67,7 @@ import { identiteConfirmee, rafraichirIdentites } from "@/lib/sfl/identites";
 import { age, BORNES, POSTES, type Poste } from "@/lib/sfl/inscription";
 import { etatNotifications } from "@/lib/sfl/notifications";
 import { photoPerso, rafraichirPhotos } from "@/lib/sfl/photos";
+import { estPageSfl } from "@/lib/sfl/routes-publiques";
 import type { Saison } from "@/lib/sfl/saisie/types";
 import { enDemo as enDemoSuivis, liensDeLaBase, liensDemo, rafraichirSuivis, suivisLus } from "@/lib/sfl/suivis";
 import { maVille, maVilleAProposer, type VilleJoueur } from "@/lib/sfl/villes";
@@ -120,7 +121,11 @@ const OBLIGATOIRES: Etape[] = ["motdepasse", "accord", "identite", "sexe", "nais
 /** Les écrans où l'on peut revenir : rien n'y part pour de bon. */
 const ON_Y_REVIENT: Etape[] = ["identite", "sexe", "naissance", "gabarit", "pied", "poste", "ville"];
 
-/** Pas d'accueil sur les pages qui ont leur propre parcours, ou pas de compte (AuthGate, PUBLIC_ROUTES). */
+/**
+ * Pas d'accueil sur les pages qui ont leur propre parcours, ou pas de compte
+ * (lib/sfl/routes-publiques.ts) ; ni sur la présentation de la ligue (/sfl,
+ * comparée en entier : estPageSfl).
+ */
 const SANS_ACCUEIL = ["/confidentialite", "/inscription", "/bienvenue", "/equipe/", "/p/", "/v/"];
 
 /** Au plus, le temps d'une lecture ; au-delà, on fait sans. */
@@ -267,7 +272,7 @@ export function Accueil() {
 
   const nomSession = session?.name ?? null;
   const serveur = !!session?.server;
-  const libre = SANS_ACCUEIL.some((r) => pathname?.startsWith(r));
+  const libre = estPageSfl(pathname) || SANS_ACCUEIL.some((r) => pathname?.startsWith(r));
   // Le joueur connecté, s'il est bien celui qu'on voit (pas un profil que l'admin emprunte).
   const nom = libre ? null : demo ? player.name : serveur && nomSession && memeNom(nomSession, me) ? player.name : null;
   const motDePasseDu = !libre && serveur && !!session?.motDePasseAChanger;
@@ -503,12 +508,17 @@ export function Accueil() {
 /**
  * Ce qui s'ouvre de soi-même à l'ouverture (cérémonies, badges,
  * invitations) : seulement l'accueil fini et l'accord donné, pour que rien ne
- * joue dessous.
+ * joue dessous. Rien non plus sous la présentation de la ligue (/sfl), qui
+ * couvre tout l'écran : un joueur connecté y trouvait, à la touche de
+ * tabulation, les boutons d'un calque qu'il ne voyait pas. Tout l'attend à
+ * « Ouvrir Bola ».
  */
 export function ApresAccueil({ children }: { children: ReactNode }) {
   const session = useSession();
+  const pathname = usePathname();
   const etat = useEtatAccueil();
   const { donne } = useAccord(session?.name);
+  if (estPageSfl(pathname)) return null;
   if (etat !== "fini") return null;
   if (session && donne !== true) return null;
   return <>{children}</>;
