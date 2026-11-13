@@ -109,7 +109,7 @@ export function FeuilleLigne({
   const present = e.statut === "Présent";
   const sienne = equipes.find((t) => t.nom === e.team);
   // Le carton que vaut ce retard : « 2/3 », « 3/3 · rouge ».
-  const cartons = e.retard ? cartonsDe(saison, e.player).cartons.filter((c) => c.j === e.j) : [];
+  const cartons = e.retard ? cartonsDe(saison, e.player).cartons.filter((c) => c.j === e.j && !c.direct) : [];
   const jaune = cartons.find((c) => c.couleur === "jaune");
   const carton = jaune ? `${jaune.rang}/${REGLES_CARTONS.jaunesPourUnRouge}${cartons.some((c) => c.couleur === "rouge") ? " · rouge" : ""}` : null;
 

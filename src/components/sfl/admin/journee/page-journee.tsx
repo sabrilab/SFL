@@ -15,7 +15,8 @@
 // Sous les matchs, les outils de la journée, à toute heure (31/10/2026 :
 // Sabri ne les trouvait plus derrière ≡) : la Feuille à consulter (lignes,
 // points décomposés, alertes), la Saisie (le direct de toujours), les Votes,
-// les Points d'un joueur et la Grille. Les « Je viens » de la convocation
+// les Points d'un joueur, le Carton rouge direct (13/11/2026,
+// feuille-carton-rouge.tsx) et la Grille. Les « Je viens » de la convocation
 // se posent sur les terrains d'un geste (venus-sur-la-feuille.ts).
 // La feuille en direct d'un match tenue par un de ses joueurs (01/11/2026,
 // components/sfl/direct) se voit sur son terrain : qui la tient, son score ;
@@ -72,6 +73,7 @@ import { cn } from "@/lib/utils";
 import { BlocConvocation, FeuilleConvocation } from "./bloc-convocation";
 import { BlocMatchs, matchsVus } from "./bloc-matchs";
 import { FeuilleArbitre } from "./feuille-arbitre";
+import { FeuilleCartonRouge } from "./feuille-carton-rouge";
 import { FeuilleConsulter } from "./feuille-consulter";
 import { FeuilleDirect } from "./feuille-direct";
 import { FeuilleLigne } from "./feuille-ligne";
@@ -115,6 +117,7 @@ export function PageJournee() {
   const [votes, setVotes] = useState(false);
   const [consulter, setConsulter] = useState(false);
   const [points, setPoints] = useState(false);
+  const [cartonRouge, setCartonRouge] = useState(false);
   // Une ligne ouverte depuis la Feuille y ramène en se fermant.
   const [retourFeuille, setRetourFeuille] = useState(false);
   const [ajouterA, setAjouterA] = useState<string | null | false>(false);
@@ -422,6 +425,7 @@ export function PageJournee() {
                   <Pastille onClick={() => setEnDirect(true)}>Saisie</Pastille>
                   <Pastille onClick={() => setVotes(true)}>Votes</Pastille>
                   <Pastille onClick={() => setPoints(true)}>Points</Pastille>
+                  <Pastille onClick={() => setCartonRouge(true)}>Carton rouge</Pastille>
                   <Link href="/admin/tableau?onglet=grille" className="mono-label inline-flex h-9 shrink-0 items-center rounded-full bg-secondary px-3.5 text-encre-2">
                     Grille
                   </Link>
@@ -439,6 +443,12 @@ export function PageJournee() {
           <span className="font-display text-[64px] leading-none text-encre-3">J{aPreparer}</span>
           <span className="mono-label text-encre-3">À préparer</span>
         </button>
+      )}
+      {/* Sans journée ouverte, le carton rouge reste à portée (13/11/2026). */}
+      {!(meta && j != null) && (
+        <div className="flex">
+          <Pastille onClick={() => setCartonRouge(true)}>Carton rouge</Pastille>
+        </div>
       )}
 
       {/* Le geste du moment, sous le pouce. */}
@@ -679,6 +689,7 @@ export function PageJournee() {
       <Feuille open={points} onOpenChange={setPoints} titre="Points" haute>
         <DetailPoints saison={saison} />
       </Feuille>
+      <FeuilleCartonRouge open={cartonRouge} onOpenChange={setCartonRouge} saison={saison} par={par} faire={faire} confirmer={setConfirmation} />
       <Confirmer confirmation={confirmation} onFermer={() => setConfirmation(null)} />
     </div>
   );
