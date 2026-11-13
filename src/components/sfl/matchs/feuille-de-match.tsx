@@ -36,10 +36,11 @@
 // meilleur et le buteur du jour (matchs/flair.tsx).
 //
 // Les terrains viennent de lib/sfl/feuille.ts ; l'image est dessinée hors
-// écran puis photographiée par html-to-image (déjà là pour la carte 3D).
+// écran puis photographiée par html-to-image (déjà là pour la carte 3D) ;
+// la prise et le partage sont dans lib/sfl/image-a-partager.ts, que le trash
+// talk des Actus emploie aussi.
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { toBlob } from "html-to-image";
 import { toast } from "sonner";
 import { Share } from "lucide-react";
 import {
@@ -58,6 +59,7 @@ import { ovr, type BoostType, type Player } from "@/lib/sfl/engine";
 import type { Camp } from "@/lib/sfl/maillots";
 import { cn } from "@/lib/utils";
 import { projeter, TERRAIN } from "@/lib/sfl/terrain-vu";
+import { partagerFichiers, poserLesPhotos, prendreImage, prisesADoubler } from "@/lib/sfl/image-a-partager";
 import { SolTerrain } from "@/components/sfl/matchs/sol-terrain";
 import { Nom } from "@/components/sfl/nom";
 import { FlairDuMatch } from "@/components/sfl/matchs/flair";
@@ -568,53 +570,8 @@ const ZOOM = 1.3;
 
 /** Les prises d'une image avant de la garder telle quelle. */
 const ESSAIS = 5;
-/** Un gif transparent d'un pixel. */
-const VIDE = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
 /** Le gris sous la photo d'une carte (Pastille) : ce qu'on voit quand elle manque. */
 const GRIS_SANS_PHOTO = [0xcf, 0xce, 0xca];
-
-/**
- * Chaque photo de l'image, repeinte à la taille de sa carte (deux fois, pour
- * l'export) en JPEG, et posée telle quelle dans la balise : une image légère,
- * au bon type, que Safari dessine sans aller la chercher. Une photo qui ne se
- * repeint pas (pas encore là, refusée) reste à son adresse.
- */
-async function poserLesPhotos(noeud: HTMLElement) {
-  const imgs = Array.from(noeud.querySelectorAll<HTMLImageElement>("img[data-photo]"));
-  await Promise.all(
-    imgs.map(async (img) => {
-      const adresse = img.dataset.photo!;
-      if (img.dataset.posee === adresse) return;
-      try {
-        const source = new Image();
-        if (!adresse.startsWith("data:") && !adresse.startsWith("blob:")) source.crossOrigin = "anonymous";
-        source.src = adresse;
-        await source.decode();
-        const boite = img.getBoundingClientRect();
-        const echelle = 2 * Math.max(1, boite.width / img.offsetWidth || 1);
-        const l = Math.max(1, Math.round(img.offsetWidth * echelle));
-        const h = Math.max(1, Math.round(img.offsetHeight * echelle));
-        // object-cover : la photo couvre la carte, centrée.
-        const k = Math.max(l / source.naturalWidth, h / source.naturalHeight);
-        const sl = l / k;
-        const sh = h / k;
-        const toile = document.createElement("canvas");
-        toile.width = l;
-        toile.height = h;
-        toile
-          .getContext("2d")!
-          .drawImage(source, (source.naturalWidth - sl) / 2, (source.naturalHeight - sh) / 2, sl, sh, 0, 0, l, h);
-        const data = toile.toDataURL("image/jpeg", 0.9);
-        if (img.dataset.photo !== adresse) return;
-        img.src = data;
-        await img.decode();
-        img.dataset.posee = adresse;
-      } catch {
-        // Elle reste à son adresse : html-to-image ira la chercher.
-      }
-    }),
-  );
-}
 
 /**
  * L'image a-t-elle toutes ses photos ? On lit, sur chaque carte qui en a une,
@@ -707,20 +664,13 @@ function useImage(
             // d'y avoir posé les photos : elle sort avec des cartes grises.
             // On regarde chaque carte de l'image, et on la reprend tant
             // qu'il en manque une (Sabri, 24/10 : « Snap » sans les photos).
-            let blob: Blob | null = null;
-            for (let essai = 0; essai < ESSAIS && !annule; essai++) {
-              blob = await toBlob(noeud!, {
-                pixelRatio: 2,
-                // Les photos changent d'adresse avec elles (?v=…) ; une photo
-                // repeinte (blob:) ne se relit pas si on lui ajoute un paramètre.
-                includeQueryParams: true,
-                // Un logo qui ne se charge pas laisse un vide, pas l'image entière.
-                imagePlaceholder: VIDE,
-                width: LARGEUR,
-                height: HAUTEUR,
-              });
-              if (!blob || (await photosPresentes(noeud!, blob))) break;
-            }
+            const blob = await prendreImage(noeud!, {
+              largeur: LARGEUR,
+              hauteur: HAUTEUR,
+              essais: ESSAIS,
+              bonne: (b) => photosPresentes(noeud!, b),
+              annule: () => annule,
+            });
             if (annule || !blob) return;
             blobs.push(blob);
           }
@@ -739,7 +689,7 @@ function useImage(
         await prendreTout();
         // Les logos aussi peuvent manquer à la première prise de Safari :
         // la seconde les a, et remplace la première.
-        if (!annule && navigator.vendor.startsWith("Apple")) await prendreTout();
+        if (!annule && prisesADoubler()) await prendreTout();
       } catch {
         // Pas d'image : le bouton reste grisé, la feuille se lit quand même.
       }
@@ -754,30 +704,8 @@ function useImage(
 
   async function partager() {
     if (!fichiers) return;
-    // Les fichiers seuls. Avec un titre, Safari met dans la feuille de partage
-    // un texte à part, avant les images : Snap (comme Instagram ou WhatsApp)
-    // prend ce texte et laisse les images, ou reste bloqué.
-    const donnees = { files: fichiers };
-    if (
-      typeof navigator.canShare === "function" &&
-      navigator.canShare(donnees)
-    ) {
-      try {
-        await navigator.share(donnees);
-      } catch (e) {
-        if ((e as Error)?.name !== "AbortError")
-          toast.error("Le partage n'a pas pu s'ouvrir.");
-      }
-      return;
-    }
-    for (const fichier of fichiers) {
-      const url = URL.createObjectURL(fichier);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = fichier.name;
-      a.click();
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
-    }
+    // Les fichiers seuls, sans titre (lib/sfl/image-a-partager.ts).
+    if ((await partagerFichiers(fichiers)) === "impossible") toast.error("Le partage n'a pas pu s'ouvrir.");
   }
 
   const calque = sujets.length > 0 && (
