@@ -1,298 +1,183 @@
 "use client";
 
-// Section Boutique — réplique de l'écran « BOUTIQUE matte » du design de
-// référence : catégories en pilules, un produit à la une, la grille des
-// articles, et le drop de la semaine.
+// L'accueil de la boutique Bola (Sabri, 12/11/2026 : « refais la boutique
+// comme ces exemples-là », deux grandes boutiques de foot en référence de
+// mise en page ; tout le reste est à Bola : nos photos, nos mots, noir et
+// blanc). Le catalogue est celui du 30/10 (lib/boutique/produits.ts), le
+// rangement est dans lib/boutique/catalogue.ts.
 //
-// LES PRODUITS D'ABORD. Les prix des Ballons, les paliers de recharge et le
-// tarif des cartes ne s'étalent plus en vitrine : ils vivent derrière le
-// bouton « Acheter des Ballons ». On entre dans une boutique pour regarder
-// des maillots, pas pour lire une grille tarifaire.
+// De haut en bas :
+//   · l'en-tête : retour, « Boutique », les favoris, les Ballons ;
+//   · le hero : trois photos portées plein cadre qu'on fait défiler au doigt
+//     (rien ne défile seul), sans dégradé ni texte posé dessus ; dessous, un
+//     titre court, un seul bouton « Voir » et l'indicateur « 1/3 », qui
+//     voyage avec sa diapo ; le bouton est à la même hauteur sur les trois
+//     diapos (un titre d'une ligne laisse son blanc au-dessus du bouton) ;
+//     sur un écran court (iPhone SE) la photo est moins haute, pour que le titre
+//     et le bouton tiennent au-dessus de la barre d'onglets ; sur tablette,
+//     deux diapos se voient à la fois ;
+//   · les rayons en liens texte, qui défilent au doigt ;
+//   · trois grands panneaux : Match, Vestiaire, Fondateurs ;
+//   · « Acheter par camp » : Noirs, Blancs ;
+//   · trois blocs : pour le match, le vestiaire, l'entraînement ;
+//   · la réassurance : livraison, retours, paiement en plusieurs fois, tous
+//     « Bientôt » tant que rien n'est branché.
+// Chaque lien ouvre la grille (/boutique/articles) sur un rayon, ou droit la
+// fiche quand le rayon n'a qu'une pièce (Survêts, Fondateurs : adresseRayon).
+// Aucun sous-titre, aucune promo, rien de payable.
 //
-// Les prix ne sont pas écrits à la main : chaque article porte son prix de
-// vente en euros, et la boutique le convertit au taux de la ligue (1 Ballon =
-// 1 centime, cf. ballons.ts). La marge se décide donc une seule fois, en
-// fixant le prix en euros — le prix en Ballons suit tout seul.
-//
-// Le textile reste verrouillé : paiement, stocks et tailles ne sont pas
-// branchés. Les recharges aussi, tant qu'il n'y a pas de paiement.
+// Sur ordinateur (≥ 1024), les trois diapos du hero tiennent côte à côte,
+// comme les panneaux et les blocs.
 
-import { useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
-import { Plus } from "lucide-react";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
-import { Locked } from "@/components/sfl/locked";
-import { useMyPlayer } from "@/components/sfl/player-provider";
-import { BoutonRetour } from "@/components/layout/bouton-retour";
-import { useBallons } from "@/hooks/use-ballons";
-import { BALLONS_PAR_EURO, RECHARGES, ballonsPourEuros } from "@/lib/sfl/ballons";
-import { CARD_PRICES } from "@/lib/sfl/collection";
+import { EnTeteBoutique } from "@/components/boutique/en-tete";
+import { Rail } from "@/components/boutique/rail";
+import { Tuile } from "@/components/boutique/tuile";
+import { adresseFiche, adresseGrille, adresseRayon, type Rayon } from "@/lib/boutique/catalogue";
 
-const CATS = ["Tout", "Maillots", "Survêts", "Montres", "Accessoires"] as const;
-
-/** Prix de vente en euros — le prix en Ballons en découle. */
-const UNE = { name: "Maillot SFL · domicile", note: "Floqué à ton nom et ton numéro", euros: 29 };
-
-const ITEMS = [
-  { tag: "SURVÊT", name: "Survêt club · veste + bas", euros: 44 },
-  { tag: "MONTRE", name: "Montre SFL · série verte", euros: 63 },
-  { tag: "CHAUSSETTES", name: "Chaussettes match · lot de 3", euros: 9 },
-  { tag: "SAC", name: "Sac de sport · logo brodé", euros: 21 },
+const HERO = [
+  { photo: "/boutique/porte-survet.webp", titre: "Collection 01", vers: adresseGrille() },
+  { photo: "/boutique/porte-maillot-noir.webp", titre: "Noirs contre Blancs", vers: adresseGrille({ rayon: "maillots" }) },
+  { photo: "/boutique/porte-dos-de-carte.webp", titre: "Ta carte dans le dos", vers: adresseFiche("t-shirt-dos-de-carte") },
 ];
 
-const milliers = (n: number) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, " ");
-const euros = (ballons: number) => (ballons / BALLONS_PAR_EURO).toFixed(2).replace(".", ",");
+const RAYONS_ACCUEIL: [titre: string, rayon: Rayon][] = [
+  ["Maillots", "maillots"],
+  ["Vestiaire", "vestiaire"],
+  ["Survêts", "survets"],
+  ["Fondateurs", "fondateurs"],
+  ["Tout", "tout"],
+];
 
-/* ------------------------- Le guichet des Ballons ------------------------- */
+const PANNEAUX: { photo: string; titre: string; rayon: Rayon }[] = [
+  { photo: "/boutique/porte-maillot-blanc-dos.webp", titre: "Match", rayon: "maillots" },
+  { photo: "/boutique/porte-raglan-blanc.webp", titre: "Vestiaire", rayon: "vestiaire" },
+  { photo: "/boutique/porte-sweat-noir.webp", titre: "Fondateurs", rayon: "fondateurs" },
+];
 
-function GuichetBallons({
-  ouvert,
-  onOpenChange,
-}: {
-  ouvert: boolean;
-  onOpenChange: (v: boolean) => void;
-}) {
+const CAMPS = [
+  { titre: "Noirs", vue: "/boutique/a-plat-rt0082-black-front.webp", couleur: "Noir" },
+  { titre: "Blancs", vue: "/boutique/a-plat-rt0082-white-front.webp", couleur: "Blanc" },
+] as const;
+
+const BLOCS: { photo: string; titre: string; rayon: Rayon }[] = [
+  { photo: "/boutique/porte-dimanche-noir.webp", titre: "Pour le match", rayon: "maillots" },
+  { photo: "/boutique/porte-polo-blanc.webp", titre: "Pour le vestiaire", rayon: "vestiaire" },
+  { photo: "/boutique/porte-survet-dos.webp", titre: "Pour l'entraînement", rayon: "survets" },
+];
+
+const REASSURANCE = ["Livraison", "Retours", "Paiement en plusieurs fois"];
+
+/* ---------------------------------- le hero -------------------------------- */
+
+function Hero() {
   return (
-    <Dialog open={ouvert} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[85dvh] max-w-md overflow-y-auto">
-        <DialogTitle className="text-titre-fort font-bold tracking-tight">
-          Acheter des Ballons
-        </DialogTitle>
-        <p className="-mt-1 text-corps leading-snug text-encre-3">
-          La monnaie de la ligue, au taux de <b className="font-semibold text-encre-2">10 €
-          pour 1 000 ⚽</b>. Tout se gagne aussi en jouant : connexion, votes, duels, convocation,
-          compositions.
-        </p>
-
-        {/* La ligne de titre reste libre à droite : c'est là que se pose la
-            pastille « Bientôt », sinon elle recouvrait un palier de recharge. */}
-        <span className="mono-label mt-1 text-primary">Les recharges</span>
-        <Locked
-          label="Bientôt"
-          chipClassName="-top-7 right-0"
-          note="Le paiement n'est pas encore branché — tout se gagne en attendant."
-        >
-          <div className="grid grid-cols-2 gap-2.5">
-            {RECHARGES.map((r) => (
-              <div key={r.euros} className="glass rounded-[20px] px-3.5 py-3">
-                <div className="flex items-baseline justify-between gap-2">
-                  <span className="text-titre-fort leading-none font-extrabold tracking-tight tabular-nums">
-                    {milliers(r.ballons)} ⚽
-                  </span>
-                  <span className="text-corps font-bold tabular-nums">{r.euros} €</span>
-                </div>
-                <p className="mono-label mt-1.5 text-encre-3">
-                  {r.bonus ? `+${r.bonus} offerts` : "Taux normal"}
-                </p>
-              </div>
-            ))}
-          </div>
-        </Locked>
-
-        {/* Ce que les Ballons achètent — informatif, pas en vitrine */}
-        <div className="mt-1 border-t border-contraste/8 pt-3.5">
-          <p className="mono-label text-encre-4">Ce qu&apos;ils achètent</p>
-          <div className="mt-2.5 flex flex-col gap-1.5">
-            {(
-              [
-                ["Carte Standard", CARD_PRICES.simple],
-                ["Carte Défensive", CARD_PRICES.def],
-                ["Carte Impact", CARD_PRICES.impact],
-                ["Carte MVP", CARD_PRICES.mvp],
-              ] as const
-            ).map(([label, prix]) => (
-              <div key={label} className="flex items-baseline justify-between gap-3 text-corps">
-                <span className="font-medium">{label}</span>
-                <span className="flex items-baseline gap-2">
-                  <span className="mono-label text-encre-4">{euros(prix)} €</span>
-                  <span className="font-bold tabular-nums">{prix} ⚽</span>
+    <section aria-label="À la une" className="-mx-5 lg:mx-0">
+      <Rail className="lg:grid lg:grid-cols-3 lg:gap-3 lg:overflow-visible">
+        {HERO.map((d, i) => (
+          <Link key={d.titre} href={d.vers} className="flex w-full shrink-0 snap-start flex-col sm:w-1/2 lg:w-auto">
+            <span className="relative block aspect-[4/5] [@media(max-height:700px)]:aspect-[5/4]">
+              <Image
+                src={d.photo}
+                alt=""
+                fill
+                priority={i === 0}
+                sizes="(max-width: 1023px) 100vw, 33vw"
+                className="object-cover object-top"
+              />
+            </span>
+            <span className="flex flex-1 flex-col gap-4 px-5 pt-5 lg:px-0">
+              <span className="titre-lettrage text-nom leading-[0.95] text-balance lg:text-titre-g">{d.titre}</span>
+              <span className="mt-auto flex items-center justify-between">
+                <span className="bouton-principal px-7 py-3 text-lecture font-bold">Voir</span>
+                {/* L'indicateur voyage avec sa diapo : il dit toujours vrai, sans rien écouter. */}
+                <span aria-hidden className="mono-label text-encre-3 lg:hidden">
+                  {i + 1}/{HERO.length}
                 </span>
-              </div>
-            ))}
-          </div>
-          <Link
-            href="/collection"
-            className="bouton-secondaire bouton--or mt-3.5 block py-2.5 text-center text-ligne font-semibold"
-          >
-            Voir le catalogue de cartes
+              </span>
+            </span>
           </Link>
-        </div>
-      </DialogContent>
-    </Dialog>
+        ))}
+      </Rail>
+    </section>
   );
 }
 
-/* --------------------------------- l'écran -------------------------------- */
+/* --------------------------------- l'écran --------------------------------- */
 
 export default function Boutique() {
-  const { player } = useMyPlayer();
-  const ballons = useBallons(player.name);
-  const [guichet, setGuichet] = useState(false);
-
   return (
-    <div className="shell flex flex-col gap-4 py-4 sm:py-8">
-      <div className="flex items-center gap-3">
-        <BoutonRetour />
-        <div className="min-w-0">
-          <h1 className="text-titre-l font-bold tracking-tight">Boutique</h1>
-          <p className="mt-1 text-corps text-encre-3">
-            Maillots, survêts, montres · payables en Ballons
-          </p>
+    <div className="shell flex flex-col gap-10 py-4 sm:py-8">
+      <div className="flex flex-col gap-4">
+        <EnTeteBoutique titre="Boutique" />
+        <Hero />
+      </div>
+
+      <nav aria-label="Rayons" className="-mx-5 -my-3 lg:mx-0">
+        <Rail className="snap-none gap-4 px-3.5 lg:px-0">
+          {RAYONS_ACCUEIL.map(([titre, rayon]) => (
+            <Link key={rayon} href={adresseRayon(rayon)} className="flex min-h-11 shrink-0 items-center px-1.5 text-lecture font-semibold">
+              {titre}
+            </Link>
+          ))}
+        </Rail>
+      </nav>
+
+      <section aria-label="Collections" className="-mx-5 lg:mx-0">
+        <Rail className="gap-2 px-5 [scroll-padding-inline:20px] lg:grid lg:grid-cols-3 lg:gap-3 lg:overflow-visible lg:px-0">
+          {PANNEAUX.map((p) => (
+            <Link key={p.titre} href={adresseRayon(p.rayon)} className="flex w-[82%] shrink-0 snap-start flex-col lg:w-auto">
+              <span className="relative block aspect-[4/5] overflow-hidden rounded-[2px]">
+                <Image src={p.photo} alt="" fill sizes="(max-width: 1023px) 82vw, 33vw" className="object-cover" />
+              </span>
+              <span className="flex items-center justify-between gap-3 pt-4">
+                <span className="titre-lettrage text-titre-m leading-none">{p.titre}</span>
+                <span className="bouton-secondaire px-5 py-2.5 text-ligne font-semibold">Voir</span>
+              </span>
+            </Link>
+          ))}
+        </Rail>
+      </section>
+
+      <section className="flex flex-col gap-4">
+        <h2 className="titre-lettrage text-titre">Acheter par camp</h2>
+        <div className="-mx-5 grid grid-cols-2 gap-0.5 sm:mx-0 sm:gap-3 lg:max-w-2xl">
+          {CAMPS.map((c) => (
+            <Link key={c.titre} href={adresseGrille({ filtres: { couleurs: [c.couleur] } })} className="flex flex-col">
+              <Tuile src={c.vue} sizes="(max-width: 1023px) 50vw, 500px" />
+              <span className="px-5 pt-3 text-lecture font-bold sm:px-1">{c.titre}</span>
+            </Link>
+          ))}
         </div>
-      </div>
+      </section>
 
-      {/* Le petit espace des Ballons : le solde, et de quoi en avoir plus.
-          Une ligne, pas une devanture. */}
-      <div className="glass-soft flex items-center justify-between gap-2 rounded-full py-2 pr-2 pl-4">
-        <span className="flex min-w-0 items-baseline gap-1.5 whitespace-nowrap">
-          <span className="text-titre font-extrabold tabular-nums">{milliers(ballons)}</span>
-          <span className="text-corps">⚽</span>
-          <span className="mono-label truncate text-encre-4">Ballons</span>
-        </span>
-        <button
-          onClick={() => setGuichet(true)}
-          className="bouton-principal bouton--or flex shrink-0 items-center gap-1.5 px-3.5 py-2 text-corps font-bold whitespace-nowrap"
-        >
-          <Plus className="size-3.5" strokeWidth={3} />
-          {/* Le libellé entier ne tient pas à côté d'un solde à cinq chiffres sur
-              390 px : il s'abrège plutôt que de casser la pilule en deux lignes. */}
-          {/* Deux libellés entiers plutôt qu'une phrase coupée en deux : le gap
-              du flex s'ajouterait à l'espace du texte et « des » se décollerait. */}
-          <span className="sm:hidden">Acheter</span>
-          <span className="hidden sm:inline">Acheter des Ballons</span>
-        </button>
-      </div>
+      <section aria-label="Par usage" className="grid gap-9 lg:grid-cols-3 lg:gap-3">
+        {BLOCS.map((b) => (
+          <Link key={b.titre} href={adresseRayon(b.rayon)} className="-mx-5 flex flex-col sm:mx-0">
+            <span className="relative block aspect-[4/5] overflow-hidden sm:rounded-[2px]">
+              <Image src={b.photo} alt="" fill sizes="(max-width: 1023px) 100vw, 33vw" className="object-cover" />
+            </span>
+            <span className="flex flex-col items-start gap-2 px-5 pt-4 sm:px-0">
+              <span className="text-titre-fort leading-tight font-black tracking-tight">{b.titre}</span>
+              <span className="text-lecture font-semibold underline underline-offset-4">Voir</span>
+            </span>
+          </Link>
+        ))}
+      </section>
 
-      <GuichetBallons ouvert={guichet} onOpenChange={setGuichet} />
-
-      {/* ------------------------- Les produits ------------------------- */}
-      {/* La pastille « Bientôt » se pose sur cette ligne de titre : au-dessus du
-          bloc elle retombait sur le bouton d'achat, dedans elle recouvrait les
-          catégories. */}
-      <div className="relative mt-1">
-        <h2 className="mb-2.5 px-1 text-titre font-bold tracking-tight">Le rayon</h2>
-        <Locked
-          label="Bientôt"
-          chipClassName="-top-8 right-1"
-          note="Le textile ouvrira plus tard : stocks, tailles et livraison sont encore à caler."
-        >
-          <div className="flex flex-col gap-4">
-            {/* Catégories */}
-            <div className="-mx-5 flex gap-2 overflow-x-auto px-5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-              {CATS.map((c, i) => (
-                <span
-                  key={c}
-                  className={
-                    i === 0
-                      ? "shrink-0 rounded-full bg-foreground px-[15px] py-2.5 text-corps font-bold text-background"
-                      : "glass-soft shrink-0 rounded-full px-[15px] py-2.5 text-corps font-semibold text-encre-2"
-                  }
-                >
-                  {c}
-                </span>
-              ))}
-            </div>
-
-            {/* Le produit à la une */}
-            <div className="glass overflow-hidden rounded-[26px] lg:flex lg:items-stretch">
-              <div
-                className="relative lg:w-[46%] lg:shrink-0"
-                style={{
-                  minHeight: 210,
-                  background:
-                    "repeating-linear-gradient(115deg, rgb(var(--contraste-rgb) / 0.06) 0 9px, rgb(var(--contraste-rgb) / 0.012) 9px 18px), radial-gradient(120% 90% at 70% 15%, rgb(var(--contraste-rgb) / 0.07), rgba(0,0,0,0) 60%)",
-                }}
-              >
-                <span className="mono-label absolute top-3.5 left-3.5 rounded-full border border-contraste/16 bg-contraste/10 px-[11px] py-[5px] text-encre-2">
-                  Nouveau · Domicile 25/26
-                </span>
-                <span className="mono-label absolute right-3.5 bottom-3.5 text-encre-4">
-                  Visuel produit
-                </span>
-              </div>
-              <div className="flex flex-1 flex-col justify-center p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="text-titre-fort leading-[1.25] font-bold tracking-tight">
-                      {UNE.name}
-                    </div>
-                    <p className="mt-[5px] text-corps text-encre-3">{UNE.note}</p>
-                  </div>
-                  <div className="shrink-0 text-right">
-                    <div className="text-titre-m font-extrabold tracking-tight tabular-nums">
-                      {milliers(ballonsPourEuros(UNE.euros))}
-                    </div>
-                    <div className="mono-label mt-[3px] text-primary">Ballons</div>
-                  </div>
-                </div>
-                <div className="mt-3.5 rounded-full bg-foreground py-[15px] text-center text-lecture font-bold text-background">
-                  Échanger mes Ballons
-                </div>
-              </div>
-            </div>
-
-            {/* La grille */}
-            <div className="grid grid-cols-2 gap-[11px] lg:grid-cols-4">
-              {ITEMS.map((it) => (
-                <div key={it.name} className="glass overflow-hidden rounded-[22px]">
-                  <div
-                    className="relative"
-                    style={{
-                      height: 112,
-                      background:
-                        "repeating-linear-gradient(115deg, rgb(var(--contraste-rgb) / 0.06) 0 9px, rgb(var(--contraste-rgb) / 0.012) 9px 18px), rgb(var(--contraste-rgb) / 0.02)",
-                    }}
-                  >
-                    <span className="mono-label absolute top-2.5 left-2.5 text-encre-3">
-                      {it.tag}
-                    </span>
-                  </div>
-                  <div className="px-3 pt-3 pb-3.5">
-                    <div className="text-ligne leading-[1.3] font-bold tracking-tight">
-                      {it.name}
-                    </div>
-                    <div className="mt-2 flex items-baseline justify-between">
-                      <span className="text-titre font-extrabold tracking-tight tabular-nums">
-                        {milliers(ballonsPourEuros(it.euros))}
-                      </span>
-                      <span className="mono-label text-primary">Ballons</span>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Le drop de la semaine */}
-            <div className="glass rounded-3xl p-4">
-              <div className="flex items-center justify-between">
-                <h2 className="text-titre font-bold tracking-tight">Drop de la semaine</h2>
-                <span className="mono-label text-[#c8352b] dark:text-[#FF6B5E]">Fin dans 2 j</span>
-              </div>
-              <div className="mt-3 flex gap-[11px]">
-                <span
-                  className="size-24 shrink-0 rounded-[18px] border border-contraste/8"
-                  style={{
-                    background:
-                      "repeating-linear-gradient(115deg, rgb(var(--contraste-rgb) / 0.06) 0 9px, rgb(var(--contraste-rgb) / 0.012) 9px 18px), rgb(var(--contraste-rgb) / 0.03)",
-                  }}
-                />
-                <div className="min-w-0 flex-1">
-                  <div className="text-lecture font-bold">Montre SFL · série verte</div>
-                  <p className="mt-1 text-corps leading-[1.45] text-encre-3">
-                    Bracelet nylon, cadran noir mat, index vert. 200 pièces.
-                  </p>
-                  <div className="mt-2 flex items-baseline gap-2">
-                    <span className="text-titre font-extrabold tabular-nums">
-                      {milliers(ballonsPourEuros(63))}
-                    </span>
-                    <span className="mono-label text-primary">Ballons</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </Locked>
-      </div>
+      <ul className="grid grid-cols-3 border-y border-contraste/8">
+        {REASSURANCE.map((r, i) => (
+          <li
+            key={r}
+            className={`flex flex-col items-center gap-1.5 px-2 py-5 text-center ${i > 0 ? "border-l border-contraste/8" : ""}`}
+          >
+            {/* Deux lignes réservées : les trois « Bientôt » restent alignés. */}
+            <span className="flex min-h-[2.5em] items-center text-corps leading-tight font-semibold">{r}</span>
+            <span className="mono-label text-encre-3">Bientôt</span>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

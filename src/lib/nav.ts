@@ -81,7 +81,9 @@ const PARENTS: [string, Parent][] = [
   ["/carte", MA_CARTE],
   ["/parrainage", MA_CARTE],
   ["/avatar", REGLAGES],
-  ["/boutique", { href: "/collection", titre: "Collection" }],
+  // La boutique est ouverte aux joueurs Bola, à qui la Collection est fermée (porte-sfl.tsx) : son parent est Ma carte.
+  ["/boutique/articles", { href: "/boutique", titre: "Boutique" }],
+  ["/boutique", MA_CARTE],
   ["/admin/activite", MA_CARTE],
   ["/admin/design", REGLAGES],
   ["/admin", REGLAGES],
@@ -115,6 +117,7 @@ const TITRES: [string, string][] = [
   ["/profil", "Ma carte"],
   ["/reglages", "Réglages"],
   ["/collection", "Collection"],
+  ["/boutique", "Boutique"],
   ["/parrainage", "Inviter"],
   ["/recherche", "Recherche"],
   ["/vestiaire", "Vestiaire"],
