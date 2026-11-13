@@ -130,8 +130,8 @@ export interface Avantage extends Visuel {
 export const AFFICHE: Visuel = { image: "affiche", alt: "", teinte: "#5b5b5b" };
 
 export const AVANTAGES: readonly Avantage[] = [
-  { id: "maillots", numero: "01", titre: "Tes maillots", image: "maillots", alt: "Les deux maillots de la SFL, le noir et le blanc", teinte: "#626262" },
-  { id: "matchs-filmes", numero: "02", titre: "Tes matchs filmés", image: "matchs-filmes", alt: "Une caméra au bord du terrain", teinte: "#353535" },
+  { id: "maillots", numero: "01", titre: "Tes maillots", image: "maillots", alt: "Les deux maillots de la SFL, le noir et le blanc", teinte: "#525252" },
+  { id: "matchs-filmes", numero: "02", titre: "Tes matchs filmés", image: "matchs-filmes", alt: "Une caméra au bord du terrain", teinte: "#4d4d4d" },
   { id: "cadeaux", numero: "03", titre: "Des cadeaux", image: "cadeaux", alt: "Un écrin noir fermé, posé sur du marbre", teinte: "#3e3e3e" },
   { id: "ceremonies", numero: "04", titre: "Les cérémonies officielles", image: "ceremonies", alt: "Un podium de marbre au centre du terrain", teinte: "#343434" },
 ];

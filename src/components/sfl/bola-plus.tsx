@@ -18,11 +18,14 @@
 //         « Je suis intéressé ». Le bouton marche avec ou sans formule ; une
 //         fois touché, il laisse la place à « C'est noté » et à « Annuler ».
 //         Les formules restent touchables : en toucher une change la formule
-//         notée. Après « Annuler », plus rien n'est coché ;
+//         notée. Après « Annuler », plus rien n'est coché. Au clavier : les
+//         flèches passent d'une formule à l'autre, et après le bouton ou
+//         « Annuler » le focus reste sur ce qui les remplace ;
 //       – BarreInteret : le même « Je suis intéressé », collé au-dessus de la
-//         barre d'onglets tant que l'offre n'est pas à l'écran. Une fois noté,
-//         elle dit « C'est noté » et mène à l'offre (formules, « Annuler »).
-//         Jamais deux boutons à l'écran : elle s'efface quand l'offre arrive.
+//         barre d'onglets tant que le bouton de l'offre n'est pas à l'écran.
+//         Une fois noté, elle dit « C'est noté » et mène à l'offre (formules,
+//         « Annuler »). Jamais deux boutons à l'écran, jamais aucun : elle
+//         s'efface quand celui de l'offre arrive à sa place, pas avant.
 //         Elle est portée dans <body> : sur iPhone, ce qui est collé dans
 //         #app-scroll passe sous la barre d'onglets (discussion-match.tsx).
 //
@@ -34,14 +37,16 @@
 // et en sombre : l'affiche et les cartes sont des îlots sombres (classe dark),
 // le reste suit le mode de l'app. Rien ne suit le doigt : une carte apparaît
 // une fois, en entrant à l'écran ; avec « Réduire les animations », elle est
-// là d'emblée, et le saut vers l'offre est immédiat (bola-plus.css).
+// là d'emblée, et le saut vers l'offre est immédiat (bola-plus.css). Une carte
+// n'est cachée qu'une fois la page en marche, et seulement si elle est hors de
+// l'écran : sans script, ou avant lui, tout se voit.
 //
 // L'emblème n'est pas une image : la rosace guillochée du dos de la carte et
 // la lune Bola en son centre (motif-carte.tsx, finitions-carte.ts), dessinées
 // à l'encre de la page. Noir et blanc, en clair comme en sombre.
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent, type RefObject } from "react";
 import { createPortal } from "react-dom";
 import { Check } from "lucide-react";
 import { ANTON } from "@/components/sfl/actus/ecran";
@@ -134,14 +139,33 @@ export function OffreBolaPlus({
   plus,
   choix,
   onChoix,
+  actionRef,
 }: {
   plus: BolaPlus;
+  /** Le bloc du bouton (ou de « C'est noté ») : la page le regarde pour effacer la barre collée. */
+  actionRef?: RefObject<HTMLDivElement | null>;
   /** La formule touchée avant « Je suis intéressé » ; une fois noté, celle de l'intérêt fait foi. */
   choix: Formule | null;
   onChoix: (f: Formule | null) => void;
 }) {
   const { interet, noter, annuler, occupe } = plus;
   const formule = interet ? interet.formule : choix;
+  const interneRef = useRef<HTMLDivElement | null>(null);
+  const blocRef = actionRef ?? interneRef;
+  // Le bouton touché ici vient de laisser sa place : le focus va à ce qui le remplace.
+  const suivre = useRef(false);
+  const note = !!interet;
+
+  useEffect(() => {
+    if (!suivre.current) return;
+    suivre.current = false;
+    blocRef.current?.focus({ preventScroll: true });
+  }, [note, blocRef]);
+
+  function interesser() {
+    suivre.current = true;
+    noter(choix);
+  }
 
   function choisir(f: Formule) {
     if (!interet) onChoix(f);
@@ -150,15 +174,27 @@ export function OffreBolaPlus({
 
   // Après « Annuler », rien ne reste coché : ni la formule notée, ni celle d'avant.
   function defaire() {
+    suivre.current = true;
     onChoix(null);
     annuler();
+  }
+
+  // Les flèches passent d'une formule à l'autre, comme dans tout groupe de choix.
+  function fleches(e: KeyboardEvent<HTMLDivElement>) {
+    const pas = e.key === "ArrowDown" || e.key === "ArrowRight" ? 1 : e.key === "ArrowUp" || e.key === "ArrowLeft" ? -1 : 0;
+    if (!pas) return;
+    e.preventDefault();
+    const boutons = [...e.currentTarget.querySelectorAll<HTMLButtonElement>('[role="radio"]')];
+    const i = (Math.max(0, boutons.indexOf(document.activeElement as HTMLButtonElement)) + pas + FORMULES.length) % FORMULES.length;
+    boutons[i]?.focus();
+    choisir(FORMULES[i]);
   }
 
   return (
     <div className="flex flex-col gap-[var(--fib-21)]">
       <EmblemeBolaPlus className="mx-auto size-[92px] text-foreground" />
 
-      <div role="radiogroup" aria-label="Formule" className="flex flex-col gap-2.5">
+      <div role="radiogroup" aria-label="Formule" onKeyDown={fleches} className="flex flex-col gap-2.5">
         {FORMULES.map((f) => {
           const p = PRIX[f];
           const choisie = formule === f;
@@ -171,11 +207,11 @@ export function OffreBolaPlus({
               disabled={occupe}
               onClick={() => choisir(f)}
               className={cn(
-                "glass flex w-full items-center gap-3 rounded-[24px] px-5 py-4 text-left transition-[border-color] duration-200 motion-reduce:transition-none",
+                "glass flex w-full items-center gap-3 rounded-[24px] px-5 py-4 text-left max-[359px]:gap-2 max-[359px]:px-4 transition-[border-color] duration-200 motion-reduce:transition-none",
                 choisie && "border-foreground"
               )}
             >
-              <span className="flex flex-1 flex-col gap-2">
+              <span className="flex min-w-0 flex-1 flex-col gap-2">
                 <span className="mono-label text-encre-3">{NOM_FORMULE[f]}</span>
                 <span className="flex items-baseline gap-2 whitespace-nowrap">
                   <span className="text-[34px] leading-[0.9] tabular-nums" style={{ fontFamily: ANTON }}>
@@ -184,7 +220,7 @@ export function OffreBolaPlus({
                   <span className="text-corps font-medium text-encre-2">/ {p.par}</span>
                 </span>
               </span>
-              <span className="text-right text-corps leading-tight font-semibold whitespace-nowrap text-encre-2">{p.detail}</span>
+              <span className="text-right text-corps leading-tight font-semibold text-encre-2 min-[360px]:whitespace-nowrap">{p.detail}</span>
               <span
                 aria-hidden
                 className={cn(
@@ -199,28 +235,30 @@ export function OffreBolaPlus({
         })}
       </div>
 
-      {interet ? (
-        <div className="flex flex-col items-center gap-1" role="status">
-          <CestNote className="py-4 text-lecture font-bold" />
+      <div ref={blocRef} tabIndex={-1} className="bp-action">
+        {interet ? (
+          <div className="flex flex-col items-center gap-1" role="status">
+            <CestNote className="py-4 text-lecture font-bold" />
+            <button
+              type="button"
+              onClick={defaire}
+              disabled={occupe}
+              className="bouton-discret bouton--rouge min-h-11 px-5 py-2 text-corps font-semibold disabled:opacity-50"
+            >
+              Annuler
+            </button>
+          </div>
+        ) : (
           <button
             type="button"
-            onClick={defaire}
+            onClick={interesser}
             disabled={occupe}
-            className="bouton-discret bouton--rouge min-h-11 px-5 py-2 text-corps font-semibold disabled:opacity-50"
+            className="bouton-principal w-full py-4 text-lecture font-bold disabled:opacity-40"
           >
-            Annuler
+            Je suis intéressé
           </button>
-        </div>
-      ) : (
-        <button
-          type="button"
-          onClick={() => noter(choix)}
-          disabled={occupe}
-          className="bouton-principal w-full py-4 text-lecture font-bold disabled:opacity-40"
-        >
-          Je suis intéressé
-        </button>
-      )}
+        )}
+      </div>
     </div>
   );
 }
@@ -231,6 +269,14 @@ export function OffreBolaPlus({
 const TAILLES = "(min-width: 430px) 430px, 100vw";
 const LARGEUR = LARGEURS[1];
 const HAUTEUR = Math.round(LARGEUR * RAPPORT_VISUEL);
+
+/**
+ * La ligne où la barre collée passe la main au bouton de l'offre : 120 px
+ * au-dessus du bas de l'écran (bola-plus.css : 14 + 62 + 10 de retrait, puis
+ * les deux tiers des 52 px de la barre). Plus bas, le bouton de l'offre est
+ * encore derrière elle ; plus haut, on verrait les deux.
+ */
+const MARGE_BARRE = "0px 0px -120px 0px";
 
 /** Le défilement de l'app (layout.tsx) : c'est lui que les observateurs regardent. */
 const defilant = () => document.getElementById("app-scroll");
@@ -273,18 +319,27 @@ function AfficheBolaPlus() {
   );
 }
 
-/** Un avantage : son visuel plein cadre, son numéro, son titre. Elle apparaît une fois, en entrant à l'écran. */
+/**
+ * Un avantage : son visuel plein cadre, son numéro, son titre. Elle apparaît
+ * une fois, en entrant à l'écran. Elle n'attend (cachée) que si la page en
+ * marche la trouve hors de l'écran : avant le script, elle se voit.
+ */
 function CarteAvantage({ avantage }: { avantage: Avantage }) {
   const ref = useRef<HTMLLIElement>(null);
-  const [vue, setVue] = useState(false);
+  const [etat, setEtat] = useState<"attend" | "vue" | null>(null);
 
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
     const o = new IntersectionObserver(
       ([e]) => {
-        if (!e.isIntersecting) return;
-        setVue(true);
+        if (!e.isIntersecting) {
+          // Entièrement hors de l'écran : elle attend. Un bord déjà visible reste visible.
+          if (e.intersectionRatio === 0) setEtat("attend");
+          return;
+        }
+        // Déjà à l'écran à l'ouverture : elle reste comme elle est, sans mouvement.
+        setEtat((avant) => (avant === "attend" ? "vue" : avant));
         o.disconnect();
       },
       { root: defilant(), threshold: 0.12 }
@@ -294,7 +349,7 @@ function CarteAvantage({ avantage }: { avantage: Avantage }) {
   }, []);
 
   return (
-    <li ref={ref} className="bp-carte dark" data-vue={vue ? "" : undefined} style={{ ["--teinte" as string]: avantage.teinte }}>
+    <li ref={ref} className="bp-carte dark" data-attend={etat === "attend" ? "" : undefined} data-vue={etat === "vue" ? "" : undefined} style={{ ["--teinte" as string]: avantage.teinte }}>
       {/* eslint-disable-next-line @next/next/no-img-element -- déjà à ses trois tailles (public/bola-plus) */}
       <img
         src={fichierVisuel(avantage.image, LARGEUR)}
@@ -342,14 +397,16 @@ export function PageBolaPlus() {
   const plus = useBolaPlus();
   const [choix, setChoix] = useState<Formule | null>(null);
   const offre = useRef<HTMLDivElement>(null);
-  // L'offre est-elle à l'écran ? null tant qu'on ne sait pas : la barre attend.
+  const actionRef = useRef<HTMLDivElement | null>(null);
+  // Le bouton de l'offre est-il à l'écran ? null tant qu'on ne sait pas : la barre attend.
   const [offreVue, setOffreVue] = useState<boolean | null>(null);
 
   useEffect(() => {
-    const el = offre.current;
+    const el = actionRef.current;
     if (!el) return;
-    // La barre d'onglets et la barre collée couvrent le bas : l'offre compte une fois au-dessus.
-    const o = new IntersectionObserver(([e]) => setOffreVue(e.isIntersecting), { root: defilant(), rootMargin: "0px 0px -150px 0px" });
+    // On regarde le bouton de l'offre, pas l'offre entière : la barre ne s'efface
+    // que lorsqu'il arrive à sa place, au-dessus de la barre d'onglets (MARGE_BARRE).
+    const o = new IntersectionObserver(([e]) => setOffreVue(e.isIntersecting), { root: defilant(), rootMargin: MARGE_BARRE });
     o.observe(el);
     return () => o.disconnect();
   }, []);
@@ -368,7 +425,7 @@ export function PageBolaPlus() {
         ))}
       </ol>
       <div ref={offre} className="bp-offre">
-        <OffreBolaPlus plus={plus} choix={choix} onChoix={setChoix} />
+        <OffreBolaPlus plus={plus} choix={choix} onChoix={setChoix} actionRef={actionRef} />
       </div>
       {offreVue !== null && (
         <BarreInteret note={!!plus.interet} occupe={plus.occupe} cachee={offreVue} onNoter={() => plus.noter(choix)} onVoirOffre={voirOffre} />

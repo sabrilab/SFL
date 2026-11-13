@@ -25,7 +25,11 @@
 //       promesse) ; chaque visuel est là aux trois largeurs, en WebP, léger ;
 //       les cartes se chargent quand on y arrive, l'affiche tout de suite ;
 //       « Réduire les animations » est traité ; les prix ne sont écrits qu'une
-//       fois ; le bouton collé note comme celui de l'offre.
+//       fois ; le bouton collé note comme celui de l'offre, et ne s'efface
+//       que lorsque le bouton de l'offre arrive (jamais d'écran sans bouton) ;
+//       les mots de l'écran sont une liste fermée (ni sous-titre, ni texte
+//       d'aide, ni avantage écrit hors de la liste) ; une carte se voit sans
+//       script ; noir et blanc, dans la feuille comme dans les classes.
 //       Des mutants de la source sont rejoués : chaque garde doit les refuser.
 // Sans réseau : fetch est remplacé.
 //   npx tsx tools/bola-plus-check.ts
@@ -365,8 +369,8 @@ async function banc() {
   assert.ok(src("app/profil/bola-plus/page.tsx").includes("<PageBolaPlus />"), "la route montre la page Bola Plus");
   // L'écran : après « Annuler », rien ne reste coché ; le bouton fait 44 px de haut.
   const ecran = src("components/sfl/bola-plus.tsx");
-  assert.ok(/function defaire\(\) \{\s*onChoix\(null\);\s*annuler\(\);\s*\}/.test(ecran), "« Annuler » décoche la formule");
-  assert.ok(/<OffreBolaPlus plus=\{plus\} choix=\{choix\} onChoix=\{setChoix\} \/>/.test(ecran), "l'offre reçoit le choix de la page");
+  assert.ok(/function defaire\(\) \{\s*suivre\.current = true;\s*onChoix\(null\);\s*annuler\(\);\s*\}/.test(ecran), "« Annuler » décoche la formule");
+  assert.ok(/<OffreBolaPlus plus=\{plus\} choix=\{choix\} onChoix=\{setChoix\} actionRef=\{actionRef\} \/>/.test(ecran), "l'offre reçoit le choix de la page");
   assert.ok(/onClick=\{defaire\}[\s\S]{0,120}min-h-11/.test(ecran), "« Annuler » : une cible de 44 px");
   assert.ok(!/onClick=\{annuler\}/.test(ecran), "« Annuler » passe par defaire");
 
@@ -386,6 +390,8 @@ async function banc() {
     }
   };
   avantagesJustes(AVANTAGES);
+  const afficheJuste = (alt: string) => assert.ok(!INTERDIT.test(alt), "l'affiche : ni chiffre, ni prix, ni promesse");
+  afficheJuste(AFFICHE.alt);
   assert.deepEqual([...LARGEURS], [480, 780, 1170]);
   assert.equal(sourcesVisuel("affiche"), "/bola-plus/affiche-480.webp 480w, /bola-plus/affiche-780.webp 780w, /bola-plus/affiche-1170.webp 1170w");
 
@@ -444,17 +450,67 @@ async function banc() {
     for (const mot of ["Je suis intéressé", "C&apos;est noté", "Annuler"]) assert.ok(tsx.includes(mot), `« ${mot} » est toujours là`);
     // La barre collée : le même geste que le bouton de l'offre, dans <body>, effacée quand l'offre est à l'écran.
     assert.ok(/onNoter=\{\(\) => plus\.noter\(choix\)\}/.test(page), "la barre collée note par le noter de la page");
-    assert.ok(/onClick=\{\(\) => noter\(choix\)\}/.test(bloc("OffreBolaPlus")), "le bouton de l'offre note par le même noter");
+    const offre = bloc("OffreBolaPlus");
+    assert.ok(/function interesser\(\) \{\s*suivre\.current = true;\s*noter\(choix\);\s*\}/.test(offre) && /onClick=\{interesser\}/.test(offre), "le bouton de l'offre note par le même noter");
     assert.equal(tsx.match(/useBolaPlus\(\)/g)?.length, 2, "un seul useBolaPlus pour la page (et celui de la tuile)");
     assert.ok(/createPortal\(/.test(barre) && /document\.body/.test(barre), "la barre collée est portée dans <body>");
     assert.ok(/cachee=\{offreVue\}/.test(page) && /inert=\{cachee\}/.test(barre), "la barre s'efface quand l'offre est à l'écran");
     assert.ok(/prefers-reduced-motion: reduce/.test(page), "le saut vers l'offre est immédiat avec « Réduire les animations »");
     // La feuille de style : le mouvement réduit, le clavier.
     const reduit = /@media \(prefers-reduced-motion: reduce\) \{([\s\S]*)\}\s*$/.exec(css)?.[1] ?? "";
-    assert.ok(/\.bp-carte \{[^}]*opacity: 1;[^}]*transition: none;/.test(reduit), "mouvement réduit : les cartes sont là d'emblée");
+    assert.ok(/\.bp-carte,\s*\.bp-carte\[data-attend\],\s*\.bp-carte\[data-vue\] \{[^}]*opacity: 1;[^}]*transition: none;/.test(reduit), "mouvement réduit : les cartes sont là d'emblée");
     assert.ok(/\.bp-barre[^{]*\{[^}]*transition: none;/.test(reduit), "mouvement réduit : la barre ne fond pas");
     assert.ok(/html\[data-clavier\] \.bp-barre \{\s*display: none;/.test(css), "la barre s'efface sous le clavier");
     assert.ok(!/scroll-snap|animation:|@keyframes/.test(css), "ni accroche ni animation en boucle");
+    // Les blocs de la feuille : l'affiche et la carte gardent leur forme ; une carte se voit sans script,
+    // n'attend que par [data-attend] et revient par [data-vue] ; la barre reste au-dessus des onglets.
+    const regle = (selecteur: string) => {
+      const i = css.indexOf(`\n${selecteur} {`);
+      assert.ok(i >= 0, `${selecteur} est dans la feuille`);
+      return css.slice(i, css.indexOf("}", i));
+    };
+    assert.ok(/aspect-ratio: 4 \/ 5;/.test(regle(".bp-carte")), "la carte garde sa forme");
+    assert.ok(/aspect-ratio: 4 \/ 5;/.test(regle(".bp-affiche")), "l'affiche garde sa forme");
+    assert.ok(!/opacity|translate/.test(regle(".bp-carte")), "sans script, une carte se voit");
+    assert.ok(/opacity: 0;/.test(regle(".bp-carte[data-attend]")), "une carte hors de l'écran attend");
+    assert.ok(/opacity: 1;[\s\S]*transition:/.test(regle(".bp-carte[data-vue]")), "une carte vue est là");
+    assert.ok(/z-index: 30;/.test(regle(".bp-barre")) && /bottom: calc\(max\(calc\(env\(safe-area-inset-bottom\) - 4px\), 14px\) \+ 62px \+ 10px\);/.test(regle(".bp-barre")), "la barre est au-dessus des onglets");
+    // La carte : elle attend hors de l'écran, puis arrive ; son visuel est décrit et à sa taille.
+    assert.ok(/setEtat\("attend"\)/.test(carte) && /avant === "attend" \? "vue" : avant/.test(carte), "la carte attend puis arrive");
+    assert.ok(/data-attend=\{etat === "attend" \? "" : undefined\}/.test(carte) && /data-vue=\{etat === "vue" \? "" : undefined\}/.test(carte), "la carte porte son état");
+    assert.ok(/alt=\{avantage\.alt\}/.test(carte) && /alt=\{AFFICHE\.alt\}/.test(affiche), "chaque visuel a son texte de remplacement");
+    for (const b of [carte, affiche]) assert.ok(/sizes=\{TAILLES\}/.test(b), "un visuel dit sa taille à l'écran");
+    // Les mots de l'écran : une liste fermée. Ni sous-titre, ni texte d'aide, ni avantage hors de la liste.
+    const rendu = (b: string) => b.slice(Math.max(b.lastIndexOf("  return ("), b.lastIndexOf("  return createPortal(")));
+    const mots = (b: string) => [...rendu(b).matchAll(/>([^<>{}]*[A-Za-zÀ-ÿ][^<>{}]*)</g)].map((m) => m[1].trim()).sort();
+    const balises = (b: string) => [...new Set([...rendu(b).matchAll(/<([A-Za-z][\w]*)/g)].map((m) => m[1]))].sort();
+    assert.deepEqual(mots(affiche), ["/ an", "/ mois", "Bola Plus"], "l'affiche : le nom et les deux prix");
+    assert.deepEqual(balises(affiche), ["BoutonRetour", "div", "h1", "header", "img", "p", "span"]);
+    assert.equal(affiche.match(/<(p|h[1-6])\b/g)?.length, 2, "l'affiche : un titre et la ligne des prix");
+    assert.deepEqual(mots(carte), [], "la carte n'écrit rien en dur");
+    assert.deepEqual(mots(page), [], "la page n'écrit rien en dur");
+    assert.deepEqual(balises(page), ["AfficheBolaPlus", "BarreInteret", "CarteAvantage", "OffreBolaPlus", "div", "ol"], "la page : l'affiche, les avantages de la liste, l'offre, la barre");
+    assert.deepEqual(mots(barre), ["Je suis intéressé"]);
+    assert.deepEqual(mots(offre), ["Annuler", "Je suis intéressé"]);
+    assert.ok(/mensuel: \{ euros: MENSUEL, par: "mois", detail: "Sans engagement" \},\s*annuel: \{ euros: ANNUEL, par: "an", detail: LIBELLE_REMISE \},/.test(tsx), "les deux formules : leurs prix et leurs détails, rien d'inventé");
+    // Les boutons : gelés pendant l'envoi ; la barre dit « C'est noté » une fois noté, pas avant.
+    assert.equal(offre.match(/disabled=\{occupe\}/g)?.length, 3, "l'offre : formules, bouton et « Annuler » gelés pendant l'envoi");
+    assert.ok(/onClick=\{onNoter\} disabled=\{occupe\}/.test(barre), "la barre : bouton gelé pendant l'envoi");
+    assert.ok(/\{note \? \([\s\S]*onClick=\{onVoirOffre\}[\s\S]*\) : \([\s\S]*onClick=\{onNoter\}/.test(barre), "la barre : « C'est noté » une fois noté, le bouton avant");
+    assert.ok(/if \(!interet\) onChoix\(f\);\s*else if \(interet\.formule !== f\) noter\(f\);/.test(offre), "une fois noté, toucher une formule la change");
+    assert.ok(/behavior: doux \? "smooth" : "auto"/.test(page), "le saut vers l'offre suit « Réduire les animations »");
+    // La barre s'efface quand le BOUTON de l'offre arrive à sa place, pas quand l'offre commence.
+    assert.ok(/const MARGE_BARRE = "0px 0px -120px 0px";/.test(tsx), "la marge de la barre");
+    assert.ok(/const el = actionRef\.current;[\s\S]*rootMargin: MARGE_BARRE/.test(page) && /actionRef=\{actionRef\}/.test(page), "la page regarde le bouton de l'offre");
+    assert.ok(/<div ref=\{blocRef\} tabIndex=\{-1\} className="bp-action">\s*\{interet \? \(/.test(offre) && /const blocRef = actionRef \?\? interneRef;/.test(offre), "l'offre donne le bloc de son bouton");
+    // Clavier : les flèches dans les formules, le focus rendu au bloc du bouton.
+    assert.ok(/onKeyDown=\{fleches\}/.test(offre) && /blocRef\.current\?\.focus\(\{ preventScroll: true \}\)/.test(offre), "clavier : flèches et focus");
+    // Noir et blanc : aucune classe de couleur dans l'écran (le rouge d'« Annuler », bouton--rouge, est celui de l'app).
+    const COULEUR = /\b(red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)-\d|\b(gold|or|braise)\b(?=[^\n]*")/;
+    assert.equal(COULEUR.exec(sansCommentaire.replace(/"[^"]*"/g, (c) => (/className|^"[\w\s:[\]().%/&>-]*"$/.test(c) ? c : '""')))?.[0] ?? null, null, "une classe de couleur dans l'écran");
+    const sansNotes = css.replace(/\/\*[\s\S]*?\*\//g, "");
+    assert.ok(!/\b(hsla?|hwb|lab|lch|oklab|oklch|color|color-mix)\(/.test(sansNotes), "la feuille n'écrit ses teintes qu'en rgb gris");
+    assert.ok(!/:\s*[^;{}]*\b(gold|red|orange|yellow|green|blue|purple|pink|brown|tomato|coral|salmon|crimson|orangered|goldenrod|navy|teal|cyan|magenta|violet|indigo|maroon|olive|lime|aqua|fuchsia|khaki|tan|beige)\b/.test(sansNotes), "aucune couleur nommée dans la feuille");
     // Noir et blanc : aucune couleur écrite dans la feuille.
     for (const m of css.matchAll(/rgb\((\d+) (\d+) (\d+)/g)) assert.ok(Math.max(+m[1], +m[2], +m[3]) - Math.min(+m[1], +m[2], +m[3]) <= 8, `une couleur dans la feuille : ${m[0]}`);
     assert.ok(!/#[0-9a-f]{3,8}\b/i.test(css.replace(/#fff\b/g, "")), "pas d'autre teinte que le blanc dans la feuille");
@@ -462,18 +518,21 @@ async function banc() {
   ecranJuste(ecran, style);
 
   // Les mutants : chaque garde refuse sa faute.
+  const sansEffet: string[] = [];
   const refuse = (nom: string, essai: () => void) => {
     let passe = true;
     try {
       essai();
-    } catch {
+    } catch (e) {
       passe = false;
+      if (process.env.MUTANTS) console.log(`${nom} ← ${(e as Error).message.split("\n")[0]}`);
     }
     assert.ok(!passe, `mutant accepté : ${nom}`);
   };
   const mute = (nom: string, source: string, de: string | RegExp, vers: string) => {
     const m = source.replace(de, vers);
-    assert.notEqual(m, source, `mutant sans effet : ${nom}`);
+    // Noté à part : un mutant sans effet ne doit pas passer pour un mutant refusé.
+    if (m === source) sansEffet.push(nom);
     return m;
   };
   refuse("un titre changé", () => avantagesJustes(AVANTAGES.map((a, i) => (i === 0 ? { ...a, titre: "Ton kit complet" } : a))));
@@ -487,7 +546,33 @@ async function banc() {
   refuse("une phrase sous un titre", () => ecranJuste(mute("phrase", ecran, "{avantage.titre}</h2>", "{avantage.titre}</h2>\n      <p>Chaque saison.</p>"), style));
   refuse("la barre jamais effacée", () => ecranJuste(mute("inert", ecran, " inert={cachee}", ""), style));
   refuse("le mouvement réduit oublié", () => ecranJuste(ecran, mute("reduit", style, /@media \(prefers-reduced-motion: reduce\) \{[\s\S]*$/, "")));
-  refuse("une couleur dans la feuille", () => ecranJuste(ecran, mute("couleur", style, "color: rgb(255 255 255 / 0.7);", "color: rgb(255 138 76 / 0.7);")));
+  refuse("une couleur dans la feuille", () => ecranJuste(ecran, mute("couleur", style, "rgb(255 255 255 / 0.09)", "rgb(255 138 76 / 0.09)")));
+  // Les mutants du contrôle du 13/11.
+  refuse("la carte sans forme", () => ecranJuste(ecran, mute("forme", style, ".bp-carte {\n  position: relative;\n  aspect-ratio: 4 / 5;", ".bp-carte {\n  position: relative;")));
+  refuse("l'affiche sans forme", () => ecranJuste(ecran, mute("forme affiche", style, ".bp-affiche {\n  position: relative;\n  aspect-ratio: 4 / 5;", ".bp-affiche {\n  position: relative;")));
+  refuse("une carte cachée sans script", () => ecranJuste(ecran, mute("cachée", style, "  color: #fff;\n}\n/* Hors de l'écran", "  color: #fff;\n  opacity: 0;\n}\n/* Hors de l'écran")));
+  refuse("une carte jamais revenue", () => ecranJuste(mute("vue", ecran, 'avant === "attend" ? "vue" : avant', "avant"), style));
+  refuse("[data-vue] sans opacité", () => ecranJuste(ecran, mute("data-vue", style, ".bp-carte[data-vue] {\n  opacity: 1;", ".bp-carte[data-vue] {")));
+  refuse("un sous-titre dans l'affiche", () => ecranJuste(mute("sous-titre", ecran, "</h1>", "</h1>\n        <p>Tout ce que tu gagnes en t'abonnant.</p>"), style));
+  refuse("un texte d'aide dans la page", () => ecranJuste(mute("aide", ecran, "      </ol>", '      </ol>\n      <p className="px-5">Choisis ta formule puis touche le bouton.</p>'), style));
+  refuse("un avantage écrit hors de la liste", () => ecranJuste(mute("en dur", ecran, "      </ol>", '      <li className="bp-carte dark"><h2 className="bp-carte__titre">Ta place garantie</h2></li>\n      </ol>'), style));
+  refuse("un visuel sans description", () => ecranJuste(mute("alt", ecran, "alt={avantage.alt}", 'alt=""'), style));
+  refuse("une promesse dans l'affiche", () => afficheJuste("Tout est offert"));
+  refuse("un détail de formule inventé", () => ecranJuste(mute("détail", ecran, 'detail: "Sans engagement"', 'detail: "Satisfait ou remboursé"'), style));
+  refuse("une couleur nommée", () => ecranJuste(ecran, mute("nommée", style, "  color: #fff;\n  text-shadow", "  color: gold;\n  text-shadow")));
+  refuse("une couleur hsl", () => ecranJuste(ecran, mute("hsl", style, "  color: #fff;\n  text-shadow", "  color: hsl(20 100% 65%);\n  text-shadow")));
+  refuse("une classe de couleur", () => ecranJuste(mute("classe", ecran, 'className="bp-carte__titre titre-lettrage"', 'className="bp-carte__titre titre-lettrage text-amber-400"'), style));
+  refuse("la barre inversée", () => ecranJuste(mute("inversée", ecran, "      {note ? (", "      {!note ? ("), style));
+  refuse("la barre sous les onglets", () => ecranJuste(ecran, mute("z", style, "z-index: 30;", "z-index: -1;")));
+  refuse("la barre sur les onglets", () => ecranJuste(ecran, mute("bas", style, "bottom: calc(max(calc(env(safe-area-inset-bottom) - 4px), 14px) + 62px + 10px);", "bottom: 0;")));
+  refuse("la barre sans gel", () => ecranJuste(mute("gel barre", ecran, "onClick={onNoter} disabled={occupe}", "onClick={onNoter}"), style));
+  refuse("le bouton de l'offre sans gel", () => ecranJuste(mute("gel offre", ecran, "onClick={interesser}\n            disabled={occupe}", "onClick={interesser}"), style));
+  refuse("la formule figée une fois noté", () => ecranJuste(mute("formule", ecran, "    else if (interet.formule !== f) noter(f);\n", ""), style));
+  refuse("le saut toujours animé", () => ecranJuste(mute("saut", ecran, 'behavior: doux ? "smooth" : "auto"', 'behavior: "smooth"'), style));
+  refuse("un visuel sans sizes", () => ecranJuste(mute("sizes", ecran, "        sizes={TAILLES}\n        width={LARGEUR}\n        height={HAUTEUR}\n        alt={avantage.alt}", "        width={LARGEUR}\n        height={HAUTEUR}\n        alt={avantage.alt}"), style));
+  refuse("la barre effacée dès le haut de l'offre", () => ecranJuste(mute("trou", ecran, "const el = actionRef.current;", "const el = offre.current;"), style));
+
+  assert.deepEqual(sansEffet, [], "des mutants sans effet");
 
   console.log("bola-plus : ok");
 }
