@@ -1,0 +1,225 @@
+/* La page Bola Plus (bola-plus.tsx) : l'affiche, les cartes d'avantage, la
+   barre collée. Les visuels sont en noir et blanc et restent sombres dans les
+   deux modes ; les voiles (pour lire le titre) sont posés ici, jamais dans
+   l'image. Rien ne suit le doigt : une carte apparaît une fois, et n'est
+   cachée ([data-attend]) que par la page en marche. Avec « Réduire les
+   animations », tout est là d'emblée (fin du fichier). */
+
+.bp {
+  /* Le fond de la page, lu hors des îlots sombres : l'affiche s'y fond. */
+  --bp-page: var(--background);
+  width: 100%;
+  max-width: 430px;
+  margin: -0.75rem auto 0;
+}
+
+/* ── L'affiche : bord à bord, 4:5. ── */
+.bp-affiche {
+  position: relative;
+  aspect-ratio: 4 / 5;
+  overflow: hidden;
+  background: var(--teinte);
+  color: #fff;
+}
+.bp-affiche img,
+.bp-carte img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+/* Deux voiles : en haut sous le retour, en bas sous le nom ; puis le fondu
+   dans la page. */
+.bp-affiche::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(to top, var(--bp-page) 0%, transparent 16%),
+    linear-gradient(to top, rgb(0 0 0 / 0.9) 8%, rgb(0 0 0 / 0.62) 34%, transparent 66%),
+    linear-gradient(to bottom, rgb(0 0 0 / 0.5) 0%, transparent 24%);
+}
+/* En clair, pas de fondu : le noir dans le papier ferait un voile gris sous
+   les prix. L'affiche se termine net, par deux coins arrondis. */
+:root:not(.dark) .bp-affiche {
+  border-radius: 0 0 28px 28px;
+}
+:root:not(.dark) .bp-affiche::after {
+  background:
+    linear-gradient(to top, rgb(0 0 0 / 0.9) 0%, rgb(0 0 0 / 0.6) 30%, transparent 62%),
+    linear-gradient(to bottom, rgb(0 0 0 / 0.5) 0%, transparent 24%);
+}
+:root:not(.dark) .bp-affiche__titre {
+  bottom: 26px;
+}
+:root:not(.dark) .bp-pile {
+  padding-top: 13px;
+}
+/* Le retour sur le marbre clair : un verre fumé, l'encre blanche. */
+.bp-affiche__retour {
+  position: absolute;
+  z-index: 1;
+  top: 14px;
+  left: 16px;
+  color: #fff;
+  background-color: rgb(12 13 15 / 0.46);
+  backdrop-filter: blur(14px) saturate(1.4);
+  -webkit-backdrop-filter: blur(14px) saturate(1.4);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.22);
+}
+.bp-affiche__titre {
+  position: absolute;
+  z-index: 1;
+  right: 20px;
+  bottom: 44px;
+  left: 20px;
+}
+
+/* ── Les avantages : une carte sous l'autre. ── */
+.bp-pile {
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+  margin: 0;
+  padding: 8px 12px 0;
+  list-style: none;
+}
+.bp-carte {
+  position: relative;
+  aspect-ratio: 4 / 5;
+  overflow: hidden;
+  border-radius: 28px;
+  background: var(--teinte);
+  color: #fff;
+}
+/* Hors de l'écran, la page en marche : elle attend. */
+.bp-carte[data-attend] {
+  opacity: 0;
+  translate: 0 12px;
+}
+/* Elle entre à l'écran : elle arrive, une fois. */
+.bp-carte[data-vue] {
+  opacity: 1;
+  translate: 0 0;
+  transition:
+    opacity 0.42s cubic-bezier(0.22, 0.61, 0.36, 1),
+    translate 0.42s cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+/* Le voile du titre, le voile du numéro, et un liseré. */
+.bp-carte::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background:
+    linear-gradient(to top, rgb(0 0 0 / 0.88) 0%, rgb(0 0 0 / 0.5) 26%, transparent 52%),
+    linear-gradient(to bottom, rgb(0 0 0 / 0.62) 0%, transparent 24%);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.09);
+}
+.bp-carte__numero {
+  position: absolute;
+  z-index: 1;
+  top: 18px;
+  left: 20px;
+  font-size: 15px;
+  line-height: 1;
+  letter-spacing: 0.04em;
+  color: #fff;
+  text-shadow: 0 1px 6px rgb(0 0 0 / 0.55);
+}
+.bp-carte__titre {
+  position: absolute;
+  z-index: 1;
+  right: 20px;
+  bottom: 22px;
+  left: 20px;
+  font-size: clamp(24px, 7.7vw, 30px);
+  line-height: 1;
+  text-wrap: balance;
+}
+
+/* ── L'offre. ── */
+.bp-offre {
+  padding: 34px 20px 0;
+  scroll-margin-top: 8px;
+}
+/* Le bloc du bouton reçoit le focus quand le bouton laisse sa place : sans contour. */
+.bp-action {
+  outline: none;
+}
+
+/* ── La barre collée : au-dessus de la barre d'onglets (bottom-nav.tsx :
+   même largeur, 62 px de haut), dans <body>. ── */
+.bp-barre {
+  position: fixed;
+  z-index: 30;
+  left: 50%;
+  bottom: calc(max(calc(env(safe-area-inset-bottom) - 4px), 14px) + 62px + 10px);
+  width: min(calc(100% - 32px), 430px);
+  translate: -50% 0;
+  transition:
+    opacity 0.2s ease,
+    visibility 0s;
+}
+.bp-barre[data-cachee] {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition:
+    opacity 0.2s ease,
+    visibility 0s 0.2s;
+}
+/* « C'est noté » dans la barre : le verre de la barre d'onglets, fumé en
+   sombre et clair en clair, lisible sur une image comme sur la page. */
+.bp-barre__note {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 52px;
+  border-radius: 999px;
+  color: var(--foreground);
+  background: rgb(28 29 33 / 0.72);
+  backdrop-filter: blur(18px) saturate(1.9);
+  -webkit-backdrop-filter: blur(18px) saturate(1.9);
+  box-shadow:
+    inset 0 0 0 0.6px rgb(255 255 255 / 0.2),
+    0 10px 24px -10px rgb(0 0 0 / 0.7);
+  -webkit-tap-highlight-color: transparent;
+}
+:root:not(.dark) .bp-barre__note {
+  background: rgb(250 250 252 / 0.84);
+  box-shadow:
+    inset 0 0 0 0.6px rgb(10 11 13 / 0.1),
+    0 10px 24px -12px rgb(10 11 13 / 0.36);
+}
+html[data-clavier] .bp-barre {
+  display: none;
+}
+
+/* Écran court : l'affiche plus basse, le premier avantage se devine dessous. */
+@media (max-height: 700px) {
+  .bp-affiche {
+    aspect-ratio: auto;
+    height: 56svh;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bp-carte,
+  .bp-carte[data-attend],
+  .bp-carte[data-vue] {
+    opacity: 1;
+    translate: 0 0;
+    transition: none;
+  }
+  .bp-barre,
+  .bp-barre[data-cachee] {
+    transition: none;
+  }
+}

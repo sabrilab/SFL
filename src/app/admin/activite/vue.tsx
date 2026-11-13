@@ -21,7 +21,8 @@
 //   3. Rétention — cohorte par cohorte, qui est là, qui relancer, les
 //      notifications (./notifications.tsx), quand et ce qu'ils font, les
 //      vidéos, Bola Agent ;
-//   4. Revenu — rien encore en euros, les packs ouverts en XP (./revenu.tsx) ;
+//   4. Revenu — rien encore en euros, les intéressés par Bola Plus
+//      (./bola-plus.tsx, 12/11), les packs ouverts en XP (./revenu.tsx) ;
 //   5. Recommandation — le parrainage (./parrainage.tsx) et qui ramène du
 //      monde (./rassembleurs.tsx) ;
 //   puis, en annexes, le détail par joueur, les emails, les accords.
