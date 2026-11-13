@@ -1,16 +1,13 @@
 "use client";
 
 // Bola Plus, enfant de Ma carte (lib/nav.ts) : la précommande (Sabri,
-// 12/11/2026). Le retour, le titre, puis l'offre et « Je suis intéressé »
-// (sfl/bola-plus.tsx). Aucun paiement.
+// 12/11/2026). Une présentation : l'affiche (le retour, le nom, les prix),
+// les avantages un par un, puis l'offre et « Je suis intéressé »
+// (sfl/bola-plus.tsx). La page a sa propre mise en page : l'affiche va d'un
+// bord à l'autre. Aucun paiement.
 
-import { OffreBolaPlus } from "@/components/sfl/bola-plus";
-import { PageRubrique } from "@/components/sfl/ma-carte/rubriques";
+import { PageBolaPlus } from "@/components/sfl/bola-plus";
 
-export default function PageBolaPlus() {
-  return (
-    <PageRubrique titre="Bola Plus">
-      <OffreBolaPlus />
-    </PageRubrique>
-  );
+export default function Page() {
+  return <PageBolaPlus />;
 }

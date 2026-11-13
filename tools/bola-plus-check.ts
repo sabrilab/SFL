@@ -20,12 +20,35 @@
 //       Plus ne cite un prestataire de paiement ; la route, la tuile de Ma
 //       carte et la section de l'admin sont branchées ; après « Annuler », rien
 //       ne reste coché, et le bouton fait 44 px.
+//   8 · les avantages (retour de Sabri, 12/11 23:08) : quatre, dans l'ordre, aux
+//       titres exacts ; un titre et rien d'autre (ni chiffre, ni prix, ni
+//       promesse) ; chaque visuel est là aux trois largeurs, en WebP, léger ;
+//       les cartes se chargent quand on y arrive, l'affiche tout de suite ;
+//       « Réduire les animations » est traité ; les prix ne sont écrits qu'une
+//       fois ; le bouton collé note comme celui de l'offre.
+//       Des mutants de la source sont rejoués : chaque garde doit les refuser.
 // Sans réseau : fetch est remplacé.
 //   npx tsx tools/bola-plus-check.ts
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
-import { ANNUEL, LIBELLE_REMISE, MENSUEL, REMISE, avecEssai, compter, interetDe, lireEssais, type LigneInteret } from "../src/lib/sfl/bola-plus";
+import {
+  AFFICHE,
+  ANNUEL,
+  AVANTAGES,
+  LARGEURS,
+  LIBELLE_REMISE,
+  MENSUEL,
+  REMISE,
+  avecEssai,
+  compter,
+  fichierVisuel,
+  interetDe,
+  lireEssais,
+  sourcesVisuel,
+  type Avantage,
+  type LigneInteret,
+} from "../src/lib/sfl/bola-plus";
 
 // 1 · L'offre.
 assert.equal(MENSUEL, 20);
@@ -322,6 +345,7 @@ async function banc() {
     "lib/sfl/bola-plus-store.ts",
     "hooks/use-bola-plus.ts",
     "components/sfl/bola-plus.tsx",
+    "components/sfl/bola-plus.css",
     "app/profil/bola-plus/page.tsx",
     "app/admin/activite/bola-plus.tsx",
   ];
@@ -338,12 +362,132 @@ async function banc() {
   assert.ok(nav.includes('["/profil/bola-plus", "Bola Plus"]'), "la page Bola Plus a son titre");
   assert.ok(src("app/profil/page.tsx").includes("<TuileBolaPlus />"), "la tuile est sur Ma carte");
   assert.ok(src("app/admin/activite/revenu.tsx").includes("<BolaPlusStats />"), "le compteur est dans Activité → Revenu");
-  assert.ok(src("app/profil/bola-plus/page.tsx").includes("<OffreBolaPlus />"), "la page montre l'offre");
+  assert.ok(src("app/profil/bola-plus/page.tsx").includes("<PageBolaPlus />"), "la route montre la page Bola Plus");
   // L'écran : après « Annuler », rien ne reste coché ; le bouton fait 44 px de haut.
   const ecran = src("components/sfl/bola-plus.tsx");
-  assert.ok(/function defaire\(\) \{\s*setChoix\(null\);\s*annuler\(\);\s*\}/.test(ecran), "« Annuler » décoche la formule");
+  assert.ok(/function defaire\(\) \{\s*onChoix\(null\);\s*annuler\(\);\s*\}/.test(ecran), "« Annuler » décoche la formule");
+  assert.ok(/<OffreBolaPlus plus=\{plus\} choix=\{choix\} onChoix=\{setChoix\} \/>/.test(ecran), "l'offre reçoit le choix de la page");
   assert.ok(/onClick=\{defaire\}[\s\S]{0,120}min-h-11/.test(ecran), "« Annuler » : une cible de 44 px");
   assert.ok(!/onClick=\{annuler\}/.test(ecran), "« Annuler » passe par defaire");
+
+  // 8 · Les avantages.
+  const TITRES = ["Tes maillots", "Tes matchs filmés", "Des cadeaux", "Les cérémonies officielles"];
+  const INTERDIT = /\d|€|%|offert|gratuit|illimit|inclus|garanti|chaque|toujours|bientôt/i;
+  const CHAMPS = ["alt", "id", "image", "numero", "teinte", "titre"];
+  const avantagesJustes = (liste: readonly Avantage[]) => {
+    assert.deepEqual(liste.map((a) => a.titre), TITRES, "quatre avantages, dans l'ordre, aux titres exacts");
+    assert.deepEqual(liste.map((a) => a.numero), ["01", "02", "03", "04"]);
+    assert.equal(new Set(liste.map((a) => a.id)).size, liste.length);
+    for (const a of liste) {
+      assert.ok(!INTERDIT.test(a.titre) && !INTERDIT.test(a.alt), `« ${a.titre} » : ni chiffre, ni prix, ni promesse`);
+      assert.ok(a.titre.length <= 28, `« ${a.titre} » : 28 caractères au plus`);
+      assert.deepEqual(Object.keys(a).sort(), CHAMPS, `« ${a.titre} » : un titre et son visuel, aucun autre texte`);
+      assert.match(a.teinte, /^#([0-9a-f]{2})\1\1$/, `« ${a.titre} » : une teinte grise`);
+    }
+  };
+  avantagesJustes(AVANTAGES);
+  assert.deepEqual([...LARGEURS], [480, 780, 1170]);
+  assert.equal(sourcesVisuel("affiche"), "/bola-plus/affiche-480.webp 480w, /bola-plus/affiche-780.webp 780w, /bola-plus/affiche-1170.webp 1170w");
+
+  // Les visuels : chacun à ses trois largeurs, en WebP (en-tête RIFF…WEBP), léger ; rien d'autre dans le dossier.
+  const PUBLIC = join(__dirname, "..", "public");
+  const POIDS: Record<number, number> = { 480: 70_000, 780: 90_000, 1170: 150_000 };
+  const visuelsLa = (images: readonly string[], dossier = PUBLIC) => {
+    let total = 0;
+    for (const image of images) {
+      for (const l of LARGEURS) {
+        const f = join(dossier, fichierVisuel(image, l));
+        assert.ok(existsSync(f), `${fichierVisuel(image, l)} manque`);
+        const o = readFileSync(f);
+        assert.ok(o.subarray(0, 4).toString("latin1") === "RIFF" && o.subarray(8, 12).toString("latin1") === "WEBP", `${fichierVisuel(image, l)} : du WebP`);
+        assert.ok(o.length <= POIDS[l], `${fichierVisuel(image, l)} : ${o.length} octets, au plus ${POIDS[l]}`);
+        total += o.length;
+      }
+    }
+    return total;
+  };
+  const IMAGES = [AFFICHE.image, ...AVANTAGES.map((a) => a.image)];
+  assert.equal(new Set(IMAGES).size, 5, "cinq visuels distincts");
+  const total = visuelsLa(IMAGES);
+  assert.ok(total <= 1_500_000, `les visuels pèsent ${total} octets, au plus 1,5 Mo`);
+  const dossier = readdirSync(join(PUBLIC, "bola-plus")).sort();
+  assert.deepEqual(dossier, IMAGES.flatMap((i) => LARGEURS.map((l) => `${i}-${l}.webp`)).sort(), "public/bola-plus : les quinze visuels, rien d'autre");
+  assert.ok(dossier.every((f) => statSync(join(PUBLIC, "bola-plus", f)).isFile()));
+
+  // La source de l'écran.
+  const style = src("components/sfl/bola-plus.css");
+  const ecranJuste = (tsx: string, css: string) => {
+    const bloc = (nom: string) => {
+      const debut = tsx.indexOf(`function ${nom}(`);
+      assert.ok(debut >= 0, `${nom} est trouvée`);
+      const fin = tsx.indexOf("\n}\n", debut);
+      return tsx.slice(debut, fin);
+    };
+    const carte = bloc("CarteAvantage");
+    const affiche = bloc("AfficheBolaPlus");
+    const barre = bloc("BarreInteret");
+    const page = bloc("PageBolaPlus");
+    // Les cartes se chargent quand on y arrive, à leur taille ; l'affiche tout de suite.
+    assert.ok(/loading="lazy"/.test(carte) && /decoding="async"/.test(carte), "les cartes d'avantage sont chargées paresseusement");
+    for (const b of [carte, affiche]) assert.ok(/width=\{LARGEUR\}/.test(b) && /height=\{HAUTEUR\}/.test(b) && /srcSet=\{sourcesVisuel\(/.test(b), "un visuel a sa largeur, sa hauteur et ses trois tailles");
+    assert.ok(!/loading=/.test(affiche) && /fetchPriority="high"/.test(affiche), "l'affiche est chargée tout de suite");
+    // Une carte : son numéro, son titre, rien d'autre d'écrit.
+    assert.ok(/\{avantage\.numero\}/.test(carte) && /\{avantage\.titre\}/.test(carte), "la carte montre le numéro et le titre");
+    assert.equal(carte.match(/<(p|h[1-6]|span)\b/g)?.length, 2, "la carte n'écrit que le numéro et le titre");
+    assert.ok(/AVANTAGES\.map\(/.test(page), "la page montre les avantages de la liste");
+    // Les prix : une seule source.
+    // (Hors commentaires ; « border-foreground/30 » est une opacité, pas un prix.)
+    const sansCommentaire = tsx.replace(/^\s*\/\/.*$/gm, "");
+    assert.ok(!/(?<![\w/[-])(20|168|30)(?![\w\]])/.test(sansCommentaire), "aucun prix écrit en dur dans l'écran");
+    assert.ok(/\{MENSUEL\}/.test(affiche) && /\{ANNUEL\}/.test(affiche) && /\{LIBELLE_REMISE\}/.test(affiche), "l'affiche lit les prix de l'offre");
+    // Le bouton, ses états.
+    for (const mot of ["Je suis intéressé", "C&apos;est noté", "Annuler"]) assert.ok(tsx.includes(mot), `« ${mot} » est toujours là`);
+    // La barre collée : le même geste que le bouton de l'offre, dans <body>, effacée quand l'offre est à l'écran.
+    assert.ok(/onNoter=\{\(\) => plus\.noter\(choix\)\}/.test(page), "la barre collée note par le noter de la page");
+    assert.ok(/onClick=\{\(\) => noter\(choix\)\}/.test(bloc("OffreBolaPlus")), "le bouton de l'offre note par le même noter");
+    assert.equal(tsx.match(/useBolaPlus\(\)/g)?.length, 2, "un seul useBolaPlus pour la page (et celui de la tuile)");
+    assert.ok(/createPortal\(/.test(barre) && /document\.body/.test(barre), "la barre collée est portée dans <body>");
+    assert.ok(/cachee=\{offreVue\}/.test(page) && /inert=\{cachee\}/.test(barre), "la barre s'efface quand l'offre est à l'écran");
+    assert.ok(/prefers-reduced-motion: reduce/.test(page), "le saut vers l'offre est immédiat avec « Réduire les animations »");
+    // La feuille de style : le mouvement réduit, le clavier.
+    const reduit = /@media \(prefers-reduced-motion: reduce\) \{([\s\S]*)\}\s*$/.exec(css)?.[1] ?? "";
+    assert.ok(/\.bp-carte \{[^}]*opacity: 1;[^}]*transition: none;/.test(reduit), "mouvement réduit : les cartes sont là d'emblée");
+    assert.ok(/\.bp-barre[^{]*\{[^}]*transition: none;/.test(reduit), "mouvement réduit : la barre ne fond pas");
+    assert.ok(/html\[data-clavier\] \.bp-barre \{\s*display: none;/.test(css), "la barre s'efface sous le clavier");
+    assert.ok(!/scroll-snap|animation:|@keyframes/.test(css), "ni accroche ni animation en boucle");
+    // Noir et blanc : aucune couleur écrite dans la feuille.
+    for (const m of css.matchAll(/rgb\((\d+) (\d+) (\d+)/g)) assert.ok(Math.max(+m[1], +m[2], +m[3]) - Math.min(+m[1], +m[2], +m[3]) <= 8, `une couleur dans la feuille : ${m[0]}`);
+    assert.ok(!/#[0-9a-f]{3,8}\b/i.test(css.replace(/#fff\b/g, "")), "pas d'autre teinte que le blanc dans la feuille");
+  };
+  ecranJuste(ecran, style);
+
+  // Les mutants : chaque garde refuse sa faute.
+  const refuse = (nom: string, essai: () => void) => {
+    let passe = true;
+    try {
+      essai();
+    } catch {
+      passe = false;
+    }
+    assert.ok(!passe, `mutant accepté : ${nom}`);
+  };
+  const mute = (nom: string, source: string, de: string | RegExp, vers: string) => {
+    const m = source.replace(de, vers);
+    assert.notEqual(m, source, `mutant sans effet : ${nom}`);
+    return m;
+  };
+  refuse("un titre changé", () => avantagesJustes(AVANTAGES.map((a, i) => (i === 0 ? { ...a, titre: "Ton kit complet" } : a))));
+  refuse("un avantage de plus", () => avantagesJustes([...AVANTAGES, { ...AVANTAGES[0], id: "x", numero: "05", titre: "Tes stats" }]));
+  refuse("une promesse chiffrée", () => avantagesJustes(AVANTAGES.map((a, i) => (i === 2 ? { ...a, titre: "Des cadeaux offerts" } : a))));
+  refuse("une description ajoutée", () => avantagesJustes(AVANTAGES.map((a) => ({ ...a, description: "Chaque saison." }) as Avantage)));
+  refuse("une image retirée", () => visuelsLa([...IMAGES, "absente"]));
+  refuse("lazy retiré", () => ecranJuste(mute("lazy", ecran, '        loading="lazy"\n', ""), style));
+  refuse("un prix en dur", () => ecranJuste(mute("prix", ecran, "{MENSUEL}&nbsp;€\n          </span>\n          / mois", "20&nbsp;€\n          </span>\n          / mois"), style));
+  refuse("la barre branchée ailleurs", () => ecranJuste(mute("barre", ecran, "onNoter={() => plus.noter(choix)}", "onNoter={voirOffre}"), style));
+  refuse("une phrase sous un titre", () => ecranJuste(mute("phrase", ecran, "{avantage.titre}</h2>", "{avantage.titre}</h2>\n      <p>Chaque saison.</p>"), style));
+  refuse("la barre jamais effacée", () => ecranJuste(mute("inert", ecran, " inert={cachee}", ""), style));
+  refuse("le mouvement réduit oublié", () => ecranJuste(ecran, mute("reduit", style, /@media \(prefers-reduced-motion: reduce\) \{[\s\S]*$/, "")));
+  refuse("une couleur dans la feuille", () => ecranJuste(ecran, mute("couleur", style, "color: rgb(255 255 255 / 0.7);", "color: rgb(255 138 76 / 0.7);")));
 
   console.log("bola-plus : ok");
 }

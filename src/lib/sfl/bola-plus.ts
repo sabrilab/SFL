@@ -11,6 +11,14 @@
 // fonction bola_plus_interesse (supabase/schema.sql) ; le magasin est dans
 // bola-plus-store.ts.
 //
+// Ce que la page montre de l'abonnement (retour de Sabri, 12/11/2026 23:08 :
+// « une meilleure mise en avant des avantages », un grand visuel par
+// avantage) : AFFICHE et AVANTAGES, plus bas. Quatre avantages, ceux que
+// Sabri a dits, dans ses mots : « ils auront des maillots », « on va filmer
+// les matchs », « ils auront des cadeaux », « cérémonies officielles ». Un
+// titre et rien d'autre : ni chiffre, ni date, ni phrase dessous. En ajouter
+// un demande son accord.
+//
 // Pur : ni React ni réseau (tools/bola-plus-check.ts).
 
 /** Le prix du mois, en euros. */
@@ -96,3 +104,40 @@ export function avecEssai(lignes: readonly LigneInteret[], essai: LigneInteret |
   if (!essai) return [...lignes];
   return [...lignes.filter((l) => l.nom !== essai.nom), essai];
 }
+
+/* ----------------------- Ce que la page montre ----------------------- */
+
+/** Les largeurs de chaque visuel (public/bola-plus/<image>-<largeur>.webp), en 4:5. */
+export const LARGEURS = [480, 780, 1170] as const;
+/** Hauteur sur largeur des visuels : 5/4. */
+export const RAPPORT_VISUEL = 5 / 4;
+
+/** Un visuel : son fichier, ce qu'il montre (lecteur d'écran), sa teinte moyenne (le fond avant l'image). */
+export interface Visuel {
+  image: string;
+  alt: string;
+  teinte: string;
+}
+
+/** Un avantage de Bola Plus : son numéro, son titre, son visuel. Rien d'autre. */
+export interface Avantage extends Visuel {
+  id: string;
+  numero: string;
+  titre: string;
+}
+
+/** L'affiche d'ouverture : le stade de Bola, la nuit. */
+export const AFFICHE: Visuel = { image: "affiche", alt: "", teinte: "#5b5b5b" };
+
+export const AVANTAGES: readonly Avantage[] = [
+  { id: "maillots", numero: "01", titre: "Tes maillots", image: "maillots", alt: "Les deux maillots de la SFL, le noir et le blanc", teinte: "#626262" },
+  { id: "matchs-filmes", numero: "02", titre: "Tes matchs filmés", image: "matchs-filmes", alt: "Une caméra au bord du terrain", teinte: "#353535" },
+  { id: "cadeaux", numero: "03", titre: "Des cadeaux", image: "cadeaux", alt: "Un écrin noir fermé, posé sur du marbre", teinte: "#3e3e3e" },
+  { id: "ceremonies", numero: "04", titre: "Les cérémonies officielles", image: "ceremonies", alt: "Un podium de marbre au centre du terrain", teinte: "#343434" },
+];
+
+/** L'adresse d'un visuel à une largeur donnée. */
+export const fichierVisuel = (image: string, largeur: number) => `/bola-plus/${image}-${largeur}.webp`;
+
+/** Le srcset d'un visuel : ses trois largeurs. */
+export const sourcesVisuel = (image: string) => LARGEURS.map((l) => `${fichierVisuel(image, l)} ${l}w`).join(", ");
