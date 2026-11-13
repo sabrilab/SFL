@@ -1,7 +1,9 @@
 // La page publique getbola.app/sfl (components/sfl/page-sfl, 12/11/2026) : ce
-// que le lien de la bio Instagram ouvre doit rester ouvert, juste et sans
-// joueur réel. Ce que ce banc tient (durci le 12/11 après un contrôle par
-// mutants : il en laissait passer 23 sur 35) :
+// que le lien de la bio Instagram ouvre doit rester ouvert, juste, et ne
+// montrer que des joueurs qui ont dit oui (depuis le 13/11, la page montre de
+// vrais joueurs : l'instantané, lib/sfl/page-sfl-instantane.ts, écrit par
+// tools/page-sfl-instantane.ts). Ce que ce banc tient (durci le 12/11 après
+// un contrôle par mutants : il en laissait passer 23 sur 35) :
 //   1 · la porte : estPublique (lib/sfl/routes-publiques.ts) ouvre /sfl et les
 //       adresses prévues, rien d'autre (chaque dossier de src/app est essayé) ;
 //       /sfl est comparée en entier partout (la porte, la barre d'onglets,
@@ -18,14 +20,21 @@
 //       /inscription, /connexion, /confidentialite et / ; aucun lien vers
 //       l'extérieur ; la visite n'est notée qu'à l'étape « site », et jamais
 //       pour un joueur connecté ;
-//   5 · la page n'importe que ce qui est sur une liste : ni Supabase, ni la
-//       saison, ni un hook de joueurs, ni une carte de joueur réel ;
+//   5 · la page n'importe que ce qui est sur une liste (l'instantané compris) :
+//       ni Supabase, ni la saison, ni un hook de joueurs, ni un composant de
+//       carte ; ses cartes sont des images de l'instantané, rien d'autre ;
 //   6 · aucun nom de l'effectif embarqué n'apparaît, en mot entier, dans ses
-//       textes ni dans ses sources ;
+//       textes ni dans ses sources ; dans l'instantané, tout nom (des blocs,
+//       des textes de remplacement, des fichiers) est dans ACCORDS, et ACCORDS
+//       ne tient que les joueurs montrés : un joueur absent d'ACCORDS fait
+//       échouer le banc (preuve par mutants) ; les règles de l'outil
+//       (empechement, podiumSansTrou) sont essayées sur des cas ;
 //   7 · ses textes : ni point d'exclamation, ni émoji, ni mot rejeté ; aucun
 //       nombre hors de ceux de la page ; aucun nom propre hors d'une liste
 //       (donc aucun lieu que Lille, aucun prénom) ; aucun texte écrit dans le
-//       composant, ni entre deux balises, ni en chaîne ;
+//       composant, ni entre deux balises, ni en chaîne ; les nombres des
+//       joueurs (notes, points, places, score, journée) ne viennent que de
+//       l'instantané, et sont plausibles ;
 //   8 · ses faits suivent le code : le barème (entryPP), la révélation
 //       (REGLES_REVELATION), le vendredi 19 h (equipesVisibles), la réponse
 //       jusqu'à vendredi (reponsesOuvertes), le lundi de la convocation
@@ -40,9 +49,17 @@
 //       300 ko, à l'empreinte de l'image écrite par l'outil, avec son texte de
 //       remplacement ;
 //  10 · le guide d'installation rouvre, hors de l'app hôte, la page affichée
-//       avec la source d'arrivée du visiteur (adresseSortie).
-// Ce qu'il ne tient pas : le rendu (les captures), et ce qu'une chaîne
-// construite à l'exécution pourrait écrire dans la page.
+//       avec la source d'arrivée du visiteur (adresseSortie) ;
+//  11 · l'instantané : chaque image existe dans public/sfl/cartes, a
+//       l'empreinte, les dimensions et le poids écrits par l'outil ; aucun
+//       fichier orphelin ; aucun « @ », identifiant de compte ou adresse ; la
+//       date de lecture est écrite et pas dans le futur ; les blocs suivent
+//       les règles (pas de trou dans un podium, dix joueurs dans la compo,
+//       un titre par édition au plus, une carte qui monte).
+// Ce qu'il ne tient pas : le rendu (les captures), ce qu'une chaîne
+// construite à l'exécution pourrait écrire dans la page, et l'état de la base
+// aujourd'hui : un accord retiré depuis la lecture, c'est
+// « tools/page-sfl-instantane.ts --verifier » qui le voit.
 //   npx tsx tools/page-sfl-check.ts
 import assert from "node:assert/strict";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
@@ -69,6 +86,7 @@ import {
   type TuileBareme,
 } from "../src/lib/sfl/page-sfl";
 import { REGLES_REVELATION } from "../src/lib/sfl/revelation";
+import { ACCORDS, CARTE_MONTEE, COMPO, LU_LE, PODIUMS, TITRES, type ImageCarte } from "../src/lib/sfl/page-sfl-instantane";
 import { CHEMIN_SFL, PUBLIC_ROUTES, estPageSfl, estPageSflMalEcrite, estPublique } from "../src/lib/sfl/routes-publiques";
 import { entryPP } from "../src/lib/sfl/saisie/engine";
 import { SERIE, evoluer } from "../src/lib/sfl/saisie/evolution";
@@ -77,6 +95,7 @@ import type { MatchEntry, Saison } from "../src/lib/sfl/saisie/types";
 import { CATEGORIES_VOTE } from "../src/lib/sfl/votes";
 import { sigleSfl } from "./sigle-sfl";
 import { APERCU_LIEN, composer, empreinte, sigleSerre } from "./sigle-sfl-exports";
+import { empechement, podiumSansTrou, slug, type LigneJoueur } from "./page-sfl-instantane";
 
 const RACINE = join(__dirname, "..");
 const lire = (f: string) => readFileSync(join(RACINE, f), "utf8");
@@ -98,6 +117,8 @@ const PAGE = "src/components/sfl/page-sfl/page-sfl.tsx";
 const TEXTES = "src/lib/sfl/page-sfl.ts";
 const ROUTES = "src/lib/sfl/routes-publiques.ts";
 const ALT = "src/app/sfl/opengraph-image.alt.txt";
+const INSTANTANE = "src/lib/sfl/page-sfl-instantane.ts";
+const CARTES = "public/sfl/cartes";
 const SOURCES = [ROUTE, PAGE, TEXTES, ROUTES, ALT];
 
 // 1 · La porte.
@@ -222,7 +243,7 @@ verifier(
 );
 const liens = [...page.matchAll(/href=(\{[^}]*\}|"[^"]*")/g)].map((m) => m[1]).sort();
 assert.deepEqual(liens, ["{LIENS_SFL.app}", "{LIENS_SFL.confidentialite}", "{bouton.vers}"], `4 · les liens de la page ont changé : ${liens.join(" ")}`);
-for (const f of SOURCES) {
+for (const f of [...SOURCES, INSTANTANE]) {
   verifier(!/https?:\/\//.test(lire(f)), `4 · ${f} écrit une adresse entière`);
   verifier(!/target=|window\.open|<a\s/.test(lire(f)), `4 · ${f} ouvre un lien hors de l'app`);
 }
@@ -234,16 +255,13 @@ const imports = (source: string) => [...source.matchAll(/^import\s[^;]*?from\s+"
 assert.deepEqual(
   imports(page),
   [
-    "@/components/sfl/bola-card",
-    "@/components/sfl/dos-carte",
     "@/components/sfl/finitions-carte",
     "@/components/sfl/marques-carte",
-    "@/hooks/use-media-query",
     "@/hooks/use-session",
     "@/lib/sfl/auth/session",
-    "@/lib/sfl/carte-neutre",
     "@/lib/sfl/maillots",
     "@/lib/sfl/page-sfl",
+    "@/lib/sfl/page-sfl-instantane",
     "@/lib/sfl/site-visites",
     "@/lib/utils",
     "lucide-react",
@@ -255,11 +273,14 @@ assert.deepEqual(
 verifier(compte(/\bimport\b/g) === imports(page).length && !/\brequire\(|\bfetch\(|import\(/.test(page), "5 · la page charge quelque chose hors de ses imports");
 assert.deepEqual(imports(lire(TEXTES)), ["./routes-publiques", "next"], "5 · les textes de la page importent autre chose que le type des métadonnées et l'adresse de la page");
 assert.deepEqual(imports(lire(ROUTES)), [], "5 · les adresses ouvertes importent quelque chose");
+assert.deepEqual(imports(lire(INSTANTANE)), [], "5 · l'instantané importe quelque chose : il ne tient que des données");
 assert.deepEqual(imports(route), ["@/components/sfl/page-sfl/page-sfl", "@/lib/sfl/page-sfl", "next"], "5 · la route importe autre chose que la page et ses métadonnées");
-for (const f of [ROUTE, PAGE, TEXTES])
-  for (const interdit of ["useSeason", "useMyPlayer", "usePlayers", "supabase", "PlayerCard", "MiniCarte", "CarteDe", "photoParNom", "seedSaison"])
+for (const f of [ROUTE, PAGE, TEXTES, INSTANTANE])
+  for (const interdit of ["useSeason", "useMyPlayer", "usePlayers", "supabase", "PlayerCard", "MiniCarte", "CarteDe", "photoParNom", "seedSaison", "BolaCard", "CartePhoto", "DosCarte", "carteNeutre", "Card3D"])
     verifier(!new RegExp(`\\b${interdit}\\b`).test(lire(f)), `5 · ${f} lit ${interdit}`);
-verifier(!/\bphoto=|<img\b|<Image\b|\.webp|\.jpe?g/.test(page), "5 · la page porte une photo ou une image");
+// Les cartes : des images de l'instantané, posées par un seul composant ; aucune autre photo ni image.
+verifier(!/\bphoto=|<Image\b|\.webp|\.jpe?g|\.png/.test(page), "5 · la page porte une photo ou une image hors de l'instantané");
+verifier(compte(/<img\b/g) === 1 && /<img\s+src=\{image\.src\}\s+alt=\{image\.lue\}/.test(page), "5 · une image de la page ne vient pas de l'instantané (Carte)");
 
 // 6 · Aucun nom de l'effectif, en mot entier (les lettres accentuées comptent).
 const motEntier = (mot: string) => new RegExp(`(?<![\\p{L}\\p{N}])${mot.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![\\p{L}\\p{N}])`, "iu");
@@ -272,6 +293,79 @@ for (const nom of effectif) {
 }
 // La preuve que le contrôle voit : un nom glissé dans une phrase est trouvé.
 assert.ok(motEntier(effectif[0]).test(`Avec ${effectif[0]}.`), "6 · le contrôle des noms ne trouve plus rien");
+
+// L'instantané : chaque joueur montré est dans ACCORDS, et ACCORDS ne tient que les joueurs montrés.
+interface Instantane {
+  accords: readonly string[];
+  compo: { camps: readonly { joueurs: readonly { nom: string; image: ImageCarte }[] }[] };
+  carte: { nom: string; depart: ImageCarte; officielle: ImageCarte };
+  podiums: readonly { places: readonly { nom: string; image: ImageCarte }[] }[];
+  titres: { cartes: readonly { nom: string; petite: ImageCarte; complete: ImageCarte }[] };
+}
+const INST: Instantane = { accords: ACCORDS, compo: COMPO, carte: CARTE_MONTEE, podiums: PODIUMS, titres: TITRES };
+/** Chaque carte de l'instantané : le nom du joueur et son image. */
+const cartesDe = (i: Instantane) => [
+  ...i.compo.camps.flatMap((c) => c.joueurs.map((j) => ({ nom: j.nom, image: j.image }))),
+  { nom: i.carte.nom, image: i.carte.depart },
+  { nom: i.carte.nom, image: i.carte.officielle },
+  ...i.podiums.flatMap((p) => p.places.map((x) => ({ nom: x.nom, image: x.image }))),
+  ...i.titres.cartes.flatMap((t) => [
+    { nom: t.nom, image: t.petite },
+    { nom: t.nom, image: t.complete },
+  ]),
+];
+/** Ce qui cloche dans les noms d'un instantané (vide : rien). */
+function fautesDeNoms(i: Instantane): string[] {
+  const f: string[] = [];
+  const accords = new Set(i.accords);
+  const montres = new Set(cartesDe(i).map((c) => c.nom));
+  for (const c of cartesDe(i)) {
+    if (!accords.has(c.nom)) f.push(`6 · « ${c.nom} » est montré sans être dans ACCORDS`);
+    if (!c.image.lue.startsWith(c.nom)) f.push(`6 · le texte de remplacement « ${c.image.lue} » ne nomme pas « ${c.nom} »`);
+    if (!c.image.src.startsWith(`/sfl/cartes/${slug(c.nom)}-`)) f.push(`6 · l'image ${c.image.src} ne porte pas le nom de « ${c.nom} »`);
+  }
+  for (const a of accords) if (!montres.has(a)) f.push(`6 · « ${a} » est dans ACCORDS sans être montré`);
+  if (accords.size !== i.accords.length) f.push("6 · un nom est deux fois dans ACCORDS");
+  return f;
+}
+fautes.push(...fautesDeNoms(INST));
+// La preuve par mutants : un joueur ajouté à un bloc, un nom de remplacement changé, une image d'un autre, un nom de trop.
+const intrus = "Intrus";
+const mutants: [string, Instantane][] = [
+  ["un joueur de plus dans un podium", { ...INST, podiums: [{ places: [...INST.podiums[0].places, { nom: intrus, image: { ...INST.podiums[0].places[0].image, lue: intrus, src: `/sfl/cartes/${slug(intrus)}-d1.webp` } }] }, ...INST.podiums.slice(1)] }],
+  ["un autre nom sur la carte qui monte", { ...INST, carte: { ...INST.carte, nom: intrus } }],
+  ["le texte de remplacement d'un autre", { ...INST, titres: { cartes: INST.titres.cartes.map((t, k) => (k === 0 ? { ...t, complete: { ...t.complete, lue: `${intrus}, carte MVP` } } : t)) } }],
+  ["l'image d'un autre", { ...INST, compo: { camps: INST.compo.camps.map((c, k) => (k === 0 ? { joueurs: c.joueurs.map((j, n) => (n === 0 ? { ...j, image: { ...j.image, src: `/sfl/cartes/${slug(intrus)}-compo.webp` } } : j)) } : c)) } }],
+  ["un nom de trop dans ACCORDS", { ...INST, accords: [...INST.accords, intrus] }],
+];
+for (const [quoi, m] of mutants) assert.ok(fautesDeNoms(m).length > 0, `6 · le contrôle de l'instantané laisse passer : ${quoi}`);
+// Hors des noms d'ACCORDS (et de leurs fichiers), aucun nom de l'effectif dans l'instantané.
+let resteInstantane = lire(INSTANTANE);
+for (const a of ACCORDS) resteInstantane = resteInstantane.split(a).join(" ").split(slug(a)).join(" ");
+for (const nom of effectif) verifier(!motEntier(nom).test(resteInstantane), `6 · un nom de l'effectif hors d'ACCORDS dans ${INSTANTANE} : « ${nom} »`);
+// Les règles de l'outil, sur des cas : qui passe, et le podium sans trou.
+const oui: LigneJoueur = { nom: "a", affiche: "A", valide: true, joue: true, arbitre: false, horsApp: true, version: "2026-10-24", majeur: true };
+verifier(empechement(oui, true) === null, "6 · un joueur avec l'accord, majeur, photo : refusé");
+for (const [quoi, j, photo] of [
+  ["sans accord", { ...oui, horsApp: false }, true],
+  ["sans ligne d'accord", { ...oui, horsApp: null }, true],
+  ["accord périmé", { ...oui, version: "2026-10-01" }, true],
+  ["mineur", { ...oui, majeur: false }, true],
+  ["sans date de naissance", { ...oui, majeur: null }, true],
+  ["compte en attente", { ...oui, valide: false }, true],
+  ["arbitre", { ...oui, arbitre: true }, true],
+  ["membre qui ne joue pas", { ...oui, joue: false }, true],
+  ["masqué", { ...oui, nom: "Sabri" }, true],
+  ["place X1", { ...oui, nom: "X1" }, true],
+  ["sans photo du studio", oui, false],
+] as const)
+  verifier(empechement(j as LigneJoueur, photo) !== null, `6 · empechement laisse passer un joueur ${quoi}`);
+verifier(empechement(undefined, true) !== null, "6 · empechement laisse passer un compte parti");
+const P = (nom: string, place: number) => ({ nom, place, points: 10 - place });
+const avec = (...noms: string[]) => (n: string) => noms.includes(n);
+verifier(pareil(podiumSansTrou([P("a", 1), P("b", 2), P("c", 3), P("d", 3)], avec("a", "b", "c")).map((x) => x.nom), ["a", "b"]), "6 · un 3e ex æquo sans accord ne coupe plus le podium");
+verifier(pareil(podiumSansTrou([P("a", 1), P("b", 2), P("c", 3)], avec("a", "c")).map((x) => x.nom), ["a"]), "6 · le podium saute un 2e sans accord");
+verifier(pareil(podiumSansTrou([P("a", 1), P("b", 1), P("c", 3), P("d", 4)], avec("a", "b", "c", "d")).map((x) => x.nom), ["a", "b", "c"]), "6 · le podium va au-delà de la 3e place");
 
 // 7 · Les textes.
 const INTERDITS = [
@@ -386,11 +480,9 @@ verifier(
   `8 · « ${jusqua.jour} » ne suit plus reponsesOuvertes (ouvertes le vendredi soir, closes le samedi)`
 );
 // La carte : 75 partout, comme celle d'un compte neuf.
-const neutre = carteNeutre(CARTE_SFL.nom);
+const neutre = carteNeutre("x");
 verifier(Object.values(neutre.stats).every((s) => s === CARTE_SFL.note), `8 · la carte neutre n'est plus à ${CARTE_SFL.note} partout`);
-verifier(CARTE_SFL.phrases[0].includes(String(CARTE_SFL.note)) && CARTE_SFL.lue.includes(String(CARTE_SFL.note)), "8 · la phrase de la carte ne dit plus sa note de départ");
-verifier(/carteNeutre\(CARTE_SFL\.nom\)/.test(page) && /overall=\{CARTE_SFL\.note\}/.test(page), "8 · la page ne montre plus la carte neutre");
-verifier(/<BolaCard name=\{TOI\.name\} position=\{TOI\.poste\} overall=\{CARTE_SFL\.note\} stats=\{TOI\.stats\} edition=\{edition\} size=\{taille\} \/>/.test(page) && compte(/<BolaCard\b/g) === 1, "8 · une carte de la page n'est plus celle d'un compte neuf");
+verifier(CARTE_SFL.phrases[0].includes(String(CARTE_SFL.note)), "8 · la phrase de la carte ne dit plus sa note de départ");
 
 // Ce qui fait monter chaque stat : la saison rejouée par evoluer, un joueur seul, parti de la carte neutre.
 const base = seedSaison();
@@ -530,5 +622,61 @@ verifier(
   "10 · le guide d'installation ne rouvre plus la page affichée avec la source d'arrivée (bouton et lien copié)"
 );
 
+// 11 · L'instantané : les images, la lecture, les règles des blocs.
+const images = cartesDe(INST).map((c) => c.image);
+/** La largeur et la hauteur d'un WebP (VP8X, VP8L ou VP8), lues dans son en-tête. */
+function tailleWebp(b: Buffer): [number, number] | null {
+  if (b.toString("latin1", 0, 4) !== "RIFF" || b.toString("latin1", 8, 12) !== "WEBP") return null;
+  const bloc = b.toString("latin1", 12, 16);
+  if (bloc === "VP8X") return [1 + b.readUIntLE(24, 3), 1 + b.readUIntLE(27, 3)];
+  if (bloc === "VP8L") {
+    const v = b.readUInt32LE(21);
+    return [1 + (v & 0x3fff), 1 + ((v >> 14) & 0x3fff)];
+  }
+  if (bloc === "VP8 ") return [b.readUInt16LE(26) & 0x3fff, b.readUInt16LE(28) & 0x3fff];
+  return null;
+}
+const servis = new Set(images.map((i) => i.src));
+verifier(servis.size === images.length, "11 · deux cartes de l'instantané partagent une image");
+let poids = 0;
+for (const i of images) {
+  const f = join(RACINE, "public", i.src);
+  if (!existsSync(f)) {
+    verifier(false, `11 · l'image ${i.src} manque`);
+    continue;
+  }
+  const b = readFileSync(f);
+  poids += b.length;
+  verifier(empreinte(b) === i.sha256, `11 · ${i.src} n'est plus l'image écrite par l'outil (empreinte)`);
+  verifier(b.length === i.octets && b.length <= 160_000, `11 · ${i.src} pèse ${b.length} octets (écrit : ${i.octets}, 160 ko au plus)`);
+  verifier(pareil(tailleWebp(b), [i.largeur, i.hauteur]), `11 · ${i.src} ne fait pas ${i.largeur} × ${i.hauteur} (WebP)`);
+}
+verifier(poids <= 1_500_000, `11 · les cartes pèsent ${poids} octets (1,5 Mo au plus)`);
+const fichiers = existsSync(join(RACINE, CARTES)) ? readdirSync(join(RACINE, CARTES)) : [];
+for (const f of fichiers) verifier(servis.has(`/sfl/cartes/${f}`), `11 · ${CARTES}/${f} n'est cité par aucune carte (orphelin)`);
+const texteInstantane = lire(INSTANTANE);
+verifier(!/@/.test(texteInstantane), "11 · l'instantané écrit un « @ » (une adresse ?)");
+verifier(!/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i.test(texteInstantane), "11 · l'instantané écrit un identifiant de compte");
+verifier(!/pseudo|username|naissance|user_id/i.test(texteInstantane.replace(/^\/\/.*$/gm, "")), "11 · l'instantané écrit un pseudo, une date de naissance ou un compte");
+const lu = Date.parse(LU_LE);
+verifier(/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/.test(LU_LE) && lu <= Date.now(), `11 · la date de lecture (${LU_LE}) manque ou est dans le futur`);
+// Les règles des blocs.
+const noteOk = (n: number) => Number.isInteger(n) && n >= 40 && n <= 99;
+verifier(pareil(COMPO.camps.map((c) => c.camp), ["Noirs", "Blancs"]) && COMPO.camps.every((c) => c.joueurs.length === 5), "11 · la compo n'est plus Noirs contre Blancs, cinq contre cinq");
+verifier(new Set(COMPO.camps.flatMap((c) => c.joueurs.map((j) => j.nom))).size === 10, "11 · un joueur est deux fois dans la compo");
+verifier(COMPO.camps.every((c) => Number.isInteger(c.score) && c.score >= 0 && c.joueurs.every((j) => noteOk(j.note))), "11 · un score ou une note de la compo n'est pas plausible");
+for (const m of [COMPO, TITRES])
+  verifier(Number.isInteger(m.journee) && m.journee >= 1 && Number.isInteger(m.match) && m.match >= 1 && /^\d{1,2} [a-zéû]+\.?$/.test(m.date), `11 · la journée « J${m.journee} · ${m.date} · Match ${m.match} » n'est pas lisible`);
+verifier(CARTE_MONTEE.a > CARTE_MONTEE.de && noteOk(CARTE_MONTEE.a) && noteOk(CARTE_MONTEE.de), "11 · la carte montrée ne monte pas");
+verifier(pareil(PODIUMS.map((p) => p.division), ["D1", "D2", "D3"]), "11 · les podiums ne sont plus D1, D2, D3");
+for (const p of PODIUMS) {
+  // Pas de trou : la première place est 1, puis chaque place suit le nombre de joueurs devant.
+  const ok = p.places.every((x, k) => x.place <= 3 && x.place === (k === 0 ? 1 : p.places[k - 1].place === x.place ? x.place : k + 1));
+  verifier(ok && p.places.every((x, k) => Number.isInteger(x.points) && x.points >= 0 && (k === 0 || x.points <= p.places[k - 1].points)), `11 · le podium ${p.division} a un trou, ou ses points ne descendent pas`);
+}
+const editions = TITRES.cartes.map((c) => c.edition);
+verifier(new Set(editions).size === editions.length && editions.every((e) => ["mvp", "impact", "def"].includes(e)), "11 · un titre est deux fois, ou n'est pas MVP, Impact, Défensive");
+verifier(new Set(TITRES.cartes.map((c) => c.nom)).size === TITRES.cartes.length && TITRES.cartes.every((c) => noteOk(c.note)), "11 · deux titres au même joueur, ou une note pas plausible");
+
 assert.equal(fautes.length, 0, `\n${fautes.join("\n")}`);
-console.log(`page-sfl : ok (${textes.length} textes, ${effectif.length} noms cherchés, ${dossiers.length} adresses essayées à la porte, ${CLASSEMENT_SFL.bareme.length} points du barème, ${CARTE_SFL.lignes.length} gestes rejoués)`);
+console.log(`page-sfl : ok (${textes.length} textes, ${effectif.length} noms cherchés, ${dossiers.length} adresses essayées à la porte, ${CLASSEMENT_SFL.bareme.length} points du barème, ${CARTE_SFL.lignes.length} gestes rejoués, ${ACCORDS.length} joueurs et ${images.length} images dans l'instantané, ${mutants.length} mutants refusés)`);

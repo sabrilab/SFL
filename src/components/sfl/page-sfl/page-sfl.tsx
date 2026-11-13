@@ -13,16 +13,25 @@
 // ligue s'ouvre ensuite depuis la Map (« Rejoindre la ligue »). La page ne
 // promet donc pas de jouer dimanche.
 //
-// Ce qu'elle montre :
-//   · aucun joueur réel, ni nom, ni photo, ni score : la page est statique,
-//     elle ne peut ni vérifier un accord « hors de l'app » ni suivre son
-//     retrait. Les quatre cartes sont celle d'un compte neuf, au nom de
-//     « Toi », à 75 partout (carte-neutre.ts) : la carte de saison, et les
-//     trois cartes à titre. Elle ne lit ni la saison ni le joueur connecté ;
-//   · du noir et blanc, sauf ces trois cartes (l'or, le rouge et le bleu
-//     leur sont réservés) ; les tuiles Noirs et Blancs gardent les couleurs
-//     des maillots dans les deux modes : celle qui a la couleur de la page
-//     (Noirs en sombre, Blancs en clair) porte un liseré plus net ;
+// Ce qu'elle montre (13/11, retour sur bola-app#6 : « Si sfl avec vrais joueurs ») :
+//   · les vraies cartes de la ligue, et seulement celles des joueurs dont
+//     l'accord hors-app était enregistré « oui » à la lecture de la base :
+//     un vrai match (ses dix joueurs, au maillot de leur camp, et son score),
+//     la carte d'un joueur avant et après une mise à jour, le haut de chaque
+//     division du Pépite d'Or, et les trois titres d'un vrai match. Tout
+//     vient de l'instantané (lib/sfl/page-sfl-instantane.ts, écrit et
+//     contrôlé par tools/page-sfl-instantane.ts) : la page reste statique,
+//     elle ne lit ni la base, ni la saison, ni le joueur connecté. Chaque
+//     carte est une image (public/sfl/cartes), dessinée par le vrai
+//     composant de l'app ; la carte est un objet, la même en clair et en
+//     sombre. Hiérarchie de l'app : grande (la carte complète) pour la carte
+//     qui a monté et, dès la tablette, les trois titres ; moyenne (la carte
+//     photo) pour les podiums, la carte de départ et les titres sur
+//     téléphone ; petite (la pastille) pour la compo ;
+//   · du noir et blanc, sauf les trois cartes à titre (l'or, le rouge et le
+//     bleu leur sont réservés) ; les tuiles Noirs et Blancs gardent les
+//     couleurs des maillots dans les deux modes : celle qui a la couleur de
+//     la page (Noirs en sombre, Blancs en clair) porte un liseré plus net ;
 //   · le thème de l'app, clair ou sombre : rien que des jetons.
 // Les textes sont dans lib/sfl/page-sfl.ts, que relit tools/page-sfl-check.ts.
 //
@@ -32,8 +41,11 @@
 // pas traduite, et un visiteur d'un pays arabophone recevrait sinon une mise
 // en page inversée (LangueDocument).
 //
-// Chaque carte est une image pour un lecteur d'écran et pour un moteur : son
-// microtexte (2 600 signes) n'est ni lu, ni repris dans un extrait.
+// Chaque carte est une image, avec son texte de remplacement (son nom, puis
+// son titre) ; les pastilles de la compo, dont le nom est écrit à côté, se
+// taisent. Les images se chargent à l'approche (loading="lazy") ; celle qui
+// n'est pas montrée à cette largeur (la carte compacte ou complète d'un
+// titre) ne se charge pas.
 //
 // Trois mises en page, sans défilement horizontal dès 320 px : le téléphone
 // (une colonne, 20 px de marge), la tablette (la même, 560 px au centre), et
@@ -43,10 +55,9 @@
 // garder leurs lignes. Le haut tient dans le premier écran : sur ordinateur,
 // ses marges, son sigle et son titre suivent la hauteur de la fenêtre (un
 // portable de 1366 × 657 montre les boutons) ; sur un téléphone couché (moins
-// de 480 px de haut), il se resserre. Une carte reçoit sa taille en nombre : les trois cartes à
-// titre prennent la largeur de leur rangée (complètes dès qu'elle leur donne
-// 170 px, sur tablette et ordinateur), la carte de saison celle de sa colonne
-// sur ordinateur (useLargeur).
+// de 480 px de haut), il se resserre. Les cartes prennent leur taille de la
+// feuille de style : les trois titres en compactes sur téléphone, complètes
+// dès 720 px (la rangée leur donne alors 170 px et plus).
 //
 // Mouvement : sous la ligne de flottaison, chaque section monte de 12 px en
 // fondu, une seule fois. L'état caché n'est posé qu'après le montage : le HTML
@@ -66,15 +77,11 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowUp, Lock } from "lucide-react";
-import { BolaCard, type BolaEdition } from "@/components/sfl/bola-card";
-import { DosCarte } from "@/components/sfl/dos-carte";
-import { LOGO_BOLA, RAYON_CARTE, matiereDe } from "@/components/sfl/finitions-carte";
+import { ArrowRight, ArrowUp, Lock } from "lucide-react";
+import { LOGO_BOLA } from "@/components/sfl/finitions-carte";
 import { SigleSfl } from "@/components/sfl/marques-carte";
-import { useMediaQuery } from "@/hooks/use-media-query";
 import { useSession } from "@/hooks/use-session";
 import { getSession } from "@/lib/sfl/auth/session";
-import { carteNeutre } from "@/lib/sfl/carte-neutre";
 import { MAILLOTS } from "@/lib/sfl/maillots";
 import {
   BOUTONS_SFL,
@@ -87,25 +94,14 @@ import {
   LIENS_SFL,
   SEMAINE_SFL,
   TITRES_SFL,
+  etiquetteMatch,
+  placeEtPoints,
   pointsLisibles,
 } from "@/lib/sfl/page-sfl";
+import { CARTE_MONTEE, COMPO, PODIUMS, TITRES, type ImageCarte } from "@/lib/sfl/page-sfl-instantane";
 import { noterSite } from "@/lib/sfl/site-visites";
 import { cn } from "@/lib/utils";
 
-/** La carte d'un compte neuf : 75 partout, sans visage. */
-const TOI = carteNeutre(CARTE_SFL.nom);
-
-/** La largeur d'une carte à la taille 1, et le rapport de ses côtés. */
-const CARTE = { l: 254, rapport: 1656 / 1024 };
-/**
- * Les trois cartes à titre sur une rangée : elles tiennent la largeur de la
- * colonne (0,43 sur un écran de 390). `complete` : la largeur où la carte
- * montre ses stats (palierCarte, bola-card.tsx) ; dès que la rangée la donne
- * (une tablette), les cartes sont complètes, jusqu'à leur taille d'ordinateur.
- * En dessous, elles restent petites (`petite`) : la carte sans stats, grande,
- * paraît vide. L'écart entre elles.
- */
-const RANGEE = { taille: 0.43, petite: 0.5, complete: 170, grande: 0.8, ecart: 10 };
 /** La hauteur de la barre du haut. */
 const BARRE = 52;
 
@@ -143,19 +139,6 @@ const OMBRE = {
 const APPARAIT =
   "transition-[opacity,translate] duration-[400ms] ease-out data-[cache]:translate-y-3 data-[cache]:opacity-0 motion-reduce:transition-none";
 
-/** La largeur d'un bloc, suivie : `null` avant le montage. */
-function useLargeur(ref: React.RefObject<HTMLElement | null>): number | null {
-  const [largeur, setLargeur] = useState<number | null>(null);
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const ro = new ResizeObserver(([e]) => setLargeur(e.contentRect.width));
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, [ref]);
-  return largeur;
-}
-
 /** Les phrases d'une section : la première à l'encre, les suivantes en retrait. */
 function Phrases({ phrases, className }: { phrases: readonly string[]; className?: string }) {
   return (
@@ -169,24 +152,26 @@ function Phrases({ phrases, className }: { phrases: readonly string[]; className
   );
 }
 
-/** Une vraie carte, montrée comme une image : ni son microtexte ni ses chiffres ne sont lus. */
-function Carte({
-  lue,
-  edition = "base",
-  taille,
-  className,
-}: {
-  lue: string;
-  edition?: BolaEdition;
-  taille: number;
-  className?: string;
-}) {
+/**
+ * Une vraie carte, en image (l'instantané) : sa largeur vient de la classe,
+ * sa hauteur de son rapport. `muette` : le nom est écrit à côté, l'image se tait.
+ */
+function Carte({ image, className, muette }: { image: ImageCarte; className?: string; muette?: boolean }) {
   return (
-    <div role="img" aria-label={lue} data-nosnippet className={className}>
-      <div aria-hidden style={{ width: CARTE.l * taille, height: CARTE.l * taille * CARTE.rapport }}>
-        <BolaCard name={TOI.name} position={TOI.poste} overall={CARTE_SFL.note} stats={TOI.stats} edition={edition} size={taille} />
-      </div>
-    </div>
+    // Une image déjà à sa taille (WebP, 3 px par px affiché) : l'optimiseur de Next n'y ajouterait rien.
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={image.src}
+      alt={image.lue}
+      aria-hidden={muette || undefined}
+      width={image.largeur}
+      height={image.hauteur}
+      loading="lazy"
+      decoding="async"
+      draggable={false}
+      data-nosnippet
+      className={cn("block h-auto select-none", className)}
+    />
   );
 }
 
@@ -231,14 +216,9 @@ function Boutons({
 export function PageSfl() {
   const session = useSession();
   const connecte = !!session?.server && !session.enAttente;
-  const ordinateur = useMediaQuery("(min-width: 960px)");
   const cadre = useRef<HTMLDivElement>(null);
   const boutonsHaut = useRef<HTMLDivElement>(null);
   const boutonsFin = useRef<HTMLDivElement>(null);
-  const rangee = useRef<HTMLDivElement>(null);
-  const largeurRangee = useLargeur(rangee);
-  const colonneCarte = useRef<HTMLDivElement>(null);
-  const largeurColonneCarte = useLargeur(colonneCarte);
   const [barre, setBarre] = useState(false);
 
   // Le haut de l'entonnoir : un visiteur de plus sur getbola.app. Un joueur
@@ -296,21 +276,11 @@ export function PageSfl() {
     };
   }, []);
 
-  // Les trois cartes à titre : complètes sur ordinateur, et dès que la rangée
-  // leur donne la largeur d'une carte complète (une tablette) ; sinon petites,
-  // à la largeur de la colonne.
-  const place = largeurRangee ? (largeurRangee - RANGEE.ecart * 2) / 3 : null;
-  const titresComplets = ordinateur || (place !== null && place >= RANGEE.complete);
-  const tailleTitre = ordinateur
-    ? RANGEE.grande
-    : place === null
-      ? RANGEE.taille
-      : Math.min(titresComplets ? RANGEE.grande : RANGEE.petite, place / CARTE.l);
-  // La carte de saison : 203 px sur téléphone ; sur ordinateur, 317 px au plus, et
-  // moins dans une colonne étroite (le dos dépasse d'elle d'un tiers de sa largeur).
-  const tailleCarte = ordinateur
-    ? Math.max(0.8, Math.min(1.25, largeurColonneCarte ? largeurColonneCarte / 1.35 / CARTE.l : 1.25))
-    : 0.8;
+  // Les trois titres de l'instantané, dans l'ordre des éditions ; un titre retiré resserre la rangée.
+  const titres = TITRES_SFL.cartes.flatMap((e) => {
+    const carte = TITRES.cartes.find((c) => c.edition === e.edition);
+    return carte ? [{ ...carte, titre: e.nom }] : [];
+  });
 
   return (
     <div
@@ -423,28 +393,41 @@ export function PageSfl() {
               {DIMANCHE_SFL.titre}
             </h2>
           </div>
-          <div
-            aria-hidden
-            className="relative mt-4 grid grid-cols-2 gap-2 min-[960px]:col-span-7 min-[960px]:col-start-6 min-[960px]:row-span-2 min-[960px]:row-start-1 min-[960px]:mt-1 min-[960px]:gap-3 min-[960px]:self-start"
-          >
-            {DIMANCHE_SFL.camps.map((camp) => (
-              <div
-                key={camp}
-                className={cn("flex aspect-[4/5] items-end rounded-tuile p-4 min-[720px]:aspect-[5/4] min-[960px]:p-6", LISERE_TUILE[camp], OMBRE.petite)}
-                style={{ background: MAILLOTS[camp].fond, color: MAILLOTS[camp].encre }}
+          {/* Un vrai match : chaque camp, son score, ses cinq joueurs en pastille, au maillot du camp. */}
+          <div className="mt-4 min-[960px]:col-span-7 min-[960px]:col-start-6 min-[960px]:row-span-2 min-[960px]:row-start-1 min-[960px]:mt-1 min-[960px]:self-start">
+            <div className="relative grid grid-cols-2 gap-2 min-[960px]:gap-3">
+              {COMPO.camps.map((c) => (
+                <div
+                  key={c.camp}
+                  className={cn("flex min-w-0 flex-col rounded-tuile p-3.5 min-[400px]:p-4 min-[960px]:p-6", LISERE_TUILE[c.camp], OMBRE.petite)}
+                  style={{ background: MAILLOTS[c.camp].fond, color: MAILLOTS[c.camp].encre }}
+                >
+                  <div className="flex items-baseline justify-between gap-2">
+                    <span className="titre-lettrage text-[clamp(19px,6.2vw,28px)] leading-none min-[960px]:text-[44px]">{c.camp}</span>
+                    <span className="font-display text-[clamp(22px,7.2vw,32px)] leading-none tabular-nums min-[960px]:text-[48px]">{c.score}</span>
+                  </div>
+                  <ul className="mt-5 space-y-2 min-[960px]:mt-7 min-[960px]:space-y-3">
+                    {c.joueurs.map((j) => (
+                      <li key={j.nom} className="flex min-w-0 items-center gap-2 min-[400px]:gap-2.5 min-[960px]:gap-3.5">
+                        <Carte image={j.image} muette className="w-[clamp(32px,10vw,40px)] shrink-0 min-[960px]:w-14" />
+                        <span className="min-w-0 truncate text-[clamp(12px,3.45vw,14px)] font-semibold min-[960px]:text-lecture">{j.nom}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+              {/* « contre », entre les deux camps ; sur ordinateur, le titre le dit. */}
+              <p
+                aria-hidden
+                className={cn(
+                  ETIQUETTE,
+                  "absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-background px-2.5 py-1 shadow-[0_0_0_1px_rgba(128,128,128,0.45)] min-[960px]:hidden"
+                )}
               >
-                <span className="titre-lettrage text-[clamp(24px,7.7vw,30px)] leading-none min-[960px]:text-[44px]">{camp}</span>
-              </div>
-            ))}
-            {/* « contre », entre les deux camps ; sur ordinateur, le titre le dit. */}
-            <p
-              className={cn(
-                ETIQUETTE,
-                "absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-background px-2.5 py-1 shadow-[0_0_0_1px_rgba(128,128,128,0.45)] min-[960px]:hidden"
-              )}
-            >
-              {DIMANCHE_SFL.contre}
-            </p>
+                {DIMANCHE_SFL.contre}
+              </p>
+            </div>
+            <p className={cn(ETIQUETTE, "mt-3 text-encre-2 min-[960px]:mt-4")}>{etiquetteMatch(COMPO)}</p>
           </div>
           <Phrases
             phrases={DIMANCHE_SFL.phrases}
@@ -458,27 +441,21 @@ export function PageSfl() {
           aria-labelledby="sfl-carte"
           className={cn(COLONNE, APPARAIT, "mt-24 min-[960px]:mt-40 min-[960px]:grid min-[960px]:grid-cols-12 min-[960px]:gap-x-16")}
         >
-          <div ref={colonneCarte} className="min-[960px]:col-span-5">
+          <div className="min-[960px]:col-span-5">
             <p className={ETIQUETTE}>{CARTE_SFL.etiquette}</p>
             <h2 id="sfl-carte" className={TITRE}>
               {CARTE_SFL.titre}
             </h2>
-            <div className="relative mt-10 flex justify-center min-[960px]:mt-14 min-[960px]:justify-start">
-              {/* Sur ordinateur, le dos de la carte, décalé derrière elle. */}
-              {ordinateur && (
-                <div
-                  aria-hidden
-                  data-nosnippet
-                  className={cn("absolute top-0 left-0 origin-bottom-left", OMBRE.grande)}
-                  style={{ transform: `translate(${Math.round(CARTE.l * tailleCarte * 0.2)}px, -10px) rotate(7deg)` }}
-                >
-                  <div className="overflow-hidden" style={{ borderRadius: (RAYON_CARTE * CARTE.l * tailleCarte) / 1024 }}>
-                    <DosCarte matiere={matiereDe("base")} nom="" size={tailleCarte} />
-                  </div>
-                </div>
-              )}
-              <Carte lue={CARTE_SFL.lue} taille={tailleCarte} className={cn("relative", OMBRE.grande)} />
+            {/* Un vrai joueur : sa carte de départ, en moyenne, puis l'officielle après la mise à jour, en grand. */}
+            <div className="mt-10 flex items-end justify-center gap-3 min-[960px]:mt-14 min-[960px]:justify-start min-[960px]:gap-6">
+              <Carte image={CARTE_MONTEE.depart} className={cn("w-[min(96px,25vw)] min-[960px]:w-[118px]", OMBRE.petite)} />
+              <Carte image={CARTE_MONTEE.officielle} className={cn("w-[min(203px,57vw)] min-[960px]:w-[clamp(220px,20vw,272px)]", OMBRE.grande)} />
             </div>
+            <p className={cn(ETIQUETTE, "mt-5 flex items-center justify-center gap-1.5 text-encre-2 min-[960px]:justify-start")}>
+              <span className="tabular-nums">{CARTE_MONTEE.de}</span>
+              <ArrowRight aria-hidden className="size-3" strokeWidth={2.6} />
+              <span className="text-encre tabular-nums">{CARTE_MONTEE.a}</span>
+            </p>
           </div>
           <div className="mt-12 min-[960px]:col-span-7 min-[960px]:mt-1">
             <dl className={cn("border-b", FILET)}>
@@ -517,10 +494,21 @@ export function PageSfl() {
                 </li>
               ))}
             </ul>
-            <ul className="mt-5 grid grid-cols-3 gap-2 min-[960px]:mt-6 min-[960px]:gap-3">
-              {CLASSEMENT_SFL.divisions.map((d) => (
-                <li key={d} className={cn("grid place-items-center rounded-champ border py-5 font-display text-affiche leading-none min-[960px]:py-7", FILET)}>
-                  {d}
+            {/* Le haut de chaque division : les vrais premiers, sans trou ; une division sans carte reste une tuile. */}
+            <ul className="mt-5 space-y-2 min-[960px]:mt-6 min-[960px]:space-y-3">
+              {PODIUMS.map((d) => (
+                <li key={d.division} className={cn("rounded-champ border p-4 min-[960px]:p-5", FILET)}>
+                  <p className="font-display text-affiche leading-none">{d.division}</p>
+                  {d.places.length > 0 && (
+                    <ol className="mt-4 grid grid-cols-3 gap-2 min-[960px]:gap-4">
+                      {d.places.map((x) => (
+                        <li key={x.nom} className="min-w-0">
+                          <Carte image={x.image} className={cn("w-full max-w-[150px]", OMBRE.petite)} />
+                          <p className={cn(ETIQUETTE, "mt-2.5 truncate text-encre-2")}>{placeEtPoints(x.place, x.points)}</p>
+                        </li>
+                      ))}
+                    </ol>
+                  )}
                 </li>
               ))}
             </ul>
@@ -534,19 +522,20 @@ export function PageSfl() {
           <h2 id="sfl-titres" className={TITRE}>
             {TITRES_SFL.titre}
           </h2>
-          <div ref={rangee} className="mt-9 flex justify-center gap-2.5 min-[960px]:mt-14 min-[960px]:gap-10">
-            {TITRES_SFL.cartes.map((c) => (
-              <div key={c.edition} className="flex flex-col items-center">
-                <Carte lue={c.lue} edition={c.edition} taille={tailleTitre} className={OMBRE.petite} />
+          {/* Les trois titres d'un vrai match : compactes sur téléphone, complètes dès 720 px. */}
+          <div className="mt-9 flex justify-center gap-2.5 min-[720px]:gap-5 min-[960px]:mt-14 min-[960px]:gap-10">
+            {titres.map((c) => (
+              <div key={c.edition} className="flex w-[calc((100%-20px)/3)] max-w-[220px] flex-col items-center min-[720px]:w-[calc((100%-40px)/3)]">
+                <Carte image={c.petite} className={cn("w-full max-w-[150px] min-[720px]:hidden", OMBRE.petite)} />
+                <Carte image={c.complete} className={cn("hidden w-full min-[720px]:block", OMBRE.petite)} />
                 {/* Une carte complète porte son étiquette : on ne la répète pas dessous. */}
-                {!titresComplets && (
-                  <p aria-hidden className={cn(ETIQUETTE, "mt-4 text-encre-2")}>
-                    {c.nom}
-                  </p>
-                )}
+                <p aria-hidden className={cn(ETIQUETTE, "mt-4 text-encre-2 min-[720px]:hidden")}>
+                  {c.titre}
+                </p>
               </div>
             ))}
           </div>
+          <p className={cn(ETIQUETTE, "mt-5 text-encre-2 min-[960px]:mt-8")}>{etiquetteMatch(TITRES)}</p>
           <Phrases phrases={TITRES_SFL.phrases} className="mt-9 min-[960px]:mx-auto min-[960px]:mt-14 min-[960px]:max-w-[640px]" />
           <div className={cn("mt-10 border-t pt-8 min-[960px]:mx-auto min-[960px]:mt-14 min-[960px]:max-w-[640px] min-[960px]:pt-12", FILET)}>
             <p className={ETIQUETTE}>{TITRES_SFL.saison.etiquette}</p>

@@ -17,6 +17,12 @@
 //     page (75, 19 h, Match 1 et 2, D1 à D3, le barème, 2026) ; aucun nom
 //     propre hors d'une liste (donc aucun lieu que Lille) ; aucun mot rejeté
 //     (un prix, « Hippodrome », « prono »…).
+// Depuis le 13/11 (retour sur bola-app#6 : « Si sfl avec vrais joueurs »), la page
+// montre de vrais joueurs : leurs noms, notes, points, la journée, le match
+// et le score viennent de l'instantané (page-sfl-instantane.ts, écrit par
+// tools/page-sfl-instantane.ts), jamais d'ici. Ce fichier ne fait que les
+// mettre en forme (etiquetteMatch, placeEtPoints), sans un mot de plus que
+// « pts ».
 //
 // Le ton est celui du site de la marque : des phrases de deux à cinq mots,
 // au présent, qui tutoient ; ni point d'exclamation, ni texte qui guide.
@@ -122,6 +128,8 @@ export const DIMANCHE_SFL = {
   titre: "Noirs contre Blancs.",
   camps: ["Noirs", "Blancs"],
   contre: "contre",
+  /** Le mot d'un match dans sa journée : « Match 1 ». */
+  match: "Match",
   phrases: [
     "Match\u00a01, Match\u00a02.",
     "Chacun son heure, son lieu, son terrain.",
@@ -130,13 +138,15 @@ export const DIMANCHE_SFL = {
   ],
 } as const;
 
-/** La carte montrée : celle d'un compte neuf (carte-neutre.ts), au nom de « Toi ». */
+/**
+ * Ta carte : la carte montrée est celle d'un vrai joueur, avant et après une
+ * mise à jour (l'instantané, CARTE_MONTEE). `note` : la note de départ d'un
+ * compte neuf (carte-neutre.ts), que dit « Elle part à 75. ».
+ */
 export const CARTE_SFL = {
   etiquette: "Ta carte",
   titre: "Ta carte bouge avec toi.",
-  nom: "Toi",
   note: 75,
-  lue: "Ta carte, 75",
   /** Ce qui fait monter quoi (saisie/evolution.ts) : `cle` nomme le geste pour le banc. */
   lignes: [
     { cle: "but", geste: "Un but", stat: "TIR" },
@@ -170,8 +180,20 @@ export const CLASSEMENT_SFL = {
     { cle: "absence", points: -2, libelle: "Absent sans prévenir." },
   ] satisfies TuileBareme[],
   divisions: ["D1", "D2", "D3"],
+  /** L'unité des points d'un joueur classé. */
+  points: "pts",
   phrases: ["Refaites chaque dimanche par le classement.", "Chaque division a son premier.", "La D1 joue le Match\u00a01."],
 } as const;
+
+/** « 1er · 43 pts », « 2e · 41 pts » : la place d'un joueur dans sa division, et ses points (l'instantané). */
+export function placeEtPoints(place: number, points: number): string {
+  return `${place}${place === 1 ? "er" : "e"} · ${points}\u00a0${CLASSEMENT_SFL.points}`;
+}
+
+/** « J4 · 1 nov. · Match 1 » : le vrai match d'où viennent une compo ou des titres (l'instantané). */
+export function etiquetteMatch(m: { journee: number; date: string; match: number }): string {
+  return `J${m.journee} · ${m.date.replace(/ /g, "\u00a0")} · ${DIMANCHE_SFL.match}\u00a0${m.match}`;
+}
 
 /** « +2 », « −1 » : le signe typographique, jamais le trait d'union. */
 export function pointsLisibles(points: number): string {
@@ -181,10 +203,11 @@ export function pointsLisibles(points: number): string {
 export const TITRES_SFL = {
   etiquette: "Chaque match",
   titre: "Trois titres.",
+  /** Les trois éditions, dans l'ordre ; les cartes et leurs textes de remplacement sont dans l'instantané (TITRES). */
   cartes: [
-    { edition: "mvp", nom: "MVP", lue: "Carte MVP" },
-    { edition: "impact", nom: "Impact", lue: "Carte Impact" },
-    { edition: "def", nom: "Défensive", lue: "Carte Défensive" },
+    { edition: "mvp", nom: "MVP" },
+    { edition: "impact", nom: "Impact" },
+    { edition: "def", nom: "Défensive" },
   ],
   phrases: [
     "Le MVP ne se vote pas.\nIl se lit sur la feuille de match.",
@@ -229,21 +252,21 @@ export function textesPageSfl(): string[] {
     DIMANCHE_SFL.titre,
     ...DIMANCHE_SFL.camps,
     DIMANCHE_SFL.contre,
+    DIMANCHE_SFL.match,
     ...DIMANCHE_SFL.phrases,
     CARTE_SFL.etiquette,
     CARTE_SFL.titre,
-    CARTE_SFL.nom,
-    CARTE_SFL.lue,
     ...CARTE_SFL.lignes.flatMap((l) => [l.geste, l.stat]),
     ...CARTE_SFL.phrases,
     CLASSEMENT_SFL.etiquette,
     CLASSEMENT_SFL.titre,
     ...CLASSEMENT_SFL.bareme.flatMap((t) => [pointsLisibles(t.points), t.libelle]),
     ...CLASSEMENT_SFL.divisions,
+    CLASSEMENT_SFL.points,
     ...CLASSEMENT_SFL.phrases,
     TITRES_SFL.etiquette,
     TITRES_SFL.titre,
-    ...TITRES_SFL.cartes.flatMap((c) => [c.nom, c.lue]),
+    ...TITRES_SFL.cartes.map((c) => c.nom),
     ...TITRES_SFL.phrases,
     TITRES_SFL.saison.etiquette,
     ...TITRES_SFL.saison.phrases,
