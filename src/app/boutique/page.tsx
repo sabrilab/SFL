@@ -11,15 +11,20 @@
 //   · le hero : trois photos portées plein cadre qu'on fait défiler au doigt
 //     (rien ne défile seul), sans dégradé ni texte posé dessus ; dessous, un
 //     titre court, un seul bouton « Voir » et l'indicateur « 1/3 », qui
-//     voyage avec sa diapo ;
+//     voyage avec sa diapo ; le bouton est à la même hauteur sur les trois
+//     diapos (un titre d'une ligne laisse son blanc au-dessus du bouton) ;
+//     sur un écran court (iPhone SE) la photo est moins haute, pour que le titre
+//     et le bouton tiennent au-dessus de la barre d'onglets ; sur tablette,
+//     deux diapos se voient à la fois ;
 //   · les rayons en liens texte, qui défilent au doigt ;
 //   · trois grands panneaux : Match, Vestiaire, Fondateurs ;
 //   · « Acheter par camp » : Noirs, Blancs ;
 //   · trois blocs : pour le match, le vestiaire, l'entraînement ;
 //   · la réassurance : livraison, retours, paiement en plusieurs fois, tous
 //     « Bientôt » tant que rien n'est branché.
-// Chaque lien ouvre la grille (/boutique/articles) sur un rayon, ou une
-// fiche. Aucun sous-titre, aucune promo, rien de payable.
+// Chaque lien ouvre la grille (/boutique/articles) sur un rayon, ou droit la
+// fiche quand le rayon n'a qu'une pièce (Survêts, Fondateurs : adresseRayon).
+// Aucun sous-titre, aucune promo, rien de payable.
 //
 // Sur ordinateur (≥ 1024), les trois diapos du hero tiennent côte à côte,
 // comme les panneaux et les blocs.
@@ -29,7 +34,7 @@ import Link from "next/link";
 import { EnTeteBoutique } from "@/components/boutique/en-tete";
 import { Rail } from "@/components/boutique/rail";
 import { Tuile } from "@/components/boutique/tuile";
-import { adresseFiche, adresseGrille, type Rayon } from "@/lib/boutique/catalogue";
+import { adresseFiche, adresseGrille, adresseRayon, type Rayon } from "@/lib/boutique/catalogue";
 
 const HERO = [
   { photo: "/boutique/porte-survet.webp", titre: "Collection 01", vers: adresseGrille() },
@@ -71,20 +76,20 @@ function Hero() {
     <section aria-label="À la une" className="-mx-5 lg:mx-0">
       <Rail className="lg:grid lg:grid-cols-3 lg:gap-3 lg:overflow-visible">
         {HERO.map((d, i) => (
-          <Link key={d.titre} href={d.vers} className="flex w-full shrink-0 snap-center flex-col">
-            <span className="relative block aspect-[4/5]">
+          <Link key={d.titre} href={d.vers} className="flex w-full shrink-0 snap-start flex-col sm:w-1/2 lg:w-auto">
+            <span className="relative block aspect-[4/5] [@media(max-height:700px)]:aspect-[5/4]">
               <Image
                 src={d.photo}
                 alt=""
                 fill
                 priority={i === 0}
                 sizes="(max-width: 1023px) 100vw, 33vw"
-                className="object-cover"
+                className="object-cover object-top"
               />
             </span>
-            <span className="flex flex-col gap-4 px-5 pt-5 lg:px-0">
+            <span className="flex flex-1 flex-col gap-4 px-5 pt-5 lg:px-0">
               <span className="titre-lettrage text-nom leading-[0.95] text-balance lg:text-titre-g">{d.titre}</span>
-              <span className="flex items-center justify-between">
+              <span className="mt-auto flex items-center justify-between">
                 <span className="bouton-principal px-7 py-3 text-lecture font-bold">Voir</span>
                 {/* L'indicateur voyage avec sa diapo : il dit toujours vrai, sans rien écouter. */}
                 <span aria-hidden className="mono-label text-encre-3 lg:hidden">
@@ -110,9 +115,9 @@ export default function Boutique() {
       </div>
 
       <nav aria-label="Rayons" className="-mx-5 -my-3 lg:mx-0">
-        <Rail className="snap-none gap-7 px-5 lg:px-0">
+        <Rail className="snap-none gap-4 px-3.5 lg:px-0">
           {RAYONS_ACCUEIL.map(([titre, rayon]) => (
-            <Link key={rayon} href={adresseGrille({ rayon })} className="flex min-h-11 shrink-0 items-center text-lecture font-semibold">
+            <Link key={rayon} href={adresseRayon(rayon)} className="flex min-h-11 shrink-0 items-center px-1.5 text-lecture font-semibold">
               {titre}
             </Link>
           ))}
@@ -122,7 +127,7 @@ export default function Boutique() {
       <section aria-label="Collections" className="-mx-5 lg:mx-0">
         <Rail className="gap-2 px-5 [scroll-padding-inline:20px] lg:grid lg:grid-cols-3 lg:gap-3 lg:overflow-visible lg:px-0">
           {PANNEAUX.map((p) => (
-            <Link key={p.titre} href={adresseGrille({ rayon: p.rayon })} className="flex w-[82%] shrink-0 snap-start flex-col lg:w-auto">
+            <Link key={p.titre} href={adresseRayon(p.rayon)} className="flex w-[82%] shrink-0 snap-start flex-col lg:w-auto">
               <span className="relative block aspect-[4/5] overflow-hidden rounded-[2px]">
                 <Image src={p.photo} alt="" fill sizes="(max-width: 1023px) 82vw, 33vw" className="object-cover" />
               </span>
@@ -149,7 +154,7 @@ export default function Boutique() {
 
       <section aria-label="Par usage" className="grid gap-9 lg:grid-cols-3 lg:gap-3">
         {BLOCS.map((b) => (
-          <Link key={b.titre} href={adresseGrille({ rayon: b.rayon })} className="-mx-5 flex flex-col sm:mx-0">
+          <Link key={b.titre} href={adresseRayon(b.rayon)} className="-mx-5 flex flex-col sm:mx-0">
             <span className="relative block aspect-[4/5] overflow-hidden sm:rounded-[2px]">
               <Image src={b.photo} alt="" fill sizes="(max-width: 1023px) 100vw, 33vw" className="object-cover" />
             </span>
@@ -165,9 +170,10 @@ export default function Boutique() {
         {REASSURANCE.map((r, i) => (
           <li
             key={r}
-            className={`flex flex-col items-center justify-center gap-1.5 px-2 py-5 text-center ${i > 0 ? "border-l border-contraste/8" : ""}`}
+            className={`flex flex-col items-center gap-1.5 px-2 py-5 text-center ${i > 0 ? "border-l border-contraste/8" : ""}`}
           >
-            <span className="text-corps leading-tight font-semibold">{r}</span>
+            {/* Deux lignes réservées : les trois « Bientôt » restent alignés. */}
+            <span className="flex min-h-[2.5em] items-center text-corps leading-tight font-semibold">{r}</span>
             <span className="mono-label text-encre-3">Bientôt</span>
           </li>
         ))}

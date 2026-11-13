@@ -18,10 +18,16 @@
 // Le rayon, les filtres et le tri vivent dans l'adresse (lib/boutique/
 // catalogue.ts) : un lien se partage tel quel, et le retour depuis une fiche
 // retrouve la grille comme on l'a laissée. Chaque case remplace l'adresse
-// sans défiler ni empiler d'historique.
+// sur place (history.replaceState, que Next relie à useSearchParams) : rien
+// ne part au serveur, la case se coche tout de suite, même hors ligne, et
+// l'historique ne s'empile pas. Chaque geste part de l'adresse du moment :
+// deux cases touchées coup sur coup gardent toutes les deux leur effet.
+// Dans un rayon, la section Catégorie n'offre que les catégories du rayon
+// (aucune s'il n'en a qu'une). La feuille se ferme si l'écran passe en
+// large (un iPad qu'on tourne) : le panneau de gauche prend le relais.
 
-import { Suspense, useMemo, useState } from "react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useMemo, useState } from "react";
+import { usePathname, useSearchParams } from "next/navigation";
 import { ChevronDown, SlidersHorizontal } from "lucide-react";
 import { CarteProduit } from "@/components/boutique/carte-produit";
 import { EnTeteBoutique } from "@/components/boutique/en-tete";
@@ -38,15 +44,18 @@ import { useFavorisBoutique } from "@/hooks/use-favoris-boutique";
 import {
   SANS_FILTRE,
   TRIS,
+  basculer,
+  categoriesDuRayon,
   colorisMontre,
-  ecrireRecherche,
   filtrer,
   lireRecherche,
   nombreArticles,
   nombreDeFiltres,
+  rechercheApres,
   titreDuRayon,
   trier,
   voirLesArticles,
+  type Filtres as LesFiltres,
   type Recherche,
   type Tri,
 } from "@/lib/boutique/catalogue";
@@ -64,7 +73,6 @@ export default function Articles() {
 
 function Grille() {
   const params = useSearchParams();
-  const router = useRouter();
   const pathname = usePathname();
   const favoris = useFavorisBoutique();
   const recherche = useMemo(() => lireRecherche(new URLSearchParams(params.toString())), [params]);
@@ -78,17 +86,30 @@ function Grille() {
   );
   const actifs = nombreDeFiltres(filtres);
 
-  const aller = (suite: Partial<Recherche>) => {
-    const q = ecrireRecherche({ ...recherche, ...suite });
-    router.replace(q ? `${pathname}?${q}` : pathname, { scroll: false });
+  const categories = useMemo(() => categoriesDuRayon(rayon), [rayon]);
+
+  // Le geste s'applique à l'adresse du moment, pas au dernier rendu.
+  const aller = (geste: (r: Recherche) => Recherche) => {
+    const q = rechercheApres(window.location.search, geste);
+    window.history.replaceState(null, "", q ? `${pathname}?${q}` : pathname);
   };
-  const effacer = () => aller({ filtres: SANS_FILTRE });
+  const effacer = () => aller((r) => ({ ...r, filtres: SANS_FILTRE }));
+  const cocher = <C extends keyof LesFiltres>(section: C, valeur: LesFiltres[C][number]) =>
+    aller((r) => ({ ...r, filtres: basculer(r.filtres, section, valeur) }));
+
+  // La feuille est celle du téléphone : en large, elle se ferme (sinon son voile resterait seul).
+  useEffect(() => {
+    const large = window.matchMedia("(min-width: 1024px)");
+    const fermer = () => large.matches && setFeuille(false);
+    large.addEventListener("change", fermer);
+    return () => large.removeEventListener("change", fermer);
+  }, []);
 
   return (
     <div className="shell flex flex-col py-4 sm:py-8">
       {/* Au-dessus de la barre collée : sa rallonge sous l'encoche ne le couvre pas. */}
       <div className="relative z-30 flex flex-col gap-2 pb-3">
-        <EnTeteBoutique titre={titreDuRayon(rayon)} />
+        <EnTeteBoutique titre={titreDuRayon(rayon)} favoris={rayon === "favoris"} />
         {/* Rien à compter : « Aucun article » le dit plus bas, la ligne garde sa place. */}
         <p className={cn("text-corps text-encre-3 tabular-nums", liste.length === 0 && "invisible")}>{nombreArticles(liste.length)}</p>
       </div>
@@ -114,12 +135,12 @@ function Grille() {
         </button>
 
         <DropdownMenu>
-          <DropdownMenuTrigger className="-mr-1 flex h-11 items-center gap-1.5 px-1 text-ligne font-semibold outline-none">
-            Trier
+          <DropdownMenuTrigger aria-label="Trier" className="-mr-1 flex h-11 items-center gap-1.5 px-1 text-ligne font-semibold outline-none">
+            {tri === "nouveautes" ? "Trier" : TRIS.find((t) => t.id === tri)!.titre}
             <ChevronDown className="size-4" />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-52 rounded-[14px] p-1.5">
-            <DropdownMenuRadioGroup value={tri} onValueChange={(v) => aller({ tri: v as Tri })}>
+            <DropdownMenuRadioGroup value={tri} onValueChange={(v) => aller((r) => ({ ...r, tri: v as Tri }))}>
               {TRIS.map((t) => (
                 <DropdownMenuRadioItem key={t.id} value={t.id} className="min-h-11 rounded-[10px] pl-3 text-ligne font-medium">
                   {t.titre}
@@ -134,11 +155,11 @@ function Grille() {
         {panneau && (
           <aside className="sticky top-8 hidden w-60 shrink-0 lg:block">
             {actifs > 0 && (
-              <button type="button" onClick={effacer} className="mb-3 text-corps font-semibold underline underline-offset-4">
+              <button type="button" onClick={effacer} className="mb-1 inline-flex min-h-11 items-center text-corps font-semibold underline underline-offset-4">
                 Tout effacer
               </button>
             )}
-            <Filtres filtres={filtres} onChange={(f) => aller({ filtres: f })} />
+            <Filtres filtres={filtres} categories={categories} onBascule={cocher} />
           </aside>
         )}
 
@@ -158,7 +179,7 @@ function Grille() {
           <div className="flex min-w-0 flex-1 flex-col items-center gap-3 py-24 text-center">
             <p className="text-titre font-bold">{rayon === "favoris" && !actifs ? "Aucun favori" : "Aucun article"}</p>
             {actifs > 0 && (
-              <button type="button" onClick={effacer} className="text-lecture font-semibold underline underline-offset-4">
+              <button type="button" onClick={effacer} className="inline-flex min-h-11 items-center text-lecture font-semibold underline underline-offset-4">
                 Tout effacer
               </button>
             )}
@@ -168,11 +189,12 @@ function Grille() {
 
       <Sheet open={feuille} onOpenChange={setFeuille} titre="les filtres">
         <SheetContent side="bottom" className="gap-0 overflow-y-auto rounded-none data-[side=bottom]:h-dvh data-[side=bottom]:border-t-0 lg:hidden">
-          {/* Sur la rangée de la croix (ui/sheet.tsx la pose 16 px plus bas que le contenu). */}
-          <div className="mt-4 flex h-14 shrink-0 items-center px-5">
+          {/* Sur la rangée de la croix (ui/sheet.tsx la pose 16 px plus bas que le contenu) ; collé en haut,
+              sur le fond de la feuille : les cases défilent dessous sans passer sous la croix. */}
+          <div className="sticky -top-4 z-20 flex h-[4.5rem] shrink-0 items-end bg-popover px-5 pb-4">
             <SheetTitle className="titre-lettrage text-titre-m leading-none font-black">Filtrer</SheetTitle>
           </div>
-          <Filtres filtres={filtres} onChange={(f) => aller({ filtres: f })} className="mx-5" />
+          <Filtres filtres={filtres} categories={categories} onBascule={cocher} className="mx-5" />
           <div className="sticky bottom-0 mt-auto flex gap-2.5 bg-popover px-5 pt-3 pb-[calc(env(safe-area-inset-bottom,0px)+16px)]">
             {actifs > 0 && (
               <button type="button" onClick={effacer} className="bouton-secondaire shrink-0 px-5 py-4 text-lecture font-bold">

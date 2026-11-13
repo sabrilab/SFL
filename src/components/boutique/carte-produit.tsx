@@ -2,7 +2,9 @@
 
 // La carte d'une pièce dans la grille et dans « Tu aimeras aussi ». De haut
 // en bas : la tuile (la vue à plat de devant), le badge, le nom, le type, le
-// nombre de couleurs, le prix. Toute la carte mène à la fiche.
+// nombre de couleurs, le prix. Toute la carte mène à la fiche. Dans une
+// rangée, les prix sont à la même hauteur (un nom sur deux lignes ne décale
+// pas celui du voisin).
 //
 // La deuxième photo (le dos) : au survol sur ordinateur ; sur téléphone, en
 // gardant le doigt posé (350 ms), le temps du toucher : relâcher ne suit
@@ -66,11 +68,11 @@ export function CarteProduit({
   };
 
   return (
-    <article className={cn("group relative", className)}>
+    <article className={cn("group relative flex flex-col", className)}>
       <Link
         href={adresseFiche(produit.id)}
         draggable={false}
-        className="block select-none [-webkit-touch-callout:none]"
+        className="flex flex-1 flex-col select-none [-webkit-touch-callout:none]"
         onPointerDown={(e) => {
           longue.current = false;
           if (e.pointerType === "mouse") return;
@@ -98,12 +100,12 @@ export function CarteProduit({
             )}
           />
         </Tuile>
-        <span className="flex flex-col px-3 pt-3 sm:px-1">
+        <span className="flex flex-1 flex-col px-3 pt-3 sm:px-1">
           {produit.badge && <span className="mono-label text-encre-3">{produit.badge}</span>}
           <span className="mt-1 text-ligne leading-snug font-bold">{produit.nom}</span>
           <span className="text-corps leading-snug text-encre-3">{produit.type}</span>
           <span className="text-corps leading-snug text-encre-3">{nombreCouleurs(produit.coloris.length)}</span>
-          <span className="mt-2 text-ligne font-bold tabular-nums">{prix(produit.euros)}</span>
+          <span className="mt-auto pt-2 text-ligne font-bold tabular-nums">{prix(produit.euros)}</span>
         </span>
       </Link>
       <Coeur id={produit.id} nom={produit.nom} className="absolute top-0 right-0" />

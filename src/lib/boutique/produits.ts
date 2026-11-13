@@ -24,8 +24,6 @@ export type Badge = "Nouveau" | "Fondateurs";
 
 export interface Coloris {
   nom: "Noir" | "Blanc";
-  /** La pastille. */
-  teinte: string;
   /** Les visuels à plat, devant puis dos (public/boutique). */
   aPlat: string[];
 }
@@ -50,8 +48,8 @@ export interface Produit {
   tapstitch: string;
 }
 
-const NOIR = "#16171a";
-const BLANC = "#f4f4f2";
+/** Les pastilles du filtre Couleur. */
+export const TEINTES: Record<Coloris["nom"], string> = { Noir: "#16171a", Blanc: "#f4f4f2" };
 const plat = (code: string, c: "black" | "white", vues = ["front", "back"]) =>
   vues.map((v) => `/boutique/a-plat-${code}-${c}-${v}.webp`);
 
@@ -67,12 +65,12 @@ export const PRODUITS: Produit[] = [
     euros: 35,
     porte: ["/boutique/porte-maillot-noir.webp", "/boutique/porte-maillot-blanc-dos.webp"],
     coloris: [
-      { nom: "Noir", teinte: NOIR, aPlat: plat("rt0082", "black") },
-      { nom: "Blanc", teinte: BLANC, aPlat: plat("rt0082", "white") },
+      { nom: "Noir", aPlat: plat("rt0082", "black") },
+      { nom: "Blanc", aPlat: plat("rt0082", "white") },
     ],
     tailles: ["M", "L", "XL", "2XL"],
     matiere: "Polyester 190 g, rayé ton sur ton",
-    marquage: ["Logo Bola au cœur, sigle SFL en face", "Nom et numéro au dos"],
+    marquage: ["Logo Bola au cœur, sigle SFL en face", "« TOI » et le 10 au dos"],
     tapstitch: "RT0082",
   },
   {
@@ -86,8 +84,8 @@ export const PRODUITS: Produit[] = [
     euros: 35,
     porte: ["/boutique/porte-dimanche-noir.webp"],
     coloris: [
-      { nom: "Noir", teinte: NOIR, aPlat: plat("ut0104", "black") },
-      { nom: "Blanc", teinte: BLANC, aPlat: plat("ut0104", "white") },
+      { nom: "Noir", aPlat: plat("ut0104", "black") },
+      { nom: "Blanc", aPlat: plat("ut0104", "white") },
     ],
     tailles: ["S", "M", "L", "XL", "2XL"],
     matiere: "Polyester 140 g, coupe ample",
@@ -104,7 +102,7 @@ export const PRODUITS: Produit[] = [
     description: "Les six phases du ballon, du noir au blanc, dans le dos.",
     euros: 35,
     porte: ["/boutique/porte-phases-dos.webp"],
-    coloris: [{ nom: "Noir", teinte: NOIR, aPlat: plat("rt0057", "black") }],
+    coloris: [{ nom: "Noir", aPlat: plat("rt0057", "black") }],
     tailles: ["S", "M", "L", "XL"],
     matiere: "Coton 260 g, empiècement filet",
     marquage: ["Symbole au cœur", "Les six phases du ballon au dos"],
@@ -121,8 +119,8 @@ export const PRODUITS: Produit[] = [
     euros: 39,
     porte: ["/boutique/porte-dos-de-carte.webp"],
     coloris: [
-      { nom: "Blanc", teinte: BLANC, aPlat: plat("rt0047", "white") },
-      { nom: "Noir", teinte: NOIR, aPlat: plat("rt0047", "black") },
+      { nom: "Blanc", aPlat: plat("rt0047", "white") },
+      { nom: "Noir", aPlat: plat("rt0047", "black") },
     ],
     tailles: ["S", "M", "L", "XL", "2XL", "3XL"],
     matiere: "Coton 240 g",
@@ -140,8 +138,8 @@ export const PRODUITS: Produit[] = [
     euros: 35,
     porte: ["/boutique/porte-raglan-blanc.webp"],
     coloris: [
-      { nom: "Blanc", teinte: BLANC, aPlat: plat("rt0091", "white") },
-      { nom: "Noir", teinte: NOIR, aPlat: plat("rt0091", "black") },
+      { nom: "Blanc", aPlat: plat("rt0091", "white") },
+      { nom: "Noir", aPlat: plat("rt0091", "black") },
     ],
     tailles: ["S", "M", "L", "XL", "2XL", "3XL"],
     matiere: "Coton 240 g, passepoil contrasté",
@@ -159,8 +157,8 @@ export const PRODUITS: Produit[] = [
     euros: 45,
     porte: ["/boutique/porte-polo-blanc.webp"],
     coloris: [
-      { nom: "Blanc", teinte: BLANC, aPlat: plat("pl0004", "white") },
-      { nom: "Noir", teinte: NOIR, aPlat: plat("pl0004", "black") },
+      { nom: "Blanc", aPlat: plat("pl0004", "white") },
+      { nom: "Noir", aPlat: plat("pl0004", "black") },
     ],
     tailles: ["S", "M", "L", "XL", "2XL", "3XL"],
     matiere: "Coton et polyester 240 g, col contrasté",
@@ -180,7 +178,6 @@ export const PRODUITS: Produit[] = [
     coloris: [
       {
         nom: "Noir",
-        teinte: NOIR,
         aPlat: [...plat("rq0019", "black"), "/boutique/a-plat-ub0003-black-front.webp"],
       },
     ],
@@ -200,8 +197,8 @@ export const PRODUITS: Produit[] = [
     euros: 65,
     porte: ["/boutique/porte-sweat-noir.webp"],
     coloris: [
-      { nom: "Noir", teinte: NOIR, aPlat: plat("rw0007", "black") },
-      { nom: "Blanc", teinte: BLANC, aPlat: plat("rw0007", "white") },
+      { nom: "Noir", aPlat: plat("rw0007", "black") },
+      { nom: "Blanc", aPlat: plat("rw0007", "white") },
     ],
     tailles: ["S", "M", "L", "XL", "2XL", "3XL"],
     matiere: "Coton et polyester 380 g, oversize",

@@ -4,22 +4,16 @@
 // l'arrivée. Catégorie et Prix en cases, Couleur en pastilles rondes avec
 // leur nom, Taille en boutons rectangulaires. Le même composant sert la
 // feuille plein écran du téléphone et le panneau de gauche de l'ordinateur ;
-// il ne garde rien : la page lui donne les filtres et reçoit les suivants
-// (ils vivent dans l'adresse).
+// il ne garde rien : la page lui donne les filtres et reçoit chaque geste
+// (la section et la valeur touchées), qu'elle applique à l'adresse du moment.
+// `categories` : celles du rayon ; vide, la section Catégorie n'est pas montrée
+// (un rayon d'une seule catégorie n'a rien à y choisir).
 
 import { Check } from "lucide-react";
-import {
-  COULEURS,
-  TAILLES,
-  TRANCHES,
-  basculer,
-  type Filtres as LesFiltres,
-} from "@/lib/boutique/catalogue";
-import { CATEGORIES } from "@/lib/boutique/produits";
+import { COULEURS, TAILLES, TRANCHES, type Filtres as LesFiltres } from "@/lib/boutique/catalogue";
+import { TEINTES, type Categorie } from "@/lib/boutique/produits";
 import { cn } from "@/lib/utils";
 import { Accordeon } from "./accordeon";
-
-const TEINTES = { Noir: "#16171a", Blanc: "#f4f4f2" } as const;
 
 function Case({ coche, onChange, children }: { coche: boolean; onChange: () => void; children: React.ReactNode }) {
   return (
@@ -40,22 +34,26 @@ function Case({ coche, onChange, children }: { coche: boolean; onChange: () => v
 
 export function Filtres({
   filtres,
-  onChange,
+  categories,
+  onBascule,
   className,
 }: {
   filtres: LesFiltres;
-  onChange: (f: LesFiltres) => void;
+  categories: readonly Categorie[];
+  onBascule: <C extends keyof LesFiltres>(section: C, valeur: LesFiltres[C][number]) => void;
   className?: string;
 }) {
   return (
     <div className={cn("flex flex-col border-b border-contraste/8", className)}>
-      <Accordeon titre="Catégorie" ouvert>
-        {CATEGORIES.map((c) => (
-          <Case key={c} coche={filtres.categories.includes(c)} onChange={() => onChange(basculer(filtres, "categories", c))}>
-            {c}
-          </Case>
-        ))}
-      </Accordeon>
+      {categories.length > 0 && (
+        <Accordeon titre="Catégorie" ouvert>
+          {categories.map((c) => (
+            <Case key={c} coche={filtres.categories.includes(c)} onChange={() => onBascule("categories", c)}>
+              {c}
+            </Case>
+          ))}
+        </Accordeon>
+      )}
 
       <Accordeon titre="Couleur" ouvert>
         <div className="flex gap-6">
@@ -66,7 +64,7 @@ export function Filtres({
                 key={c}
                 type="button"
                 aria-pressed={coche}
-                onClick={() => onChange(basculer(filtres, "couleurs", c))}
+                onClick={() => onBascule("couleurs", c)}
                 className="flex min-w-11 flex-col items-center gap-2 text-corps"
               >
                 <span
@@ -94,7 +92,7 @@ export function Filtres({
                 key={t}
                 type="button"
                 aria-pressed={coche}
-                onClick={() => onChange(basculer(filtres, "tailles", t))}
+                onClick={() => onBascule("tailles", t)}
                 className={cn(
                   "h-12 rounded-[6px] border text-ligne font-semibold tabular-nums",
                   coche ? "border-foreground bg-foreground text-background" : "border-contraste/20",
@@ -109,7 +107,7 @@ export function Filtres({
 
       <Accordeon titre="Prix" ouvert>
         {TRANCHES.map((t) => (
-          <Case key={t.id} coche={filtres.prix.includes(t.id)} onChange={() => onChange(basculer(filtres, "prix", t.id))}>
+          <Case key={t.id} coche={filtres.prix.includes(t.id)} onChange={() => onBascule("prix", t.id)}>
             {t.titre}
           </Case>
         ))}

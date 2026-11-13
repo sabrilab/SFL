@@ -5,13 +5,16 @@
 // catalogue de cartes), déplacé ici le 12/11/2026 : il ne s'étale plus en
 // vitrine, il s'ouvre depuis la petite entrée de l'en-tête (en-tete.tsx).
 // Ses textes n'ont pas bougé ; son bouton a quitté l'or pour le ton neutre :
-// dans la boutique, l'or reste aux cartes MVP.
+// dans la boutique, l'or reste aux cartes MVP. Le lien vers le catalogue de
+// cartes n'est montré qu'à un joueur de la SFL : la Collection est fermée
+// aux joueurs Bola (porte-sfl.tsx), le lien les renvoyait à Ma carte.
 //
 // Les recharges restent verrouillées tant qu'aucun paiement n'est branché.
 
 import Link from "next/link";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Locked } from "@/components/sfl/locked";
+import { useHorsSflEtat } from "@/hooks/use-hors-sfl";
 import { BALLONS_PAR_EURO, RECHARGES } from "@/lib/sfl/ballons";
 import { CARD_PRICES } from "@/lib/sfl/collection";
 
@@ -25,6 +28,7 @@ export function GuichetBallons({
   ouvert: boolean;
   onOpenChange: (v: boolean) => void;
 }) {
+  const sfl = useHorsSflEtat() === false;
   return (
     <Dialog open={ouvert} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[85dvh] max-w-md overflow-y-auto">
@@ -83,12 +87,14 @@ export function GuichetBallons({
               </div>
             ))}
           </div>
-          <Link
-            href="/collection"
-            className="bouton-secondaire mt-3.5 block py-2.5 text-center text-ligne font-semibold"
-          >
-            Voir le catalogue de cartes
-          </Link>
+          {sfl && (
+            <Link
+              href="/collection"
+              className="bouton-secondaire mt-3.5 block py-2.5 text-center text-ligne font-semibold"
+            >
+              Voir le catalogue de cartes
+            </Link>
+          )}
         </div>
       </DialogContent>
     </Dialog>

@@ -30,6 +30,18 @@ export const RAYONS: { id: Rayon; titre: string }[] = [
 
 export const titreDuRayon = (rayon: Rayon) => RAYONS.find((r) => r.id === rayon)!.titre;
 
+/**
+ * Les catégories qu'on peut cocher dans un rayon : celles de ses pièces.
+ * « Tout » et « Favoris » les offrent toutes ; un rayon d'une seule catégorie
+ * (Maillots, Survêts, Fondateurs) n'en offre aucune, la section disparaît :
+ * cocher « T-shirts » chez les maillots ne pouvait rendre qu'une grille vide.
+ */
+export function categoriesDuRayon(rayon: Rayon, produits: readonly Produit[] = PRODUITS): Categorie[] {
+  if (rayon === "tout" || rayon === "favoris") return CATEGORIES;
+  const presentes = CATEGORIES.filter((c) => produits.some((p) => p.categorie === c && dansLeRayon(p, rayon, [])));
+  return presentes.length > 1 ? presentes : [];
+}
+
 function dansLeRayon(p: Produit, rayon: Rayon, favoris: readonly string[]): boolean {
   switch (rayon) {
     case "maillots":
@@ -75,7 +87,7 @@ export const SANS_FILTRE: Filtres = { categories: [], couleurs: [], tailles: [],
 export const nombreDeFiltres = (f: Filtres) =>
   f.categories.length + f.couleurs.length + f.tailles.length + f.prix.length;
 
-/** Coche ou décoche une case, dans l'ordre de la section. */
+/** Coche ou décoche une case (ajoutée en fin : l'adresse, relue par lireRecherche, remet l'ordre de la section). */
 export function basculer<C extends keyof Filtres>(f: Filtres, section: C, valeur: Filtres[C][number]): Filtres {
   const liste = f[section] as string[];
   const suite = liste.includes(valeur) ? liste.filter((v) => v !== valeur) : [...liste, valeur];
@@ -174,6 +186,25 @@ export function adresseGrille(r: Partial<Omit<Recherche, "filtres">> & { filtres
 
 export const adresseFiche = (id: string) => `/boutique/articles/${id}`;
 
+/**
+ * Où mène un lien de l'accueil vers un rayon : sa grille, ou droit la fiche
+ * quand le rayon n'a qu'une pièce (Survêts, Fondateurs) : une grille d'une
+ * tuile avec « Filtrer » et « Trier » ne sert à rien.
+ */
+export function adresseRayon(rayon: Rayon, produits: readonly Produit[] = PRODUITS): string {
+  const pieces = filtrer(produits, rayon, SANS_FILTRE);
+  return pieces.length === 1 ? adresseFiche(pieces[0].id) : adresseGrille({ rayon });
+}
+
+/**
+ * L'adresse après un geste sur la grille, calculée depuis l'adresse du moment
+ * (pas depuis le dernier rendu) : deux cases touchées coup sur coup gardent
+ * toutes les deux leur effet.
+ */
+export function rechercheApres(recherche: string, geste: (r: Recherche) => Recherche): string {
+  return ecrireRecherche(geste(lireRecherche(new URLSearchParams(recherche))));
+}
+
 /* -------------------------------- les libellés ----------------------------- */
 
 export const nombreArticles = (n: number) => (n === 1 ? "1 article" : `${n} articles`);
@@ -200,14 +231,24 @@ export interface Vue {
   aPlat: boolean;
 }
 
+/** La couleur que montre une photo portée : dite par son nom de fichier, sinon le premier coloris de la pièce. */
+export function couleurPortee(p: Produit, src: string): Couleur {
+  if (/-noir\b/.test(src)) return "Noir";
+  if (/-blanc\b/.test(src)) return "Blanc";
+  return p.coloris[0].nom;
+}
+
 /**
- * Les images de la fiche. Les photos portées montrent le premier coloris :
- * elles passent devant pour lui, derrière les vues à plat pour un autre.
+ * Les images de la fiche, pour le coloris choisi : ses photos portées, ses
+ * vues à plat, puis les photos portées de l'autre coloris (elles montrent la
+ * coupe, jamais en premier).
  */
 export function vuesFiche(p: Produit, iColoris: number): Vue[] {
-  const portees = p.porte.map((src) => ({ src, aPlat: false }));
-  const plates = (p.coloris[iColoris] ?? p.coloris[0]).aPlat.map((src) => ({ src, aPlat: true }));
-  return iColoris === 0 ? [...portees, ...plates] : [...plates, ...portees];
+  const coloris = p.coloris[iColoris] ?? p.coloris[0];
+  const portee = (src: string) => ({ src, aPlat: false });
+  const siennes = p.porte.filter((src) => couleurPortee(p, src) === coloris.nom);
+  const autres = p.porte.filter((src) => couleurPortee(p, src) !== coloris.nom);
+  return [...siennes.map(portee), ...coloris.aPlat.map((src) => ({ src, aPlat: true })), ...autres.map(portee)];
 }
 
 /** « Tu aimeras aussi » : quatre pièces, la même ligne d'abord, jamais la pièce elle-même. */

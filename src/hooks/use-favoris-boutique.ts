@@ -16,7 +16,8 @@ const AUCUN: string[] = [];
 let brut: string | null = null;
 let liste: string[] = AUCUN;
 
-function lire(): string[] {
+/** La liste gardée sur l'appareil ; un contenu abîmé (pas une liste, pas des textes) ne casse rien. */
+export function lireFavoris(): string[] {
   let lu: string | null = null;
   try {
     lu = localStorage.getItem(CLE);
@@ -35,7 +36,7 @@ function lire(): string[] {
 }
 
 export function basculerFavori(id: string) {
-  const l = lire();
+  const l = lireFavoris();
   const suite = l.includes(id) ? l.filter((x) => x !== id) : [...l, id];
   try {
     localStorage.setItem(CLE, JSON.stringify(suite));
@@ -55,5 +56,5 @@ export function useFavorisBoutique(): string[] {
       window.removeEventListener("storage", onChange);
     };
   }, []);
-  return useSyncExternalStore(subscribe, lire, () => AUCUN);
+  return useSyncExternalStore(subscribe, lireFavoris, () => AUCUN);
 }

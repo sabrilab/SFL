@@ -9,11 +9,20 @@
 //   5. l'adresse : un aller-retour rend la même recherche, l'inconnu est ignoré ;
 //   6. les libellés : singulier et pluriel ;
 //   7. « Tu aimeras aussi » : quatre pièces, jamais la pièce, sa ligne d'abord ;
-//   8. les vues de la fiche et le coloris montré par la grille ;
+//   8. les vues de la fiche (les photos du coloris choisi d'abord) et le
+//      coloris montré par la grille ;
 //   9. les garde-fous de la DA et de la demande, lus dans le code de la
-//      boutique : ni ton de couleur sur un bouton, ni blanc nu (mode clair),
-//      ni prix barré, ni paiement, ni taille de texte hors jetons, ni marque
-//      d'autrui.
+//      boutique : aucune couleur (ni ton sur un bouton, ni utilité de
+//      couleur), ni blanc nu (mode clair), ni prix barré (classe ou balise),
+//      ni paiement, ni taille de texte hors jetons, ni marque d'autrui ;
+//      chaque image citée existe ; la grille ne demande rien au serveur ;
+//  10. les rayons vus de l'accueil et de la feuille de filtres : un rayon
+//      d'une pièce mène à sa fiche, la section Catégorie suit le rayon ;
+//      deux gestes coup sur coup gardent leur effet ;
+//  11. la place de la boutique dans l'app : son retour mène à Ma carte, celui
+//      de la grille et des fiches à la boutique ; elle est ouverte aux
+//      joueurs Bola ;
+//  12. les favoris gardés sur l'appareil : un contenu abîmé ne casse rien.
 //   npx tsx tools/boutique-check.ts
 import assert from "node:assert/strict";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
@@ -25,16 +34,21 @@ import {
   TAILLES,
   TRANCHES,
   TRIS,
+  adresseFiche,
   adresseGrille,
+  adresseRayon,
   aussi,
   basculer,
+  categoriesDuRayon,
   colorisMontre,
+  couleurPortee,
   ecrireRecherche,
   filtrer,
   lireRecherche,
   nombreArticles,
   nombreCouleurs,
   nombreDeFiltres,
+  rechercheApres,
   trier,
   voirLesArticles,
   vuesFiche,
@@ -42,6 +56,8 @@ import {
   type Recherche,
 } from "../src/lib/boutique/catalogue";
 import { CATEGORIES, PRODUITS, produitDe } from "../src/lib/boutique/produits";
+import { parentDe, titreDe } from "../src/lib/nav";
+import { lireFavoris } from "../src/hooks/use-favoris-boutique";
 
 const racine = new URL("..", import.meta.url).pathname;
 const ids = (l: { id: string }[]) => l.map((p) => p.id);
@@ -196,16 +212,34 @@ for (const p of PRODUITS) {
 {
   const maillot = produitDe("maillot-noirs-blancs")!;
   assert.deepEqual(
-    vuesFiche(maillot, 0).map((v) => v.aPlat),
-    [false, false, true, true],
-    "premier coloris : les photos portées d'abord",
+    vuesFiche(maillot, 0).map((v) => v.src.replace("/boutique/", "").replace(".webp", "")),
+    ["porte-maillot-noir", "a-plat-rt0082-black-front", "a-plat-rt0082-black-back", "porte-maillot-blanc-dos"],
+    "Noir : sa photo portée, ses vues à plat, puis la photo du blanc",
   );
   assert.deepEqual(
-    vuesFiche(maillot, 1).map((v) => v.aPlat),
-    [true, true, false, false],
-    "autre coloris : ses vues à plat d'abord",
+    vuesFiche(maillot, 1).map((v) => v.src.replace("/boutique/", "").replace(".webp", "")),
+    ["porte-maillot-blanc-dos", "a-plat-rt0082-white-front", "a-plat-rt0082-white-back", "porte-maillot-noir"],
+    "Blanc : sa photo portée d'abord, celle du noir en dernier",
   );
-  assert.ok(vuesFiche(maillot, 1)[0].src.includes("white-front"));
+  const polo = produitDe("polo-club")!;
+  assert.ok(vuesFiche(polo, 0)[0].src.includes("porte-polo-blanc"), "le polo blanc : sa photo portée d'abord");
+  assert.deepEqual(
+    vuesFiche(polo, 1).map((v) => v.aPlat),
+    [true, true, false],
+    "le polo noir : ses vues à plat, la photo du blanc en dernier",
+  );
+  for (const p of PRODUITS) {
+    // La première image de la fiche montre toujours le coloris choisi ; aucune image n'est perdue.
+    p.coloris.forEach((c, i) => {
+      const vues = vuesFiche(p, i);
+      assert.equal(vues.length, p.porte.length + c.aPlat.length, `${p.id} ${c.nom} : toutes ses images`);
+      assert.equal(new Set(vues.map((v) => v.src)).size, vues.length, `${p.id} ${c.nom} : sans doublon`);
+      assert.ok(vues[0].aPlat || couleurPortee(p, vues[0].src) === c.nom, `${p.id} ${c.nom} : la première image est de ce coloris`);
+    });
+    // Une photo portée dit sa couleur par son nom, et la pièce a ce coloris.
+    for (const src of p.porte) assert.ok(p.coloris.some((c) => c.nom === couleurPortee(p, src)), `${src} : un coloris de ${p.id}`);
+    assert.ok(!vuesFiche(p, 0)[0].aPlat, `${p.id} : le premier coloris s'ouvre sur une photo portée`);
+  }
   assert.equal(vuesFiche(produitDe("survet-olympe")!, 0).length, 5);
   assert.equal(colorisMontre(maillot, SANS_FILTRE), 0);
   assert.equal(colorisMontre(maillot, f({ couleurs: ["Blanc"] })), 1, "filtre Blanc : le blanc devant");
@@ -230,8 +264,13 @@ for (const p of PRODUITS) {
   assert.ok(fichiers.length >= 13, `tous les fichiers de la boutique sont lus (${fichiers.length})`);
   const INTERDITS: [RegExp, string][] = [
     [/bouton--(or|vert|mauve|braise|rouge)/, "un ton de couleur sur un bouton"],
-    [/text-white\/|border-white\/|bg-white\/|rgba\(255/, "un blanc nu (mode clair)"],
-    [/line-through/, "un prix barré"],
+    [
+      /\b(text|bg|border|outline|fill|stroke|ring|from|via|to|decoration|shadow|accent|caret|divide)-(red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose|or|bleu|rouge|braise|vert|mauve|destructive)\b/,
+      "une couleur (la boutique est en noir et blanc)",
+    ],
+    [/(?<!dark:)\b(text|border|bg|outline|fill|stroke)-white\b|rgba\(255/, "un blanc nu (mode clair)"],
+    [/line-through|<(s|del|strike)[\s>]/, "un prix barré"],
+    [/router\.(push|replace)|useRouter/, "une navigation qui attend le serveur"],
     [/stripe/i, "un paiement"],
     [/text-\[\d+(\.\d+)?px\]/, "une taille de texte hors jetons"],
     [/nike|footkorner/i, "la marque d'un autre"],
@@ -243,9 +282,92 @@ for (const p of PRODUITS) {
       assert.ok(!motif.test(code), `${chemin.replace(racine, "")} : ${quoi} (${motif.exec(code)?.[0]})`);
     }
   }
+  // Chaque image citée en toutes lettres (hero, panneaux, camps, blocs) existe.
+  let citees = 0;
+  for (const chemin of fichiers) {
+    for (const [src] of readFileSync(chemin, "utf8").matchAll(/\/boutique\/[a-z0-9-]+\.webp/g)) {
+      citees++;
+      assert.ok(existsSync(join(racine, "public", src)), `${chemin.replace(racine, "")} : ${src} existe`);
+    }
+  }
+  assert.ok(citees >= 11, `les images de l'accueil sont lues (${citees})`);
+  // La grille change l'adresse sur place : rien ne part au serveur, rien ne s'empile.
+  const grille = readFileSync(join(racine, "src/app/boutique/articles/page.tsx"), "utf8");
+  assert.ok(/window\.history\.replaceState\(/.test(grille) && !/pushState/.test(grille), "la grille remplace l'adresse sur place");
+  assert.ok(/rechercheApres\(window\.location\.search,/.test(grille), "chaque geste part de l'adresse du moment");
+  assert.ok(/matchMedia\("\(min-width: 1024px\)"\)/.test(grille), "la feuille de filtres se ferme en large");
   // Rien de payable : le bouton du panier reste désactivé.
   const fiche = readFileSync(join(racine, "src/app/boutique/articles/[id]/page.tsx"), "utf8");
   assert.ok(/disabled\s+className="bouton-principal[^>]*>\s*Ajouter au panier/.test(fiche), "« Ajouter au panier » est désactivé");
+}
+
+// 10 · Les rayons vus de l'accueil et de la feuille de filtres.
+{
+  assert.equal(adresseRayon("maillots"), "/boutique/articles?rayon=maillots");
+  assert.equal(adresseRayon("vestiaire"), "/boutique/articles?rayon=vestiaire");
+  assert.equal(adresseRayon("tout"), "/boutique/articles");
+  assert.equal(adresseRayon("survets"), adresseFiche("survet-olympe"), "un rayon d'une pièce mène à sa fiche");
+  assert.equal(adresseRayon("fondateurs"), adresseFiche("sweat-fondateurs"));
+  assert.equal(adresseRayon("fondateurs", [...PRODUITS, { ...produitDe("sweat-fondateurs")!, id: "second" }]), "/boutique/articles?rayon=fondateurs", "deux pièces : la grille");
+  assert.equal(adresseRayon("favoris"), "/boutique/articles?rayon=favoris", "aucun favori : la grille, pas une fiche");
+
+  assert.deepEqual(categoriesDuRayon("tout"), CATEGORIES);
+  assert.deepEqual(categoriesDuRayon("favoris"), CATEGORIES);
+  assert.deepEqual(categoriesDuRayon("vestiaire"), ["T-shirts", "Polos", "Survêts"], "le vestiaire : ses catégories seulement");
+  for (const r of ["maillots", "survets", "fondateurs"] as const) assert.deepEqual(categoriesDuRayon(r), [], `${r} : une seule catégorie, pas de section`);
+  // Aucune case offerte ne peut vider un rayon à elle seule.
+  for (const r of RAYONS) for (const c of categoriesDuRayon(r.id)) {
+    if (r.id !== "favoris") assert.ok(filtrer(PRODUITS, r.id, f({ categories: [c] })).length > 0, `${r.id} + ${c} : au moins une pièce`);
+  }
+
+  // Deux gestes coup sur coup : le second part de l'adresse laissée par le premier.
+  const coche = <C extends keyof Filtres>(q: string, section: C, valeur: Filtres[C][number]) =>
+    rechercheApres(q, (r) => ({ ...r, filtres: basculer(r.filtres, section, valeur) }));
+  let q = "?rayon=tout";
+  q = coche(q, "categories", "Maillots");
+  q = coche(`?${q}`, "couleurs", "Blanc");
+  q = coche(`?${q}`, "tailles", "XL");
+  assert.equal(q, "categorie=Maillots&couleur=Blanc&taille=XL", "les trois cases sont gardées");
+  assert.equal(coche(`?${q}`, "couleurs", "Blanc"), "categorie=Maillots&taille=XL", "recocher décoche");
+  assert.equal(rechercheApres("?rayon=maillots&couleur=Blanc&tri=prix-croissant", (r) => ({ ...r, filtres: SANS_FILTRE })), "rayon=maillots&tri=prix-croissant", "« Tout effacer » garde le rayon et le tri");
+  assert.equal(rechercheApres("?couleur=Blanc", (r) => ({ ...r, tri: "prix-decroissant" })), "couleur=Blanc&tri=prix-decroissant", "trier garde les filtres");
+  assert.equal(rechercheApres("", (r) => r), "");
+  // Le marquage dit ce qui est imprimé, pas une personnalisation qui n'existe pas.
+  assert.ok(!PRODUITS.some((p) => p.marquage.some((m) => /nom et numéro/i.test(m))), "aucun « nom et numéro » promis");
+}
+
+// 11 · La place de la boutique dans l'app.
+{
+  assert.deepEqual(parentDe("/boutique"), { href: "/profil", titre: "Ma carte" }, "le retour de la boutique mène à Ma carte");
+  assert.deepEqual(parentDe("/boutique/articles"), { href: "/boutique", titre: "Boutique" });
+  assert.deepEqual(parentDe("/boutique/articles/polo-club"), { href: "/boutique", titre: "Boutique" });
+  assert.equal(titreDe("/boutique/articles?rayon=maillots"), "Boutique");
+  // Ouverte aux joueurs Bola : elle n'est pas une page de la SFL.
+  const porte = readFileSync(join(racine, "src/components/sfl/porte-sfl.tsx"), "utf8");
+  const pages = /const PAGES_SFL[^=]*=\s*\[([\s\S]*?)\n\];/.exec(porte)?.[1] ?? "";
+  assert.ok(pages.includes('"/collection"'), "la liste des pages de la SFL est lue");
+  assert.ok(!pages.includes("/boutique"), "la boutique n'est pas fermée aux joueurs Bola");
+  // Le guichet ne mène à la Collection qu'un joueur de la SFL.
+  const guichet = readFileSync(join(racine, "src/components/boutique/guichet-ballons.tsx"), "utf8");
+  assert.ok(/\{sfl && \(\s*<Link\s+href="\/collection"/.test(guichet), "le lien vers la Collection est réservé à la SFL");
+}
+
+// 12 · Les favoris gardés sur l'appareil.
+{
+  const g = globalThis as unknown as { localStorage?: { getItem: (k: string) => string | null } };
+  let garde: string | null = null;
+  g.localStorage = { getItem: () => garde };
+  const lus = (v: string | null) => {
+    garde = v;
+    return lireFavoris();
+  };
+  assert.deepEqual(lus(null), []);
+  assert.deepEqual(lus('["polo-club",3,null,"disparu"]'), ["polo-club", "disparu"], "seuls les textes sont gardés");
+  assert.deepEqual(ids(filtrer(PRODUITS, "favoris", SANS_FILTRE, lus('["polo-club",3,null,"disparu"]'))), ["polo-club"]);
+  for (const v of ['{"a":1}', "null", "pas du json", '"polo-club"', "12"]) assert.deepEqual(lus(v), [], `${v} : aucun favori, aucune erreur`);
+  g.localStorage = { getItem: () => { throw new Error("refusé"); } };
+  assert.deepEqual(lireFavoris(), [], "stockage refusé : aucun favori");
+  delete g.localStorage;
 }
 
 console.log("boutique-check: ok");

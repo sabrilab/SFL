@@ -3,16 +3,17 @@
 // La fiche d'une pièce de la boutique (une vraie page depuis le 12/11/2026 :
 // le retour de l'iPhone y marche, son adresse se partage).
 //
-//   · la galerie : les grandes images défilent au doigt bord à bord (photos
-//     portées, puis les vues à plat du coloris choisi sur la tuile grise),
+//   · la galerie : les grandes images défilent au doigt bord à bord (les
+//     photos portées du coloris choisi, ses vues à plat sur la tuile grise,
+//     puis les photos portées de l'autre coloris),
 //     l'indicateur « 1/4 », et les vignettes dessous : en toucher une amène
 //     son image. Sur ordinateur, les vignettes sont en colonne à gauche de
 //     la galerie, et les informations à droite restent en vue ;
 //   · le badge, le nom, le type, le prix ;
 //   · les coloris en vignettes photo (la vue de devant de chacun) ;
 //   · les tailles sur l'échelle complète S à 3XL : une taille que la pièce
-//     n'a pas est barrée, grisée, inerte. « Guide des tailles » ouvre une
-//     feuille : les mesures n'ont pas été lues, elles sont « Bientôt » ;
+//     n'a pas est barrée, grisée, inerte. « Guide des tailles » est écrit
+//     mais n'ouvre rien : les mesures n'ont pas été lues, il est « Bientôt » ;
 //   · « Ajouter au panier » reste « Bientôt » : aucun paiement n'est
 //     branché, rien n'est payable. « Favori » garde la pièce sur l'appareil ;
 //   · les accordéons : Description, Marquage, Matière et entretien,
@@ -21,7 +22,7 @@
 //   · « Tu aimeras aussi » : quatre pièces, la même ligne d'abord.
 // Un identifiant inconnu : « Article introuvable » et le lien vers la boutique.
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useParams } from "next/navigation";
@@ -31,7 +32,6 @@ import { CarteProduit } from "@/components/boutique/carte-produit";
 import { EnTeteBoutique } from "@/components/boutique/en-tete";
 import { Rail } from "@/components/boutique/rail";
 import { FOND_TUILE, Tuile } from "@/components/boutique/tuile";
-import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { basculerFavori, useFavorisBoutique } from "@/hooks/use-favoris-boutique";
 import { TAILLES, aussi, prix, vuesFiche, type Vue } from "@/lib/boutique/catalogue";
 import { produitDe, type Produit } from "@/lib/boutique/produits";
@@ -85,7 +85,7 @@ function Galerie({ vues }: { vues: Vue[] }) {
   };
 
   return (
-    <div className="flex flex-col gap-3 lg:flex-row-reverse lg:items-start">
+    <div className="flex flex-col gap-3 sm:max-lg:mx-auto sm:max-lg:w-full sm:max-lg:max-w-[520px] lg:flex-row-reverse lg:items-start">
       <div className="relative -mx-5 min-w-0 flex-1 sm:mx-0">
         <Rail ref={rail} className="relative">
           {vues.map((v, i) => (
@@ -152,9 +152,9 @@ function Ligne({ titre, children }: { titre: string; children: React.ReactNode }
 function Fiche({ produit }: { produit: Produit }) {
   const [coloris, setColoris] = useState(0);
   const [taille, setTaille] = useState<string | null>(null);
-  const [guide, setGuide] = useState(false);
   const favori = useFavorisBoutique().includes(produit.id);
-  const vues = vuesFiche(produit, coloris);
+  // Le même tableau tant que le coloris ne change pas : la galerie n'a pas à se rebrancher.
+  const vues = useMemo(() => vuesFiche(produit, coloris), [produit, coloris]);
 
   return (
     <>
@@ -190,9 +190,10 @@ function Fiche({ produit }: { produit: Produit }) {
           <div className="flex flex-col gap-3">
             <div className="flex items-baseline justify-between">
               <p className="text-lecture font-bold">Taille</p>
-              <button type="button" onClick={() => setGuide(true)} className="text-corps font-semibold underline underline-offset-4">
+              <p className="flex items-baseline gap-2 text-corps text-encre-3">
                 Guide des tailles
-              </button>
+                <span className="mono-label">Bientôt</span>
+              </p>
             </div>
             <div className="grid grid-cols-3 gap-2">
               {TAILLES.map((t) => {
@@ -266,7 +267,6 @@ function Fiche({ produit }: { produit: Produit }) {
                 <p className="text-ligne">Fabriqué à la commande, 1 à 3 jours</p>
                 <Ligne titre="Livraison">Bientôt</Ligne>
                 <Ligne titre="Retours">Bientôt</Ligne>
-                <p className="text-corps text-encre-3 tabular-nums">Réf. {produit.tapstitch}</p>
               </div>
             </Accordeon>
           </div>
@@ -283,20 +283,6 @@ function Fiche({ produit }: { produit: Produit }) {
           </Rail>
         </div>
       </section>
-
-      <Sheet open={guide} onOpenChange={setGuide} titre="le guide des tailles">
-        <SheetContent side="bottom" className="mx-auto w-full gap-5 rounded-t-[28px] px-5 pt-12 pb-[calc(env(safe-area-inset-bottom,0px)+24px)] sm:max-w-lg">
-          <SheetTitle className="titre-lettrage text-titre-m leading-none font-black">Guide des tailles</SheetTitle>
-          <p className="flex flex-wrap gap-x-5 gap-y-1 text-titre font-bold tabular-nums">
-            {produit.tailles.map((t) => (
-              <span key={t}>{t}</span>
-            ))}
-          </p>
-          <div className="border-t border-contraste/8 pt-4">
-            <Ligne titre="Mesures">Bientôt</Ligne>
-          </div>
-        </SheetContent>
-      </Sheet>
     </>
   );
 }
