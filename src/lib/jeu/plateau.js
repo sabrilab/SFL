@@ -9,7 +9,7 @@
 //
 // Jusqu'au jet 7, ce fichier construisait toute la salle par le code à l'ouverture (1 104 maillages, 24 lumières,
 // 804 draw calls par image en téléphone). Ce fichier-là est gardé tel quel sous le nom plateau-code.js : il sert de
-// repli si le GLB ne se charge pas, et de point de comparaison (?decor=code).
+// repli si le GLB ne se charge pas ou ne se monte pas, et de point de comparaison (option decor: "code").
 //
 // Ici, la salle vient de plateau-telephone.glb ou plateau-film.glb, exportés du fichier Blender versionné dans
 // sabrilab/bola-app (blender/plateau/ : construire.py, plateau.blend, cuire.py, assembler.mjs, LISEZ-MOI.md) :
@@ -28,8 +28,11 @@
 // brillantes (sol, marbre, laque) : l'hémisphère du jet 7 et deux projecteurs au-dessus des lignes de touche, qui
 // valent la somme des grappes. Le décor cuit ne les évalue pas. Les deux projecteurs portent l'ombre des objets posés
 // (cartes), reçue par un plan transparent sur le gazon et calculée une seule fois (majOmbres()).
+// La lampe chaude du tunnel (une PointLight au jet 7) n'est pas une quatrième lumière : sa part diffuse est cuite, et
+// son reflet est calculé dans les seules matières qui le montraient (couloir, arche laquée, sol) ; de même pour le halo
+// sous le cube, sur l'acier du gril (eclat()).
 //
-// L'API ne change pas : creerPlateau(renderer, { qualite, base, largeur, hauteur }) rend
+// L'API ne change pas : creerPlateau(renderer, { qualite, base, largeur, hauteur, decor }) rend
 // { scene, camera, renderer, composer, emplacements, points, plans, cadrer, rendre, majTemps, temps, bloom, etalon,
 //   trainees, fxaa, ao, envCube, lyres, flashs, majOmbres, majReflets, logos, DIM }.
 // Emplacements : ecranN, ecranS, ecranE, ecranO, bandeau, mur, banniereG, banniereD, panneauxN, panneauxS, panneauxE,
@@ -50,7 +53,6 @@ import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
 import { FXAAPass } from "three/examples/jsm/postprocessing/FXAAPass.js";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { MeshoptDecoder } from "three/examples/jsm/libs/meshopt_decoder.module.js";
-/* eslint-disable -- copie du plateau, gardée telle quelle pour suivre ses versions */
 
 // ---------------------------------------------------------------- dimensions (celles du jet 7 ; verifier.py contrôle le .blend contre elles)
 export const DIM = {
@@ -64,21 +66,28 @@ export const DIM = {
   cube: { y: 12, w: 8.3, h: 4.67, d: 8.3 },
   murX: -27,               // le mur BOLA (côté ouest)
 };
+// Dans le jeu, la caméra de télé regarde la tribune de face, sièges posés : avec les réglages du viewer elle sortait
+// presque deux fois plus claire qu'au jet 7 (contrôle du 13/11). Ces niveaux-là ne valent que pour jeuTel et jeuPlein.
+const NIVEAUX_JEU = { places: 1.1, LM_tribunes: 0.6 };
 // glb : le fichier chargé ; ombres : l'ombre des objets posés ; couches : fibres du gazon ; foule : part des places
 // occupées (× 0,8) ; fouleFine : gabarit détaillé du spectateur ; le reste comme au jet 7
 const QUALITES = {
   telephone: { glb: "telephone", ombres: true, tailleOmbre: 1024, couches: 5, foule: 0.42, fouleFine: false, bloom: 0.5, msaa: 0, pr: 1, trainees: false, sieges: false, fxaa: true, flashs: 260 },
   film: { glb: "film", ombres: true, tailleOmbre: 2048, couches: 14, foule: 1, fouleFine: true, bloom: 1, msaa: 4, pr: 1, trainees: true, sieges: true, fxaa: false, flashs: 700 },
   // le jeu (SFL /jouer) sur ordinateur : le plateau entier (sièges, foule fine, gazon épais), sans le MSAA
-  jeuPlein: { glb: "film", ombres: true, tailleOmbre: 2048, couches: 10, foule: 1, fouleFine: true, bloom: 0.8, msaa: 0, pr: 1, trainees: false, sieges: true, fxaa: true, flashs: 520 },
+  jeuPlein: { glb: "film", ombres: true, tailleOmbre: 2048, couches: 10, foule: 1, fouleFine: true, bloom: 0.8, msaa: 0, pr: 1, trainees: false, sieges: true, fxaa: true, flashs: 520, niveaux: NIVEAUX_JEU },
   // le jeu sur téléphone : le plateau du téléphone, avec ses sièges et un gazon plus épais
-  jeuTel: { glb: "telephone", ombres: true, tailleOmbre: 1024, couches: 7, foule: 0.75, fouleFine: false, bloom: 0.6, msaa: 0, pr: 1, trainees: false, sieges: true, fxaa: true, flashs: 300 },
+  jeuTel: { glb: "telephone", ombres: true, tailleOmbre: 1024, couches: 7, foule: 0.75, fouleFine: false, bloom: 0.6, msaa: 0, pr: 1, trainees: false, sieges: true, fxaa: true, flashs: 300, niveaux: NIVEAUX_JEU },
   // l'ancien réglage du jeu, gardé pour les appareils faibles
   jeu: { glb: "telephone", ombres: true, tailleOmbre: 1024, couches: 3, foule: 0.3, fouleFine: false, bloom: 0.5, msaa: 0, pr: 1, trainees: false, sieges: false, fxaa: true, flashs: 140 },
 };
 // Réglages de l'éclairage cuit, faits en comparant les six plans aux captures du jet 7 (voir le compte rendu) :
-// un facteur par atlas et par lot de sommets, sans toucher aux fichiers cuits.
-const NIVEAUX = { LM_sols: 1, LM_tribunes: 0.8, LM_ouest: 1, LM_salle: 1, st_charpente: 1, st_mobilier: 1, places: 1.7, filets: 0.55, voileGazon: 0.04 };
+// un facteur par atlas (ou par maillage, quand il porte son nom : st_ouest) et par lot de sommets, sans toucher aux fichiers cuits.
+// gazon et voileGazon : la lumière cuite du gazon (teintée par sa couleur) et la part non teintée qui rend le reflet mat
+// de la salle sur l'herbe du jet 7 (une matière éclairée). Les deux valeurs sont ajustées sur quatre zones du plan large
+// du jet 7 (13/11 : 1 et 0,04 donnaient un gazon délavé, saturation 0,28 contre 0,35).
+// ombre : l'opacité de l'ombre des objets posés (au jet 7, une ombre n'ôtait qu'un projecteur sur dix).
+const NIVEAUX = { LM_sols: 1, LM_tribunes: 0.8, LM_ouest: 1, st_ouest: 0.8, LM_salle: 1, st_charpente: 1, st_mobilier: 1, places: 1.7, filets: 0.55, gazon: 1.2, voileGazon: 0.024, ombre: 0.22 };
 // les deux projecteurs en temps réel : au-dessus des lignes de touche nord et sud, visés comme les grappes du centre
 const PROJECTEURS = { intensite: 2800, portee: 60, angle: 0.95, penombre: 0.7 };
 
@@ -151,18 +160,20 @@ const ETALON = {
 
 // ---------------------------------------------------------------- la scène
 export async function creerPlateau(renderer, options = {}) {
-  const { qualite = "film", base = "./" } = options;
+  const { qualite = "film", base = "./", decor = null } = options;
   const Q = QUALITES[qualite] || QUALITES.film;
-  // ?decor=code : le plateau du jet 7 construit par le code (comparaison) ; même repli si le GLB manque
+  // decor: "code" : le plateau du jet 7 construit par le code, pour comparer. C'est une option de l'appelant (le viewer la
+  // lit dans son URL), pas un paramètre d'URL lu ici : le jeu ne la passe pas, /jouer?decor=code ne change donc rien.
+  // Même repli si le GLB manque, est illisible, ou s'il lui manque de quoi monter la scène.
   const repli = async (raison) => { if (raison) console.warn("Plateau : repli sur le décor construit par le code.", raison); return (await import("./plateau-code.js")).creerPlateau(renderer, options); };
-  if (typeof location !== "undefined" && new URLSearchParams(location.search).get("decor") === "code") return repli(null);
-  let gltf;
+  if (decor === "code") return repli(null);
   marque("debut");
-  try { gltf = await new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).loadAsync(base + "plateau-" + Q.glb + ".glb"); }
-  catch (e) { return repli(e); }
-  marque("glb");
-  await pause();
-  return monter(renderer, gltf, Q, options);
+  try {
+    const gltf = await new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).loadAsync(base + "plateau-" + Q.glb + ".glb");
+    marque("glb");
+    await pause();
+    return await monter(renderer, gltf, Q, options);
+  } catch (e) { return repli(e); }
 }
 
 async function monter(renderer, gltf, Q, { base = "./", largeur = 1080, hauteur = 1920 } = {}) {
@@ -176,6 +187,9 @@ async function monter(renderer, gltf, Q, { base = "./", largeur = 1080, hauteur 
   const envCube = { value: null };
   const decor = gltf.scene; decor.name = "plateau"; scene.add(decor); decor.updateMatrixWorld(true);
   const infos = gltf.scene.userData.plateau || {};
+  const N = { ...NIVEAUX, ...(Q.niveaux || {}) };
+  // un GLB lisible mais incomplet ne doit pas donner une salle à trous : sans ses pièces maîtresses, on passe au repli
+  for (const n of ["plan_sol", "st_sol", "st_salle", "st_charpente", "st_mobilier", "gab_siege", "gab_spectateur", "emplacement_sol", "emplacement_ecranN"]) if (!decor.getObjectByName(n)) throw new Error("GLB incomplet : « " + n + " » manque");
 
   // ---- les logos (SVG de la marque) et les images par défaut des écrans
   const [logoSymbole, logoBola, sigleSfl, logoBolaNoir, sigleSflNoir] = await Promise.all([svgImage(base + "symbole-blanc.svg"), svgImage(base + "logo-blanc.svg"), svgImage(base + "sfl.svg"),
@@ -232,12 +246,32 @@ async function monter(renderer, gltf, Q, { base = "./", largeur = 1080, hauteur 
   const noeuds = {}; decor.traverse((o) => { if (o.name) noeuds[o.name] = o; });
   const matieres = new Map(); // une matière par rôle et par atlas, partagée
   const une = (cle, creer) => { if (!matieres.has(cle)) matieres.set(cle, creer()); return matieres.get(cle); };
-  const lumiereDe = (m, atlas) => { const t = m.aoMap; t.colorSpace = THREE.SRGBColorSpace; return { lightMap: t, lightMapIntensity: (m.userData.echelle || 1) * Math.PI * (NIVEAUX[atlas] ?? 1) }; };
+  const lumiereDe = (m, atlas, lot) => { const t = m.aoMap; t.colorSpace = THREE.SRGBColorSpace; return { lightMap: t, lightMapIntensity: (m.userData.echelle || 1) * Math.PI * (N[lot] ?? N[atlas] ?? 1) }; };
   // une matière brillante garde le reflet de la salle et l'éclat des projecteurs ; son diffus vient de la lightmap :
   // on retire donc l'hémisphère (déjà cuite) et le diffus direct des projecteurs en temps réel
   const diffusCuit = (m) => { m.onBeforeCompile = (s) => { s.fragmentShader = s.fragmentShader
     .replace("#include <lights_fragment_maps>", "irradiance = vec3(0.0);\n#include <lights_fragment_maps>")
     .replace("#include <lights_fragment_end>", "#include <lights_fragment_end>\nreflectedLight.directDiffuse = vec3(0.0);"); }; m.customProgramCacheKey = () => "bola-plateau-diffus-cuit-v1"; };
+  // l'éclat de deux lampes du jet 7 qui ne sont plus des lumières (elles coûteraient à toutes les matières) : la lampe
+  // chaude du tunnel (PointLight 0xffb57a, 14 cd, 12 m, dans le couloir) et le halo sous le cube (0xdfe6ff, 55 cd, 20 m).
+  // Leur part diffuse est cuite ; leur reflet, qui dépend de l'œil, est calculé ici (GGX, une lampe par matière), à portée
+  // de la lampe seulement. normale : l'expression GLSL de la normale en repère monde ; f0 : le reflet de face.
+  const TUNNEL = { pos: new THREE.Vector3(DIM.murX - 2, 2.6, 0), couleur: new THREE.Color(0xffb57a).multiplyScalar(14), portee: 12 };
+  const HALO = { pos: new THREE.Vector3(0, DIM.cube.y - 3, 0), couleur: new THREE.Color(0xdfe6ff).multiplyScalar(55), portee: 20 };
+  const eclat = (m, lampe, rugosite, f0, normale, cle) => { const avant = m.onBeforeCompile;
+    m.onBeforeCompile = (s, r) => { if (avant) avant(s, r); s.uniforms.uLampePos = { value: lampe.pos }; s.uniforms.uLampeCoul = { value: lampe.couleur };
+      s.vertexShader = s.vertexShader.replace("#include <common>", "#include <common>\nvarying vec3 vMondeT;").replace("#include <project_vertex>", "#include <project_vertex>\nvMondeT = (modelMatrix * vec4(transformed, 1.0)).xyz;");
+      s.fragmentShader = s.fragmentShader.replace("#include <common>", `#include <common>
+        varying vec3 vMondeT; uniform vec3 uLampePos; uniform vec3 uLampeCoul;
+        vec3 eclatLampe(vec3 Nm) { vec3 Lv = uLampePos - vMondeT; float d2 = dot(Lv, Lv); if (d2 > ${(lampe.portee ** 2).toFixed(1)}) return vec3(0.0);
+          float d = sqrt(d2); vec3 L = Lv / d, V = normalize(cameraPosition - vMondeT); float nl = dot(Nm, L), nv = dot(Nm, V); if (nl <= 0.0 || nv <= 0.0) return vec3(0.0);
+          vec3 H = normalize(L + V); float nh = max(dot(Nm, H), 0.0), a = ${(rugosite * rugosite).toFixed(4)}, a2 = a * a, dn = nh * nh * (a2 - 1.0) + 1.0, D = a2 / (3.14159265 * dn * dn);
+          float k = a * 0.5, G = 1.0 / ((nl * (1.0 - k) + k) * (nv * (1.0 - k) + k)), F = ${f0.toFixed(4)} + ${(1 - f0).toFixed(4)} * pow(1.0 - max(dot(V, H), 0.0), 5.0);
+          float fen = 1.0 - pow(d / ${lampe.portee.toFixed(1)}, 4.0); fen = clamp(fen, 0.0, 1.0); fen *= fen;
+          return uLampeCoul * (D * G * F * 0.25 * nl * fen / max(d2, 0.01)); }`)
+        .replace("#include <opaque_fragment>", "outgoingLight += eclatLampe(" + normale + ");\n#include <opaque_fragment>"); };
+    const cleAvant = m.customProgramCacheKey ? m.customProgramCacheKey() : ""; m.customProgramCacheKey = () => cleAvant + "|" + cle; };
+  const NORMALE_PLATE = "normalize(cross(dFdx(vMondeT), dFdy(vMondeT)))", NORMALE_MATIERE = "inverseTransformDirection(normal, viewMatrix)";
   const FACE = THREE.FrontSide; // le GLB sort de Blender en double face ; le décor fusionné n'a que des faces tournées vers la salle
   const plansEcran = {}; const gabarits = {}; const lotsPlaces = []; const aRetirer = [];
   let planSol = null;
@@ -248,16 +282,33 @@ async function monter(renderer, gltf, Q, { base = "./", largeur = 1080, hauteur 
     if (o.name.startsWith("places_")) { lotsPlaces.push(o); aRetirer.push(o); return; }
     if (genre === "ecran") { const d = o.userData; const mat = matEcran(d.pix || [100, 100], d.lum ?? 1.6, d.defile || [0, 0], d.aEnv || 0); o.material = mat; (plansEcran[d.emplacement] ||= []).push({ o, mat, format: d.format }); return; }
     if (genre === "gazon") { planSol = o; return; }
-    if (genre === "cuit") o.material = une("cuit:" + ex.lumiere, () => new THREE.MeshBasicMaterial({ color: 0xffffff, side: FACE, ...lumiereDe(m, ex.lumiere) }));
-    else if (genre === "cuit_sommets") o.material = une("sommets:" + o.name, () => new THREE.MeshBasicMaterial({ vertexColors: true, side: FACE, color: new THREE.Color().setScalar((o.userData.echelle || 1) * (NIVEAUX[o.name] ?? 1)) }));
+    if (genre === "cuit") o.material = une("cuit:" + ex.lumiere, () => { const mat = new THREE.MeshBasicMaterial({ color: 0xffffff, side: FACE, ...lumiereDe(m, ex.lumiere, o.name) });
+      if (ex.lumiere === "LM_ouest") eclat(mat, TUNNEL, 0.45, 0.04, NORMALE_PLATE, "bola-plateau-tunnel-couloir-v2"); return mat; });
+    else if (genre === "cuit_sommets") o.material = une("sommets:" + o.name, () => { const mat = new THREE.MeshBasicMaterial({ vertexColors: true, side: FACE, color: new THREE.Color().setScalar((o.userData.echelle || 1) * (N[o.name] ?? 1)) });
+      if (o.name === "st_mobilier") eclat(mat, HALO, 0.42, 0.012, NORMALE_PLATE, "bola-plateau-halo-mobilier-v1"); return mat; }); // (l'acier du gril sous le cube : rugosité 0,42, métal sombre)
     else if (genre === "emissif") o.material = une("emissif", () => new THREE.MeshBasicMaterial({ vertexColors: true, side: FACE, color: new THREE.Color().setScalar(ex.facteur || 1) }));
     else if (genre === "emissif_tex") o.material = une("emissif_tex", () => { m.map.anisotropy = 8; return new THREE.MeshBasicMaterial({ map: m.map, vertexColors: true, side: FACE, color: new THREE.Color().setScalar(ex.facteur || 1) }); });
     else if (genre === "alpha") o.material = une("alpha:" + m.name, () => ex.coupe
-      ? new THREE.MeshBasicMaterial({ map: m.map, color: new THREE.Color(...ex.couleur).multiplyScalar(NIVEAUX.filets), alphaTest: ex.coupe, side: THREE.DoubleSide })
+      ? new THREE.MeshBasicMaterial({ map: m.map, color: new THREE.Color(...ex.couleur).multiplyScalar(N.filets), alphaTest: ex.coupe, side: THREE.DoubleSide })
       : new THREE.MeshBasicMaterial({ map: m.map, color: new THREE.Color(...ex.couleur), transparent: true, opacity: ex.opacite ?? 1, depthWrite: false, side: THREE.DoubleSide, forceSinglePass: true }));
-    else if (genre === "verre") { m.depthWrite = false; m.forceSinglePass = true; m.envMapIntensity = 1; }
+    else if (genre === "verre") { m.depthWrite = false; m.forceSinglePass = true; m.envMapIntensity = 1;
+      // le verre ne garde que le reflet de la salle et l'ambiance : les deux projecteurs en temps réel, plus larges que les
+      // grappes du jet 7, posaient sur la vitre des loges un éclat et un pan gris qui n'existaient pas
+      m.onBeforeCompile = (s) => { s.fragmentShader = s.fragmentShader.replace("#include <lights_fragment_end>", "#include <lights_fragment_end>\nreflectedLight.directDiffuse = vec3(0.0); reflectedLight.directSpecular = vec3(0.0);"); };
+      m.customProgramCacheKey = () => "bola-plateau-verre-v1"; }
     else if (genre === "brillant") { m.side = FACE; if (ex.env != null) m.envMapIntensity = ex.env;
-      if (ex.lumiere && m.aoMap) { Object.assign(m, lumiereDe(m, ex.lumiere)); m.aoMap = null; diffusCuit(m); if (m.map) m.map.anisotropy = 8; } }
+      if (ex.lumiere && m.aoMap) { Object.assign(m, lumiereDe(m, ex.lumiere)); m.aoMap = null; diffusCuit(m); if (m.map) m.map.anisotropy = 8; }
+      if (o.name === "st_sol") eclat(m, TUNNEL, m.roughness, 0.04, NORMALE_MATIERE, "bola-plateau-tunnel-sol-v2");
+      if (o.name === "st_noir_brillant") { eclat(m, TUNNEL, m.roughness, 0.04, NORMALE_MATIERE, "bola-plateau-tunnel-laque-v2");
+        // hors du plateau (tribunes nord, sud et est), la laque ne reçoit pas les deux projecteurs en temps réel : plus larges
+        // et plus forts que les grappes du jet 7, ils s'y reflétaient (un pan gris sur la tribune d'en face)
+        const av = m.onBeforeCompile, cle = m.customProgramCacheKey();
+        m.onBeforeCompile = (s, r) => { av(s, r); s.fragmentShader = s.fragmentShader.replace("#include <lights_fragment_end>", `#include <lights_fragment_end>
+          if (abs(vMondeT.z) > 16.5 || vMondeT.x > 19.0) { reflectedLight.directDiffuse = vec3(0.0); reflectedLight.directSpecular = vec3(0.0);
+          #ifdef USE_CLEARCOAT
+            clearcoatSpecularDirect = vec3(0.0);
+          #endif
+          }`); }; m.customProgramCacheKey = () => cle + "|bola-plateau-laque-tribunes-v1"; } } // (l'arche du tunnel : c'est elle qui portait les deux points chauds)
   });
   for (const o of aRetirer) o.removeFromParent();
   marque("matieres");
@@ -277,12 +328,12 @@ async function monter(renderer, gltf, Q, { base = "./", largeur = 1080, hauteur 
   let texGazon = null, imageGazon = null;
   if (planSol) {
     const mg = planSol.material; texGazon = mg.map; imageGazon = texGazon.image; texGazon.anisotropy = 8;
-    const lm = lumiereDe(mg, "LM_sols"); const teinte = new THREE.Color(...(mg.userData.couleur || [0.323, 0.323, 0.323]));
-    // le gazon du jet 7 était une matière éclairée : sous une lumière rasante, son reflet mat le blanchissait un peu.
-    // Sans éclairage au pixel, ce voile est rendu par une part de lumière non teintée.
-    const VOILE = "reflectedLight.indirectDiffuse *= diffuseColor.rgb + vec3(" + NIVEAUX.voileGazon.toFixed(3) + ");";
+    const lm = lumiereDe(mg, "LM_sols"); lm.lightMapIntensity *= N.gazon; const teinte = new THREE.Color(...(mg.userData.couleur || [0.323, 0.323, 0.323]));
+    // le gazon du jet 7 était une matière éclairée : le reflet mat de la salle le blanchissait un peu. Sans éclairage au
+    // pixel, ce voile est rendu par une part de lumière non teintée (divisée par le niveau du gazon : elle ne le suit pas).
+    const VOILE = "reflectedLight.indirectDiffuse *= diffuseColor.rgb + vec3(" + (N.voileGazon / N.gazon).toFixed(4) + ");";
     planSol.material = new THREE.MeshBasicMaterial({ map: texGazon, color: teinte, side: THREE.DoubleSide, ...lm });
-    planSol.material.onBeforeCompile = (s) => { s.fragmentShader = s.fragmentShader.replace("reflectedLight.indirectDiffuse *= diffuseColor.rgb;", VOILE); }; planSol.material.customProgramCacheKey = () => "bola-plateau-gazon-v1";
+    planSol.material.onBeforeCompile = (s) => { s.fragmentShader = s.fragmentShader.replace("reflectedLight.indirectDiffuse *= diffuseColor.rgb;", VOILE); }; planSol.material.customProgramCacheKey = () => "bola-plateau-gazon-v2";
     const geo = planSol.geometry.clone().applyMatrix4(planSol.matrixWorld);
     const fibres = new THREE.MeshBasicMaterial({ map: texGazon, side: THREE.DoubleSide, ...lm });
     fibres.onBeforeCompile = (s) => {
@@ -296,7 +347,7 @@ async function monter(renderer, gltf, Q, { base = "./", largeur = 1080, hauteur 
           float rr = length(fp - o * 0.5) / (0.5 * (1.0 - vCouche * 0.85));
           if (vCouche > hb || rr > 1.0) discard; }`).replace("reflectedLight.indirectDiffuse *= diffuseColor.rgb;", VOILE);
     };
-    fibres.customProgramCacheKey = () => "bola-plateau-fibres-v1";
+    fibres.customProgramCacheKey = () => "bola-plateau-fibres-v2";
     const im = new THREE.InstancedMesh(geo, fibres, Q.couches); const M = new THREE.Matrix4(), rangs = new Float32Array(Q.couches), col = new THREE.Color();
     for (let i = 1; i <= Q.couches; i++) { const u = i / Q.couches; im.setMatrixAt(i - 1, M.makeTranslation(0, u * hauteurFibre, 0)); rangs[i - 1] = u; im.setColorAt(i - 1, col.setScalar(0.42 + 0.42 * u)); }
     geo.setAttribute("aCouche", new THREE.InstancedBufferAttribute(rangs, 1)); im.name = "gazon_fibres"; im.frustumCulled = false; im.renderOrder = -1; scene.add(im);
@@ -308,7 +359,7 @@ async function monter(renderer, gltf, Q, { base = "./", largeur = 1080, hauteur 
       if (src) { const w = 4.2 * m, h = w * src.height / src.width; g.globalAlpha = 0.5; g.drawImage(src, c.width / 2 - w / 2, c.height / 2 - h / 2, w, h); g.globalAlpha = 1; }
       texGazon.image = c; texGazon.needsUpdate = true; return this; } };
   // l'ombre des objets posés sur le terrain (cartes) : un plan transparent qui ne reçoit que l'ombre
-  if (Q.ombres) { const g = new THREE.PlaneGeometry(DIM.TL, DIM.Tl); g.rotateX(-Math.PI / 2); const o = new THREE.Mesh(g, new THREE.ShadowMaterial({ opacity: 0.42, depthWrite: false }));
+  if (Q.ombres) { const g = new THREE.PlaneGeometry(DIM.TL, DIM.Tl); g.rotateX(-Math.PI / 2); const o = new THREE.Mesh(g, new THREE.ShadowMaterial({ opacity: N.ombre, depthWrite: false }));
     o.position.y = hauteurFibre + 0.004; o.receiveShadow = true; o.name = "ombre_terrain"; scene.add(o); }
   marque("gazon");
 
@@ -319,14 +370,9 @@ async function monter(renderer, gltf, Q, { base = "./", largeur = 1080, hauteur 
     const r = alea(42); const personnes = [], flashs = [], sieges = []; const v = new THREE.Vector3(), q = new THREE.Quaternion(), M = new THREE.Matrix4(), col = new THREE.Color(), un = new THREE.Vector3(1, 1, 1);
     const ordre = ["places_N", "places_S", "places_E"].map((n) => lotsPlaces.find((o) => o.name === n)).filter(Boolean);
     for (const lot of ordre) {
-      const mw = lot.matrixWorld, n = lot.count, im = lot.instanceMatrix.array; let ic = lot.instanceColor ? lot.instanceColor.array : null, pasC = 3;
+      const mw = lot.matrixWorld, n = lot.count, im = lot.instanceMatrix.array; const ic = lot.instanceColor ? lot.instanceColor.array : null, pasC = lot.instanceColor ? lot.instanceColor.itemSize : 3; // (RVBA dans le GLB : 4)
       const norm = lot.instanceColor && lot.instanceColor.normalized ? 1 / (ic instanceof Uint16Array ? 65535 : 255) : 1;
-      // la lumière des places tient en trois octets par place, alignés sur quatre dans le fichier ; la vue du GLB ne
-      // déclare ce pas que dans son extension meshopt, que GLTFLoader ne lit pas : on relit donc le tampon au bon pas
-      if (ic) { const def = (gltf.parser.json.nodes || []).find((d) => d.name === lot.name), acc = def && gltf.parser.json.accessors[def.extensions?.EXT_mesh_gpu_instancing?.attributes?._COLOR_0];
-        const vue = acc && gltf.parser.json.bufferViews[acc.bufferView], pas = vue && (vue.byteStride || vue.extensions?.EXT_meshopt_compression?.byteStride);
-        if (pas && pas !== 3 * ic.BYTES_PER_ELEMENT && ic.byteOffset + n * pas <= ic.buffer.byteLength) { pasC = pas / ic.BYTES_PER_ELEMENT; ic = new ic.constructor(ic.buffer, ic.byteOffset, n * pasC); } }
-      const ech = (lot.userData.echelle || 1) * NIVEAUX.places; lot.getWorldQuaternion(q); const qt = q.clone();
+      const ech = (lot.userData.echelle || 1) * N.places; lot.getWorldQuaternion(q); const qt = q.clone();
       for (let i = 0; i < n; i++) {
         const x = im[i * 16 + 12], y = im[i * 16 + 13], z = im[i * 16 + 14] + 0.08; // la place du siège ; le siège lui-même recule de 8 cm
         const lum = ic ? [ic[i * pasC] * norm * ech, ic[i * pasC + 1] * norm * ech, ic[i * pasC + 2] * norm * ech] : [ech, ech, ech];
@@ -416,7 +462,7 @@ async function monter(renderer, gltf, Q, { base = "./", largeur = 1080, hauteur 
   // ---- les trois lumières en temps réel (le décor est cuit : elles servent aux objets posés et à l'éclat des matières brillantes)
   scene.add(new THREE.HemisphereLight(0xffe2c4, 0x1a1612, 1.5));
   for (const sz of [-1, 1]) { const P = PROJECTEURS; const s = new THREE.SpotLight(0xfff1df, P.intensite, P.portee, P.angle, P.penombre, 2); s.position.set(0, DIM.portique - 0.6, sz * 14); s.target.position.set(0, 0, sz * 2.8); scene.add(s, s.target);
-    if (Q.ombres) { s.castShadow = true; s.shadow.mapSize.set(Q.tailleOmbre, Q.tailleOmbre); s.shadow.bias = -0.0004; s.shadow.normalBias = 0.03; s.shadow.radius = 6; s.shadow.blurSamples = 12; s.shadow.camera.near = 4; s.shadow.camera.far = 40; } }
+    if (Q.ombres) { s.castShadow = true; s.shadow.mapSize.set(Q.tailleOmbre, Q.tailleOmbre); s.shadow.bias = -0.0004; s.shadow.normalBias = 0.03; s.shadow.radius = 6; s.shadow.blurSamples = 12; s.shadow.camera.near = 4; s.shadow.camera.far = 40; s.shadow.focus = 0.66; } } // (focus : la carte d'ombre garde le cône des grappes du jet 7, 0,62 rad)
 
   // ---- les points utiles : les nœuds point_* du GLB (les valeurs du jet 7 en repli)
   const C = DIM.cube;
