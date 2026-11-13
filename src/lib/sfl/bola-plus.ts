@@ -22,9 +22,14 @@
 // Ce que la page montre de l'abonnement (retour de Sabri, 12/11/2026 23:08 :
 // « une meilleure mise en avant des avantages », un grand visuel par
 // avantage) : AFFICHE et AVANTAGES, plus bas. La carte « Tes maillots » peut
-// montrer les maillots portés (retour du 13/11 01:45) : il suffit de déposer
+// montrer les maillots portés (retour du 13/11 01:45) : un seul fichier,
 // public/bola-plus/maillots-portes.webp (1170 px de large, 4:5). Tant qu'il
-// manque, la carte garde le portant (bola-plus.tsx, VisuelAvantage). Quatre avantages, ceux que
+// manque, la carte garde le portant (bola-plus.tsx, CarteAvantage). Ce
+// fichier montre de vrais joueurs : il ne va jamais dans ce dépôt, qui est
+// public (.gitignore le refuse) ; on ne le dépose qu'en local, pour les
+// captures. Sa mise en ligne attend l'accord écrit des joueurs pour cette
+// image et un autre chemin que le dépôt (le stockage de l'app). Image
+// générée : son texte de remplacement le dit. Quatre avantages, ceux que
 // Sabri a dits, dans ses mots : « ils auront des maillots », « on va filmer
 // les matchs », « ils auront des cadeaux », « cérémonies officielles ». Un
 // titre et rien d'autre : ni chiffre, ni date, ni phrase dessous. En ajouter
@@ -153,8 +158,9 @@ export interface Visuel {
 
 /**
  * Le visuel qui prend la place de celui d'un avantage dès que son fichier est
- * déposé dans public/ : un seul fichier, 1170 px de large, en 4:5. Absent, la
- * carte garde son visuel.
+ * déposé dans public/ et chargé : un seul fichier, 1170 px de large, en 4:5.
+ * Absent, la carte garde son visuel, sans attente. Son texte commence par
+ * « Image générée » et ne nomme personne.
  */
 export interface VisuelDepose {
   fichier: string;
@@ -180,7 +186,7 @@ export const AVANTAGES: readonly Avantage[] = [
     image: "maillots",
     alt: "Les deux maillots de la SFL, le noir et le blanc",
     teinte: "#525252",
-    depose: { fichier: "/bola-plus/maillots-portes.webp", alt: "Trois joueurs de la SFL portent les maillots, le noir et le blanc" },
+    depose: { fichier: "/bola-plus/maillots-portes.webp", alt: "Image générée : trois joueurs de la SFL portent les maillots, le noir et le blanc" },
   },
   { id: "matchs-filmes", numero: "02", titre: "Tes matchs filmés", image: "matchs-filmes", alt: "Une caméra au bord du terrain", teinte: "#4d4d4d" },
   { id: "cadeaux", numero: "03", titre: "Des cadeaux", image: "cadeaux", alt: "Un écrin noir fermé, posé sur du marbre", teinte: "#3e3e3e" },

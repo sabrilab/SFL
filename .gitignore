@@ -42,3 +42,7 @@ next-env.d.ts
 
 # scripts de capture locaux (identifiants : jamais dans le dépôt)
 verify-*.mjs
+
+# Bola Plus : les maillots portés montrent de vrais joueurs (image générée) ;
+# jamais dans ce dépôt public, seulement en local pour les captures.
+public/bola-plus/maillots-portes*.webp

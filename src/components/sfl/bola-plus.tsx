@@ -13,8 +13,9 @@
 //         le nom et les deux prix ;
 //       – quatre CarteAvantage, une sous l'autre : un avantage par carte, son
 //         visuel plein cadre, son numéro, son titre. Rien d'autre. « Tes
-//         maillots » montre les maillots portés dès que leur fichier est
-//         déposé (Avantage.depose) ; s'il manque, la carte revient au portant ;
+//         maillots » montre d'abord le portant ; les maillots portés
+//         (Avantage.depose, un fichier gardé hors du dépôt) ne prennent sa
+//         place qu'une fois chargés : absents, rien ne bouge ni ne reste vide ;
 //       – OffreBolaPlus : l'emblème, les deux formules à toucher (Mensuel
 //         19,90 € par mois, sans engagement ; Annuel 168,90 € par an, −29 %,
 //         et dessous « 4 × 42,23 € sans frais » ; retour du 13/11 01:44), puis
@@ -334,9 +335,25 @@ function AfficheBolaPlus() {
 function CarteAvantage({ avantage }: { avantage: Avantage }) {
   const ref = useRef<HTMLLIElement>(null);
   const [etat, setEtat] = useState<"attend" | "vue" | null>(null);
-  // Le visuel déposé (un seul fichier) passe devant ; s'il manque, la carte revient à son visuel.
-  const [sansDepose, setSansDepose] = useState(false);
-  const depose = sansDepose ? undefined : avantage.depose;
+  // Le visuel déposé (un seul fichier) ne remplace le portant qu'une fois chargé : s'il manque, la carte
+  // garde son visuel, sans trou ni attente.
+  const [deposeLa, setDeposeLa] = useState(false);
+  const depose = deposeLa ? avantage.depose : undefined;
+
+  useEffect(() => {
+    const fichier = avantage.depose?.fichier;
+    if (!fichier) return;
+    let vivant = true;
+    const essai = new Image();
+    essai.onload = () => {
+      if (vivant && essai.naturalWidth > 0) setDeposeLa(true);
+    };
+    essai.src = fichier;
+    return () => {
+      vivant = false;
+      essai.onload = null;
+    };
+  }, [avantage.depose?.fichier]);
 
   useEffect(() => {
     const el = ref.current;
@@ -361,12 +378,9 @@ function CarteAvantage({ avantage }: { avantage: Avantage }) {
   return (
     <li ref={ref} className="bp-carte dark" data-attend={etat === "attend" ? "" : undefined} data-vue={etat === "vue" ? "" : undefined} style={{ ["--teinte" as string]: avantage.teinte }}>
       {depose ? (
-        // Absent, il passe la main au visuel : par onError, ou au branchement, si l'erreur est arrivée avant le script.
+        // Déjà chargé (l'essai ci-dessus) : il prend la place du portant.
         // eslint-disable-next-line @next/next/no-img-element -- un seul fichier déposé, sans tailles
         <img
-          ref={(img) => {
-            if (img?.complete && img.naturalWidth === 0) setSansDepose(true);
-          }}
           src={depose.fichier}
           width={LARGEUR}
           height={HAUTEUR}
@@ -374,7 +388,6 @@ function CarteAvantage({ avantage }: { avantage: Avantage }) {
           loading="lazy"
           decoding="async"
           draggable={false}
-          onError={() => setSansDepose(true)}
         />
       ) : (
         // eslint-disable-next-line @next/next/no-img-element -- déjà à ses trois tailles (public/bola-plus)
