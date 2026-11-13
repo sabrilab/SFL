@@ -27,7 +27,9 @@
 //      Playwright, déjà installés) et la photo du studio lue à son adresse
 //      publique ;
 //   5. il écrit public/sfl/cartes/<nom>-<bloc>.webp (fond transparent, 3 px
-//      par px affiché), src/lib/sfl/page-sfl-instantane.ts (généré : la date
+//      par px affiché ; la boîte exacte du corps de la carte, la même pour
+//      tout un format, sans l'ombre que le composant porte dans l'app, les
+//      quatre coins à alpha 0), src/lib/sfl/page-sfl-instantane.ts (généré : la date
 //      de lecture, les blocs, les images et leurs empreintes, ACCORDS), et,
 //      hors du dépôt (--rendu), accords.md : la preuve, joueur par joueur.
 // Rien d'autre n'entre dans le dépôt public : ni la lecture, ni les refus, ni
@@ -41,12 +43,20 @@
 // Usage :
 //   npx tsx tools/page-sfl-instantane.ts --requetes
 //   npx tsx tools/page-sfl-instantane.ts --lecture <dossier> --rendu <dossier> --polices <dossier>
-//   npx tsx tools/page-sfl-instantane.ts --verifier --lecture <dossier>
+//   npx tsx tools/page-sfl-instantane.ts --verifier --lecture <dossier> [--rendu <dossier>]
 // --polices : un dossier qui tient polices.css et ses woff2 (Inter, Anton,
 // Barlow Condensed, ceux de next/font) ; la carte se dessine avec.
 // --verifier ne réécrit rien : il compare les joueurs de l'instantané à une
-// lecture fraîche, et échoue en nommant celui qui n'a plus l'accord. À jouer
-// le jour de la fusion, puis après chaque dimanche révélé.
+// lecture fraîche (refusée au-delà de FRAICHEUR_H, l'âge est écrit), et
+// échoue en nommant celui qui n'a plus l'accord. Avec --rendu, il retrouve
+// chaque joueur par son nom de saison (le accords.md privé du rendu) ; sans,
+// par le nom affiché, et échoue si ce nom désigne plus d'un profil (un nom
+// affiché peut être le nom de saison d'un autre). C'est la seule preuve de
+// l'accord : tools/page-sfl-check.ts ne contrôle que l'instantané avec
+// lui-même, pas la base. Obligatoire sur une lecture fraîche (la requête
+// joueurs.txt de --requetes, jouée telle quelle, jamais recopiée à la main)
+// juste avant le push qui publie, puis le jour de la fusion et après chaque
+// dimanche révélé.
 
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
@@ -449,22 +459,57 @@ async function dessiner(commandes: Commande[], photos: Map<string, Buffer>, poli
       await page.waitForSelector("body[data-pret]", { timeout: 120_000 });
       await page.waitForTimeout(400);
       if (erreurs.length) throw new Error(`le banc a échoué :\n${erreurs.join("\n")}`);
+      // Chaque carte sur une ligne entière de pixels : la boîte de chaque format est la même d'une carte à l'autre.
+      await page.evaluate(() => {
+        for (const w of document.querySelectorAll<HTMLElement>(".carte")) {
+          const corps = w.querySelector("[data-card-part=body]");
+          if (!corps) continue;
+          const r = corps.getBoundingClientRect();
+          w.style.width = `${Math.ceil(r.width)}px`;
+          w.style.height = `${Math.ceil(r.height)}px`;
+        }
+      });
+      const formats = new Map<number, string>();
       for (const [i, c] of commandes.entries()) {
-        const el = await page.$(`#carte-${i} > *`);
-        if (!el) throw new Error(`carte ${c.fichier} : rien n'est dessiné`);
-        const png = await el.screenshot({ omitBackground: true, type: "png" });
-        const webp = await page.evaluate(async (b64: string) => {
-          const img = new Image();
-          img.src = `data:image/png;base64,${b64}`;
-          await img.decode();
-          const toile = document.createElement("canvas");
-          toile.width = img.naturalWidth;
-          toile.height = img.naturalHeight;
-          toile.getContext("2d")!.drawImage(img, 0, 0);
-          const url = toile.toDataURL("image/webp", 0.86);
-          if (!url.startsWith("data:image/webp")) throw new Error("WebP refusé par le navigateur");
-          return { b64: url.slice(url.indexOf(",") + 1), l: img.naturalWidth, h: img.naturalHeight };
-        }, png.toString("base64"));
+        // La carte seule, à la boîte exacte de son corps : l'ombre que le composant porte dans l'app
+        // (hors du corps) n'entre pas dans l'image ; celle de la page (OMBRE) la remplace.
+        const boite = await page.evaluate((k: number) => {
+          const corps = document.querySelector(`#carte-${k} [data-card-part=body]`);
+          if (!corps) return null;
+          const r = corps.getBoundingClientRect();
+          const rayon = getComputedStyle(corps).borderTopLeftRadius;
+          const px = rayon.endsWith("%") ? (parseFloat(rayon) / 100) * r.width : parseFloat(rayon) || 0;
+          return { x: r.x, y: r.y, width: r.width, height: r.height, rayon: px };
+        }, i);
+        if (!boite) throw new Error(`carte ${c.fichier} : rien n'est dessiné`);
+        const { rayon, ...clip } = boite;
+        const png = await page.screenshot({ clip, fullPage: true, omitBackground: true, type: "png" });
+        // Hors du coin arrondi, rien : le masque du corps, au même rayon (les quatre coins à alpha 0).
+        const webp = await page.evaluate(
+          async ({ b64, r }: { b64: string; r: number }) => {
+            const img = new Image();
+            img.src = `data:image/png;base64,${b64}`;
+            await img.decode();
+            const toile = document.createElement("canvas");
+            toile.width = img.naturalWidth;
+            toile.height = img.naturalHeight;
+            const ctx = toile.getContext("2d")!;
+            ctx.drawImage(img, 0, 0);
+            ctx.globalCompositeOperation = "destination-in";
+            ctx.beginPath();
+            ctx.roundRect(0, 0, toile.width, toile.height, r * window.devicePixelRatio);
+            ctx.fill();
+            const coins = [[0, 0], [toile.width - 1, 0], [0, toile.height - 1], [toile.width - 1, toile.height - 1]].map(([x, y]) => ctx.getImageData(x, y, 1, 1).data[3]);
+            const url = toile.toDataURL("image/webp", 0.86);
+            if (!url.startsWith("data:image/webp")) throw new Error("WebP refusé par le navigateur");
+            return { b64: url.slice(url.indexOf(",") + 1), l: img.naturalWidth, h: img.naturalHeight, coins };
+          },
+          { b64: png.toString("base64"), r: rayon }
+        );
+        if (webp.coins.some((a) => a !== 0)) throw new Error(`carte ${c.fichier} : un coin n'est pas transparent (${webp.coins.join(", ")})`);
+        const vu = formats.get(c.carte.largeur);
+        if (vu && vu !== `${webp.l}×${webp.h}`) throw new Error(`carte ${c.fichier} : ${webp.l}×${webp.h}, alors que ce format fait ${vu}`);
+        formats.set(c.carte.largeur, `${webp.l}×${webp.h}`);
         sortie.set(c.fichier, { webp: Buffer.from(webp.b64, "base64"), l: webp.l, h: webp.h });
       }
     } finally {
@@ -648,21 +693,88 @@ async function construire(dossier: string, rendu: string, polices: string) {
   console.log(`  ${accords.join(", ")}`);
 }
 
-async function verifierInstantane(dossier: string) {
-  const lecture = lireLecture(dossier);
-  const { ACCORDS } = await import("../src/lib/sfl/page-sfl-instantane");
-  const parAffiche = new Map([...lecture.joueurs.values()].map((j) => [j.affiche, j]));
+/**
+ * Les profils que désigne un nom affiché : celui dont c'est le nom affiché, et
+ * celui dont c'est le nom de saison (l'index unique de schema.sql ne couvre que
+ * les noms affichés entre eux : « Youss’ » peut être le nom affiché de l'un et
+ * le nom de saison d'un autre).
+ */
+export function profilsDe(joueurs: Map<string, LigneJoueur>, affiche: string): LigneJoueur[] {
+  return [...joueurs.values()].filter((j) => j.affiche === affiche || j.nom === affiche);
+}
+
+/**
+ * Les noms de saison des joueurs montrés, relus dans le accords.md privé du
+ * rendu (colonnes « Nom dans l'app » puis « Nom de saison ») : la vérification
+ * se fait alors par le nom de saison, sans ambiguïté.
+ */
+export function nomsDeSaison(accordsMd: string): Map<string, string> {
+  const m = new Map<string, string>();
+  for (const l of accordsMd.split("\n")) {
+    const c = l.split("|").map((x) => x.trim());
+    if (c.length < 4 || !c[1] || !c[2] || c[1].startsWith("Nom") || /^-+$/.test(c[1])) continue;
+    if (!m.has(c[1])) m.set(c[1], c[2]);
+  }
+  return m;
+}
+
+/**
+ * Ce qui empêche l'instantané de passer, joueur par joueur, contre une lecture
+ * (vide : il passe). `saison` : les noms de saison relus dans accords.md, s'il
+ * est donné. `photo` : la photo du studio existe. Un nom affiché qui désigne
+ * plus d'un profil, ou une lecture trop vieille, échouent.
+ */
+export function fautesInstantane(
+  lecture: Lecture,
+  accords: readonly string[],
+  photo: (nom: string) => boolean,
+  saison: Map<string, string> | null,
+  maintenant = Date.now()
+): string[] {
   const fautes: string[] = [];
-  for (const nom of ACCORDS as readonly string[]) {
-    const j = parAffiche.get(nom);
-    const e = empechement(j, j ? lirePhoto(j.nom) !== null : false);
+  const age = (maintenant - lecture.luLe.getTime()) / 3_600_000;
+  if (age > FRAICHEUR_H) fautes.push(`la lecture a ${Math.round(age)} h (plus de ${FRAICHEUR_H} h) : la refaire`);
+  if (age < -0.1) fautes.push("la lecture est datée dans le futur");
+  for (const nom of accords) {
+    let j: LigneJoueur | undefined;
+    if (saison) {
+      const s = saison.get(nom);
+      if (!s) {
+        fautes.push(`${nom} : absent d'accords.md`);
+        continue;
+      }
+      j = lecture.joueurs.get(s);
+      if (j && j.affiche !== nom) {
+        fautes.push(`${nom} : le profil s'affiche aujourd'hui « ${j.affiche} »`);
+        continue;
+      }
+    }
+    const profils = profilsDe(lecture.joueurs, nom);
+    if (profils.length > 1) {
+      fautes.push(`${nom} : ce nom désigne ${profils.length} profils, la vérification ne sait pas lequel est montré`);
+      continue;
+    }
+    if (!saison) j = profils[0];
+    const e = empechement(j, j ? photo(j.nom) : false);
     if (e) fautes.push(`${nom} : ${e}`);
   }
+  return fautes;
+}
+
+async function verifierInstantane(dossier: string, rendu: string | undefined) {
+  const lecture = lireLecture(dossier);
+  const { ACCORDS } = await import("../src/lib/sfl/page-sfl-instantane");
+  const fichierAccords = rendu ? join(rendu, "accords.md") : null;
+  if (fichierAccords && !existsSync(fichierAccords)) throw new Error(`--rendu ${rendu} : accords.md manque`);
+  const saison = fichierAccords ? nomsDeSaison(readFileSync(fichierAccords, "utf8")) : null;
+  const age = (Date.now() - lecture.luLe.getTime()) / 3_600_000;
+  const fautes = fautesInstantane(lecture, ACCORDS, (n) => lirePhoto(n) !== null, saison);
+  const quand = `lecture du ${lecture.luLe.toISOString()}, il y a ${age.toFixed(1)} h ; ${saison ? "par le nom de saison (accords.md)" : "par le nom affiché"}`;
   if (fautes.length) {
-    console.error(`L'instantané montre des joueurs qui ne passent plus (lecture du ${lecture.luLe.toISOString()}) :\n${fautes.join("\n")}`);
+    console.error(`L'instantané ne passe pas (${quand}) :\n${fautes.join("\n")}`);
     process.exit(1);
   }
-  console.log(`instantané vérifié : ${ACCORDS.length} joueurs, tous avec l'accord (lecture du ${lecture.luLe.toISOString()})`);
+  console.log(`instantané vérifié : ${ACCORDS.length} joueurs, tous avec l'accord (${quand})`);
 }
 
 async function main() {
@@ -677,7 +789,7 @@ async function main() {
   }
   const lecture = val("--lecture");
   if (!lecture) throw new Error("--lecture <dossier> manque (voir l'en-tête)");
-  if (args.includes("--verifier")) return verifierInstantane(lecture);
+  if (args.includes("--verifier")) return verifierInstantane(lecture, val("--rendu"));
   const rendu = val("--rendu");
   const polices = val("--polices");
   if (!rendu || !polices) throw new Error("--rendu <dossier> et --polices <dossier> manquent (voir l'en-tête)");

@@ -141,7 +141,8 @@ export const DIMANCHE_SFL = {
 /**
  * Ta carte : la carte montrée est celle d'un vrai joueur, avant et après une
  * mise à jour (l'instantané, CARTE_MONTEE). `note` : la note de départ d'un
- * compte neuf (carte-neutre.ts), que dit « Elle part à 75. ».
+ * compte neuf (carte-neutre.ts), que dit « Une carte neuve part à 75. » (la
+ * carte montrée, elle, n'est pas neuve : la phrase ne la contredit pas).
  */
 export const CARTE_SFL = {
   etiquette: "Ta carte",
@@ -156,7 +157,7 @@ export const CARTE_SFL = {
     { cle: "mvp", geste: "MVP", stat: "Tes deux meilleures" },
     { cle: "serie", geste: "Trois dimanches de suite, à l’heure", stat: "PHY" },
   ],
-  phrases: ["Elle part à 75.", "Elle ne descend jamais."],
+  phrases: ["Une carte neuve part à 75.", "Elle ne descend jamais."],
 } as const;
 
 /** Une tuile du barème : les points Pépite d'un geste (saisie/engine.ts, BAREME). */
@@ -211,7 +212,7 @@ export const TITRES_SFL = {
   ],
   phrases: [
     "Le MVP ne se vote pas.\nIl se lit sur la feuille de match.",
-    "Un Impact et une\u00a0Défensive par équipe.\nL’équipe d’en face vote.",
+    "Un Impact et\u00a0une\u00a0Défensive par équipe.\nL’équipe d’en face vote.",
   ],
   saison: {
     etiquette: "En fin de saison",

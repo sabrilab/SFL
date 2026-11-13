@@ -24,7 +24,8 @@
 //     elle ne lit ni la base, ni la saison, ni le joueur connecté. Chaque
 //     carte est une image (public/sfl/cartes), dessinée par le vrai
 //     composant de l'app ; la carte est un objet, la même en clair et en
-//     sombre. Hiérarchie de l'app : grande (la carte complète) pour la carte
+//     sombre (dessinée sans ombre, l'ombre est celle de la page, OMBRE).
+//     Une division sans carte n'est pas montrée. Hiérarchie de l'app : grande (la carte complète) pour la carte
 //     qui a monté et, dès la tablette, les trois titres ; moyenne (la carte
 //     photo) pour les podiums, la carte de départ et les titres sur
 //     téléphone ; petite (la pastille) pour la compo ;
@@ -394,7 +395,7 @@ export function PageSfl() {
             </h2>
           </div>
           {/* Un vrai match : chaque camp, son score, ses cinq joueurs en pastille, au maillot du camp. */}
-          <div className="mt-4 min-[960px]:col-span-7 min-[960px]:col-start-6 min-[960px]:row-span-2 min-[960px]:row-start-1 min-[960px]:mt-1 min-[960px]:self-start">
+          <div className="mt-6 min-[960px]:col-span-7 min-[960px]:col-start-6 min-[960px]:row-span-2 min-[960px]:row-start-1 min-[960px]:mt-1 min-[960px]:self-start">
             <div className="relative grid grid-cols-2 gap-2 min-[960px]:gap-3">
               {COMPO.camps.map((c) => (
                 <div
@@ -416,12 +417,12 @@ export function PageSfl() {
                   </ul>
                 </div>
               ))}
-              {/* « contre », entre les deux camps ; sur ordinateur, le titre le dit. */}
+              {/* « contre », à cheval sur le haut des deux tuiles, dans leur marge : il ne couvre ni un nom, ni un score, ni une pastille ; sur ordinateur, le titre le dit. */}
               <p
                 aria-hidden
                 className={cn(
                   ETIQUETTE,
-                  "absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-background px-2.5 py-1 shadow-[0_0_0_1px_rgba(128,128,128,0.45)] min-[960px]:hidden"
+                  "absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-background px-2.5 py-1 shadow-[0_0_0_1px_rgba(128,128,128,0.45)] min-[960px]:hidden"
                 )}
               >
                 {DIMANCHE_SFL.contre}
@@ -494,21 +495,19 @@ export function PageSfl() {
                 </li>
               ))}
             </ul>
-            {/* Le haut de chaque division : les vrais premiers, sans trou ; une division sans carte reste une tuile. */}
+            {/* Le haut de chaque division : les vrais premiers, sans trou ; une division sans carte n'est pas montrée (une tuile vide ressemble à un chargement raté). */}
             <ul className="mt-5 space-y-2 min-[960px]:mt-6 min-[960px]:space-y-3">
-              {PODIUMS.map((d) => (
+              {PODIUMS.filter((d) => d.places.length > 0).map((d) => (
                 <li key={d.division} className={cn("rounded-champ border p-4 min-[960px]:p-5", FILET)}>
                   <p className="font-display text-affiche leading-none">{d.division}</p>
-                  {d.places.length > 0 && (
-                    <ol className="mt-4 grid grid-cols-3 gap-2 min-[960px]:gap-4">
-                      {d.places.map((x) => (
-                        <li key={x.nom} className="min-w-0">
-                          <Carte image={x.image} className={cn("w-full max-w-[150px]", OMBRE.petite)} />
-                          <p className={cn(ETIQUETTE, "mt-2.5 truncate text-encre-2")}>{placeEtPoints(x.place, x.points)}</p>
-                        </li>
-                      ))}
-                    </ol>
-                  )}
+                  <ol className="mt-4 grid grid-cols-3 gap-2 min-[960px]:gap-4">
+                    {d.places.map((x) => (
+                      <li key={x.nom} className="min-w-0">
+                        <Carte image={x.image} className={cn("w-full max-w-[150px]", OMBRE.petite)} />
+                        <p className={cn(ETIQUETTE, "mt-2.5 truncate text-encre-2")}>{placeEtPoints(x.place, x.points)}</p>
+                      </li>
+                    ))}
+                  </ol>
                 </li>
               ))}
             </ul>

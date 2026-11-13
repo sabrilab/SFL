@@ -60,8 +60,8 @@ export const COMPO = {
             "src": "/sfl/cartes/coucoupops-compo.webp",
             "largeur": 192,
             "hauteur": 192,
-            "sha256": "1d451760bb912a5ebb486cbd87f97b081b77fb12243b167014ea7f5e23ee7282",
-            "octets": 8354,
+            "sha256": "5a1187477810ba2b2fded36ed2e7e383629c605334c430de1b66889f74e7bd2f",
+            "octets": 8050,
             "lue": "Coucoupop’s"
           }
         },
@@ -72,8 +72,8 @@ export const COMPO = {
             "src": "/sfl/cartes/ilyes-compo.webp",
             "largeur": 192,
             "hauteur": 192,
-            "sha256": "972bea5fbd2e776b0d313970739a9f41242b1be8f03e4aebb387376f97fbb911",
-            "octets": 8220,
+            "sha256": "36c8a8447257a1e14206453f6a9b277fc5970122ebeb241daf85a291193a4013",
+            "octets": 7886,
             "lue": "Ilyes"
           }
         },
@@ -84,8 +84,8 @@ export const COMPO = {
             "src": "/sfl/cartes/souley-compo.webp",
             "largeur": 192,
             "hauteur": 192,
-            "sha256": "0f29ec6f053fb9cb5deca9873093cbcfd8b9150f832e850860f2f48320d65ed5",
-            "octets": 8472,
+            "sha256": "9d7d2d3f56f61857a68bfb38b68bdc59a2bee3e6737b5857bdf14f6302b47027",
+            "octets": 8102,
             "lue": "Souley"
           }
         },
@@ -96,8 +96,8 @@ export const COMPO = {
             "src": "/sfl/cartes/yamin-compo.webp",
             "largeur": 192,
             "hauteur": 192,
-            "sha256": "55f7904b0cd28a5fc207c235afa8936e49d5dcec96b42261bb09d21e34df0061",
-            "octets": 7150,
+            "sha256": "1bc870330728c4d1b368c1aef2699b46ba1b5f722164923072b5fb72c774c8ad",
+            "octets": 6714,
             "lue": "Yamin"
           }
         },
@@ -108,8 +108,8 @@ export const COMPO = {
             "src": "/sfl/cartes/youss-compo.webp",
             "largeur": 192,
             "hauteur": 192,
-            "sha256": "5c4987eebcd074b62d67c7c11524a181b80f9884a74700f6525004254f75b05b",
-            "octets": 7014,
+            "sha256": "ce8a5ccc12f39ad5c6d25ab709528b3eee201711042e5d78b8eb99040a5954e5",
+            "octets": 6662,
             "lue": "Youss’"
           }
         }
@@ -126,8 +126,8 @@ export const COMPO = {
             "src": "/sfl/cartes/abdel-compo.webp",
             "largeur": 192,
             "hauteur": 192,
-            "sha256": "fcf8ff57d5f14307949d749b49cf2193559c418612bd76d44327b61a09340c25",
-            "octets": 8818,
+            "sha256": "042ca217f0b2cce4162bab1c1cfd3a47a933a7711224c5ba71c18b79be0139b9",
+            "octets": 8402,
             "lue": "Abdel"
           }
         },
@@ -138,8 +138,8 @@ export const COMPO = {
             "src": "/sfl/cartes/ibrahim-compo.webp",
             "largeur": 192,
             "hauteur": 192,
-            "sha256": "3ed21d73960f01d3c487c2c280e7b2d5d041890ad161be9801b34e9526cad592",
-            "octets": 8036,
+            "sha256": "9707e27747f2972838c18e65a74db9022f27a4b90a6989d2f708dd9bac3cc925",
+            "octets": 7676,
             "lue": "Ibrahim"
           }
         },
@@ -150,8 +150,8 @@ export const COMPO = {
             "src": "/sfl/cartes/jouneiid-compo.webp",
             "largeur": 192,
             "hauteur": 192,
-            "sha256": "bc028a33a8f8caa079429ecb86f547a6dc3044765a84aa63c04a216254bccf18",
-            "octets": 9222,
+            "sha256": "f05d743a03992ea82183a42b7eedf2528658fc7928e62383612c6240c3c7e968",
+            "octets": 8894,
             "lue": "Jouneiid"
           }
         },
@@ -162,8 +162,8 @@ export const COMPO = {
             "src": "/sfl/cartes/selim-l-compo.webp",
             "largeur": 192,
             "hauteur": 192,
-            "sha256": "36498e12dc4062a9408acd6e03479fe1c719309febc5abb650f0b62bb5d8e98d",
-            "octets": 7660,
+            "sha256": "d9f52e7559209fbda73498db41540ebf48704f09f3895281d552e3410fccd70d",
+            "octets": 7150,
             "lue": "Selim L"
           }
         },
@@ -174,8 +174,8 @@ export const COMPO = {
             "src": "/sfl/cartes/sidali-compo.webp",
             "largeur": 192,
             "hauteur": 192,
-            "sha256": "a9d4a47b1e5ec3df14212b09f3a58808a7280b1ece60ce542d23b13c1a7fdf00",
-            "octets": 8156,
+            "sha256": "937750e965ebc910bdb6523638b96b0a36be585119dfb949b24b05846a66f4d6",
+            "octets": 7814,
             "lue": "Sidali"
           }
         }
@@ -192,17 +192,17 @@ export const CARTE_MONTEE = {
   "depart": {
     "src": "/sfl/cartes/billal-depart.webp",
     "largeur": 450,
-    "hauteur": 729,
-    "sha256": "b609e4fa814c0ff96405dc99b50f6dfbb0e8a571a91c1de5d7d004a2fd9f766c",
-    "octets": 27688,
+    "hauteur": 726,
+    "sha256": "b0ce8eac61d906b7db0813480a9afbcd36ca50b582fca228e29d91f4afc050a8",
+    "octets": 27360,
     "lue": "Billal, 79"
   },
   "officielle": {
     "src": "/sfl/cartes/billal-officielle.webp",
     "largeur": 960,
-    "hauteur": 1557,
-    "sha256": "8aa3a343db4baec0919ae01875b667f0b388f344c37110b1a6c0f6e00ee3bca3",
-    "octets": 80010,
+    "hauteur": 1551,
+    "sha256": "e0f621097017b1f3ab3ffbacf16ca62f03ad6331c185c00a7e6dbe32fc0e426e",
+    "octets": 75902,
     "lue": "Billal, 81"
   }
 } as const;
@@ -219,9 +219,9 @@ export const PODIUMS = [
         "image": {
           "src": "/sfl/cartes/jouneiid-d1.webp",
           "largeur": 450,
-          "hauteur": 729,
-          "sha256": "46b3ab4e72898c2330d06683166c164097f33a7871af644090e914f4629b6968",
-          "octets": 32308,
+          "hauteur": 726,
+          "sha256": "9be8a2289d328b202abe664ee0084f7e2479624090a93f772f16123c30a303d1",
+          "octets": 31944,
           "lue": "Jouneiid, 1er, 43 pts"
         }
       },
@@ -232,9 +232,9 @@ export const PODIUMS = [
         "image": {
           "src": "/sfl/cartes/selim-l-d1.webp",
           "largeur": 450,
-          "hauteur": 732,
-          "sha256": "2f857cdf45a73943791d198ac6d3804ed15abbd6bc7c4acb27d000b1c1529222",
-          "octets": 27976,
+          "hauteur": 726,
+          "sha256": "7214925fdabf4c9cb9c92dbf85a04cd8adff7da761674b9ca8191af5db2dc9d2",
+          "octets": 26374,
           "lue": "Selim L, 2e, 41 pts"
         }
       },
@@ -245,9 +245,9 @@ export const PODIUMS = [
         "image": {
           "src": "/sfl/cartes/coucoupops-d1.webp",
           "largeur": 450,
-          "hauteur": 729,
-          "sha256": "ddb30ab36287822644ee695b29f3f8788e5985fd9e4c2bb4917f329c37b3d833",
-          "octets": 32148,
+          "hauteur": 726,
+          "sha256": "e679cb611dc8969d0730613f3011168f4cf0ef2ea07ec6809b069f5b2e977f69",
+          "octets": 31848,
           "lue": "Coucoupop’s, 3e, 39 pts"
         }
       }
@@ -263,9 +263,9 @@ export const PODIUMS = [
         "image": {
           "src": "/sfl/cartes/afid-d2.webp",
           "largeur": 450,
-          "hauteur": 732,
-          "sha256": "a25305641ffa7873b4ddc4e78ea3017d1d70297837a9773dfdc0e6cd95750f7d",
-          "octets": 40414,
+          "hauteur": 726,
+          "sha256": "02dc0b3dd2be592821e3cc4e1fdbd4168d99d25a155bb931e8b35c13621e4d96",
+          "octets": 39886,
           "lue": "Afid, 1er, 10 pts"
         }
       },
@@ -276,9 +276,9 @@ export const PODIUMS = [
         "image": {
           "src": "/sfl/cartes/gail-d2.webp",
           "largeur": 450,
-          "hauteur": 729,
-          "sha256": "049a21bb3f5deb27cdda4d61029c5e3dd77615b4b86b888004e00abec415b76b",
-          "octets": 41956,
+          "hauteur": 726,
+          "sha256": "8a362423a6ce9a75abb36689cb0d2b7122a318c12c1850a31d361630b726e763",
+          "octets": 41518,
           "lue": "Gaïl, 1er, 10 pts"
         }
       }
@@ -303,17 +303,17 @@ export const TITRES = {
       "petite": {
         "src": "/sfl/cartes/selim-l-mvp-petite.webp",
         "largeur": 450,
-        "hauteur": 732,
-        "sha256": "7d683ed54b29f43f12eb0fdbcdc9e36a4b537934577fef78376166ba84bead65",
-        "octets": 29290,
+        "hauteur": 726,
+        "sha256": "db9b745eb4b5a660077081fdb919626674728a96d64fecf7b53f64e56ef67201",
+        "octets": 28108,
         "lue": "Selim L, carte MVP"
       },
       "complete": {
         "src": "/sfl/cartes/selim-l-mvp.webp",
         "largeur": 660,
-        "hauteur": 1071,
-        "sha256": "07fc7cb2c6b3337e0afa2d95bd0ca25be308d1a9feb8947dc7521ecfa6031d75",
-        "octets": 68128,
+        "hauteur": 1065,
+        "sha256": "f15ba82eba665191a67b31ab869fc39a962c912d490d8017615aa81312e36c90",
+        "octets": 65894,
         "lue": "Selim L, carte MVP"
       }
     },
@@ -324,17 +324,17 @@ export const TITRES = {
       "petite": {
         "src": "/sfl/cartes/youss-impact-petite.webp",
         "largeur": 450,
-        "hauteur": 729,
-        "sha256": "e415b7f1395276127e2cac2c3bcd419e39ac4af9ab32fb64c0b28f9196d28ae7",
-        "octets": 37062,
+        "hauteur": 726,
+        "sha256": "6469f6b2e9903f95829eb4582c50d7fe55336dc878dd7b9bf2e62e886d8e3737",
+        "octets": 36752,
         "lue": "Youss’, carte Impact"
       },
       "complete": {
         "src": "/sfl/cartes/youss-impact.webp",
         "largeur": 660,
-        "hauteur": 1071,
-        "sha256": "5fa6d3eab91296c37a254d5fe4cb1fdab76c1c7192c7a6ed8ae49f4da38feb2b",
-        "octets": 81404,
+        "hauteur": 1065,
+        "sha256": "576a492ca6920a77a087f177bb14267941678dc28a4a48d46484fa28a21a5f6f",
+        "octets": 80208,
         "lue": "Youss’, carte Impact"
       }
     },
@@ -345,17 +345,17 @@ export const TITRES = {
       "petite": {
         "src": "/sfl/cartes/sidali-def-petite.webp",
         "largeur": 450,
-        "hauteur": 732,
-        "sha256": "bcab0ae5e486a9157c82a6f89c434758bbfde9545c03c484fe0c70e318cc80f5",
-        "octets": 34826,
+        "hauteur": 726,
+        "sha256": "eb270d52d5f1ec484b315b3cfe0735674b450315c4fcc112a4281e0099a6bd94",
+        "octets": 33718,
         "lue": "Sidali, carte Défensive"
       },
       "complete": {
         "src": "/sfl/cartes/sidali-def.webp",
         "largeur": 660,
-        "hauteur": 1071,
-        "sha256": "acb6aea5b198657e0dfcbe7e36ef44c8e7c084f6a9187419b80c2e6fa0aa6990",
-        "octets": 79090,
+        "hauteur": 1065,
+        "sha256": "ec2ff0f3b9f33fccc1bd61aeb827b4657c886ca44c0f226d8ad45f3951c3768d",
+        "octets": 77044,
         "lue": "Sidali, carte Défensive"
       }
     }

@@ -56,10 +56,20 @@
 //       date de lecture est écrite et pas dans le futur ; les blocs suivent
 //       les règles (pas de trou dans un podium, dix joueurs dans la compo,
 //       un titre par édition au plus, une carte qui monte).
+//       Depuis le contrôle du 13/11 : les quatre coins de chaque image à
+//       alpha 0 (aucun reste d'ombre autour d'une carte) et une même boîte
+//       par format ; --verifier (fautesInstantane) essayé sur des cas
+//       (homonyme, nom affiché égal au nom de saison d'un autre, lecture trop
+//       vieille ou datée dans le futur, accord retiré, joueur hors accords.md).
 // Ce qu'il ne tient pas : le rendu (les captures), ce qu'une chaîne
-// construite à l'exécution pourrait écrire dans la page, et l'état de la base
-// aujourd'hui : un accord retiré depuis la lecture, c'est
-// « tools/page-sfl-instantane.ts --verifier » qui le voit.
+// construite à l'exécution pourrait écrire dans la page, et SURTOUT L'ACCORD
+// LUI-MÊME. Ce banc ne contrôle que l'instantané avec lui-même : un joueur
+// sans accord mis à la fois dans ACCORDS, dans un bloc et dans un nom
+// d'image le passe (contrôle du 13/11, M7). Sa « preuve par mutants » ne
+// couvre pas l'accord. Seul « tools/page-sfl-instantane.ts --verifier »,
+// sur une lecture fraîche de la base (la requête joueurs.txt de --requetes,
+// jouée telle quelle), le prouve : obligatoire juste avant le push qui
+// publie, puis le jour de la fusion.
 //   npx tsx tools/page-sfl-check.ts
 import assert from "node:assert/strict";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
@@ -95,7 +105,7 @@ import type { MatchEntry, Saison } from "../src/lib/sfl/saisie/types";
 import { CATEGORIES_VOTE } from "../src/lib/sfl/votes";
 import { sigleSfl } from "./sigle-sfl";
 import { APERCU_LIEN, composer, empreinte, sigleSerre } from "./sigle-sfl-exports";
-import { empechement, podiumSansTrou, slug, type LigneJoueur } from "./page-sfl-instantane";
+import { empechement, fautesInstantane, nomsDeSaison, podiumSansTrou, slug, type Lecture, type LigneJoueur } from "./page-sfl-instantane";
 
 const RACINE = join(__dirname, "..");
 const lire = (f: string) => readFileSync(join(RACINE, f), "utf8");
@@ -366,6 +376,27 @@ const avec = (...noms: string[]) => (n: string) => noms.includes(n);
 verifier(pareil(podiumSansTrou([P("a", 1), P("b", 2), P("c", 3), P("d", 3)], avec("a", "b", "c")).map((x) => x.nom), ["a", "b"]), "6 · un 3e ex æquo sans accord ne coupe plus le podium");
 verifier(pareil(podiumSansTrou([P("a", 1), P("b", 2), P("c", 3)], avec("a", "c")).map((x) => x.nom), ["a"]), "6 · le podium saute un 2e sans accord");
 verifier(pareil(podiumSansTrou([P("a", 1), P("b", 1), P("c", 3), P("d", 4)], avec("a", "b", "c", "d")).map((x) => x.nom), ["a", "b", "c"]), "6 · le podium va au-delà de la 3e place");
+// --verifier (fautesInstantane), sur des cas : l'homonyme (contrôle du 13/11, M2b), la lecture trop vieille (M3).
+{
+  const maintenant = Date.parse("2026-11-13T12:00:00Z");
+  const lect = (joueurs: LigneJoueur[], lu = "2026-11-13T10:00:00Z") =>
+    ({ luLe: new Date(lu), joueurs: new Map(joueurs.map((j) => [j.nom, j])) }) as unknown as Lecture;
+  const youss: LigneJoueur = { ...oui, nom: "Youss", affiche: "Youss’" };
+  const zak: LigneJoueur = { ...oui, nom: "Zakaria", affiche: "Zakaria" };
+  const toujours = () => true;
+  const md = "| Nom dans l'app | Nom de saison |\n|---|---|\n| Youss’ | Youss |\n";
+  verifier(fautesInstantane(lect([youss, zak]), ["Youss’"], toujours, null, maintenant).length === 0, "6 · --verifier refuse un joueur qui passe");
+  verifier(fautesInstantane(lect([youss, zak]), ["Youss’"], toujours, nomsDeSaison(md), maintenant).length === 0, "6 · --verifier (par le nom de saison) refuse un joueur qui passe");
+  const homonyme = [{ ...youss, horsApp: false }, { ...zak, affiche: "Youss’" }];
+  verifier(fautesInstantane(lect(homonyme), ["Youss’"], toujours, null, maintenant).length > 0, "6 · --verifier laisse passer un nom affiché porté par deux profils (M2b)");
+  verifier(fautesInstantane(lect(homonyme), ["Youss’"], toujours, nomsDeSaison(md), maintenant).length > 0, "6 · --verifier (par le nom de saison) laisse passer un homonyme sans accord (M2b)");
+  const croise = [{ ...youss, nom: "Youss’", affiche: "Youss2" }, { ...zak, affiche: "Youss’", horsApp: false }];
+  verifier(fautesInstantane(lect(croise), ["Youss’"], toujours, null, maintenant).length > 0, "6 · --verifier laisse passer un nom affiché égal au nom de saison d'un autre");
+  verifier(fautesInstantane(lect([youss], "2026-01-01T00:00:00Z"), ["Youss’"], toujours, null, maintenant).length > 0, "6 · --verifier accepte une lecture de plus de 24 h (M3)");
+  verifier(fautesInstantane(lect([youss], "2026-11-14T00:00:00Z"), ["Youss’"], toujours, null, maintenant).length > 0, "6 · --verifier accepte une lecture datée dans le futur");
+  verifier(fautesInstantane(lect([{ ...youss, horsApp: false }]), ["Youss’"], toujours, nomsDeSaison(md), maintenant).length > 0, "6 · --verifier laisse passer un accord retiré");
+  verifier(fautesInstantane(lect([youss]), ["Youss’", "Abdel"], toujours, nomsDeSaison(md), maintenant).length > 0, "6 · --verifier laisse passer un joueur absent d'accords.md");
+}
 
 // 7 · Les textes.
 const INTERDITS = [
@@ -559,9 +590,9 @@ const FIGEES: [string, readonly string[], string[]][] = [
     "Dimanche 19 h : Points, classement, divisions, titres.",
   ]],
   ["le dimanche", DIMANCHE_SFL.phrases, ["Match 1, Match 2.", "Chacun son heure, son lieu, son terrain.", "Les équipes se font seules.\nÉquilibrées.", "La feuille de match se tient en direct."]],
-  ["la carte", CARTE_SFL.phrases, ["Elle part à 75.", "Elle ne descend jamais."]],
+  ["la carte", CARTE_SFL.phrases, ["Une carte neuve part à 75.", "Elle ne descend jamais."]],
   ["le classement", CLASSEMENT_SFL.phrases, ["Refaites chaque dimanche par le classement.", "Chaque division a son premier.", "La D1 joue le Match 1."]],
-  ["les titres", TITRES_SFL.phrases, ["Le MVP ne se vote pas.\nIl se lit sur la feuille de match.", "Un Impact et une Défensive par équipe.\nL’équipe d’en face vote."]],
+  ["les titres", TITRES_SFL.phrases, ["Le MVP ne se vote pas.\nIl se lit sur la feuille de match.", "Un Impact et une Défensive par équipe.\nL’équipe d’en face vote."]],
   ["la fin de saison", TITRES_SFL.saison.phrases, ["Pépite d’Or. Buteurs. Passeurs. Défenseurs. MVP.", "Les trois premiers gardent leur écusson.\nPour toujours.", "Chaque saison reste au Wall of Fame."]],
   ["le chemin", FIN_SFL.etapes, ["Crée ta carte.", "Sur la Map : « Rejoindre la ligue ».", "La ligue te répond."]],
   ["le barème", CLASSEMENT_SFL.bareme.map((t) => t.libelle), ["Tu viens.", "Tu gagnes.", "Un but.", "Une passe décisive.", "Clean sheet.", "MVP.", "En retard.", "Absent sans prévenir."]],
@@ -652,6 +683,28 @@ for (const i of images) {
   verifier(pareil(tailleWebp(b), [i.largeur, i.hauteur]), `11 · ${i.src} ne fait pas ${i.largeur} × ${i.hauteur} (WebP)`);
 }
 verifier(poids <= 1_500_000, `11 · les cartes pèsent ${poids} octets (1,5 Mo au plus)`);
+// Les quatre coins de chaque carte à alpha 0 : rien autour de la carte (contrôle du 13/11 : un reste
+// d'ombre aux bords faisait un carré gris en clair) ; une même boîte pour tout un format.
+const coinsOpaques = (async () => {
+  const sharp = (await import("sharp")).default;
+  const opaques: string[] = [];
+  for (const i of images) {
+    const f = join(RACINE, "public", i.src);
+    if (!existsSync(f)) continue;
+    const { data, info } = await sharp(f).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+    const a = (x: number, y: number) => data[(y * info.width + x) * info.channels + 3];
+    const coins = [a(0, 0), a(info.width - 1, 0), a(0, info.height - 1), a(info.width - 1, info.height - 1)];
+    if (coins.some((v) => v !== 0)) opaques.push(`11 · ${i.src} : un coin n'est pas transparent (alpha ${coins.join(", ")})`);
+  }
+  return opaques;
+})();
+const boites = new Map<string, Set<string>>();
+for (const i of images) {
+  const format = /-(compo|depart|officielle|d[123]|mvp|impact|def)(-petite)?\.webp$/.exec(i.src);
+  const cle = !format ? i.src : format[1] === "compo" ? "pastille" : format[1] === "officielle" ? "grande" : format[2] || /^(d[123]|depart)$/.test(format[1]) ? "compacte" : "titre";
+  boites.set(cle, (boites.get(cle) ?? new Set()).add(`${i.largeur}×${i.hauteur}`));
+}
+for (const [cle, tailles] of boites) verifier(tailles.size === 1, `11 · les cartes « ${cle} » n'ont pas toutes la même boîte : ${[...tailles].join(", ")}`);
 const fichiers = existsSync(join(RACINE, CARTES)) ? readdirSync(join(RACINE, CARTES)) : [];
 for (const f of fichiers) verifier(servis.has(`/sfl/cartes/${f}`), `11 · ${CARTES}/${f} n'est cité par aucune carte (orphelin)`);
 const texteInstantane = lire(INSTANTANE);
@@ -678,5 +731,8 @@ const editions = TITRES.cartes.map((c) => c.edition);
 verifier(new Set(editions).size === editions.length && editions.every((e) => ["mvp", "impact", "def"].includes(e)), "11 · un titre est deux fois, ou n'est pas MVP, Impact, Défensive");
 verifier(new Set(TITRES.cartes.map((c) => c.nom)).size === TITRES.cartes.length && TITRES.cartes.every((c) => noteOk(c.note)), "11 · deux titres au même joueur, ou une note pas plausible");
 
-assert.equal(fautes.length, 0, `\n${fautes.join("\n")}`);
-console.log(`page-sfl : ok (${textes.length} textes, ${effectif.length} noms cherchés, ${dossiers.length} adresses essayées à la porte, ${CLASSEMENT_SFL.bareme.length} points du barème, ${CARTE_SFL.lignes.length} gestes rejoués, ${ACCORDS.length} joueurs et ${images.length} images dans l'instantané, ${mutants.length} mutants refusés)`);
+void coinsOpaques.then((opaques) => {
+  fautes.push(...opaques);
+  assert.equal(fautes.length, 0, `\n${fautes.join("\n")}`);
+  console.log(`page-sfl : ok (${textes.length} textes, ${effectif.length} noms cherchés, ${dossiers.length} adresses essayées à la porte, ${CLASSEMENT_SFL.bareme.length} points du barème, ${CARTE_SFL.lignes.length} gestes rejoués, ${ACCORDS.length} joueurs et ${images.length} images dans l'instantané, ${mutants.length} mutants refusés)`);
+});
