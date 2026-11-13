@@ -12,9 +12,12 @@
 //       – AfficheBolaPlus : le stade de Bola la nuit, bord à bord, le retour,
 //         le nom et les deux prix ;
 //       – quatre CarteAvantage, une sous l'autre : un avantage par carte, son
-//         visuel plein cadre, son numéro, son titre. Rien d'autre ;
+//         visuel plein cadre, son numéro, son titre. Rien d'autre. « Tes
+//         maillots » montre les maillots portés dès que leur fichier est
+//         déposé (Avantage.depose) ; s'il manque, la carte revient au portant ;
 //       – OffreBolaPlus : l'emblème, les deux formules à toucher (Mensuel
-//         20 € par mois, sans engagement ; Annuel 168 € par an, −30 %), puis
+//         19,90 € par mois, sans engagement ; Annuel 168,90 € par an, −29 %,
+//         et dessous « 4 × 42,23 € sans frais » ; retour du 13/11 01:44), puis
 //         « Je suis intéressé ». Le bouton marche avec ou sans formule ; une
 //         fois touché, il laisse la place à « C'est noté » et à « Annuler ».
 //         Les formules restent touchables : en toucher une change la formule
@@ -30,7 +33,8 @@
 //         #app-scroll passe sous la barre d'onglets (discussion-match.tsx).
 //
 // Aucun paiement, aucun formulaire, aucun texte d'aide : les titres, les deux
-// prix, le bouton. Les quatre avantages sont ceux que Sabri a dits ; leurs
+// prix (et les 4 fois de l'annuel, sans nom de prestataire), le bouton. Les
+// montants sont écrits et calculés dans lib/sfl/bola-plus.ts, jamais ici. Les quatre avantages sont ceux que Sabri a dits ; leurs
 // titres sont dans lib/sfl/bola-plus.ts, pas ici.
 //
 // Les visuels (public/bola-plus/, 4:5, noir et blanc) sont les mêmes en clair
@@ -60,6 +64,7 @@ import {
   AVANTAGES,
   FORMULES,
   LARGEURS,
+  LIBELLE_ECHEANCES,
   LIBELLE_REMISE,
   MENSUEL,
   NOM_FORMULE,
@@ -129,9 +134,10 @@ export function TuileBolaPlus() {
   );
 }
 
-const PRIX: Record<Formule, { euros: number; par: string; detail: string }> = {
+/** Chaque formule : son prix, sa période, son détail à droite, et la ligne sous le prix (les 4 fois de l'annuel). */
+const PRIX: Record<Formule, { euros: string; par: string; detail: string; sous?: string }> = {
   mensuel: { euros: MENSUEL, par: "mois", detail: "Sans engagement" },
-  annuel: { euros: ANNUEL, par: "an", detail: LIBELLE_REMISE },
+  annuel: { euros: ANNUEL, par: "an", detail: LIBELLE_REMISE, sous: LIBELLE_ECHEANCES },
 };
 
 /** L'offre : l'emblème, les deux formules, « Je suis intéressé ». */
@@ -214,13 +220,14 @@ export function OffreBolaPlus({
               <span className="flex min-w-0 flex-1 flex-col gap-2">
                 <span className="mono-label text-encre-3">{NOM_FORMULE[f]}</span>
                 <span className="flex items-baseline gap-2 whitespace-nowrap">
-                  <span className="text-[34px] leading-[0.9] tabular-nums" style={{ fontFamily: ANTON }}>
+                  <span className="text-[34px] leading-[0.9] tabular-nums max-[359px]:text-[28px]" style={{ fontFamily: ANTON }}>
                     {p.euros}&nbsp;€
                   </span>
                   <span className="text-corps font-medium text-encre-2">/ {p.par}</span>
                 </span>
+                {p.sous && <span className="text-[13px] leading-tight font-medium text-encre-2 tabular-nums">{p.sous}</span>}
               </span>
-              <span className="text-right text-corps leading-tight font-semibold text-encre-2 min-[360px]:whitespace-nowrap">{p.detail}</span>
+              <span className="text-right text-corps leading-tight font-semibold text-encre-2 max-[359px]:w-min min-[360px]:whitespace-nowrap">{p.detail}</span>
               <span
                 aria-hidden
                 className={cn(
@@ -300,15 +307,15 @@ function AfficheBolaPlus() {
       <BoutonRetour className="bp-affiche__retour" />
       <div className="bp-affiche__titre">
         <h1 className="text-[44px] leading-none font-black tracking-[-0.045em] whitespace-nowrap">Bola Plus</h1>
-        <p className="mt-3 flex items-baseline gap-x-2 whitespace-nowrap text-[13px] font-semibold text-white/72">
-          <span className="text-[22px] leading-none text-white tabular-nums" style={{ fontFamily: ANTON }}>
+        <p className="mt-3 flex items-baseline gap-x-2 whitespace-nowrap text-[13px] font-semibold text-white/72 max-[359px]:gap-x-1.5">
+          <span className="text-[22px] leading-none text-white tabular-nums max-[359px]:text-[19px]" style={{ fontFamily: ANTON }}>
             {MENSUEL}&nbsp;€
           </span>
           / mois
           <span aria-hidden className="text-white/40">
             ·
           </span>
-          <span className="text-[22px] leading-none text-white tabular-nums" style={{ fontFamily: ANTON }}>
+          <span className="text-[22px] leading-none text-white tabular-nums max-[359px]:text-[19px]" style={{ fontFamily: ANTON }}>
             {ANNUEL}&nbsp;€
           </span>
           / an
@@ -327,6 +334,9 @@ function AfficheBolaPlus() {
 function CarteAvantage({ avantage }: { avantage: Avantage }) {
   const ref = useRef<HTMLLIElement>(null);
   const [etat, setEtat] = useState<"attend" | "vue" | null>(null);
+  // Le visuel déposé (un seul fichier) passe devant ; s'il manque, la carte revient à son visuel.
+  const [sansDepose, setSansDepose] = useState(false);
+  const depose = sansDepose ? undefined : avantage.depose;
 
   useEffect(() => {
     const el = ref.current;
@@ -350,18 +360,36 @@ function CarteAvantage({ avantage }: { avantage: Avantage }) {
 
   return (
     <li ref={ref} className="bp-carte dark" data-attend={etat === "attend" ? "" : undefined} data-vue={etat === "vue" ? "" : undefined} style={{ ["--teinte" as string]: avantage.teinte }}>
-      {/* eslint-disable-next-line @next/next/no-img-element -- déjà à ses trois tailles (public/bola-plus) */}
-      <img
-        src={fichierVisuel(avantage.image, LARGEUR)}
-        srcSet={sourcesVisuel(avantage.image)}
-        sizes={TAILLES}
-        width={LARGEUR}
-        height={HAUTEUR}
-        alt={avantage.alt}
-        loading="lazy"
-        decoding="async"
-        draggable={false}
-      />
+      {depose ? (
+        // Absent, il passe la main au visuel : par onError, ou au branchement, si l'erreur est arrivée avant le script.
+        // eslint-disable-next-line @next/next/no-img-element -- un seul fichier déposé, sans tailles
+        <img
+          ref={(img) => {
+            if (img?.complete && img.naturalWidth === 0) setSansDepose(true);
+          }}
+          src={depose.fichier}
+          width={LARGEUR}
+          height={HAUTEUR}
+          alt={depose.alt}
+          loading="lazy"
+          decoding="async"
+          draggable={false}
+          onError={() => setSansDepose(true)}
+        />
+      ) : (
+        // eslint-disable-next-line @next/next/no-img-element -- déjà à ses trois tailles (public/bola-plus)
+        <img
+          src={fichierVisuel(avantage.image, LARGEUR)}
+          srcSet={sourcesVisuel(avantage.image)}
+          sizes={TAILLES}
+          width={LARGEUR}
+          height={HAUTEUR}
+          alt={avantage.alt}
+          loading="lazy"
+          decoding="async"
+          draggable={false}
+        />
+      )}
       <span className="bp-carte__numero tabular-nums" style={{ fontFamily: ANTON }} aria-hidden>
         {avantage.numero}
       </span>

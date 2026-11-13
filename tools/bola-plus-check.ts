@@ -1,5 +1,12 @@
 // Bola Plus, la précommande (12/11/2026 : lib/sfl/bola-plus.ts, bola-plus-store.ts).
-//   1 · l'offre : 168 = 12 × 20 × 0,7, et le libellé « −30 % » en découle ;
+//   1 · l'offre (retour de Sabri, 13/11 01:44) : 19,90 € et 168,90 €, écrits
+//       en centimes dans lib/sfl/bola-plus.ts et nulle part ailleurs ; la
+//       remise se calcule (1 − 16 890 / 23 880 = 29,27 % → « −29 % », arrondie
+//       vers le bas) ; les 4 fois aussi (16 890 / 4 = 4 222,5 centimes →
+//       « 4 × 42,23 € sans frais », arrondie au centime supérieur, en entiers :
+//       un toFixed sur des euros tombe parfois sous le prix). Balayage de 0 à 50 000
+//       centimes : n échéances ne passent jamais sous le prix, ni plus de n − 1
+//       centimes au-dessus ;
 //   2 · le compteur de l'admin : total, mensuel, annuel, sans formule, du plus
 //       récent au plus ancien ; l'essai d'un aperçu remplace la ligne du même
 //       joueur ;
@@ -17,7 +24,8 @@
 //       du téléphone montré même sans la table ;
 //   7 · garde de source : dans le magasin, noter et annuler traitent l'aperçu
 //       et en sortent avant tout appel à la base ; aucun des fichiers de Bola
-//       Plus ne cite un prestataire de paiement ; la route, la tuile de Ma
+//       Plus ne cite un prestataire de paiement (ni Klarna, ni aucun autre
+//       paiement en plusieurs fois ; « Klarna » n'est nulle part dans src/) ; la route, la tuile de Ma
 //       carte et la section de l'admin sont branchées ; après « Annuler », rien
 //       ne reste coché, et le bouton fait 44 px.
 //   8 · les avantages (retour de Sabri, 12/11 23:08) : quatre, dans l'ordre, aux
@@ -25,7 +33,11 @@
 //       promesse) ; chaque visuel est là aux trois largeurs, en WebP, léger ;
 //       les cartes se chargent quand on y arrive, l'affiche tout de suite ;
 //       « Réduire les animations » est traité ; les prix ne sont écrits qu'une
-//       fois ; le bouton collé note comme celui de l'offre, et ne s'efface
+//       fois (aucun montant en dur dans l'écran, ni dans la tuile ni dans
+//       l'admin) ; l'annuel montre « 4 × 42,23 € sans frais » sous son prix ;
+//       « Tes maillots » prend l'image des maillots portés par un seul fichier
+//       déposé (public/bola-plus/maillots-portes.webp), et revient au portant
+//       s'il manque (onError, et au branchement si l'erreur précède le script) ; le bouton collé note comme celui de l'offre, et ne s'efface
 //       que lorsque le bouton de l'offre arrive (jamais d'écran sans bouton) ;
 //       les mots de l'écran sont une liste fermée (ni sous-titre, ni texte
 //       d'aide, ni avantage écrit hors de la liste) ; une carte se voit sans
@@ -39,27 +51,62 @@ import { join } from "node:path";
 import {
   AFFICHE,
   ANNUEL,
+  ANNUEL_CENTIMES,
   AVANTAGES,
+  ECHEANCES,
   LARGEURS,
+  LIBELLE_ECHEANCES,
   LIBELLE_REMISE,
   MENSUEL,
+  MENSUEL_CENTIMES,
   REMISE,
+  REMISE_POUR_CENT,
   avecEssai,
   compter,
+  echeance,
   fichierVisuel,
   interetDe,
   lireEssais,
+  montant,
   sourcesVisuel,
   type Avantage,
   type LigneInteret,
 } from "../src/lib/sfl/bola-plus";
 
 // 1 · L'offre.
-assert.equal(MENSUEL, 20);
-assert.equal(ANNUEL, 168);
-assert.equal(ANNUEL * 10, 12 * MENSUEL * 7, "168 = 12 × 20 × 0,7");
-assert.ok(Math.abs(REMISE - 0.3) < 1e-12, "la remise est de 30 %");
-assert.equal(LIBELLE_REMISE, "−30 %");
+const NBSP = "\u00a0";
+assert.equal(MENSUEL_CENTIMES, 1990);
+assert.equal(ANNUEL_CENTIMES, 16890);
+assert.equal(ECHEANCES, 4);
+assert.equal(MENSUEL, "19,90");
+assert.equal(ANNUEL, "168,90");
+assert.equal(montant(5), "0,05");
+assert.equal(montant(100), "1,00");
+assert.equal(montant(100000), "1\u202f000,00");
+assert.throws(() => montant(42.225), "un montant n'est fait que de centimes entiers");
+assert.throws(() => montant(-1));
+assert.ok(Math.abs(REMISE - (1 - 16890 / 23880)) < 1e-12, "la remise : 1 − 16 890 / (12 × 1 990)");
+assert.equal(REMISE_POUR_CENT, 29, "29,27 % arrondis vers le bas");
+assert.equal(LIBELLE_REMISE, `−29${NBSP}%`);
+assert.equal(LIBELLE_ECHEANCES, `4${NBSP}×${NBSP}42,23${NBSP}€ sans frais`);
+// La remise et l'échéance, rejouées par des calculs qu'on peut fausser (les mutants, plus bas).
+const remiseJuste = (pourCent: (mois: number, an: number) => number) => {
+  assert.equal(pourCent(1990, 16890), 29, "−29 % pour 19,90 € et 168,90 €");
+  assert.equal(pourCent(2000, 16800), 30, "−30 % pour 20 € et 168 €");
+  assert.equal(pourCent(1000, 8900), 25, "25,83 % → −25 % : jamais plus que la vraie remise");
+};
+remiseJuste((m, a) => Math.floor(((12 * m - a) * 100) / (12 * m)));
+const echeanceJuste = (libelle: (centimes: number, n: number) => string) => {
+  assert.equal(libelle(16890, 4), "42,23", "168,90 € en 4 fois : 42,23 €");
+  for (let c = 0; c <= 50_000; c += 7) {
+    for (const n of [2, 3, 4]) {
+      const [e, ct] = libelle(c, n).split(",").map(Number);
+      const parEcheance = e * 100 + ct;
+      assert.ok(parEcheance * n >= c && parEcheance * n - c <= n - 1, `${c} centimes en ${n} fois : ${libelle(c, n)} €`);
+    }
+  }
+};
+echeanceJuste((c, n) => montant(echeance(c, n)));
 
 // 2 · Le compteur.
 const lignes: LigneInteret[] = [
@@ -353,11 +400,33 @@ async function banc() {
     "app/profil/bola-plus/page.tsx",
     "app/admin/activite/bola-plus.tsx",
   ];
-  const PAIEMENT = /stripe|paypal|lydia|sumup|mollie|adyen|checkout|apple ?pay|google ?pay|carte bancaire|\biban\b|\bcvc\b/i;
-  for (const f of FICHIERS) {
-    const trouve = PAIEMENT.exec(readFileSync(join(SRC, f), "utf8"));
+  const PAIEMENT = /stripe|paypal|lydia|sumup|mollie|adyen|checkout|apple ?pay|google ?pay|carte bancaire|\biban\b|\bcvc\b|klarna|\balma\b|\boney\b|scalapay|\bfloa\b|younited|cofidis|afterpay|clearpay/i;
+  const sansPaiement = (f: string, texte: string) => {
+    const trouve = PAIEMENT.exec(texte);
     assert.equal(trouve, null, `${f} cite un moyen de paiement : ${trouve?.[0]}`);
-  }
+  };
+  for (const f of FICHIERS) sansPaiement(f, readFileSync(join(SRC, f), "utf8"));
+  // « Klarna » nulle part dans l'app : ni nom, ni logo, ni appel.
+  const tout = (d: string): string[] => readdirSync(d, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? tout(join(d, e.name)) : [join(d, e.name)]));
+  for (const f of tout(SRC)) assert.ok(!/klarna/i.test(readFileSync(f, "utf8")), `${f} nomme Klarna`);
+  // Les prix : une seule source. Aucun montant de l'offre ailleurs que dans lib/sfl/bola-plus.ts.
+  const MONTANTS = /(?<![\d,.])(19[,.]90?|168[,.]90?|42[,.]2[235]|1990|16890|4223)(?![\d,.])|[−-][\s\u00a0]?(29|30)[\s\u00a0]?%/;
+  const uneSource = (f: string, texte: string) => {
+    const sansNotes = texte.replace(/^\s*(\/\/|\*|\/\*).*$/gm, "");
+    const trouve = MONTANTS.exec(sansNotes);
+    assert.equal(trouve, null, `${f} écrit un montant de l'offre en dur : ${trouve?.[0]}`);
+  };
+  for (const f of [...FICHIERS.filter((f) => f !== "lib/sfl/bola-plus.ts"), "app/profil/page.tsx", "app/admin/activite/revenu.tsx"]) uneSource(f, readFileSync(join(SRC, f), "utf8"));
+  // Dans la source de l'offre : les deux prix en centimes, une seule fois, et aucun arrondi sur des euros flottants.
+  const offreSource = readFileSync(join(SRC, "lib/sfl/bola-plus.ts"), "utf8");
+  const sourceJuste = (texte: string) => {
+    const code = texte.replace(/^\s*(\/\/|\*|\/\*).*$/gm, "");
+    assert.equal(code.match(/\b1990\b/g)?.length, 1, "1990 écrit une fois");
+    assert.equal(code.match(/\b16890\b/g)?.length, 1, "16890 écrit une fois");
+    assert.ok(!/toFixed|parseFloat|toLocaleString|Intl\./.test(code), "les montants se calculent en centimes entiers");
+    assert.ok(/LIBELLE_ECHEANCES = `\$\{ECHEANCES\}[^`]*\$\{montant\(echeance\(ANNUEL_CENTIMES, ECHEANCES\)\)\}[^`]*sans frais`/.test(code), "les 4 fois se calculent sur le prix de l'année");
+  };
+  sourceJuste(offreSource);
 
   // Les trois branchements : la route et son titre, la tuile de Ma carte, la section de l'admin.
   const src = (f: string) => readFileSync(join(SRC, f), "utf8");
@@ -378,6 +447,7 @@ async function banc() {
   const TITRES = ["Tes maillots", "Tes matchs filmés", "Des cadeaux", "Les cérémonies officielles"];
   const INTERDIT = /\d|€|%|offert|gratuit|illimit|inclus|garanti|chaque|toujours|bientôt/i;
   const CHAMPS = ["alt", "id", "image", "numero", "teinte", "titre"];
+  const DEPOSE = "/bola-plus/maillots-portes.webp";
   const avantagesJustes = (liste: readonly Avantage[]) => {
     assert.deepEqual(liste.map((a) => a.titre), TITRES, "quatre avantages, dans l'ordre, aux titres exacts");
     assert.deepEqual(liste.map((a) => a.numero), ["01", "02", "03", "04"]);
@@ -385,11 +455,18 @@ async function banc() {
     for (const a of liste) {
       assert.ok(!INTERDIT.test(a.titre) && !INTERDIT.test(a.alt), `« ${a.titre} » : ni chiffre, ni prix, ni promesse`);
       assert.ok(a.titre.length <= 28, `« ${a.titre} » : 28 caractères au plus`);
-      assert.deepEqual(Object.keys(a).sort(), CHAMPS, `« ${a.titre} » : un titre et son visuel, aucun autre texte`);
+      assert.deepEqual(Object.keys(a).filter((k) => k !== "depose").sort(), CHAMPS, `« ${a.titre} » : un titre et son visuel, aucun autre texte`);
+      if (a.depose) {
+        assert.equal(a.id, "maillots", "seule « Tes maillots » attend un visuel déposé");
+        assert.deepEqual(Object.keys(a.depose).sort(), ["alt", "fichier"]);
+        assert.equal(a.depose.fichier, DEPOSE, "un seul fichier à déposer");
+        assert.ok(a.depose.alt && !INTERDIT.test(a.depose.alt), "le visuel déposé : décrit, ni chiffre, ni prix, ni promesse");
+      }
       assert.match(a.teinte, /^#([0-9a-f]{2})\1\1$/, `« ${a.titre} » : une teinte grise`);
     }
   };
   avantagesJustes(AVANTAGES);
+  assert.equal(AVANTAGES.filter((a) => a.depose).length, 1, "« Tes maillots » est prête pour les maillots portés");
   const afficheJuste = (alt: string) => assert.ok(!INTERDIT.test(alt), "l'affiche : ni chiffre, ni prix, ni promesse");
   afficheJuste(AFFICHE.alt);
   assert.deepEqual([...LARGEURS], [480, 780, 1170]);
@@ -416,8 +493,23 @@ async function banc() {
   assert.equal(new Set(IMAGES).size, 5, "cinq visuels distincts");
   const total = visuelsLa(IMAGES);
   assert.ok(total <= 1_500_000, `les visuels pèsent ${total} octets, au plus 1,5 Mo`);
+  // Le visuel déposé, s'il est là : un WebP de 1170 px de large au plus 250 ko ; il est le seul ajout permis.
+  const deposeJuste = (dossier = PUBLIC) => {
+    const f = join(dossier, DEPOSE);
+    if (!existsSync(f)) return false;
+    const o = readFileSync(f);
+    assert.ok(o.subarray(0, 4).toString("latin1") === "RIFF" && o.subarray(8, 12).toString("latin1") === "WEBP", `${DEPOSE} : du WebP`);
+    assert.ok(o.length <= 250_000, `${DEPOSE} : ${o.length} octets, au plus 250 000`);
+    return true;
+  };
+  const depose = deposeJuste();
+  if (depose) console.log(`bola-plus : ${DEPOSE} est déposé, « Tes maillots » le montre`);
   const dossier = readdirSync(join(PUBLIC, "bola-plus")).sort();
-  assert.deepEqual(dossier, IMAGES.flatMap((i) => LARGEURS.map((l) => `${i}-${l}.webp`)).sort(), "public/bola-plus : les quinze visuels, rien d'autre");
+  assert.deepEqual(
+    dossier,
+    [...IMAGES.flatMap((i) => LARGEURS.map((l) => `${i}-${l}.webp`)), ...(depose ? [DEPOSE.split("/").pop()!] : [])].sort(),
+    "public/bola-plus : les quinze visuels (et le visuel déposé), rien d'autre"
+  );
   assert.ok(dossier.every((f) => statSync(join(PUBLIC, "bola-plus", f)).isFile()));
 
   // La source de l'écran.
@@ -444,7 +536,8 @@ async function banc() {
     // Les prix : une seule source.
     // (Hors commentaires ; « border-foreground/30 » est une opacité, pas un prix.)
     const sansCommentaire = tsx.replace(/^\s*\/\/.*$/gm, "");
-    assert.ok(!/(?<![\w/[-])(20|168|30)(?![\w\]])/.test(sansCommentaire), "aucun prix écrit en dur dans l'écran");
+    assert.ok(!/(?<![\w/[-])(19|20|168|29|30|42|90|1990|16890|4223)(?![\w\]])/.test(sansCommentaire.replace(/size-\[\d+px\]|\[\d+px\]/g, "")), "aucun prix écrit en dur dans l'écran");
+    assert.ok(!/sans frais|en \d+ fois|×/.test(sansCommentaire), "les 4 fois ne s'écrivent que dans l'offre (lib/sfl/bola-plus.ts)");
     assert.ok(/\{MENSUEL\}/.test(affiche) && /\{ANNUEL\}/.test(affiche) && /\{LIBELLE_REMISE\}/.test(affiche), "l'affiche lit les prix de l'offre");
     // Le bouton, ses états.
     for (const mot of ["Je suis intéressé", "C&apos;est noté", "Annuler"]) assert.ok(tsx.includes(mot), `« ${mot} » est toujours là`);
@@ -481,7 +574,7 @@ async function banc() {
     assert.ok(/alt=\{avantage\.alt\}/.test(carte) && /alt=\{AFFICHE\.alt\}/.test(affiche), "chaque visuel a son texte de remplacement");
     for (const b of [carte, affiche]) assert.ok(/sizes=\{TAILLES\}/.test(b), "un visuel dit sa taille à l'écran");
     // Les mots de l'écran : une liste fermée. Ni sous-titre, ni texte d'aide, ni avantage hors de la liste.
-    const rendu = (b: string) => b.slice(Math.max(b.lastIndexOf("  return ("), b.lastIndexOf("  return createPortal(")));
+    const rendu = (b: string) => b.slice(Math.max(b.lastIndexOf("  return ("), b.lastIndexOf("  return createPortal("))).replace(/^\s*\/\/.*$/gm, "");
     const mots = (b: string) => [...rendu(b).matchAll(/>([^<>{}]*[A-Za-zÀ-ÿ][^<>{}]*)</g)].map((m) => m[1].trim()).sort();
     const balises = (b: string) => [...new Set([...rendu(b).matchAll(/<([A-Za-z][\w]*)/g)].map((m) => m[1]))].sort();
     assert.deepEqual(mots(affiche), ["/ an", "/ mois", "Bola Plus"], "l'affiche : le nom et les deux prix");
@@ -492,7 +585,14 @@ async function banc() {
     assert.deepEqual(balises(page), ["AfficheBolaPlus", "BarreInteret", "CarteAvantage", "OffreBolaPlus", "div", "ol"], "la page : l'affiche, les avantages de la liste, l'offre, la barre");
     assert.deepEqual(mots(barre), ["Je suis intéressé"]);
     assert.deepEqual(mots(offre), ["Annuler", "Je suis intéressé"]);
-    assert.ok(/mensuel: \{ euros: MENSUEL, par: "mois", detail: "Sans engagement" \},\s*annuel: \{ euros: ANNUEL, par: "an", detail: LIBELLE_REMISE \},/.test(tsx), "les deux formules : leurs prix et leurs détails, rien d'inventé");
+    assert.ok(/mensuel: \{ euros: MENSUEL, par: "mois", detail: "Sans engagement" \},\s*annuel: \{ euros: ANNUEL, par: "an", detail: LIBELLE_REMISE, sous: LIBELLE_ECHEANCES \},/.test(tsx), "les deux formules : leurs prix et leurs détails, rien d'inventé");
+    assert.ok(/\{p\.sous && <span[^>]*>\{p\.sous\}<\/span>\}/.test(offre) && offre.indexOf("{p.sous") > offre.indexOf("/ {p.par}"), "les 4 fois s'écrivent sous le prix de l'annuel");
+    // « Tes maillots » : le visuel déposé passe devant, et revient au portant s'il manque.
+    assert.ok(/const depose = sansDepose \? undefined : avantage\.depose;/.test(carte) && /\{depose \? \(/.test(carte), "la carte essaie d'abord le visuel déposé");
+    assert.ok(/src=\{depose\.fichier\}/.test(carte) && /alt=\{depose\.alt\}/.test(carte), "le visuel déposé a son fichier et son texte");
+    assert.ok(/onError=\{\(\) => setSansDepose\(true\)\}/.test(carte), "absent, il rend la main au portant");
+    assert.ok(/if \(img\?\.complete && img\.naturalWidth === 0\) setSansDepose\(true\);/.test(carte), "une erreur arrivée avant le script rend aussi la main");
+    assert.equal(carte.match(/loading="lazy"/g)?.length, 2, "les deux visuels de la carte sont chargés paresseusement");
     // Les boutons : gelés pendant l'envoi ; la barre dit « C'est noté » une fois noté, pas avant.
     assert.equal(offre.match(/disabled=\{occupe\}/g)?.length, 3, "l'offre : formules, bouton et « Annuler » gelés pendant l'envoi");
     assert.ok(/onClick=\{onNoter\} disabled=\{occupe\}/.test(barre), "la barre : bouton gelé pendant l'envoi");
@@ -569,7 +669,32 @@ async function banc() {
   refuse("le bouton de l'offre sans gel", () => ecranJuste(mute("gel offre", ecran, "onClick={interesser}\n            disabled={occupe}", "onClick={interesser}"), style));
   refuse("la formule figée une fois noté", () => ecranJuste(mute("formule", ecran, "    else if (interet.formule !== f) noter(f);\n", ""), style));
   refuse("le saut toujours animé", () => ecranJuste(mute("saut", ecran, 'behavior: doux ? "smooth" : "auto"', 'behavior: "smooth"'), style));
-  refuse("un visuel sans sizes", () => ecranJuste(mute("sizes", ecran, "        sizes={TAILLES}\n        width={LARGEUR}\n        height={HAUTEUR}\n        alt={avantage.alt}", "        width={LARGEUR}\n        height={HAUTEUR}\n        alt={avantage.alt}"), style));
+  refuse("un visuel sans sizes", () => ecranJuste(mute("sizes", ecran, "          sizes={TAILLES}\n          width={LARGEUR}\n          height={HAUTEUR}\n          alt={avantage.alt}", "          width={LARGEUR}\n          height={HAUTEUR}\n          alt={avantage.alt}"), style));
+  // Les mutants du retour du 13/11 (les prix, les 4 fois, le visuel déposé).
+  refuse("l'échéance par toFixed", () => echeanceJuste((c, n) => (c / 100 / n).toFixed(2).replace(".", ",")));
+  refuse("l'échéance arrondie au plus proche", () => echeanceJuste((c, n) => montant(Math.round(c / n))));
+  refuse("l'échéance arrondie vers le bas", () => echeanceJuste((c, n) => montant(Math.floor(c / n))));
+  refuse("la remise arrondie vers le haut", () => remiseJuste((m, a) => Math.ceil(((12 * m - a) * 100) / (12 * m))));
+  refuse("la remise écrite en dur", () => remiseJuste(() => 30));
+  refuse("un prix en euros flottants", () => sourceJuste(mute("flottant", offreSource, "export const echeance = (centimes: number, n: number) => Math.ceil(centimes / n);", "export const echeance = (centimes: number, n: number) => Number((centimes / 100 / n).toFixed(2)) * 100;")));
+  refuse("un prix écrit deux fois", () => sourceJuste(mute("deux fois", offreSource, "export const MENSUEL = montant(MENSUEL_CENTIMES);", "export const MENSUEL = montant(1990);")));
+  refuse("les 4 fois sur le prix du mois", () => sourceJuste(mute("4 fois mois", offreSource, "montant(echeance(ANNUEL_CENTIMES, ECHEANCES))", "montant(echeance(12 * MENSUEL_CENTIMES, ECHEANCES))")));
+  refuse("le nouveau prix en dur dans l'affiche", () => ecranJuste(mute("19,90", ecran, "{ANNUEL}&nbsp;€", "168,90&nbsp;€"), style));
+  refuse("les 4 fois en dur dans l'écran", () => ecranJuste(mute("4 fois en dur", ecran, "sous: LIBELLE_ECHEANCES", 'sous: "4 × 42,23 € sans frais"'), style));
+  refuse("les 4 fois retirés", () => ecranJuste(mute("4 fois retirés", ecran, ", sous: LIBELLE_ECHEANCES", ""), style));
+  refuse("les 4 fois au-dessus du prix", () => {
+    const ligne = ecran.split("\n").find((l) => l.includes("{p.sous && ")) ?? "";
+    const sansLigne = mute("4 fois haut", ecran, `${ligne}\n`, "");
+    ecranJuste(mute("4 fois haut", sansLigne, '                <span className="mono-label', `${ligne}\n                <span className="mono-label`), style);
+  });
+  refuse("un montant en dur dans la tuile", () => uneSource("tuile", ecran.replace('whitespace-nowrap">Bola Plus</span>', 'whitespace-nowrap">Bola Plus · 19,90 €</span>')));
+  refuse("Klarna nommé", () => sansPaiement("bola-plus.tsx", mute("klarna", ecran, "sous: LIBELLE_ECHEANCES", 'sous: "Payable avec Klarna"')));
+  refuse("Alma nommé", () => sansPaiement("bola-plus.ts", "export const AVEC = 'Alma';"));
+  refuse("le visuel déposé sans repli", () => ecranJuste(mute("repli", ecran, "          onError={() => setSansDepose(true)}\n", ""), style));
+  refuse("le visuel déposé sans repli avant le script", () => ecranJuste(mute("repli tôt", ecran, "if (img?.complete && img.naturalWidth === 0) setSansDepose(true);", "void img;"), style));
+  refuse("le visuel déposé toujours essayé", () => ecranJuste(mute("toujours", ecran, "const depose = sansDepose ? undefined : avantage.depose;", "const depose = avantage.depose;"), style));
+  refuse("un second fichier déposé", () => avantagesJustes(AVANTAGES.map((a, i) => (i === 1 ? { ...a, depose: { fichier: "/bola-plus/camera-portee.webp", alt: "Une caméra" } } : a))));
+  refuse("le visuel déposé ailleurs", () => avantagesJustes(AVANTAGES.map((a) => (a.depose ? { ...a, depose: { ...a.depose, fichier: "/bola-plus/maillots-portes-1170.webp" } } : a))));
   refuse("la barre effacée dès le haut de l'offre", () => ecranJuste(mute("trou", ecran, "const el = actionRef.current;", "const el = offre.current;"), style));
 
   assert.deepEqual(sansEffet, [], "des mutants sans effet");
