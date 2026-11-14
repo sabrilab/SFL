@@ -7,17 +7,17 @@
 //     jusqu'à la ligne : on obtient le point de passage et l'instant. À côté ou au-dessus : il regarde passer.
 //   · Choix : près du corps et sous 1,9 m, arrêt debout (k_block en bas, k_catch à hauteur) ; sinon plongeon. La table
 //     des mains du clip (sim/clips.js) donne, image par image, où sont les mains : on choisit l'image, le côté
-//     (k_dive_r ou k_dive_l), le cap et le rythme (0,8-1,45) pour que les mains arrivent au point de passage à
+//     (k_dive_r ou k_dive_l), le cap et le rythme (0,8-1,3) pour que les mains arrivent au point de passage à
 //     l'instant prédit. L'écart qui reste (0,5 m au plus) est pris par un appel au départ. La racine ne bouge plus
 //     pendant le plongeon (le clip porte déjà le déplacement des hanches) : c'est ce qui le faisait glisser deux fois.
 //     À la fin du clip, il est debout à côté de sa racine : la racine le rejoint (le rendu enchaîne sans fondu).
-//   · Contact : la balle est testée contre les mains (sphère de 0,17 m) et le corps (capsule jusqu'aux mains), sur
+//   · Contact : la balle est testée contre les mains (sphère de 0,14 m) et le corps (capsule jusqu'aux mains), sur
 //     son segment du pas (rien ne passe à travers à 30 m/s). Captée sous 16 m/s de vitesse relative, au centre des
 //     mains, sous 1,6 m ; repoussée sinon (restitution 0,35-0,5, vers l'extérieur du but) ; du bout des doigts au
 //     bord : déviée de 5 à 20°. Plus de tirage au sort de l'arrêt : c'est la géométrie qui décide.
 //   · Après : relance à la main (k_throw, avec son root motion) ou au pied (k_kick) au bout de 0,9 à 3 s ; sortie sur
 //     une balle libre de sa surface s'il y arrive le premier.
-import { PAS, BALLON, BUT_DL, BUT_H, TERRAIN, butDe, sens, LB } from './constantes.js';
+import { PAS, BALLON, BUT_DL, BUT_H, TERRAIN, butDe, LB } from './constantes.js';
 import { lancerGeste, mainsA, piedA, versMonde, clamp, enrouler, duree, finirGeste } from './corps.js';
 import { CLIPS, FPS_CLIPS } from './clips.js';
 import { predire } from './ballon.js';
@@ -25,8 +25,10 @@ import { choisirPartenaire, rouler } from './gestes.js';
 import { atan2, cos, hypot, sin } from './maths.js';
 
 const R = BALLON.R;
-// un plongeon se joue au plus 1,7 fois plus vite que la capture Mixamo : au-delà, le gardien serait surhumain
-const TAUX_MAX = 1.45;
+// un plongeon se joue au plus 1,3 fois plus vite que la capture Mixamo : au-delà, le gardien serait surhumain
+const TAUX_MAX = 1.3;
+// la prise d'élan de la capture (les 0,2 premières secondes : le gardien se ramasse) est sautée : il part de l'appel
+const ELAN = 0.2;
 const t1 = { x: 0, y: 0, z: 0 }, t2 = { x: 0, y: 0, z: 0 }, t3 = { x: 0, y: 0, z: 0 };
 
 /** Les mains du gardien dans le monde (x, y, z), d'après le clip qu'il joue. */
@@ -164,14 +166,14 @@ function decider(m, k, r) {
   const face = dedansDe(k.e) > 0 ? 0 : Math.PI;
   for (const nom of ['k_dive_r', 'k_dive_l']) {
     const c = CLIPS[nom];
-    for (let i = 8; i < 46; i++) {
+    for (let i = 9; i < 46; i++) {
       const hx = c.mains[i * 3] / 100, hy = c.mains[i * 3 + 1] / 100, hz = c.mains[i * 3 + 2] / 100;
       const rho = hypot(hx, hz);
       const tx = T.x - k.p.x, tz = T.z - k.p.z, rt = hypot(tx, tz);
       const cap = enrouler(atan2(tx, tz) - atan2(hx, hz));
       const ecartFace = Math.abs(enrouler(cap - face));
       if (ecartFace > 1.3) continue;
-      const taux = (i / FPS_CLIPS) / Math.max(0.05, reste - 0.02);
+      const taux = (i / FPS_CLIPS - ELAN) / Math.max(0.05, reste - 0.02);
       const pTaux = taux > TAUX_MAX ? (taux - TAUX_MAX) * 2 : taux < 0.8 ? (0.8 - taux) : 0;
       const dy = clamp(T.y - hy, -0.4, 0.5);
       const err = Math.max(0, Math.abs(rt - rho) - 0.5) + Math.abs(hy + dy - T.y) * 0.8 + pTaux + ecartFace * 0.05;
@@ -180,7 +182,7 @@ function decider(m, k, r) {
   }
   if (!meilleur) return;
   k.cap = meilleur.cap;
-  const g = lancerGeste(k, meilleur.nom, { taux: meilleur.taux, type: 'plongeon' });
+  const g = lancerGeste(k, meilleur.nom, { taux: meilleur.taux, type: 'plongeon', depuis: ELAN / duree(meilleur.nom) });
   const appel = clamp(meilleur.appel, -0.5, 0.5), ta = 0.15;
   g.donnees = { appel: { x: (meilleur.tx / meilleur.rt) * appel / ta, z: (meilleur.tz / meilleur.rt) * appel / ta, t: ta }, err: meilleur.err, dy: meilleur.dy, tVise: meilleur.i / FPS_CLIPS };
   m.ev('plongeon', { j: k.i, nom: meilleur.nom, err: meilleur.err });
@@ -234,8 +236,8 @@ export function contactGardien(m, k, p0) {
       dc = Math.min(dc, hypot(cx - k.p.x, cy - yb, cz - k.p.z) - 0.04);
     }
   }
-  const RM = 0.17; // le rayon des gants (les deux mains ensemble)
-  if (d > RM + R && dc > 0.18 + R) return false;
+  const RM = 0.14; // le rayon des gants (les deux mains ensemble)
+  if (d > RM + R && dc > 0.15 + R) return false;
   let dejaDedans = false; // les gants sont venus sur la balle (elle était déjà dans leur sphère au début du pas)
   // le point d'entrée dans la sphère des mains (et non le point le plus proche, qui peut être déjà derrière les gants)
   if (d <= RM + R && L2 > 1e-9) {

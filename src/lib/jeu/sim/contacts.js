@@ -2,7 +2,7 @@
 // (bola-app#23). Plus de « séparation » qui déplace les corps sans conséquence : les vitesses changent vraiment.
 //
 //   · corps : cylindres de 0,30 m au sol. Pour une paire qui se recouvre : correction de position au prorata inverse
-//     des masses (80 % de la pénétration, 5 cm par pas au plus), impulsion J = −(1 + e) v_rel·n / (1/m₁ + 1/m₂)
+//     des masses (95 % de la pénétration, 20 cm par pas au plus), impulsion J = −(1 + e) v_rel·n / (1/m₁ + 1/m₂)
 //     (e = 0,15) seulement s'ils se rapprochent, frottement tangent 0,3 J. Un joueur lancé dans un autre est freiné,
 //     l'autre est poussé ; un choc fort déséquilibre.
 //   · épaule : deux joueurs côte à côte, qui vont dans le même sens, dont un charge (bouton, ou l'IA qui va à la
@@ -36,8 +36,31 @@ function contreMur(j, dx, dz) {
   return (dx > 0.3 && j.p.x >= BX - lim) || (dx < -0.3 && j.p.x <= -BX + lim) || (dz > 0.3 && j.p.z >= BZ - lim) || (dz < -0.3 && j.p.z <= -BZ + lim);
 }
 
+/** Deux passes de plus sur les positions seules : trois corps serrés (contre un panneau) se démêlent ensemble. */
+function demeler(m) {
+  const J = m.joueurs, rr = 2 * C.rayon;
+  for (let it = 0; it < 2; it++) for (let a = 0; a < J.length; a++) for (let c = a + 1; c < J.length; c++) {
+    const A = J[a], B = J[c];
+    if (A.absent || B.absent || A.mode === 'sol' || B.mode === 'sol' || A.mode === 'releve' || B.mode === 'releve') continue;
+    let nx = B.p.x - A.p.x, nz = B.p.z - A.p.z;
+    const d = hypot(nx, nz);
+    if (d >= rr || d < 1e-6) continue;
+    nx /= d; nz /= d;
+    const ia = 1 / A.m, ib = 1 / B.m, corr = 0.95 * (rr - d);
+    const murA = contreMur(A, -nx, -nz), murB = contreMur(B, nx, nz);
+    const pa = murA ? 0 : murB ? 1 : ia / (ia + ib), pb = murB ? 0 : murA ? 1 : ib / (ia + ib);
+    A.p.x -= nx * corr * pa; A.p.z -= nz * corr * pa;
+    B.p.x += nx * corr * pb; B.p.z += nz * corr * pb;
+  }
+}
+
 /** Corps contre corps, pour toutes les paires (45 au plus). */
 export function pasCorpsACorps(m, dt) {
+  pasPaires(m, dt);
+  demeler(m);
+}
+
+function pasPaires(m, dt) {
   const J = m.joueurs, rr = 2 * C.rayon;
   for (let a = 0; a < J.length; a++) for (let c = a + 1; c < J.length; c++) {
     const A = J[a], B = J[c];
@@ -51,7 +74,7 @@ export function pasCorpsACorps(m, dt) {
     epaule(m, A, B, nx, nz, d, dt);
     if (d >= rr + 0.01) continue;
     const ia = 1 / A.m, ib = 1 / B.m;
-    const pen = rr - d, corr = Math.max(0, Math.min(0.2, 0.8 * pen));
+    const pen = rr - d, corr = Math.max(0, Math.min(0.2, 0.95 * pen));
     // (un corps collé à un panneau ne recule pas : l'autre prend toute la correction)
     const murA = contreMur(A, -nx, -nz), murB = contreMur(B, nx, nz);
     const pa = murA ? 0 : murB ? 1 : ia / (ia + ib), pb = murB ? 0 : murA ? 1 : ib / (ia + ib);
@@ -85,7 +108,7 @@ export function pasCorpsACorps(m, dt) {
   }
 }
 
-function epaule(m, A, B, nx, nz, d, dt) { // eslint-disable-line no-param-reassign
+function epaule(m, A, B, nx, nz, d, dt) {
   if (A.e === B.e || A.gardien || B.gardien) return;
   if (!(A.mode === 'loco' && B.mode === 'loco')) return;
   const sa = hypot(A.v.x, A.v.z), sb = hypot(B.v.x, B.v.z);

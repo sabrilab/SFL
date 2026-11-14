@@ -15,7 +15,7 @@
 //   · la foulée : une phase φ ∈ [0 ; 2) qui avance de v / L(v) (L, longueur d'une foulée du clip voisin) ; le rendu
 //     y cale les clips de course, et la conduite de balle y cale ses touches (un appui tous les 0,5 de phase).
 // Pas fixe (constantes.js, PAS), aucune allocation par pas, rien de three.
-import { PAS, CORPS as C } from './constantes.js';
+import { CORPS as C } from './constantes.js';
 import { CLIPS, FPS_CLIPS } from './clips.js';
 import { atan2, cos, exp, hypot, sin } from './maths.js';
 

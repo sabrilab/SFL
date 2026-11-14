@@ -71,7 +71,7 @@ const classe = (v) => (v < 2 ? 0 : v < 4.6 ? 1 : v < 6.2 ? 2 : 3);
  * Une touche de conduite, si le pied qui arrive est à portée et que la balle n'est pas déjà assez loin devant.
  * appui : un pied vient de se poser (la phase a passé un multiple de 0,5).
  */
-export function pasConduite(m, j, appui, dt) {
+export function pasConduite(m, j, appui) {
   const b = m.balle, it = j.int;
   if (b.p.y > 0.4 || !libre(j)) return;
   const s = hypot(j.v.x, j.v.z);

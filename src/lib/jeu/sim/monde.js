@@ -261,7 +261,7 @@ export function pas(m, entrees = null) {
     if (q && !q.demande) {
       const i = q.i, a = m._phases[i], c = q.phase;
       const appui = Math.floor(a * 2) !== Math.floor(c * 2);
-      pasConduite(m, q, appui, PAS);
+      pasConduite(m, q, appui);
     }
     // les autres : le plus proche d'abord
     let touche = false;
