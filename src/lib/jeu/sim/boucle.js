@@ -7,6 +7,7 @@
 // 1/144 ou irrégulières donne la même empreinte.
 import { PAS } from './constantes.js';
 import { pas } from './monde.js';
+import { hypot } from './maths.js';
 
 const N_J = 10;
 
@@ -62,7 +63,7 @@ export function joueurInterpole(b, i, out) {
   while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI;
   // un saut de cap (fin de plongeon, engagement) ne s'interpole pas
   out.cap = Math.abs(d) > 1.2 ? j.cap : P[i * 3 + 2] + d * a;
-  if (Math.hypot(j.p.x - P[i * 3], j.p.z - P[i * 3 + 1]) > 1) { out.x = j.p.x; out.z = j.p.z; }
+  if (hypot(j.p.x - P[i * 3], j.p.z - P[i * 3 + 1]) > 1) { out.x = j.p.x; out.z = j.p.z; }
   return out;
 }
 
@@ -70,6 +71,6 @@ export function joueurInterpole(b, i, out) {
 export function balleInterpolee(b, out) {
   const P = b.prec, q = b.m.balle.p, k = N_J * 3, a = b.alpha;
   out.x = P[k] + (q.x - P[k]) * a; out.y = P[k + 1] + (q.y - P[k + 1]) * a; out.z = P[k + 2] + (q.z - P[k + 2]) * a;
-  if (Math.hypot(q.x - P[k], q.z - P[k + 2]) > 1) { out.x = q.x; out.y = q.y; out.z = q.z; }
+  if (hypot(q.x - P[k], q.z - P[k + 2]) > 1) { out.x = q.x; out.y = q.y; out.z = q.z; }
   return out;
 }

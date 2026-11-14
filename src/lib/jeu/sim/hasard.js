@@ -2,6 +2,7 @@
 // Générateur xoshiro128** (32 bits, entiers seulement : identique dans tous les moteurs JavaScript), amorcé par
 // splitmix32. Un flux par usage (« ia », « touches », « frappes », « gardiens »…) : ajouter un tirage à l'IA ne change
 // pas les touches de balle. Plus aucun Math.random dans la simulation.
+import { cos, log } from './maths.js';
 
 function splitmix32(a) {
   return () => {
@@ -38,7 +39,7 @@ export function creerFlux(graine, nom) {
     normal: () => {
       // Box-Muller (une seule valeur par appel : pas d'état caché à sauver)
       const u1 = Math.max(1e-12, f.u()), u2 = f.u();
-      return Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+      return Math.sqrt(-2 * log(u1)) * cos(2 * Math.PI * u2);
     },
     choix: (t) => t[Math.floor(f.u() * t.length) % t.length],
     etat: () => Array.from(s),

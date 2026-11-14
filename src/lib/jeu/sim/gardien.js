@@ -7,24 +7,27 @@
 //     jusqu'à la ligne : on obtient le point de passage et l'instant. À côté ou au-dessus : il regarde passer.
 //   · Choix : près du corps et sous 1,9 m, arrêt debout (k_block en bas, k_catch à hauteur) ; sinon plongeon. La table
 //     des mains du clip (sim/clips.js) donne, image par image, où sont les mains : on choisit l'image, le côté
-//     (k_dive_r ou k_dive_l), le cap et le rythme (0,8-2,6) pour que les mains arrivent au point de passage à
+//     (k_dive_r ou k_dive_l), le cap et le rythme (0,8-1,45) pour que les mains arrivent au point de passage à
 //     l'instant prédit. L'écart qui reste (0,5 m au plus) est pris par un appel au départ. La racine ne bouge plus
 //     pendant le plongeon (le clip porte déjà le déplacement des hanches) : c'est ce qui le faisait glisser deux fois.
 //     À la fin du clip, il est debout à côté de sa racine : la racine le rejoint (le rendu enchaîne sans fondu).
-//   · Contact : la balle est testée contre les mains (sphère de 0,22 m) et le corps (capsule jusqu'aux mains), sur
+//   · Contact : la balle est testée contre les mains (sphère de 0,17 m) et le corps (capsule jusqu'aux mains), sur
 //     son segment du pas (rien ne passe à travers à 30 m/s). Captée sous 16 m/s de vitesse relative, au centre des
 //     mains, sous 1,6 m ; repoussée sinon (restitution 0,35-0,5, vers l'extérieur du but) ; du bout des doigts au
 //     bord : déviée de 5 à 20°. Plus de tirage au sort de l'arrêt : c'est la géométrie qui décide.
 //   · Après : relance à la main (k_throw, avec son root motion) ou au pied (k_kick) au bout de 0,9 à 3 s ; sortie sur
 //     une balle libre de sa surface s'il y arrive le premier.
 import { PAS, BALLON, BUT_DL, BUT_H, TERRAIN, butDe, sens, LB } from './constantes.js';
-import { lancerGeste, mainsA, versMonde, clamp, enrouler, duree, finirGeste } from './corps.js';
+import { lancerGeste, mainsA, piedA, versMonde, clamp, enrouler, duree, finirGeste } from './corps.js';
 import { CLIPS, FPS_CLIPS } from './clips.js';
 import { predire } from './ballon.js';
 import { choisirPartenaire, rouler } from './gestes.js';
+import { atan2, cos, hypot, sin } from './maths.js';
 
 const R = BALLON.R;
-const t1 = { x: 0, y: 0, z: 0 }, t2 = { x: 0, y: 0, z: 0 };
+// un plongeon se joue au plus 1,7 fois plus vite que la capture Mixamo : au-delà, le gardien serait surhumain
+const TAUX_MAX = 1.45;
+const t1 = { x: 0, y: 0, z: 0 }, t2 = { x: 0, y: 0, z: 0 }, t3 = { x: 0, y: 0, z: 0 };
 
 /** Les mains du gardien dans le monde (x, y, z), d'après le clip qu'il joue. */
 export function mainsMonde(k, out) {
@@ -56,6 +59,7 @@ export function pasGardien(m, k) {
   // il tient la balle : il attend, puis relance
   if (b.garde === k.i) {
     it.contenir = false;
+    finPlongeon(m, k);
     k.attente = (k.attente ?? 1.5) - PAS;
     if (!k.g && k.attente <= 0) relancer(m, k);
     if (k.g?.type === 'relance') pasRelance(m, k);
@@ -65,15 +69,7 @@ export function pasGardien(m, k) {
 
   // un plongeon ou un arrêt en cours : rien d'autre
   if (k.g && (k.g.type === 'plongeon' || k.g.type === 'arret')) {
-    if (k.g.type === 'plongeon' && k.g.t >= duree(k.g.nom) - 1e-6) {
-      // debout à côté de sa racine : la racine le rejoint (les pieds de la dernière image)
-      const c = CLIPS[k.g.nom], i = (c.n - 1) * 6;
-      const lx = (c.pieds[i] + c.pieds[i + 3]) / 200, lz = (c.pieds[i + 2] + c.pieds[i + 5]) / 200;
-      versMonde(k.cap, lx, lz, t2);
-      k.p.x += t2.x; k.p.z += t2.z;
-      finirGeste(k);
-      k.sauts = (k.sauts ?? 0) + 1;
-    }
+    finPlongeon(m, k);
     return;
   }
   if (k.g && k.g.type !== 'relance') return;
@@ -83,19 +79,23 @@ export function pasGardien(m, k) {
   if (t && t.e !== k.e && b.garde == null) {
     if (!k.lecture || k.lecture.t0 !== t.t0) {
       const tireur = m.joueurs[t.j];
-      const pres = Math.hypot(tireur.p.x - k.p.x, tireur.p.z - k.p.z) < 6 ? 0.06 : 0;
-      k.lecture = { t0: t.t0, reaction: m.rng.gardiens.entre(0.18, 0.26) + pres, prochaine: 0, fait: false, pred: null };
+      const pres = hypot(tireur.p.x - k.p.x, tireur.p.z - k.p.z) < 6 ? 0.06 : 0;
+      k.lecture = { t0: t.t0, reaction: m.rng.gardiens.entre(0.24, 0.34) + pres, prochaine: 0, fait: false, pred: null };
     }
     const L = k.lecture;
     const age = m.t - t.t0;
     if (!L.fait && age >= L.reaction && m.t >= L.prochaine) {
       L.prochaine = m.t + 0.03;
       const s = Math.sign(zb);
+      // deux points de la trajectoire prédite : où elle passe la ligne (cadrée ou non), et où elle passe le plan du
+      // gardien (c'est là que ses mains doivent être)
       const r = predire(b, (q) => (q.p.z - zb) * s >= 0 || (q.v.z * s <= 0 && Math.abs(q.p.z - zb) > 1), 2.2);
       if (r && (r.p.z - zb) * s >= 0) {
         L.pred = r;
         const cadre = Math.abs(r.p.x) < BUT_DL + 0.15 && r.p.y < BUT_H + 0.15;
-        if (cadre) { decider(m, k, r); L.fait = true; }
+        const zk = k.p.z;
+        const rk = (b.p.z - zk) * s < 0 ? predire(b, (q) => (q.p.z - zk) * s >= 0, 2.2) : null;
+        if (cadre) { decider(m, k, rk ?? r); L.fait = true; }
       } else L.pred = null;
     }
     if (!L.fait && L.pred) { it.dx = clamp(L.pred.p.x - k.p.x, -1, 1); it.allure = 0.6; }
@@ -103,18 +103,18 @@ export function pasGardien(m, k) {
   }
 
   // la balle libre dans sa surface, s'il y arrive le premier : il sort
-  const dBut = Math.hypot(b.p.x, b.p.z - zb);
-  const libreB = b.possesseur == null || (m.joueurs[b.possesseur] && Math.hypot(m.joueurs[b.possesseur].p.x - b.p.x, m.joueurs[b.possesseur].p.z - b.p.z) > 1.6);
+  const dBut = hypot(b.p.x, b.p.z - zb);
+  const libreB = b.possesseur == null || (m.joueurs[b.possesseur] && hypot(m.joueurs[b.possesseur].p.x - b.p.x, m.joueurs[b.possesseur].p.z - b.p.z) > 1.6);
   let cx = clamp(b.p.x * 0.28, -1.1, 1.1);
-  const prof = clamp(0.7 + (1 - clamp(Math.hypot(b.p.x, b.p.z - zb) / 15, 0, 1)) * 0.9, 0.7, 1.6);
+  const prof = clamp(0.7 + (1 - clamp(hypot(b.p.x, b.p.z - zb) / 15, 0, 1)) * 0.9, 0.7, 1.6);
   let cz = zb + dedans * prof;
   let vise = false;
-  if (libreB && dBut < TERRAIN.surface - 0.3 && Math.hypot(b.v.x, b.v.z) < 9 && b.p.y < 1.5) {
-    const tk = Math.hypot(k.p.x - b.p.x, k.p.z - b.p.z) / 5.4;
-    const premier = m.joueurs.every((o) => o === k || o.gardien || o.absent || Math.hypot(o.p.x - b.p.x, o.p.z - b.p.z) / 6.2 > tk - 0.1);
+  if (libreB && dBut < TERRAIN.surface - 0.3 && hypot(b.v.x, b.v.z) < 9 && b.p.y < 1.5) {
+    const tk = hypot(k.p.x - b.p.x, k.p.z - b.p.z) / 5.4;
+    const premier = m.joueurs.every((o) => o === k || o.gardien || o.absent || hypot(o.p.x - b.p.x, o.p.z - b.p.z) / 6.2 > tk - 0.1);
     if (premier) { cx = b.p.x; cz = b.p.z; vise = true; }
   }
-  const dx = cx - k.p.x, dz = cz - k.p.z, d = Math.hypot(dx, dz);
+  const dx = cx - k.p.x, dz = cz - k.p.z, d = hypot(dx, dz);
   if (d > 0.15) {
     it.dx = dx / d; it.dz = dz / d;
     it.allure = clamp(d / 1.5, 0.2, 1); it.sprint = vise ? 0.3 : 0;
@@ -123,11 +123,22 @@ export function pasGardien(m, k) {
   // il ramasse une balle lente à ses pieds (dans sa surface)
   if (b.garde == null && dBut < TERRAIN.surface && b.p.y < 1.7) {
     mainsMonde(k, t1);
-    const pres = Math.hypot(b.p.x - k.p.x, b.p.z - k.p.z) < 0.85;
-    const vr = Math.hypot(b.v.x - k.v.x, b.v.z - k.v.z);
+    const pres = hypot(b.p.x - k.p.x, b.p.z - k.p.z) < 0.85;
+    const vr = hypot(b.v.x - k.v.x, b.v.z - k.v.z);
     const passeDuPartenaire = false;
     if (pres && vr < 7 && !passeDuPartenaire && !(b.dernier === k.i && m.t - b.dernierT < 0.6)) capter(m, k, 'k_scoop');
   }
+}
+
+/** La fin d'un plongeon : debout à côté de sa racine, la racine le rejoint (les pieds de la dernière image). */
+function finPlongeon(m, k) {
+  if (k.g?.type !== 'plongeon' || k.g.t < duree(k.g.nom) - 1e-6) return;
+  const c = CLIPS[k.g.nom], i = (c.n - 1) * 6;
+  const lx = (c.pieds[i] + c.pieds[i + 3]) / 200, lz = (c.pieds[i + 2] + c.pieds[i + 5]) / 200;
+  versMonde(k.cap, lx, lz, t2);
+  k.p.x += t2.x; k.p.z += t2.z;
+  finirGeste(k);
+  k.sauts = (k.sauts ?? 0) + 1;
 }
 
 /** Le choix de l'arrêt, sur la trajectoire prédite r = { t, p, v }. */
@@ -155,16 +166,16 @@ function decider(m, k, r) {
     const c = CLIPS[nom];
     for (let i = 8; i < 46; i++) {
       const hx = c.mains[i * 3] / 100, hy = c.mains[i * 3 + 1] / 100, hz = c.mains[i * 3 + 2] / 100;
-      const rho = Math.hypot(hx, hz);
-      const tx = T.x - k.p.x, tz = T.z - k.p.z, rt = Math.hypot(tx, tz);
-      const cap = enrouler(Math.atan2(tx, tz) - Math.atan2(hx, hz));
+      const rho = hypot(hx, hz);
+      const tx = T.x - k.p.x, tz = T.z - k.p.z, rt = hypot(tx, tz);
+      const cap = enrouler(atan2(tx, tz) - atan2(hx, hz));
       const ecartFace = Math.abs(enrouler(cap - face));
       if (ecartFace > 1.3) continue;
       const taux = (i / FPS_CLIPS) / Math.max(0.05, reste - 0.02);
-      const pTaux = taux > 2.6 ? (taux - 2.6) * 2 : taux < 0.8 ? (0.8 - taux) : 0;
+      const pTaux = taux > TAUX_MAX ? (taux - TAUX_MAX) * 2 : taux < 0.8 ? (0.8 - taux) : 0;
       const dy = clamp(T.y - hy, -0.4, 0.5);
       const err = Math.max(0, Math.abs(rt - rho) - 0.5) + Math.abs(hy + dy - T.y) * 0.8 + pTaux + ecartFace * 0.05;
-      if (!meilleur || err < meilleur.err) meilleur = { nom, i, cap, taux: clamp(taux, 0.8, 2.6), err, appel: rt - rho, tx, tz, rt, dy };
+      if (!meilleur || err < meilleur.err) meilleur = { nom, i, cap, taux: clamp(taux, 0.8, TAUX_MAX), err, appel: rt - rho, tx, tz, rt, dy };
     }
   }
   if (!meilleur) return;
@@ -195,47 +206,83 @@ export function contactGardien(m, k, p0) {
   if (b.garde != null || k.mode === 'sol') return false;
   if (b.dernier === k.i && m.t - b.dernierT < 0.4) return false;
   // les gardiens ne jouent qu'avec les mains dans leur surface
-  if (Math.hypot(b.p.x, b.p.z - butDe(k.e)) > TERRAIN.surface + 0.5) return false;
+  if (hypot(b.p.x, b.p.z - butDe(k.e)) > TERRAIN.surface + 0.5) return false;
   const h = mainsMonde(k, t1);
   // la plus courte distance du segment p0 → p au centre des mains
   const sx = b.p.x - p0.x, sy = b.p.y - p0.y, sz = b.p.z - p0.z;
   const L2 = sx * sx + sy * sy + sz * sz;
   const u = L2 > 1e-9 ? clamp(((h.x - p0.x) * sx + (h.y - p0.y) * sy + (h.z - p0.z) * sz) / L2, 0, 1) : 1;
-  const cx = p0.x + sx * u, cy = p0.y + sy * u, cz = p0.z + sz * u;
-  const d = Math.hypot(cx - h.x, cy - h.y, cz - h.z);
-  // le corps : une capsule des pieds aux mains, de 0,18 m de rayon
+  let cx = p0.x + sx * u, cy = p0.y + sy * u, cz = p0.z + sz * u;
+  const d = hypot(cx - h.x, cy - h.y, cz - h.z);
+  // le corps : une capsule des pieds aux mains (0,18 m de rayon ; en plongeon, c'est le corps étendu), et debout le
+  // buste, une capsule verticale de 0,3 à 1,65 m
   let dc = Infinity;
   {
-    const ax = k.p.x, ay = 0.25, az = k.p.z;
+    const g = k.g;
+    let ax = k.p.x, ay = 0.25, az = k.p.z;
+    if (g && CLIPS[g.nom]?.pieds) {
+      piedA(g.nom, g.t, 0, t2); const lx = t2.x, ly = t2.y, lz = t2.z;
+      piedA(g.nom, g.t, 1, t2);
+      versMonde(k.cap, (lx + t2.x) / 2, (lz + t2.z) / 2, t3);
+      ax = k.p.x + t3.x; ay = Math.max(0.15, (ly + t2.y) / 2); az = k.p.z + t3.z;
+    }
     const ex = h.x - ax, ey = h.y - ay, ez = h.z - az, E2 = ex * ex + ey * ey + ez * ez;
     const w = E2 > 1e-9 ? clamp(((cx - ax) * ex + (cy - ay) * ey + (cz - az) * ez) / E2, 0, 1) : 0;
-    dc = Math.hypot(cx - (ax + ex * w), cy - (ay + ey * w), cz - (az + ez * w));
+    dc = hypot(cx - (ax + ex * w), cy - (ay + ey * w), cz - (az + ez * w));
+    if (!g || g.type !== 'plongeon') {
+      const yb = clamp(cy, 0.3, 1.65);
+      dc = Math.min(dc, hypot(cx - k.p.x, cy - yb, cz - k.p.z) - 0.04);
+    }
   }
-  const RM = 0.22;
+  const RM = 0.17; // le rayon des gants (les deux mains ensemble)
   if (d > RM + R && dc > 0.18 + R) return false;
-  const vr = Math.hypot(b.v.x - k.v.x, b.v.y, b.v.z - k.v.z);
+  let dejaDedans = false; // les gants sont venus sur la balle (elle était déjà dans leur sphère au début du pas)
+  // le point d'entrée dans la sphère des mains (et non le point le plus proche, qui peut être déjà derrière les gants)
+  if (d <= RM + R && L2 > 1e-9) {
+    const fx = p0.x - h.x, fy = p0.y - h.y, fz = p0.z - h.z, rr = RM + R;
+    const bq = 2 * (fx * sx + fy * sy + fz * sz), c = fx * fx + fy * fy + fz * fz - rr * rr;
+    const disc = bq * bq - 4 * L2 * c;
+    const s0 = c <= 0 ? 0 : disc > 0 ? clamp((-bq - Math.sqrt(disc)) / (2 * L2), 0, 1) : u;
+    cx = p0.x + sx * s0; cy = p0.y + sy * s0; cz = p0.z + sz * s0;
+    dejaDedans = c <= 0;
+  }
+  const vr = hypot(b.v.x - k.v.x, b.v.y, b.v.z - k.v.z);
   // une balle lente qui vient dans ses jambes : il la ramasse
   if (vr < 4) { if (b.p.y < 1.6) { capter(m, k, b.p.y < 0.5 ? 'k_scoop' : null); return true; } return false; }
   // la balle est ramenée au point de contact du segment (elle ne traverse pas les gants)
   b.p.x = cx; b.p.y = Math.max(R, cy); b.p.z = cz;
   const mains = d <= RM + R;
-  const centre = d < 0.12 + R * 0.5;
+  // la distance de la trajectoire (la droite de la balle, pas seulement le bout du pas) au centre des gants : au
+  // premier contact, la balle n'est qu'au bord de leur sphère ; c'est ce passage qui dit « dans les mains » ou « du bout
+  // des doigts »
+  let dl = d;
+  {
+    const vl = hypot(b.v.x, b.v.y, b.v.z);
+    if (vl > 1e-6) {
+      const ux = b.v.x / vl, uy = b.v.y / vl, uz = b.v.z / vl, qx = h.x - p0.x, qy = h.y - p0.y, qz = h.z - p0.z;
+      dl = hypot(qy * uz - qz * uy, qz * ux - qx * uz, qx * uy - qy * ux);
+    }
+  }
+  const centre = dl < 0.12 + R * 0.5;
   if (mains && centre && vr < 16 && cy < 1.6) { capter(m, k, null); return true; }
   // repoussée : la normale des gants (ou du corps), vers l'extérieur du but
   let nx = cx - h.x, ny = cy - h.y, nz = cz - h.z;
-  const nl = Math.hypot(nx, ny, nz) || 1; nx /= nl; ny /= nl; nz /= nl;
+  const nl = hypot(nx, ny, nz) || 1; nx /= nl; ny /= nl; nz /= nl;
   const dedans = dedansDe(k.e);
   const rng = m.rng.gardiens;
-  if (mains && d > RM + R * 0.4) {
+  if (mains && dl > RM + R * 0.4) {
     // du bout des doigts : la balle est déviée de 5 à 20°, presque sans perte
     const dev = (5 + 15 * rng.u()) * (Math.PI / 180) * Math.sign(cx - k.p.x || 1) * -dedans;
-    const c = Math.cos(dev), s = Math.sin(dev);
+    const c = cos(dev), s = sin(dev);
     const vx = b.v.x * c + b.v.z * s, vz = -b.v.x * s + b.v.z * c;
     b.v.x = vx * 0.85; b.v.z = vz * 0.85; b.v.y = b.v.y * 0.85 + 0.6;
     m.ev('parade', { j: k.i, doigts: true });
   } else {
     const e = 0.35 + 0.15 * rng.u();
-    const vn = b.v.x * nx + b.v.y * ny + b.v.z * nz;
+    if (dejaDedans) { const vl = hypot(b.v.x, b.v.y, b.v.z) || 1; nx = -b.v.x / vl; ny = -b.v.y / vl; nz = -b.v.z / vl; }
+    let vn = b.v.x * nx + b.v.y * ny + b.v.z * nz;
+    // un contact de côté (le corps) : la balle est arrêtée de face
+    if (vn > -0.3 * hypot(b.v.x, b.v.y, b.v.z)) { const vl = hypot(b.v.x, b.v.y, b.v.z) || 1; nx = -b.v.x / vl; ny = -b.v.y / vl; nz = -b.v.z / vl; vn = -vl; }
     if (vn < 0) { b.v.x -= (1 + e) * vn * nx; b.v.y -= (1 + e) * vn * ny; b.v.z -= (1 + e) * vn * nz; }
     // vers l'extérieur, loin de la cage
     b.v.x += Math.sign(cx || 1) * 2.2; b.v.z += dedans * 1.5; b.v.y = Math.max(b.v.y, 1 + rng.u() * 1.5);
@@ -272,9 +319,9 @@ function relancer(m, k) {
   const dedans = dedansDe(k.e);
   const cible = choisirPartenaire(m, k, 0, dedans);
   if (!cible) { k.attente = 0.5; return; }
-  const d = Math.hypot(cible.p.x - k.p.x, cible.p.z - k.p.z);
+  const d = hypot(cible.p.x - k.p.x, cible.p.z - k.p.z);
   const pied = d > 14;
-  k.cap = Math.atan2(cible.p.x - k.p.x, cible.p.z - k.p.z);
+  k.cap = atan2(cible.p.x - k.p.x, cible.p.z - k.p.z);
   // k_throw : la balle part à 0,98 s de clip ; k_kick : à 1,25 s (mesuré à l'œil sur le clip)
   const nom = pied ? 'k_kick' : 'k_throw';
   const g = lancerGeste(k, nom, { taux: 1.4, rm: true, echelle: 0.45, type: 'relance', fin: pied ? 1.9 : 1.6, donnees: { cible: cible.i, depart: pied ? 1.25 : 0.98 } });
@@ -286,8 +333,8 @@ function pasRelance(m, k) {
   if (g.donnees.parti || g.t < g.donnees.depart) return;
   g.donnees.parti = true;
   const c = m.joueurs[g.donnees.cible];
-  const d = Math.hypot(c.p.x - b.p.x, c.p.z - b.p.z);
-  const tx = c.p.x + c.v.x * 0.6 - b.p.x, tz = c.p.z + c.v.z * 0.6 - b.p.z, L = Math.hypot(tx, tz) || 1;
+  const d = hypot(c.p.x - b.p.x, c.p.z - b.p.z);
+  const tx = c.p.x + c.v.x * 0.6 - b.p.x, tz = c.p.z + c.v.z * 0.6 - b.p.z, L = hypot(tx, tz) || 1;
   const pied = g.nom === 'k_kick';
   const v = pied ? clamp(8 + d * 0.45, 10, 18) : clamp(Math.sqrt(4.5 * 4.5 + 2 * 1.3 * d), 7, 15);
   b.garde = null;

@@ -17,6 +17,7 @@
 // Rien ici ne dépend de three ni du DOM : le même code tourne dans la page, dans le banc node et dans la prédiction du
 // gardien (predire), qui rejoue l'intégrateur sur une copie.
 import { PAS, G, BALLON as B, BX, BZ, LB, BUT_DL, BUT_H, BUT_P, HAUT_FILET, TERRAIN } from './constantes.js';
+import { exp, hypot } from './maths.js';
 
 const R = B.R;
 const COTES = [-1, 1];
@@ -47,13 +48,13 @@ const cd = (v) => (v <= B.vCrise1 ? B.cdBas : v >= B.vCrise2 ? B.cdHaut : B.cdBa
 
 /** Les forces de l'air sur la vitesse (traînée, Magnus), pendant dt. */
 function air(b, dt) {
-  const v = b.v, s = Math.hypot(v.x, v.y, v.z);
+  const v = b.v, s = hypot(v.x, v.y, v.z);
   if (s < 1e-6) return;
   const k = B.kAir * cd(s);
   // traînée
   let ax = -k * s * v.x, ay = -k * s * v.y, az = -k * s * v.z;
   // Magnus : C_L = min(0,22 ; 0,7 R |ω| / |v|) ; direction ω̂ × v̂
-  const w = b.w, wn = Math.hypot(w.x, w.y, w.z);
+  const w = b.w, wn = hypot(w.x, w.y, w.z);
   if (wn > 1e-3) {
     const cl = Math.min(B.clMax, (B.clPente * R * wn) / s);
     const m = (B.kAir * cl * s * s) / (wn * s);
@@ -79,7 +80,7 @@ function choc(b, nx, ny, nz, e, mu) {
     let cx = v.x + (w.y * rz - w.z * ry), cy = v.y + (w.z * rx - w.x * rz), cz = v.z + (w.x * ry - w.y * rx);
     const cn = cx * nx + cy * ny + cz * nz;
     cx -= cn * nx; cy -= cn * ny; cz -= cn * nz;
-    const c = Math.hypot(cx, cy, cz);
+    const c = hypot(cx, cy, cz);
     if (c > 1e-6) {
       // le frottement qui annulerait le glissement : Δv = −c / (1 + mR²/I), borné par Coulomb
       const dv = Math.min(c / (1 + KI), mu * jn);
@@ -100,7 +101,7 @@ function cylindre(b, ax, ay, az, dx, dy, dz, lmin, lmax, r, e, ev) {
   const l = qx * dx + qy * dy + qz * dz;
   if (l < lmin || l > lmax) return;
   const ox = qx - l * dx, oy = qy - l * dy, oz = qz - l * dz;
-  const d = Math.hypot(ox, oy, oz), rr = r + R;
+  const d = hypot(ox, oy, oz), rr = r + R;
   if (d >= rr || d < 1e-9) return;
   const nx = ox / d, ny = oy / d, nz = oz / d;
   p.x += nx * (rr - d); p.y += ny * (rr - d); p.z += nz * (rr - d);
@@ -177,12 +178,12 @@ export function pasBalle(b, ev, dt = PAS) {
   const auSol = p.y <= R + 1e-4 && v.y <= B.finRebond && v.y >= -B.finRebond;
   if (!auSol) {
     v.y -= G * dt;
-    const k = Math.exp(-dt / B.tauRotation);
+    const k = exp(-dt / B.tauRotation);
     w.x *= k; w.y *= k; w.z *= k;
   } else {
     p.y = R; v.y = 0;
     // vitesse du point de contact (r = (0, −R, 0)) : v + ω × r = (v.x + R ω_z, 0, v.z − R ω_x)
-    const cx = v.x + R * w.z, cz = v.z - R * w.x, c = Math.hypot(cx, cz);
+    const cx = v.x + R * w.z, cz = v.z - R * w.x, c = hypot(cx, cz);
     if (c > 0.05) {
       // glissement : le frottement tend vers le roulement (la vitesse de contact baisse de (1 + mR²/I) × Δv)
       const dv = Math.min(B.muGlisse * G * dt, c / (1 + KI));
@@ -194,16 +195,16 @@ export function pasBalle(b, ev, dt = PAS) {
       w.z = -v.x / R; w.x = v.z / R;
     }
     // résistance au roulement, et la rotation sur place qui meurt
-    const s = Math.hypot(v.x, v.z);
+    const s = hypot(v.x, v.z);
     if (s > 0) {
       const ns = Math.max(0, s - B.muRoule * G * dt);
       v.x *= ns / s; v.z *= ns / s;
       if (c <= 0.05) { w.z = -v.x / R; w.x = v.z / R; }
     }
-    w.y *= Math.exp(-dt / 0.8);
+    w.y *= exp(-dt / 0.8);
   }
   // le déplacement, en sous-pas de 5 cm au plus
-  const d = Math.hypot(v.x, v.y, v.z) * dt;
+  const d = hypot(v.x, v.y, v.z) * dt;
   const n = Math.min(8, Math.max(1, Math.ceil(d / 0.05)));
   const zAvant = p.z;
   for (let i = 0; i < n; i++) {
@@ -229,12 +230,12 @@ export function pasBalle(b, ev, dt = PAS) {
 
 /** Anti-blocage : un ballon arrêté dans un coin (ou collé à un panneau) plus de 1,5 s est relancé vers le centre. */
 export function antiBlocage(b, dt = PAS) {
-  const s = Math.hypot(b.v.x, b.v.z);
+  const s = hypot(b.v.x, b.v.z);
   const coin = (Math.abs(b.p.x) > BX - 0.7 && Math.abs(b.p.z) > BZ - 0.7);
   if (b.garde == null && coin && s < 0.3) b.coinT += dt; else b.coinT = 0;
   if (b.coinT > 1.5) {
     b.coinT = 0;
-    const L = Math.hypot(b.p.x, b.p.z) || 1;
+    const L = hypot(b.p.x, b.p.z) || 1;
     b.v.x = (-b.p.x / L) * 2.2; b.v.z = (-b.p.z / L) * 2.2;
     return true;
   }

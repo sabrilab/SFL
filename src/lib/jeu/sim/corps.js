@@ -17,6 +17,7 @@
 // Pas fixe (constantes.js, PAS), aucune allocation par pas, rien de three.
 import { PAS, CORPS as C } from './constantes.js';
 import { CLIPS, FPS_CLIPS } from './clips.js';
+import { atan2, cos, exp, hypot, sin } from './maths.js';
 
 const TAU = Math.PI * 2;
 export const enrouler = (a) => { a %= TAU; if (a > Math.PI) a -= TAU; if (a < -Math.PI) a += TAU; return a; };
@@ -71,7 +72,7 @@ export const impactDe = (nom) => { const c = CLIPS[nom]; return c ? (c.impact ??
 
 /** Repère du joueur → monde (x, z) : le joueur regarde (sin cap, cos cap). */
 export function versMonde(cap, lx, lz, out) {
-  const c = Math.cos(cap), s = Math.sin(cap);
+  const c = cos(cap), s = sin(cap);
   out.x = lx * c + lz * s; out.z = -lx * s + lz * c;
   return out;
 }
@@ -134,8 +135,8 @@ export function finirGeste(j) {
 /** La chute : le corps garde son élan (root motion de trip, borné à 6 m/s), puis reste au sol, puis se relève. */
 export function tomber(j) {
   if (j.mode === 'sol' || j.mode === 'releve') return;
-  const s = Math.hypot(j.v.x, j.v.z);
-  const h = s > 0.3 ? Math.atan2(j.v.x, j.v.z) : j.cap;
+  const s = hypot(j.v.x, j.v.z);
+  const h = s > 0.3 ? atan2(j.v.x, j.v.z) : j.cap;
   j.cap = h;
   lancerGeste(j, 'trip', { taux: 1.5, rm: true, echelle: clamp(s / 3.4, 0.5, 1.4), type: 'chute' });
   j.mode = 'sol';
@@ -147,8 +148,8 @@ export function tomber(j) {
 /** Trébucher : la première moitié de la chute, puis la course reprend. */
 export function trebucher(j) {
   if (j.mode !== 'loco') return;
-  const s = Math.hypot(j.v.x, j.v.z);
-  if (s > 0.3) j.cap = Math.atan2(j.v.x, j.v.z);
+  const s = hypot(j.v.x, j.v.z);
+  if (s > 0.3) j.cap = atan2(j.v.x, j.v.z);
   lancerGeste(j, 'trip', { taux: 1.6, rm: true, echelle: clamp(s / 3.4, 0.4, 1.1), type: 'trebuche', fin: 0.45 * duree('trip') });
   j.recup = Math.max(j.recup, 0.5);
 }
@@ -176,8 +177,8 @@ export function pasCorps(j, dt, balle) {
 
   if (j.mode === 'geste' || j.mode === 'sol' || j.mode === 'releve' || j.mode === 'pivot') pasGeste(j, dt);
   else {
-    let s = Math.hypot(j.v.x, j.v.z);
-    let h = s > 0.05 ? Math.atan2(j.v.x, j.v.z) : j.cap;
+    let s = hypot(j.v.x, j.v.z);
+    let h = s > 0.05 ? atan2(j.v.x, j.v.z) : j.cap;
     const veut = it && (it.dx || it.dz) && it.allure > 0.02;
     const vc = veut ? vitesseVoulue(j, it, balle) : 0;
     const accF = 1 - 0.6 * clamp(j.d, 0, 1);
@@ -186,17 +187,17 @@ export function pasCorps(j, dt, balle) {
       // freinage planté avant le pivot
       s = Math.max(0, s - C.freinPlante * dt);
       if (s <= C.pivotEntree) {
-        j.v.x = Math.sin(h) * s; j.v.z = Math.cos(h) * s;
+        j.v.x = sin(h) * s; j.v.z = cos(h) * s;
         j.cap = h;
         const g = lancerGeste(j, 'turn180', { taux: 1, type: 'pivot', donnees: { s0: s, h0: h, cible: j.cible } });
         j.mode = 'pivot';
         g.cap0 = h;
-      } else { j.v.x = Math.sin(h) * s; j.v.z = Math.cos(h) * s; j.cap = h; }
+      } else { j.v.x = sin(h) * s; j.v.z = cos(h) * s; j.cap = h; }
     } else if (!veut) {
       s = Math.max(0, s - C.frein * dt);
-      j.v.x = Math.sin(h) * s; j.v.z = Math.cos(h) * s;
+      j.v.x = sin(h) * s; j.v.z = cos(h) * s;
     } else {
-      const hv = Math.atan2(it.dx, it.dz);
+      const hv = atan2(it.dx, it.dz);
       const delta = enrouler(hv - h);
       const ad = Math.abs(delta);
       if (!it.contenir && !it.protege && s > C.pivotVitesse && ad > (150 * Math.PI) / 180) {
@@ -213,16 +214,16 @@ export function pasCorps(j, dt, balle) {
         }
         if (s < vt) s = Math.min(vt, s + C.a0 * accF * Math.max(0.15, 1 - s / (1.08 * vt)) * dt);
         else s = Math.max(vt, s - freinage * dt);
-        j.v.x = Math.sin(h) * s; j.v.z = Math.cos(h) * s;
+        j.v.x = sin(h) * s; j.v.z = cos(h) * s;
       }
     }
     // le cap : face à la course, ou au regard voulu quand on contient, protège ou piétine
     if (j.mode === 'loco') {
-      const sp = Math.hypot(j.v.x, j.v.z);
+      const sp = hypot(j.v.x, j.v.z);
       let capVoulu = j.cap;
       const r = it?.regard;
-      if ((it?.contenir || it?.protege || sp < 0.6) && r) capVoulu = Math.atan2(r.x - j.p.x, r.z - j.p.z);
-      else if (sp >= 0.6) capVoulu = Math.atan2(j.v.x, j.v.z);
+      if ((it?.contenir || it?.protege || sp < 0.6) && r) capVoulu = atan2(r.x - j.p.x, r.z - j.p.z);
+      else if (sp >= 0.6) capVoulu = atan2(j.v.x, j.v.z);
       if (it?.protege && r) capVoulu = enrouler(capVoulu + Math.PI); // dos à l'adversaire
       const dc = enrouler(capVoulu - j.cap);
       // en course, le buste suit la course (sinon le pied glisse) ; ailleurs, 6 rad/s au plus
@@ -231,16 +232,17 @@ export function pasCorps(j, dt, balle) {
     }
   }
 
+  j.bloqueT = 0;
   // l'intégration (semi-implicite : vitesse puis position)
   j.p.x += j.v.x * dt; j.p.z += j.v.z * dt;
   // accélérations dans le repère du cap, filtrées (8 Hz) pour le buste et le roulis
   const ax = (j.v.x - vx0) / dt, az = (j.v.z - vz0) / dt;
-  const fx = Math.sin(j.cap), fz = Math.cos(j.cap);
-  const k = 1 - Math.exp(-dt * 2 * Math.PI * 8 / 2);
+  const fx = sin(j.cap), fz = cos(j.cap);
+  const k = 1 - exp(-dt * 2 * Math.PI * 8 / 2);
   j.aLong += (ax * fx + az * fz - j.aLong) * k;
   j.aLat += (ax * fz - az * fx - j.aLat) * k;
   // la foulée
-  const s = Math.hypot(j.v.x, j.v.z);
+  const s = hypot(j.v.x, j.v.z);
   if (j.mode === 'loco' || j.mode === 'frein') {
     const balleL = balle && s < 4.4 ? 2.2 / longueurFoulee(2.54) : 1; // la conduite : foulée du clip drib
     j.phase = (j.phase + (dt * s) / (longueurFoulee(s) * balleL)) % 2;
@@ -257,17 +259,22 @@ function pasGeste(j, dt) {
     vitesseRacine(g.nom, g.t, tmp);
     versMonde(g.cap0, tmp.x * g.taux * g.echelle, tmp.z * g.taux * g.echelle, tmp);
     j.v.x = tmp.x; j.v.z = tmp.z;
+    // un autre corps devant (contacts.js) : le geste ne passe pas au travers
+    if (j.bloqueT > 0) {
+      const vn = j.v.x * j.bloque.x + j.v.z * j.bloque.z;
+      if (vn > 0) { j.v.x -= vn * j.bloque.x; j.v.z -= vn * j.bloque.z; }
+    }
   } else if (g.type === 'pivot') {
     // le pivot : la vitesse d'entrée meurt sur l'appui, puis le joueur repart dans l'autre sens
     const u = clamp(g.t / duree(g.nom), 0, 1), s0 = g.donnees.s0, h0 = g.donnees.h0;
     const c = CLIPS[g.nom];
     const lacet = c?.turn ? echantillon(c.turn, c.turn.length, 1, 0, u * duree(g.nom), duree(g.nom)) : -Math.PI * u;
     j.cap = enrouler(g.cap0 + lacet);
-    if (u < 0.45) { const s = s0 * (1 - u / 0.45); j.v.x = Math.sin(h0) * s; j.v.z = Math.cos(h0) * s; }
-    else { const s = 2.5 * ((u - 0.45) / 0.55); j.v.x = Math.sin(j.cap) * s; j.v.z = Math.cos(j.cap) * s; }
+    if (u < 0.45) { const s = s0 * (1 - u / 0.45); j.v.x = sin(h0) * s; j.v.z = cos(h0) * s; }
+    else { const s = 2.5 * ((u - 0.45) / 0.55); j.v.x = sin(j.cap) * s; j.v.z = cos(j.cap) * s; }
   } else {
     // geste sur place (passe arrêtée, frappe arrêtée, contrôle) : le joueur s'arrête sur ses appuis
-    const s = Math.hypot(j.v.x, j.v.z);
+    const s = hypot(j.v.x, j.v.z);
     if (s > 0) { const ns = Math.max(0, s - C.freinPlante * dt); j.v.x *= ns / s; j.v.z *= ns / s; }
   }
   // fin du geste
@@ -275,7 +282,7 @@ function pasGeste(j, dt) {
   if (j.mode === 'sol') {
     if (g.nom === 'trip' && g.t >= duree('trip')) {
       // au sol : frottement 4 m/s²
-      const s = Math.hypot(j.v.x, j.v.z);
+      const s = hypot(j.v.x, j.v.z);
       if (s > 0) { const ns = Math.max(0, s - 4 * dt); j.v.x *= ns / s; j.v.z *= ns / s; }
       g.rm = false;
       g.t = duree('trip');

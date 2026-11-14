@@ -21,6 +21,7 @@ import { pasConduite, pasControle, demanderFrappe, pasDemande, pasFrappe, porteu
 import { pasCorpsACorps, demanderTacle, pasTacle, desequilibrer } from './contacts.js';
 import { pasGardien, pasCorpsGardien, contactGardien, tenirBalle } from './gardien.js';
 import { pasIA, intentionVide, conduire } from './ia.js';
+import { atan2, cos, hypot, sin } from './maths.js';
 
 /**
  * Crée un match. humains : [bool, bool] (une équipe jouée par un humain) ; aides : [aide0, aide1] (1 = pouce,
@@ -97,15 +98,17 @@ function majControle(m) {
   const b = m.balle, p = porteur(m);
   for (const e of [0, 1]) {
     if (!m.humains[e]) { m.controle[e] = null; continue; }
+    // (une scène de capture tient la main sur un joueur choisi)
+    if (m.controleFixe?.[e] != null) { m.controle[e] = m.controleFixe[e]; continue; }
     const c = m.controle[e];
     if (p && p.e === e && !p.gardien) { if (c !== p.i) { m.controle[e] = p.i; m.changeT[e] = m.t; } continue; }
     if (b.recepteur != null && m.joueurs[b.recepteur].e === e && !m.joueurs[b.recepteur].gardien) { m.controle[e] = b.recepteur; continue; }
     if (m.t - m.changeT[e] < 0.6) continue;
     const cur = m.joueurs[c ?? 0];
-    let best = cur, bd = Math.hypot(cur.p.x - b.p.x, cur.p.z - b.p.z);
+    let best = cur, bd = hypot(cur.p.x - b.p.x, cur.p.z - b.p.z);
     for (const j of m.joueurs) {
       if (j.e !== e || j.gardien || j.absent) continue;
-      const d = Math.hypot(j.p.x - b.p.x, j.p.z - b.p.z);
+      const d = hypot(j.p.x - b.p.x, j.p.z - b.p.z);
       if (d < bd - 2) { bd = d; best = j; }
     }
     if (best !== cur || c == null) { m.controle[e] = best.i; m.changeT[e] = m.t; }
@@ -116,7 +119,7 @@ function majControle(m) {
 function copierIntention(j, src) {
   const it = j.int;
   it.dx = src.dx ?? 0; it.dz = src.dz ?? 0;
-  const L = Math.hypot(it.dx, it.dz);
+  const L = hypot(it.dx, it.dz);
   if (L > 1e-6) { it.dx /= L; it.dz /= L; }
   it.allure = clamp(src.allure ?? 0, 0, 1); it.sprint = clamp(src.sprint ?? 0, 0, 1);
   it.regard = src.regard ?? null; it.contenir = !!src.contenir; it.protege = !!src.protege; it.charge = !!src.charge; it.vaBalle = true;
@@ -130,20 +133,22 @@ function agir(m, j) {
   j.int.action = null;
   const p = porteur(m);
   if (a.type === 'tacle') { if (!p || p.e !== j.e) demanderTacle(m, j, !!a.glisse); return; }
-  if (a.type === 'roulette') { roulette(m, j, a.cote ?? 1); return; }
+  if (a.type === 'roulette') { roulette(m, j, a.dx ?? 1, a.dz ?? 0); return; }
   // une passe ou une frappe : il faut la balle à portée
   if (p && p.e !== j.e) return;
   if (demanderFrappe(m, j, a)) m.stats.demandes++;
 }
 
-/** La roulette : un pas de côté balle au pied ; le défenseur trop près reste planté un instant. */
-function roulette(m, j, cote) {
+/** La roulette : un pas de côté balle au pied, vers (dx, dz) ; le défenseur trop près reste planté un instant. */
+function roulette(m, j, dx, dz) {
   if (!libre(j) || porteur(m) !== j) return;
-  const s = Math.hypot(j.v.x, j.v.z);
-  j.cap += cote * 0.9; // la roulette part de ce côté
+  const s = hypot(j.v.x, j.v.z);
+  // la roulette part en biais : moitié devant, moitié du côté demandé
+  const fx = sin(j.cap), fz = cos(j.cap), L = hypot(dx, dz) || 1;
+  j.cap = atan2(fx * 0.55 + (dx / L) * 0.85, fz * 0.55 + (dz / L) * 0.85);
   lancerGeste(j, 'roulette', { taux: 1.25, rm: true, echelle: clamp(Math.max(2.5, s) / 3.4, 0.7, 1.3), type: 'roulette', fin: 0.85 * 1.267 });
   j.intouchable = 0.75;
-  for (const o of m.joueurs) if (o.e !== j.e && !o.gardien && !o.absent && Math.hypot(o.p.x - j.p.x, o.p.z - j.p.z) < 2.6) { o.plante = 0.85; desequilibrer(m, o, 0.2); }
+  for (const o of m.joueurs) if (o.e !== j.e && !o.gardien && !o.absent && hypot(o.p.x - j.p.x, o.p.z - j.p.z) < 2.6) { o.plante = 0.85; desequilibrer(m, o, 0.2); }
   m.ev('roulette', { j: j.i });
 }
 
@@ -151,9 +156,9 @@ function roulette(m, j, cote) {
 function pasRoulette(m, j) {
   const b = m.balle, g = j.g;
   if (!g || g.type !== 'roulette' || m.t - (j.toucheT ?? -9) < 0.18) return;
-  const fx = Math.sin(g.cap0), fz = Math.cos(g.cap0);
+  const fx = sin(g.cap0), fz = cos(g.cap0);
   const cx = j.p.x + fx * 0.4, cz = j.p.z + fz * 0.4;
-  if (Math.hypot(b.p.x - cx, b.p.z - cz) > 0.9 || b.p.y > 0.4) return;
+  if (hypot(b.p.x - cx, b.p.z - cz) > 0.9 || b.p.y > 0.4) return;
   j.toucheT = m.t;
   b.v.x = j.v.x + clamp((cx - b.p.x) * 3, -2, 2); b.v.z = j.v.z + clamp((cz - b.p.z) * 3, -2, 2);
   b.w.z = -b.v.x / BALLON.R; b.w.x = b.v.z / BALLON.R;
@@ -167,15 +172,15 @@ function pasRoulette(m, j) {
 function melee(m) {
   const b = m.balle, p = porteur(m);
   let serre = false;
-  if (p && Math.hypot(p.v.x, p.v.z) < 0.5) for (const o of m.joueurs) if (!o.absent && o.e !== p.e && Math.hypot(o.p.x - p.p.x, o.p.z - p.p.z) < 0.85) serre = true;
+  if (p && hypot(p.v.x, p.v.z) < 0.5) for (const o of m.joueurs) if (!o.absent && o.e !== p.e && hypot(o.p.x - p.p.x, o.p.z - p.p.z) < 0.85) serre = true;
   m.meleeT = serre ? (m.meleeT ?? 0) + PAS : 0;
   if (m.meleeT > 2.5) {
     m.meleeT = 0;
     const r = m.rng.contacts;
-    const L = Math.hypot(b.p.x, b.p.z) || 1, a = (r.u() - 0.5) * 1.2;
+    const L = hypot(b.p.x, b.p.z) || 1, a = (r.u() - 0.5) * 1.2;
     const dx = -b.p.x / L, dz = -b.p.z / L;
     const s = 2.5 + r.u() * 1.5;
-    b.v.x = (dx * Math.cos(a) + dz * Math.sin(a)) * s; b.v.z = (-dx * Math.sin(a) + dz * Math.cos(a)) * s; b.v.y = 0.8;
+    b.v.x = (dx * cos(a) + dz * sin(a)) * s; b.v.z = (-dx * sin(a) + dz * cos(a)) * s; b.v.y = 0.8;
     b.possesseur = null; b.dernier = null; b.dernierT = m.t;
     m.stats.antiBlocages++;
     m.ev('melee', {});
@@ -264,7 +269,7 @@ export function pas(m, entrees = null) {
       let best = null, bd = Infinity;
       for (const j of m.joueurs) {
         if (j === q || j.gardien || j.absent) continue;
-        const d = Math.hypot(j.p.x - b.p.x, j.p.z - b.p.z);
+        const d = hypot(j.p.x - b.p.x, j.p.z - b.p.z);
         if (d < bd) { bd = d; best = j; }
       }
       if (best && bd < 1) touche = pasControle(m, best);
