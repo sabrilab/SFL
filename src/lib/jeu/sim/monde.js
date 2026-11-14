@@ -9,6 +9,11 @@
 // de touche, pas de corner, pas de hors-jeu ; après un but, l'équipe qui l'a pris engage au rond central. Aucune
 // faute sifflée (proposé à Sabri : la chute suffit). Les phases : attente, intro, engagement, jeu, but, fin.
 //
+// Ce que les humains (pouce ou manettes, entrees/) ajoutent à l'intention d'un joueur : presse (aller au porteur),
+// renfort (un coéquipier de l'IA presse aussi), sortie (le gardien sort), changer (prendre un autre joueur, au plus
+// proche de la balle ou dans une direction), et les actions crochet et semelle en plus des passes, frappes, tacles et
+// roulette. Pour l'IA, rien ne change : l'IA contre l'IA garde la même empreinte.
+//
 // Ordre d'un pas de jeu : main au bon joueur → intentions (humains, IA, gardiens) → gestes demandés → corps
 // (locomotion, gestes à root motion) → frappes et tacles en cours → contacts entre corps → balle (conduite, contrôle,
 // gardiens, intégration, but) → horloge. Le monde publie la liste des événements du pas (ev) pour le rendu, le son et

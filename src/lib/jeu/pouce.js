@@ -3,7 +3,10 @@
 //     (au-delà de 85 % du rayon : le sprint) ;
 //   · un coup sec puis lâché : la frappe (surLancer, avec la direction et la vivacité du dernier mouvement) ;
 //   · touché bref sans bouger : le dribble (surTouche).
-// À la souris, c'est pareil (cliquer-glisser) ; au clavier, flèches pour courir, Espace pour frapper, D pour dribbler.
+// À la souris, c'est pareil (cliquer-glisser) ; au clavier, flèches pour courir, Maj pour sprinter, Espace pour frapper
+// (maintenu = plus fort), D pour la passe, S la lobée, F la profondeur, Q pour changer de joueur, E le tacle glissé
+// (surClavier). « utilise » passe à vrai au premier toucher ou à la première touche : quand des manettes jouent, le
+// pouce ne prend les Noirs que s'il a servi.
 
 const ZONE = 0.55; // le pouce se pose sous cette fraction de la hauteur
 const RAYON = 58; // px : le stick plein
@@ -32,7 +35,9 @@ export function creerPouce(el) {
     stick: { x: 0, y: 0 },
     surTouche: null,
     surLancer: null,
+    surClavier: null,
     actif: false,
+    utilise: false,
   };
   let id = null, ox = 0, oy = 0, debut = 0, bouge = 0;
   const trace = []; // derniers points { x, y, t }
@@ -48,6 +53,7 @@ export function creerPouce(el) {
     trace.length = 0;
     trace.push({ x: e.clientX, y: e.clientY, t: debut });
     p.actif = true;
+    p.utilise = true;
     anneau.style.left = point.style.left = ox + 'px';
     anneau.style.top = point.style.top = oy + 'px';
     anneau.style.opacity = point.style.opacity = '1';
@@ -106,8 +112,11 @@ export function creerPouce(el) {
   const bas = (e) => {
     if (e.repeat) return;
     if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' '].includes(e.key)) e.preventDefault();
+    if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' ', 'Shift', 'd', 'D', 's', 'S', 'f', 'F', 'q', 'Q', 'e', 'E'].includes(e.key)) p.utilise = true;
     if (e.key === ' ') { espace = performance.now(); return; }
     if (e.key === 'd' || e.key === 'D') { p.surTouche?.(); return; }
+    const k = { s: 'lob', f: 'profondeur', q: 'changer', e: 'tacle' }[e.key.toLowerCase()];
+    if (k) { p.surClavier?.(k); return; }
     touches.add(e.key); majClavier();
   };
   const haut = (e) => {

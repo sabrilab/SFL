@@ -8,6 +8,14 @@
 // pas de 1/120 s, rendu interpolé : rien ne dépend des images par seconde), l'animation calée sur la simulation
 // (rendu/animateur.js), la caméra, le tableau, les vibrations et le banc d'essai (_test).
 //
+// Les manettes (bola-app#23, entrees/manettes.js et entrees/commande.js) : lues une fois par image, avant les pas.
+// Une manette rangée chez les Noirs ou les Blancs joue cette équipe ; une équipe sans manette est jouée par l'IA, sauf
+// les Noirs que joue le pouce (toujours sans manette ; avec des manettes, seulement s'il a servi). Le partage est relu
+// à chaque image : une manette débranchée rend son équipe à l'IA au pas suivant, sans pause. Les gardiens restent à
+// l'IA. Menu / Options met le match en pause. Les vibrations suivent les événements de la simulation (frappe, tacle,
+// chute, épaule, poteau, but). Sous le joueur de chaque humain, un anneau : blanc pour les Noirs, noir cerclé de blanc
+// pour les Blancs ; la jauge de puissance s'y remplit pendant qu'on charge une passe ou une frappe.
+//
 // Les règles de Bola (un five en salle) : la balle ne sort jamais, elle rebondit sur les panneaux et les filets ; pas
 // de touche, pas de corner, pas de hors-jeu ; après un but, l'équipe qui l'a pris engage au rond central.
 //
@@ -43,6 +51,8 @@ import { PAS, BALLON } from './sim/constantes.js';
 import { allongeBras } from './sim/gardien.js';
 import { porteur } from './sim/gestes.js';
 import { SCENARIOS } from './sim/scenarios.js';
+import { changerHumains } from './sim/monde.js';
+import { creerManettes, EFFETS } from './entrees/manettes.js';
 
 const R = BALLON.R;
 const PX = DIM.Tl / 2 - R;
@@ -79,11 +89,13 @@ function texOmbre() {
 /**
  * Lance le jeu dans conteneur. Renvoie { demarrer(), detruire(), _test }.
  * @param {HTMLElement} conteneur
- * @param {{ photo?: string | null, surEtat?: (etat: any) => void, reduit?: boolean, duree?: number, surProgres?: (p: number) => void }} [options]
- *   photo : ta photo du studio ; surEtat : le tableau (HUD) ; reduit : « Réduire les animations » ; duree : en secondes.
+ * @param {{ photo?: string | null, surEtat?: (etat: any) => void, reduit?: boolean, duree?: number, surProgres?: (p: number) => void, surSalon?: () => void, surDemarrer?: () => void }} [options]
+ *   photo : ta photo du studio ; surEtat : le tableau (HUD) ; reduit : « Réduire les animations » ; duree : en secondes ;
+ *   surSalon : une manette demande l'écran Manettes (A / ✕ ou Menu avant le match) ; surDemarrer : Menu / Options
+ *   dans l'écran Manettes.
  */
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, reduit = false, duree = 150, surProgres = () => {} } = {}) {
+export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, reduit = false, duree = 150, surProgres = () => {}, surSalon = () => {}, surDemarrer = () => {} } = {}) {
   const pr = Math.min(window.devicePixelRatio || 1, 1.5);
   let echelle = 1; // la définition adaptative
   const dims = () => {
@@ -180,8 +192,34 @@ export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, 
   );
   anneau.renderOrder = 3;
   monde.add(anneau);
+  // celui des Blancs : noir cerclé de blanc, pour qu'il se voie sur le gazon
+  const anneauB = new THREE.Group();
+  {
+    const mat = (c) => new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0.95, depthWrite: false, toneMapped: false });
+    const a = new THREE.Mesh(new THREE.RingGeometry(0.42, 0.5, 48).rotateX(-Math.PI / 2), mat(0x050505));
+    const b1 = new THREE.Mesh(new THREE.RingGeometry(0.5, 0.53, 48).rotateX(-Math.PI / 2), mat(0xffffff));
+    const b2 = new THREE.Mesh(new THREE.RingGeometry(0.39, 0.42, 48).rotateX(-Math.PI / 2), mat(0xffffff));
+    for (const o of [a, b1, b2]) { o.renderOrder = 3; anneauB.add(o); }
+  }
+  anneauB.visible = false;
+  monde.add(anneauB);
+  // la jauge de puissance : un arc qui se remplit autour de l'anneau (une par équipe)
+  const jauges = [0, 1].map((e) => {
+    const g = new THREE.RingGeometry(0.55, 0.62, 48, 1, Math.PI / 2, -Math.PI * 2).rotateX(-Math.PI / 2);
+    const o = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ color: e === 0 ? 0xffffff : 0xf2f2f2, transparent: true, opacity: 0.95, depthWrite: false, toneMapped: false }));
+    o.renderOrder = 3; o.visible = false; monde.add(o);
+    return o;
+  });
 
   const pouce = creerPouce(renderer.domElement);
+  // l'écran vu de la tribune : la droite de l'écran = vers le but attaqué par les Noirs (-z), le haut = vers -x
+  const ecranVersJeu = (sx, sy) => ({ x: -sy, z: -sx });
+  const manettes = creerManettes({ versJeu: ecranVersJeu });
+  manettes.surSalon = () => surSalon();
+  manettes.surDemarrer = () => surDemarrer();
+  let pause = false;
+  manettes.surPause = () => { if (m().phase === 'jeu' || m().phase === 'engagement') { pause = !pause; etat.pause = pause; signaler(); } };
+  let avecManettes = false; // le match a commencé avec au moins une manette dans une équipe
 
   // ── la simulation ──
   const params = typeof location !== 'undefined' ? new URLSearchParams(location.search) : null;
@@ -191,7 +229,7 @@ export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, 
   const m = () => boucleSim.m;
   // banc d'essai : l'IA joue aussi les Noirs (auto), le rendu peut être coupé ; pas = secondes de simulation par image
   const banc = { auto: false, rendu: true, pas: 0, stats: monde0.stats };
-  const etat = { phase: 'attente', noirs: 0, blancs: 0, reste: duree, message: null, buteur: null };
+  const etat = { phase: 'attente', noirs: 0, blancs: 0, reste: duree, message: null, buteur: null, pause: false, manettes: false };
   const MOI = 4; // l'attaquant des Noirs
   const signaler = () => surEtat({ ...etat });
   let ralenti = 1, ralentiFin = 0;
@@ -203,8 +241,6 @@ export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, 
   let scene = null; // un scénario de capture en cours (sim/scenarios.js)
 
   // ── le pouce → l'intention des Noirs ──
-  // l'écran vu de la tribune : la droite de l'écran = vers le but attaqué (-z), le haut = vers l'autre côté (-x)
-  const ecranVersJeu = (sx, sy) => ({ x: -sy, z: -sx });
   const entree = { dx: 0, dz: 0, allure: 0, sprint: 0, action: null, regard: null, contenir: false, protege: false, charge: false };
   let actionPouce = null;
   function lireEntree() {
@@ -215,14 +251,30 @@ export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, 
     entree.sprint = amp > 0.85 ? (amp - 0.85) / 0.15 : 0;
     entree.regard = m().balle.p;
     entree.action = actionPouce; actionPouce = null;
+    entree.changer = changerPouce; changerPouce = null;
     return entree;
   }
+  let changerPouce = null;
   const entrees = [null, null];
+  /** Qui joue quoi : une manette par équipe, sinon le pouce pour les Noirs, sinon l'IA. */
+  const pouceJoue = () => !avecManettes || pouce.utilise;
   function lireEntrees() {
     if (scene) return scene.entrees(m());
     if (banc.auto || m().phase !== 'jeu') { entrees[0] = null; entrees[1] = null; return entrees; }
-    entrees[0] = lireEntree(); entrees[1] = null;
+    const eq = manettes.equipes();
+    entrees[0] = eq[0] ? manettes.intention(0) : pouceJoue() ? lireEntree() : null;
+    entrees[1] = eq[1] ? manettes.intention(1) : null;
     return entrees;
+  }
+  const humainsVoulus = [true, false], aidesVoulues = [1, 0];
+  /** Relu à chaque image : une manette branchée, débranchée, rejointe, et le monde suit au pas suivant. */
+  function majHumains() {
+    const M = m();
+    if (banc.auto || scene) return;
+    const eq = manettes.equipes();
+    humainsVoulus[0] = !!eq[0] || pouceJoue(); humainsVoulus[1] = !!eq[1];
+    aidesVoulues[0] = eq[0] ? 0.5 : 1; aidesVoulues[1] = eq[1] ? 0.5 : 0;
+    if (M.humains[0] !== humainsVoulus[0] || M.humains[1] !== humainsVoulus[1] || M.aides[0] !== aidesVoulues[0] || M.aides[1] !== aidesVoulues[1]) changerHumains(M, humainsVoulus, aidesVoulues);
   }
   pouce.surTouche = () => {
     if (m().phase !== 'jeu') return;
@@ -234,6 +286,15 @@ export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, 
       return;
     }
     if (p && p.e !== j.e && Math.hypot(p.p.x - j.p.x, p.p.z - j.p.z) < 2.2) actionPouce = { type: 'tacle', glisse: false };
+  };
+  // le clavier : S lobée, F profondeur (puissance moyenne, vers la course), Q changer de joueur, E tacle glissé
+  pouce.surClavier = (k) => {
+    if (m().phase !== 'jeu') return;
+    const j = m().joueurs[m().controle[0] ?? MOI];
+    const st = pouce.stick, a = Math.hypot(st.x, st.y) > 0.3, g = ecranVersJeu(st.x, st.y);
+    if (k === 'changer') { changerPouce = true; return; }
+    if (k === 'tacle') { actionPouce = { type: 'tacle', glisse: true }; return; }
+    actionPouce = { type: k, p: 0.5, dx: a ? g.x : Math.sin(j.cap), dz: a ? g.z : Math.cos(j.cap) };
   };
   pouce.surLancer = (dx, dy, force) => {
     if (m().phase !== 'jeu') return;
@@ -259,20 +320,26 @@ export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, 
   // ── les événements de la simulation → vibrations, tableau, ralenti ──
   function evenements() {
     const M = m();
+    const eq = banc.auto || scene ? [null, null] : manettes.equipes();
+    // une vibration pour l'équipe e : sa manette, ou le téléphone si c'est le pouce qui joue les Noirs
+    const secouer = (e, ef, ms) => { if (banc.auto || e == null) return; if (eq[e]) manettes.vibrer(e, ef); else if (e === 0 && M.humains[0]) vibrer(ms); };
+    const eqDe = (i) => (i != null ? M.joueurs[i]?.e : null);
+    const joue = (i) => i != null && M.controle[M.joueurs[i]?.e] === i;
     for (const e of M.evts) {
-      const nous = (i) => i != null && M.joueurs[i]?.e === 0;
       switch (e.type) {
-        case 'frappe': case 'passe': if (nous(e.j) && !banc.auto) vibrer(e.type === 'frappe' ? 18 : 8); break;
-        case 'tacleBalle': if (nous(e.j) && !banc.auto) vibrer(14); break;
-        case 'chute': if (nous(e.j) && !banc.auto) vibrer(22); break;
-        case 'poteau': vibrer(12); break;
+        case 'frappe': secouer(eqDe(e.j), EFFETS.frappe(e.p ?? 0.5), 18); break;
+        case 'passe': if (!eq[eqDe(e.j)]) secouer(eqDe(e.j), null, 8); break;
+        case 'tacleBalle': case 'tacleJambes': secouer(eqDe(e.j), EFFETS.tacle(), 14); break;
+        case 'chute': if (joue(e.j)) secouer(eqDe(e.j), EFFETS.chute(), 22); break;
+        case 'epaule': for (const i of [e.a, e.b]) if (joue(i) && eq[eqDe(i)]) manettes.vibrer(eqDe(i), EFFETS.epaule()); break;
+        case 'poteau': if (!banc.auto) { for (const k of [0, 1]) if (eq[k]) manettes.vibrer(k, EFFETS.poteau()); if (!eq[0] && M.humains[0]) vibrer(12); } break;
         case 'but':
           banc.stats.buts = M.stats.buts;
           etat.message = 'BUT';
           etat.buteur = e.j === MOI ? 'moi' : e.e === 0 ? 'noirs' : 'blancs';
           cam.buteur = e.j;
           if (!reduit) { ralenti = 0.3; ralentiFin = 1.1; }
-          if (e.e === 0 && !banc.auto) vibrer([30, 40, 60]);
+          secouer(e.e, EFFETS.but(), [30, 40, 60]);
           break;
         case 'engagement': etat.message = null; etat.buteur = null; break;
         default: break;
@@ -284,6 +351,7 @@ export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, 
   function majEtat() {
     const M = m();
     const changePhase = etat.phase !== M.phase;
+    if (changePhase && M.phase === 'fin') { manettes.mode('repos'); pause = false; etat.pause = false; }
     etat.phase = M.phase; etat.noirs = M.score[0]; etat.blancs = M.score[1]; etat.reste = Math.max(0, M.reste);
     if (M.phase !== 'but') { etat.message = null; if (M.phase !== 'fin') etat.buteur = null; }
     const s = Math.ceil(etat.reste);
@@ -320,9 +388,17 @@ export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, 
     if (wn > 1e-4 && dt > 0) { axeB.set(wv.x / wn, wv.y / wn, wv.z / wn); qBalle.setFromAxisAngle(axeB, wn * dt * ralenti); balle.quaternion.premultiply(qBalle); }
     ombreBalle.position.set(bInterp.x, 0.045, bInterp.z);
     // l'anneau sous le joueur que tu joues
-    const c = M.controle[0];
-    anneau.visible = !banc.auto && c != null && (M.phase === 'jeu' || M.phase === 'engagement');
+    const visibleJeu = !banc.auto && (M.phase === 'jeu' || M.phase === 'engagement');
+    const c = M.controle[0], c1 = M.controle[1];
+    anneau.visible = visibleJeu && c != null;
     if (c != null) { const I = vus[c].interp; anneau.position.set(I.x, 0.05, I.z); }
+    anneauB.visible = visibleJeu && c1 != null;
+    if (c1 != null) { const I = vus[c1].interp; anneauB.position.set(I.x, 0.05, I.z); }
+    for (const e of [0, 1]) {
+      const o = jauges[e], q = M.controle[e], f = manettes.jauge(e);
+      o.visible = visibleJeu && q != null && f > 0.02;
+      if (o.visible) { const I = vus[q].interp; o.position.set(I.x, 0.055, I.z); o.geometry.setDrawRange(0, 6 * Math.max(1, Math.round(48 * f))); }
+    }
   }
 
   function versMondeDir(v, out) { return out.set(v.z, v.y, -v.x); }
@@ -386,6 +462,10 @@ export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, 
     adapter(ms);
     horloge.update(ms);
     const dtReel = Math.min(0.25, horloge.getDelta());
+    // les manettes : une lecture par image, avant les pas ; puis qui joue quelle équipe
+    manettes.lire(ms / 1000, m());
+    majHumains();
+    if (pause) { evenements(); majEtat(); rendre(0); return; }
     if (ralentiFin > 0) { ralentiFin -= dtReel; if (ralentiFin <= 0) ralenti = 1; }
     let dtJeu = dtReel * ralenti;
     if (!gele) {
@@ -437,15 +517,25 @@ export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, 
   }
 
   return {
+    /** Le match : avec les manettes rangées dans l'écran Manettes (s'il y en a), sinon au pouce. */
     demarrer() {
       if (m().phase !== 'attente') nouveauMonde(graine + 1);
+      manettes.mode('match');
+      avecManettes = !!(manettes.equipes()[0] || manettes.equipes()[1]);
+      etat.manettes = avecManettes;
+      pouce.utilise = false; pause = false; etat.pause = false;
+      majHumains();
       demarrerMonde(m(), { intro: true, reduit });
       etat.message = null; etat.buteur = null; derniereSeconde = -1;
       majEtat(); signaler();
     },
+    /** L'écran Manettes ouvert (salon) ou fermé (repos) ; abonner / instantane pour l'écran (manettes.tsx). */
+    salon(ouvert) { manettes.mode(ouvert ? 'salon' : 'repos'); },
+    manettes: { abonner: manettes.abonner, instantane: manettes.instantane, reconnues: manettes.reconnues },
     // banc d'essai (?banc) : l'état, la graine, des pas exacts, l'empreinte, les scénarios de capture
     _test: {
-      etat, banc, anneau, pouce,
+      etat, banc, anneau, anneauB, pouce, manettes,
+      get pause() { return pause; },
       get monde() { return m(); },
       get joueurs() { return m().joueurs; },
       get b() { return m().balle; },
@@ -479,6 +569,7 @@ export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, 
       cancelAnimationFrame(raf);
       ro.disconnect();
       pouce.detruire();
+      manettes.detruire();
       for (const v of vus) v.perso.liberer();
       pl.composer.dispose?.();
       renderer.dispose();
