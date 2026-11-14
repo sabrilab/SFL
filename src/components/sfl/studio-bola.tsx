@@ -188,7 +188,7 @@ function Cartes({ pose, l }: { pose: Scene["pose"]; l: number }) {
       // De très près, penchée vers l'objectif ; l'adversaire, coupé au bord, flou.
       return (
         <>
-          <CarteToi largeur={l * 0.46} dos style={{ right: "-24%", bottom: "20%", transform: "rotate(9deg)", filter: "blur(3px) brightness(0.7)" }} />
+          <CarteToi largeur={l * 0.44} dos style={{ right: "-17%", bottom: "38%", transform: "rotate(11deg)", filter: "blur(2.5px) brightness(0.72)" }} />
           <CarteToi largeur={l * 0.66} style={{ left: "6%", bottom: "-6%", transform: "perspective(560px) rotateY(18deg) rotate(-6deg)" }} />
         </>
       );
