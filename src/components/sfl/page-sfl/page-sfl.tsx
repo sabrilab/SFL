@@ -7,8 +7,8 @@
 // puis mène à la création du compte (/inscription) ou à la connexion.
 //
 // De haut en bas : le haut (le sigle, « Lille. Chaque dimanche. », les deux
-// boutons), la semaine d'un joueur, Noirs contre Blancs, la carte qui bouge,
-// le classement Pépite d'Or et ses divisions, les trois titres d'un match,
+// boutons, sur sa couverture), la semaine d'un joueur, Noirs contre Blancs,
+// la carte qui bouge, le classement Pépite d'Or et ses divisions, les trois titres d'un match,
 // puis la fin, qui dit le vrai chemin : un compte neuf entre dans Bola, la
 // ligue s'ouvre ensuite depuis la Map (« Rejoindre la ligue »). La page ne
 // promet donc pas de jouer dimanche.
@@ -35,6 +35,14 @@
 //     la page (Noirs en sombre, Blancs en clair) porte un liseré plus net ;
 //   · le thème de l'app, clair ou sombre : rien que des jetons.
 // Les textes sont dans lib/sfl/page-sfl.ts, que relit tools/page-sfl-check.ts.
+//
+// Le haut (14/11, retour sur bola-app#6 : « rends l'accueil plus visuel avec
+// une belle photo de couverture ») : le premier écran entier, une grande image
+// derrière (couverture.tsx : la photo, le mur des vraies cartes, et son voile
+// de la couleur de la page), le contenu posé en bas, sur le voile. Sa hauteur
+// ne vient que de la fenêtre (100svh moins la zone sûre) : rien ne saute
+// quand l'image arrive. C'est la seule image hors de l'instantané, et elle est
+// dans couverture.tsx, pas ici.
 //
 // Le cadre est plein écran, au-dessus de la barre d'onglets, comme
 // l'inscription ; c'est lui qui défile (la classe overflow-y-auto est exigée
@@ -102,6 +110,7 @@ import {
 import { CARTE_MONTEE, COMPO, PODIUMS, TITRES, type ImageCarte } from "@/lib/sfl/page-sfl-instantane";
 import { noterSite } from "@/lib/sfl/site-visites";
 import { cn } from "@/lib/utils";
+import { Couverture } from "./couverture";
 
 /** La hauteur de la barre du haut. */
 const BARRE = 52;
@@ -315,34 +324,37 @@ export function PageSfl() {
 
       {/* Le contenu : la racine de l'app (layout.tsx) porte déjà le <main>. */}
       <div>
-        {/* 1 · Le haut : sur ordinateur, tout suit la hauteur de la fenêtre (les valeurs d'un écran de 900 px au plus) ; resserré sur un téléphone couché. */}
-        <header className={cn(COLONNE, "flex flex-col items-center pt-11 text-center min-[960px]:pt-[clamp(48px,12.5vh,112px)] [@media(max-height:480px)]:pt-6")}>
-          <p className={ETIQUETTE}>{HAUT_SFL.etiquette}</p>
-          <span
-            role="img"
-            aria-label={HAUT_SFL.sigle}
-            className={cn("mt-7 block aspect-[735/237] h-[76px] bg-current min-[960px]:mt-[clamp(24px,5.4vh,48px)] min-[960px]:h-[clamp(88px,15.6vh,140px)] [@media(max-height:480px)]:mt-4 [@media(max-height:480px)]:h-12")}
-            style={{ mask: MASQUE_SIGLE, WebkitMask: MASQUE_SIGLE }}
-          />
-          <h1
-            className={cn(
-              AFFICHE,
-              "mt-7 text-[clamp(30px,9.7vw,44px)] leading-[1.04] min-[960px]:mt-[clamp(24px,5.4vh,48px)] min-[960px]:text-[clamp(56px,min(6.7vw,11.5vh),96px)] min-[960px]:leading-none [@media(max-height:480px)]:mt-4"
-            )}
-          >
-            {HAUT_SFL.titre.map((ligne) => (
-              <span key={ligne} className="block whitespace-nowrap">
-                {ligne}
-              </span>
-            ))}
-          </h1>
-          <p className={cn("mt-4 text-titre-fort font-bold text-encre-2 min-[960px]:mt-[clamp(14px,3.2vh,28px)] min-[960px]:text-titre-g [@media(max-height:480px)]:mt-2")}>{HAUT_SFL.ligne}</p>
-          <Boutons
-            ref={boutonsHaut}
-            connecte={connecte}
-            className={cn("mt-9 w-full min-[720px]:max-w-[420px] min-[960px]:mt-[clamp(24px,5.4vh,48px)] min-[960px]:w-auto min-[960px]:max-w-none [@media(max-height:480px)]:mt-5")}
-          />
-        </header>
+        {/* 1 · Le haut, sur sa couverture : le premier écran entier, le contenu en bas, sur le voile ; sur ordinateur, tout suit la hauteur de la fenêtre (les valeurs d'un écran de 900 px au plus) ; resserré sur un téléphone couché. */}
+        <div className="relative isolate flex min-h-[calc(100svh-env(safe-area-inset-top))] flex-col justify-end">
+          <Couverture />
+          <header className={cn(COLONNE, "flex flex-col items-center pt-11 pb-12 text-center min-[960px]:pt-[clamp(48px,12.5vh,112px)] min-[960px]:pb-[clamp(40px,9vh,96px)] [@media(max-height:480px)]:pt-6 [@media(max-height:480px)]:pb-6")}>
+            <p className={ETIQUETTE}>{HAUT_SFL.etiquette}</p>
+            <span
+              role="img"
+              aria-label={HAUT_SFL.sigle}
+              className={cn("mt-7 block aspect-[735/237] h-[76px] bg-current min-[960px]:mt-[clamp(24px,5.4vh,48px)] min-[960px]:h-[clamp(88px,15.6vh,140px)] [@media(max-height:480px)]:mt-4 [@media(max-height:480px)]:h-12")}
+              style={{ mask: MASQUE_SIGLE, WebkitMask: MASQUE_SIGLE }}
+            />
+            <h1
+              className={cn(
+                AFFICHE,
+                "mt-7 text-[clamp(30px,9.7vw,44px)] leading-[1.04] min-[960px]:mt-[clamp(24px,5.4vh,48px)] min-[960px]:text-[clamp(56px,min(6.7vw,11.5vh),96px)] min-[960px]:leading-none [@media(max-height:480px)]:mt-4"
+              )}
+            >
+              {HAUT_SFL.titre.map((ligne) => (
+                <span key={ligne} className="block whitespace-nowrap">
+                  {ligne}
+                </span>
+              ))}
+            </h1>
+            <p className={cn("mt-4 text-titre-fort font-bold text-encre-2 min-[960px]:mt-[clamp(14px,3.2vh,28px)] min-[960px]:text-titre-g [@media(max-height:480px)]:mt-2")}>{HAUT_SFL.ligne}</p>
+            <Boutons
+              ref={boutonsHaut}
+              connecte={connecte}
+              className={cn("mt-9 w-full min-[720px]:max-w-[420px] min-[960px]:mt-[clamp(24px,5.4vh,48px)] min-[960px]:w-auto min-[960px]:max-w-none [@media(max-height:480px)]:mt-5")}
+            />
+          </header>
+        </div>
 
         {/* 2 · La semaine */}
         <section

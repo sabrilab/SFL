@@ -61,6 +61,15 @@
 //       par format ; --verifier (fautesInstantane) essayé sur des cas
 //       (homonyme, nom affiché égal au nom de saison d'un autre, lecture trop
 //       vieille ou datée dans le futur, accord retiré, joueur hors accords.md).
+//  12 · la couverture du haut (14/11) : la variante de la page est a « La
+//       cage » ; la production ne lit jamais l'adresse (?couverture= n'existe
+//       qu'en dev) ; l'image est décorative, chargée tout de suite, avec ses
+//       dimensions, et la hauteur du haut ne vient que de la fenêtre ; chaque
+//       image existe dans public/sfl/couverture, à l'empreinte, aux
+//       dimensions et au poids écrits par tools/page-sfl-couverture.ts
+//       (250 ko au plus pour le téléphone) ; une photo vient du moodboard des
+//       Actus (lib/sfl/couvertures.ts), le mur ne montre que des joueurs
+//       d'ACCORDS ; aucun fichier orphelin.
 // Ce qu'il ne tient pas : le rendu (les captures), ce qu'une chaîne
 // construite à l'exécution pourrait écrire dans la page, et SURTOUT L'ACCORD
 // LUI-MÊME. Ce banc ne contrôle que l'instantané avec lui-même : un joueur
@@ -105,6 +114,9 @@ import type { MatchEntry, Saison } from "../src/lib/sfl/saisie/types";
 import { CATEGORIES_VOTE } from "../src/lib/sfl/votes";
 import { sigleSfl } from "./sigle-sfl";
 import { APERCU_LIEN, composer, empreinte, sigleSerre } from "./sigle-sfl-exports";
+import { COUVERTURES } from "../src/lib/sfl/couvertures";
+import { VARIANTES_COUVERTURE, type ImageCouverture } from "../src/lib/sfl/page-sfl-couverture";
+import { POIDS_ORDINATEUR, POIDS_TELEPHONE, cartesPermises } from "./page-sfl-couverture";
 import { empechement, fautesInstantane, nomsDeSaison, podiumSansTrou, slug, type Lecture, type LigneJoueur } from "./page-sfl-instantane";
 
 const RACINE = join(__dirname, "..");
@@ -129,7 +141,9 @@ const ROUTES = "src/lib/sfl/routes-publiques.ts";
 const ALT = "src/app/sfl/opengraph-image.alt.txt";
 const INSTANTANE = "src/lib/sfl/page-sfl-instantane.ts";
 const CARTES = "public/sfl/cartes";
-const SOURCES = [ROUTE, PAGE, TEXTES, ROUTES, ALT];
+const COUVERTURE = "src/components/sfl/page-sfl/couverture.tsx";
+const IMAGES_COUVERTURE = "src/lib/sfl/page-sfl-couverture.ts";
+const SOURCES = [ROUTE, PAGE, TEXTES, ROUTES, ALT, COUVERTURE];
 
 // 1 · La porte.
 // Ce qui est ouvert sans compte, et rien d'autre : chaque dossier de src/app est essayé.
@@ -265,6 +279,7 @@ const imports = (source: string) => [...source.matchAll(/^import\s[^;]*?from\s+"
 assert.deepEqual(
   imports(page),
   [
+    "./couverture",
     "@/components/sfl/finitions-carte",
     "@/components/sfl/marques-carte",
     "@/hooks/use-session",
@@ -730,6 +745,43 @@ for (const p of PODIUMS) {
 const editions = TITRES.cartes.map((c) => c.edition);
 verifier(new Set(editions).size === editions.length && editions.every((e) => ["mvp", "impact", "def"].includes(e)), "11 · un titre est deux fois, ou n'est pas MVP, Impact, Défensive");
 verifier(new Set(TITRES.cartes.map((c) => c.nom)).size === TITRES.cartes.length && TITRES.cartes.every((c) => noteOk(c.note)), "11 · deux titres au même joueur, ou une note pas plausible");
+
+// 12 · La couverture du haut (14/11) : des images déjà validées, rien d'autre ; aucun joueur hors d'ACCORDS ; un poids tenu.
+assert.deepEqual(imports(lire(COUVERTURE)), ["@/lib/sfl/page-sfl-couverture", "react"], "12 · la couverture importe autre chose que ses images");
+assert.deepEqual(imports(lire(IMAGES_COUVERTURE)), [], "12 · les images de la couverture importent quelque chose : elles ne tiennent que des données");
+const couverture = lire(COUVERTURE);
+verifier(/export const COUVERTURE_SFL: CleCouverture = "a";/.test(couverture), "12 · la variante de la page n'est plus a « La cage » (la recommandée)");
+verifier(
+  /if \(process\.env\.NODE_ENV === "production"\) return COUVERTURE_SFL;/.test(couverture) && /useSyncExternalStore\(rien, lireAdresse, \(\) => COUVERTURE_SFL\)/.test(couverture),
+  "12 · la production lit l'adresse, ou le HTML servi ne porte plus la variante de la page"
+);
+verifier((couverture.match(/<img\b/g) ?? []).length === 1 && /alt=""/.test(couverture) && /aria-hidden/.test(couverture), "12 · l'image de couverture n'est plus décorative (alt vide, aria-hidden), ou il y en a plusieurs");
+verifier(/loading="eager"/.test(couverture) && /fetchPriority="high"/.test(couverture) && !/loading="lazy"/.test(couverture), "12 · l'image de couverture ne se charge plus tout de suite, en priorité");
+verifier(/width=\{petite\.largeur\}/.test(couverture) && /height=\{petite\.hauteur\}/.test(couverture), "12 · l'image de couverture n'a plus ses dimensions");
+verifier(/<Couverture \/>/.test(page) && /min-h-\[calc\(100svh-env\(safe-area-inset-top\)\)\]/.test(page), "12 · le haut n'est plus posé sur sa couverture, ou sa hauteur ne vient plus de la fenêtre");
+const sourcesValidees = new Set(COUVERTURES.map((c) => `/actus/couvertures/${c.id}-1200.webp`));
+const permises = new Set(cartesPermises().map((c) => c.nom));
+const servisCouverture = new Set<string>();
+for (const [cle, v] of Object.entries(VARIANTES_COUVERTURE)) {
+  verifier(v.source === null ? cle === "b" : sourcesValidees.has(v.source), `12 · la variante ${cle} vient d'une image hors du moodboard des Actus (${v.source})`);
+  verifier(v.cartes.every((n) => (ACCORDS as readonly string[]).includes(n) && permises.has(n)), `12 · le mur de la variante ${cle} montre un joueur hors d'ACCORDS`);
+  verifier(v.source === null ? v.cartes.length > 0 : v.cartes.length === 0, `12 · la variante ${cle} : une photo avec des joueurs, ou un mur sans`);
+  verifier(v.telephone.length === 2 && v.telephone[0].largeur < v.telephone[1].largeur, `12 · la variante ${cle} n'a plus ses deux largeurs de téléphone`);
+  const toutes: [ImageCouverture, number][] = [...v.telephone.map((i): [ImageCouverture, number] => [i, POIDS_TELEPHONE]), [v.ordinateur, POIDS_ORDINATEUR]];
+  for (const [i, max] of toutes) {
+    servisCouverture.add(i.src);
+    const f = join(RACINE, "public", i.src);
+    if (!existsSync(f)) {
+      verifier(false, `12 · l'image ${i.src} manque`);
+      continue;
+    }
+    const b = readFileSync(f);
+    verifier(empreinte(b) === i.sha256, `12 · ${i.src} n'est plus l'image écrite par l'outil (empreinte)`);
+    verifier(b.length === i.octets && b.length <= max, `12 · ${i.src} pèse ${b.length} octets (écrit : ${i.octets}, ${max} au plus)`);
+    verifier(pareil(tailleWebp(b), [i.largeur, i.hauteur]), `12 · ${i.src} ne fait pas ${i.largeur} × ${i.hauteur} (WebP)`);
+  }
+}
+for (const f of readdirSync(join(RACINE, "public/sfl/couverture"))) verifier(servisCouverture.has(`/sfl/couverture/${f}`), `12 · public/sfl/couverture/${f} n'est cité par aucune variante (orphelin)`);
 
 void coinsOpaques.then((opaques) => {
   fautes.push(...opaques);
