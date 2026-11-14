@@ -1,28 +1,111 @@
-/* La page Bola Plus (bola-plus.tsx) : l'affiche, les cartes d'avantage, la
-   barre collée. Les visuels sont en noir et blanc et restent sombres dans les
-   deux modes ; les voiles (pour lire le titre) sont posés ici, jamais dans
-   l'image. Rien ne suit le doigt : une carte apparaît une fois, et n'est
-   cachée ([data-attend]) que par la page en marche. Avec « Réduire les
-   animations », tout est là d'emblée (fin du fichier). */
+/* La page Bola Plus (bola-plus.tsx) : un carrousel horizontal en couleurs
+   (retours de Sabri du 14/11). La couleur est permise sur CETTE page
+   seulement : le violet de Bola Plus, le vert terrain de la SFL, le lime du
+   prix. Les teintes ne sont pas écrites ici : la page les pose en variables
+   (--bp-*, depuis PALETTE de lib/sfl/bola-plus.ts) ; on n'en tire ici que des
+   voiles, par color-mix. Les cartes à photo, l'ouverture et « Ramène 5 »
+   restent des îlots sombres dans les deux modes (classe dark) ; « Ta carte »,
+   « Bola Plus » et « Ton prix » prennent un papier teinté en clair. La page
+   tient dans l'écran : elle ne défile pas en vertical, seul le rail glisse,
+   aimanté carte par carte. Avec « Réduire les animations », rien ne bouge
+   seul (fin du fichier). */
 
 .bp {
-  /* Le fond de la page, lu hors des îlots sombres : l'affiche s'y fond. */
-  --bp-page: var(--background);
+  --bp-r: 28px;
+  /* Le bas de l'écran : la barre d'onglets (bottom-nav.tsx : 62 px, posée à
+     14 px du bas ou sur l'encoche), puis la barre « Je suis intéressé ». */
+  --bp-onglets: calc(max(calc(env(safe-area-inset-bottom) - 4px), 14px) + 62px);
+  display: flex;
+  flex-direction: column;
   width: 100%;
   max-width: 430px;
-  margin: -0.75rem auto 0;
+  /* #app-scroll : main a 12 px en haut et 128 px en bas ; la page les reprend
+     pour tenir dans l'écran, sans défilement vertical. */
+  height: calc(100dvh - env(safe-area-inset-top));
+  margin: -0.75rem auto -8rem;
+  overflow: hidden;
 }
 
-/* ── L'affiche : bord à bord, 4:5. ── */
-.bp-affiche {
-  position: relative;
-  aspect-ratio: 4 / 5;
-  overflow: hidden;
-  background: var(--teinte);
-  color: #fff;
+/* ── Le haut : le retour. ── */
+.bp-tete {
+  flex: none;
+  display: flex;
+  align-items: center;
+  height: 56px;
+  padding: 0 16px;
 }
-.bp-affiche > img,
-.bp-carte > img {
+
+/* ── Le rail. ── */
+.bp-scene {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+.bp-rail {
+  display: flex;
+  gap: 10px;
+  height: 100%;
+  margin: 0;
+  padding: 0 20px;
+  list-style: none;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x mandatory;
+  scroll-padding-inline: 20px;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+  outline: none;
+}
+.bp-rail::-webkit-scrollbar {
+  display: none;
+}
+.bp-rail:focus-visible {
+  outline: 2px solid var(--foreground);
+  outline-offset: -2px;
+  border-radius: var(--bp-r);
+}
+.bp-diapo {
+  position: relative;
+  flex: 0 0 calc(100% - 40px);
+  max-width: 390px;
+  height: 100%;
+  min-height: 0;
+  scroll-snap-align: center;
+  scroll-snap-stop: always;
+  border-radius: var(--bp-r);
+  overflow: hidden;
+  isolation: isolate;
+}
+.bp-diapo > * {
+  height: 100%;
+}
+
+/* Les titres de la page : Barlow Condensed 800 en capitales (la police des
+   cartes, déjà chargée). La piste B (Archivo large et penchée) ne s'applique
+   que si sa police est chargée ; sinon on retombe sur Barlow. */
+.bp-titre {
+  margin: 0;
+  font-family: var(--font-barlow), "Barlow Condensed", sans-serif;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: -0.01em;
+  line-height: 0.92;
+  text-wrap: balance;
+}
+.bp[data-police="archivo"] .bp-titre {
+  font-family: var(--font-archivo, var(--font-barlow)), sans-serif;
+  font-weight: 900;
+  font-style: italic;
+  font-stretch: 125%;
+  letter-spacing: -0.02em;
+  line-height: 0.95;
+}
+.bp[data-police="archivo"] :is(.bp-photo-carte__titre, .bp-texte__titre) {
+  font-size: clamp(24px, 7.8vw, 30px);
+}
+
+/* Une photo, plein cadre. */
+.bp-photo {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -31,126 +114,624 @@
   user-select: none;
   -webkit-user-drag: none;
 }
-/* Deux voiles : en haut sous le retour, en bas sous le nom ; puis le fondu
-   dans la page. */
-.bp-affiche::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background:
-    linear-gradient(to top, var(--bp-page) 0%, transparent 16%),
-    linear-gradient(to top, rgb(0 0 0 / 0.9) 8%, rgb(0 0 0 / 0.62) 34%, transparent 66%),
-    linear-gradient(to bottom, rgb(0 0 0 / 0.5) 0%, transparent 24%);
-}
-/* En clair, pas de fondu : le noir dans le papier ferait un voile gris sous
-   les prix. L'affiche se termine net, par deux coins arrondis. */
-:root:not(.dark) .bp-affiche {
-  border-radius: 0 0 28px 28px;
-}
-:root:not(.dark) .bp-affiche::after {
-  background:
-    linear-gradient(to top, rgb(0 0 0 / 0.9) 0%, rgb(0 0 0 / 0.6) 30%, transparent 62%),
-    linear-gradient(to bottom, rgb(0 0 0 / 0.5) 0%, transparent 24%);
-}
-:root:not(.dark) .bp-affiche__titre {
-  bottom: 26px;
-}
-:root:not(.dark) .bp-pile {
-  padding-top: 13px;
-}
-/* Le retour sur le marbre clair : un verre fumé, l'encre blanche. */
-.bp-affiche__retour {
-  position: absolute;
-  z-index: 1;
-  top: 14px;
-  left: 16px;
+
+/* ── Les étiquettes des parts. ── */
+.bp-part {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 10px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
   color: #fff;
-  background-color: rgb(12 13 15 / 0.46);
-  backdrop-filter: blur(14px) saturate(1.4);
-  -webkit-backdrop-filter: blur(14px) saturate(1.4);
-  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.22);
 }
-.bp-affiche__titre {
-  position: absolute;
-  z-index: 1;
-  right: 20px;
-  bottom: 44px;
-  left: 20px;
+.bp-part--plus {
+  border-radius: 999px;
+  background: var(--bp-plus-vif);
+}
+.bp-part--sfl {
+  border-radius: 6px;
+  background: var(--bp-sfl-encre);
+  padding: 0 9px;
+}
+.bp-plus-signe {
+  font-size: 15px;
+  font-weight: 700;
+  color: rgb(255 255 255 / 0.7);
+}
+/* « Prix premiers joueurs » : la seule étiquette lime, toujours encre de nuit dessus. */
+.bp-etiquette-prix {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  height: 24px;
+  padding: 0 10px;
+  border-radius: 6px;
+  background: var(--bp-prix);
+  color: var(--bp-nuit);
+  font-family: var(--font-inter), system-ui, sans-serif;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-style: normal;
+  line-height: 1;
+}
+.bp-barre-prix {
+  font-size: 15px;
+  font-weight: 600;
+  color: color-mix(in srgb, currentColor 58%, transparent);
+  text-decoration-thickness: 1.5px;
 }
 
-/* ── Les avantages : une carte sous l'autre. ── */
-.bp-pile {
+/* ── 1 · L'ouverture : le stade gris, teint en violet en haut et en vert en
+   bas (fusion « color »), puis la nuit sous les mots. ── */
+.bp-ouverture {
+  position: relative;
   display: flex;
   flex-direction: column;
-  gap: 13px;
-  margin: 0;
-  padding: 8px 12px 0;
-  list-style: none;
-}
-.bp-carte {
-  position: relative;
-  aspect-ratio: 4 / 5;
-  overflow: hidden;
-  border-radius: 28px;
+  justify-content: space-between;
   background: var(--teinte);
   color: #fff;
 }
-/* Hors de l'écran, la page en marche : elle attend. */
-.bp-carte[data-attend] {
-  opacity: 0;
-  translate: 0 12px;
-}
-/* Elle entre à l'écran : elle arrive, une fois. */
-.bp-carte[data-vue] {
-  opacity: 1;
-  translate: 0 0;
-  transition:
-    opacity 0.42s cubic-bezier(0.22, 0.61, 0.36, 1),
-    translate 0.42s cubic-bezier(0.22, 0.61, 0.36, 1);
-}
-/* Le voile du titre, le voile du numéro, et un liseré. */
-.bp-carte::after {
+.bp-ouverture::before,
+.bp-ouverture::after {
   content: "";
   position: absolute;
   inset: 0;
-  border-radius: inherit;
   pointer-events: none;
+}
+.bp-ouverture::before {
+  z-index: 1;
+  mix-blend-mode: color;
+  background: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--bp-plus-vif) 75%, transparent) 0%,
+    color-mix(in srgb, var(--bp-plus-vif) 45%, transparent) 40%,
+    color-mix(in srgb, var(--bp-sfl-vif) 55%, transparent) 72%
+  );
+}
+.bp-ouverture::after {
+  z-index: 1;
   background:
-    linear-gradient(to top, rgb(0 0 0 / 0.88) 0%, rgb(0 0 0 / 0.5) 26%, transparent 52%),
-    linear-gradient(to bottom, rgb(0 0 0 / 0.62) 0%, transparent 24%);
-  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.09);
+    radial-gradient(70% 38% at 50% 40%, color-mix(in srgb, var(--bp-nuit) 55%, transparent), transparent 100%),
+    linear-gradient(to top, var(--bp-nuit) 0%, color-mix(in srgb, var(--bp-nuit) 82%, transparent) 26%, transparent 56%),
+    linear-gradient(to bottom, color-mix(in srgb, var(--bp-nuit) 40%, transparent) 0%, transparent 22%);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.08);
+  border-radius: inherit;
 }
-.bp-carte__numero {
-  position: absolute;
-  z-index: 1;
-  top: 18px;
-  left: 20px;
-  font-size: 15px;
-  line-height: 1;
-  letter-spacing: 0.04em;
+.bp-ouverture > :not(img) {
+  position: relative;
+  z-index: 2;
+}
+.bp-ouverture__marque {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding-bottom: 8%;
+}
+.bp-ouverture__logo {
+  width: 64%;
+  line-height: 0;
+}
+.bp-ouverture__logo img {
+  width: 100%;
+  height: auto;
+  filter: drop-shadow(0 6px 24px rgb(0 0 0 / 0.45));
+}
+.bp-ouverture__sigle {
   color: #fff;
-  text-shadow: 0 1px 6px rgb(0 0 0 / 0.55);
+  opacity: 0.92;
 }
-.bp-carte__titre {
-  position: absolute;
-  z-index: 1;
-  right: 20px;
-  bottom: 22px;
-  left: 20px;
-  font-size: clamp(24px, 7.7vw, 30px);
-  line-height: 1;
-  text-wrap: balance;
+.bp-ouverture__bas {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 0 22px 24px;
+}
+.bp-ouverture__prix {
+  font-size: 46px;
+  line-height: 0.9;
+}
+.bp-ouverture__par {
+  font-size: 15px;
+  font-weight: 600;
+  color: rgb(255 255 255 / 0.78);
 }
 
-/* ── L'offre. ── */
-.bp-offre {
-  padding: 34px 20px 0;
-  scroll-margin-top: 8px;
+/* ── 2, 3 · Les cartes de texte (Ta carte, Bola Plus) : la nuit violette en
+   sombre, le papier lilas en clair. ── */
+.bp-texte {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px 22px 24px;
+  color: #fff;
+}
+.bp-texte--plus {
+  background:
+    radial-gradient(90% 60% at 50% 38%, color-mix(in srgb, var(--bp-plus-vif) 55%, transparent), transparent 70%),
+    linear-gradient(to bottom, var(--bp-plus-fond), var(--bp-plus-haut));
+}
+.bp-texte__titre {
+  font-size: clamp(34px, 10.4vw, 42px);
+}
+.bp-texte__sous {
+  margin-top: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--bp-plus-clair);
+}
+:root:not(.dark) .bp-texte--plus {
+  color: var(--bp-plus-fond);
+  background:
+    radial-gradient(90% 60% at 50% 38%, color-mix(in srgb, var(--bp-plus-vif) 22%, transparent), transparent 70%),
+    var(--bp-plus-papier);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--bp-plus-vif) 18%, transparent);
+}
+:root:not(.dark) .bp-texte--plus .bp-texte__sous {
+  color: var(--bp-plus-encre);
+}
+.bp-visuel-carte {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  align-items: center;
+  justify-content: center;
+}
+.bp-visuel-carte > * {
+  filter: drop-shadow(0 18px 30px rgb(0 0 0 / 0.42));
+}
+.bp-visuel-plus {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 0;
+}
+.bp-fonctions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.bp-fonctions li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  white-space: nowrap;
+  min-height: 48px;
+  padding: 0 14px 0 8px;
+  border-radius: 16px;
+  font-size: 17px;
+  font-weight: 700;
+  background: rgb(255 255 255 / 0.08);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.1);
+}
+.bp-fonctions__icone {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 11px;
+  background: var(--bp-plus-vif);
+  color: #fff;
+}
+.bp-fonctions__sigle {
+  margin-left: auto;
+  opacity: 0.85;
+}
+:root:not(.dark) .bp-fonctions li {
+  background: rgb(255 255 255 / 0.72);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--bp-plus-vif) 14%, transparent);
+}
+.bp-visuel-plus__embleme {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  max-height: 168px;
+  margin: 0 auto;
+  color: var(--bp-plus-clair);
+  opacity: 0.55;
+}
+:root:not(.dark) .bp-visuel-plus__embleme {
+  color: var(--bp-plus-vif);
+  opacity: 0.4;
+}
+.bp-offert {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+.bp-offert .bp-barre-prix {
+  font-size: 22px;
+}
+/* « Offert » : en lime sur la nuit violette ; en clair, l'étiquette lime à l'encre de nuit. */
+.bp-offert__mot {
+  font-family: var(--font-barlow), "Barlow Condensed", sans-serif;
+  font-size: 40px;
+  font-weight: 800;
+  line-height: 1;
+  text-transform: uppercase;
+  color: var(--bp-prix);
+}
+:root:not(.dark) .bp-offert__mot {
+  padding: 4px 10px 2px;
+  border-radius: 8px;
+  background: var(--bp-prix);
+  color: var(--bp-nuit);
+}
+
+/* ── 4 à 7 · Les cartes à photo de la SFL : la photo, un voile vert terrain en bas. ── */
+.bp-photo-carte {
+  position: relative;
+  background: var(--teinte);
+  color: #fff;
+}
+.bp-photo-carte::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  border-radius: inherit;
+  background:
+    linear-gradient(to top, var(--bp-sfl-fond) 0%, color-mix(in srgb, var(--bp-sfl-fond) 82%, transparent) 20%, transparent 50%),
+    linear-gradient(to bottom, rgb(0 0 0 / 0.42) 0%, transparent 20%);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.08);
+}
+/* Le voile court (Visuel.voileCourt) : il ne monte que jusqu'au-dessus du titre. */
+.bp-photo-carte[data-voile-court]::after {
+  background:
+    linear-gradient(to top, var(--bp-sfl-fond) 0%, color-mix(in srgb, var(--bp-sfl-fond) 70%, transparent) 14%, transparent 32%),
+    linear-gradient(to bottom, rgb(0 0 0 / 0.42) 0%, transparent 20%);
+}
+/* Le portant des maillots est en noir et blanc : la lumière verte du stade passe dessus. */
+.bp-photo-carte[data-teindre]::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  mix-blend-mode: color;
+  background: linear-gradient(to bottom, color-mix(in srgb, var(--bp-sfl-vif) 26%, transparent), color-mix(in srgb, var(--bp-sfl-vif) 42%, transparent));
+}
+.bp-photo-carte__part {
+  position: absolute;
+  z-index: 2;
+  top: 16px;
+  left: 18px;
+}
+.bp-photo-carte__titre {
+  position: absolute;
+  z-index: 2;
+  right: 20px;
+  bottom: 22px;
+  left: 22px;
+  font-size: clamp(36px, 11vw, 44px);
+  text-shadow: 0 2px 18px rgb(0 0 0 / 0.35);
+}
+
+/* ── 8 · Ramène 5 abonnés : la nuit, un halo vert et un halo violet, cinq
+   ronds en arc qui se remplissent en lime au-dessus de « Toi ». ── */
+.bp-parrainage {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 18px 22px 24px;
+  color: #fff;
+  background:
+    radial-gradient(60% 40% at 18% 30%, color-mix(in srgb, var(--bp-sfl-vif) 34%, transparent), transparent 70%),
+    radial-gradient(60% 40% at 84% 46%, color-mix(in srgb, var(--bp-plus-vif) 42%, transparent), transparent 70%),
+    var(--bp-nuit);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.08);
+}
+.bp-arc {
+  --rayon: min(118px, 30vw);
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+.bp-arc__rond,
+.bp-arc__toi {
+  position: absolute;
+  left: 50%;
+  top: 62%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+}
+.bp-arc__rond {
+  width: 48px;
+  height: 48px;
+  translate: calc(-50% + var(--x) * var(--rayon)) calc(-50% + var(--y) * var(--rayon));
+  color: rgb(255 255 255 / 0.45);
+  border: 1.5px dashed rgb(255 255 255 / 0.32);
+  transition:
+    background-color 0.36s ease calc(var(--i) * 0.12s + 0.15s),
+    border-color 0.36s ease calc(var(--i) * 0.12s + 0.15s),
+    color 0.36s ease calc(var(--i) * 0.12s + 0.15s);
+}
+.bp-parrainage[data-vu] .bp-arc__rond {
+  color: var(--bp-nuit);
+  border: 1.5px solid var(--bp-prix);
+  background-color: var(--bp-prix);
+}
+.bp-arc__toi {
+  width: 76px;
+  height: 76px;
+  translate: -50% -50%;
+  font-family: var(--font-barlow), "Barlow Condensed", sans-serif;
+  font-size: 24px;
+  font-weight: 800;
+  text-transform: uppercase;
+  color: #fff;
+  background: linear-gradient(160deg, var(--bp-plus-vif), var(--bp-plus-fond));
+  box-shadow:
+    0 0 0 4px color-mix(in srgb, var(--bp-plus-vif) 30%, transparent),
+    0 14px 30px -10px rgb(0 0 0 / 0.6);
+}
+.bp-parrainage__sous {
+  color: var(--bp-prix);
+}
+
+/* ── 9 · Ton prix : la nuit en sombre, le blanc en clair. ── */
+.bp-prix {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 18px 18px 18px;
+  background:
+    radial-gradient(80% 36% at 20% 0%, color-mix(in srgb, var(--bp-plus-vif) 30%, transparent), transparent 70%),
+    radial-gradient(80% 36% at 90% 18%, color-mix(in srgb, var(--bp-sfl-vif) 22%, transparent), transparent 70%),
+    var(--bp-nuit);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.08);
+  color: #fff;
+}
+:root:not(.dark) .bp-prix {
+  color: var(--bp-nuit);
+  background:
+    radial-gradient(80% 36% at 20% 0%, color-mix(in srgb, var(--bp-plus-vif) 12%, transparent), transparent 70%),
+    radial-gradient(80% 36% at 90% 18%, color-mix(in srgb, var(--bp-sfl-vif) 10%, transparent), transparent 70%),
+    #fff;
+  box-shadow: inset 0 0 0 1px rgb(10 11 13 / 0.08);
+}
+/* Le haut : le bundle et, juste dessous, la grille officielle barrée, ensemble au milieu de la place libre. */
+.bp-prix__haut {
+  display: flex;
+  flex: 1 0 auto;
+  flex-direction: column;
+  justify-content: center;
+  gap: 14px;
+  min-height: 0;
+}
+/* Le bundle : ce que tu reçois, une pièce après l'autre. */
+.bp-bundle {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  align-content: center;
+  align-items: center;
+  justify-content: center;
+  gap: 10px 6px;
+  min-height: 0;
+  margin: 0;
+  padding: 0 6px;
+  list-style: none;
+}
+.bp-bundle li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+:root:not(.dark) .bp-prix .bp-plus-signe {
+  color: rgb(10 11 13 / 0.45);
+}
+.bp-bundle .bp-part {
+  height: 32px;
+  padding: 0 13px;
+  font-size: 14px;
+}
+.bp-bundle__piece {
+  display: inline-flex;
+  align-items: center;
+  height: 32px;
+  padding: 0 13px;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 700;
+  white-space: nowrap;
+  background: rgb(255 255 255 / 0.1);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.14);
+}
+:root:not(.dark) .bp-bundle__piece {
+  background: rgb(10 11 13 / 0.05);
+  box-shadow: inset 0 0 0 1px rgb(10 11 13 / 0.1);
+}
+.bp-grille {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 4px 10px;
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: color-mix(in srgb, currentColor 55%, transparent);
+}
+/* Le sigle SFL devant la grille : c'est la sienne, sans un mot de plus. */
+.bp-grille__sigle {
+  opacity: 0.8;
+}
+.bp-grille s {
+  text-decoration-thickness: 1.5px;
+}
+.bp-prix__etiquette {
+  margin-top: 2px;
+}
+.bp-prix > * {
+  flex-shrink: 0;
+}
+.bp-formule {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 16px;
+  border-radius: 20px;
+  text-align: left;
+  background: rgb(255 255 255 / 0.06);
+  box-shadow: inset 0 0 0 1.5px rgb(255 255 255 / 0.12);
+  transition: box-shadow 0.2s ease;
+}
+.bp-formule--choisie {
+  box-shadow: inset 0 0 0 2px var(--bp-prix);
+}
+:root:not(.dark) .bp-formule {
+  background: rgb(10 11 13 / 0.03);
+  box-shadow: inset 0 0 0 1.5px rgb(10 11 13 / 0.12);
+}
+:root:not(.dark) .bp-formule--choisie {
+  box-shadow: inset 0 0 0 2px var(--bp-nuit);
+}
+.bp-formule__nom {
+  color: color-mix(in srgb, currentColor 60%, transparent);
+}
+.bp-formule__prix {
+  font-size: 30px;
+  line-height: 0.9;
+}
+.bp-formule__par {
+  font-size: 14px;
+  font-weight: 600;
+  color: color-mix(in srgb, currentColor 72%, transparent);
+}
+.bp-formule .bp-barre-prix {
+  font-size: 14px;
+}
+.bp-formule__sous {
+  font-size: 13px;
+  font-weight: 600;
+  color: color-mix(in srgb, currentColor 72%, transparent);
+}
+.bp-formule__rond {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  border: 1.5px solid color-mix(in srgb, currentColor 30%, transparent);
+}
+.bp-formule--choisie .bp-formule__rond {
+  border-color: var(--bp-prix);
+  background: var(--bp-prix);
+  color: var(--bp-nuit);
+}
+:root:not(.dark) .bp-formule--choisie .bp-formule__rond {
+  border-color: var(--bp-nuit);
+  background: var(--bp-nuit);
+  color: #fff;
 }
 /* Le bloc du bouton reçoit le focus quand le bouton laisse sa place : sans contour. */
 .bp-action {
   outline: none;
+}
+
+/* ── Les flèches, sur ordinateur seulement (pointeur fin). ── */
+.bp-fleche {
+  display: none;
+}
+@media (pointer: fine) {
+  .bp-fleche {
+    position: absolute;
+    z-index: 2;
+    top: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 999px;
+    translate: 0 -50%;
+    color: #fff;
+    background-color: rgb(12 13 15 / 0.5);
+    backdrop-filter: blur(14px) saturate(1.4);
+    -webkit-backdrop-filter: blur(14px) saturate(1.4);
+    box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.22);
+    transition: opacity 0.2s ease;
+  }
+  .bp-fleche:disabled {
+    opacity: 0;
+    pointer-events: none;
+  }
+  .bp-fleche--avant {
+    left: 6px;
+  }
+  .bp-fleche--apres {
+    right: 6px;
+  }
+}
+
+/* ── Les segments : un trait par carte, plein dans la couleur de sa part
+   quand c'est la carte à l'écran. Touchables sur 44 px de haut. ── */
+.bp-segments {
+  flex: none;
+  display: flex;
+  gap: 4px;
+  height: 44px;
+  padding: 0 24px;
+}
+.bp-segment {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+.bp-segment > span {
+  width: 100%;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--seg, var(--foreground));
+  opacity: 0.22;
+  transition: opacity 0.25s ease;
+}
+.bp-segment[aria-current] > span {
+  opacity: 1;
+}
+.bp-segment[data-part="plus"] {
+  --seg: var(--bp-plus-vif);
+}
+.bp-segment[data-part="sfl"] {
+  --seg: var(--bp-sfl-vif);
+}
+.dark .bp-segment[data-part="prix"] {
+  --seg: var(--bp-prix);
+}
+.bp-segment:focus-visible {
+  outline: 2px solid var(--foreground);
+  outline-offset: -6px;
+  border-radius: 6px;
+}
+
+/* La place de la barre « Je suis intéressé » et de la barre d'onglets. */
+.bp-pied {
+  flex: none;
+  height: calc(var(--bp-onglets) + 10px + 52px + 6px);
 }
 
 /* ── La barre collée : au-dessus de la barre d'onglets (bottom-nav.tsx :
@@ -175,7 +756,7 @@
     visibility 0s 0.2s;
 }
 /* « C'est noté » dans la barre : le verre de la barre d'onglets, fumé en
-   sombre et clair en clair, lisible sur une image comme sur la page. */
+   sombre et clair en clair. */
 .bp-barre__note {
   display: flex;
   align-items: center;
@@ -202,24 +783,111 @@ html[data-clavier] .bp-barre {
   display: none;
 }
 
-/* Écran court : l'affiche plus basse, le premier avantage se devine dessous. */
+/* Écran court (375 × 667) : des titres et des prix un peu plus petits. */
 @media (max-height: 700px) {
-  .bp-affiche {
-    aspect-ratio: auto;
-    height: 56svh;
+  .bp-tete {
+    height: 50px;
+  }
+  .bp-texte,
+  .bp-parrainage {
+    gap: 10px;
+    padding: 14px 18px 18px;
+  }
+  .bp-texte__titre,
+  .bp-photo-carte__titre {
+    font-size: 34px;
+  }
+  .bp-fonctions li {
+    min-height: 42px;
+    font-size: 16px;
+  }
+  .bp-prix {
+    gap: 9px;
+    padding: 14px 14px 14px;
+  }
+  .bp-formule {
+    padding: 9px 14px;
+  }
+  .bp-formule__prix {
+    font-size: 26px;
+  }
+  .bp-bundle {
+    gap: 6px;
+  }
+  .bp-bundle .bp-part,
+  .bp-bundle__piece {
+    height: 26px;
+    padding: 0 10px;
+    font-size: 12px;
+  }
+  .bp-ouverture__prix {
+    font-size: 40px;
+  }
+  .bp-ouverture__bas {
+    gap: 10px;
+    padding-bottom: 18px;
+  }
+}
+/* Téléphone étroit (360 à 380 px) : les formules et le bundle se resserrent. */
+@media (max-width: 380px) {
+  .bp-formule {
+    gap: 8px;
+    padding: 10px 12px;
+  }
+  .bp-formule__prix {
+    font-size: 26px;
+  }
+  .bp-formule .bp-barre-prix,
+  .bp-formule__par {
+    font-size: 13px;
+  }
+  .bp-fonctions li {
+    gap: 10px;
+    font-size: 16px;
+  }
+  .bp-bundle .bp-part,
+  .bp-bundle__piece {
+    height: 28px;
+    padding: 0 10px;
+    font-size: 13px;
+  }
+}
+@media (max-width: 359px) {
+  .bp-texte__titre,
+  .bp-photo-carte__titre {
+    font-size: 32px;
+  }
+  .bp-formule__prix {
+    font-size: 24px;
+  }
+}
+
+/* Écran court et étroit à la fois (375 × 667) : le bundle au plus serré. */
+@media (max-height: 700px) {
+  .bp-bundle {
+    gap: 6px 4px;
+  }
+  .bp-bundle .bp-part,
+  .bp-bundle__piece {
+    height: 24px;
+    padding: 0 9px;
+    font-size: 12px;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .bp-carte,
-  .bp-carte[data-attend],
-  .bp-carte[data-vue] {
-    opacity: 1;
-    translate: 0 0;
+  .bp-arc__rond,
+  .bp-segment > span,
+  .bp-formule,
+  .bp-barre,
+  .bp-barre[data-cachee],
+  .bp-fleche {
     transition: none;
   }
-  .bp-barre,
-  .bp-barre[data-cachee] {
-    transition: none;
+  /* Les ronds de « Ramène 5 » sont pleins d'emblée. */
+  .bp-parrainage .bp-arc__rond {
+    color: var(--bp-nuit);
+    border: 1.5px solid var(--bp-prix);
+    background-color: var(--bp-prix);
   }
 }

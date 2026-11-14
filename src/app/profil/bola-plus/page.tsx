@@ -1,10 +1,11 @@
 "use client";
 
 // Bola Plus, enfant de Ma carte (lib/nav.ts) : la précommande (Sabri,
-// 12/11/2026). Une présentation : l'affiche (le retour, le nom, les prix),
-// les avantages un par un, puis l'offre et « Je suis intéressé »
-// (sfl/bola-plus.tsx). La page a sa propre mise en page : l'affiche va d'un
-// bord à l'autre. Aucun paiement.
+// 12/11/2026). Un carrousel horizontal en couleurs (retours du 14/11) :
+// l'ouverture, les avantages carte par carte, « Ramène 5 abonnés », puis
+// « Ton prix » et « Je suis intéressé » (sfl/bola-plus.tsx). La page a sa
+// propre mise en page : elle tient dans l'écran, seul le rail glisse. Aucun
+// paiement.
 
 import { PageBolaPlus } from "@/components/sfl/bola-plus";
 
