@@ -49,6 +49,16 @@
 // puisse filtrer facilement ») : map/format-terrains.tsx, le même choix que
 // dans la feuille « Terrains ».
 //
+// La boutique (14/11/2026, Sabri : « comme ça s'affiche les matchs sur la
+// carte, on pourrait afficher ça aussi : une petite étiquette sur laquelle on
+// pourrait cliquer ») : l'étiquette « Boutique », papier blanc et encre, de la
+// famille des étiquettes des stickers, sous le compte en haut à gauche. Elle
+// est posée sur l'écran, dans la bande que le cadrage des matchs laisse libre
+// (MARGE_HAUT, map/carte-map.tsx) : elle ne couvre ni un match ni un terrain,
+// ne bouge ni au zoom ni avec « toi », et ne se prend pas pour un lieu. Elle
+// ouvre /boutique ; elle s'efface avec les matchs quand le viseur des
+// contrats est allumé.
+//
 // Les contrats en direct (23/10) : le bouton au viseur ne laisse sur la Map
 // que les cibles des contrats signés du dimanche, sous leur viseur, leur prime
 // à la place de la note (map/contrats-map.ts) ; les matchs et les terrains
@@ -75,6 +85,7 @@ import {
   Plus,
   Search,
   Settings2,
+  ShoppingBag,
   Star,
   Trash2,
   Users,
@@ -1543,7 +1554,7 @@ export default function MapPage() {
             Leaflet (z-index 400 et plus). */}
         <div className="pointer-events-none absolute inset-x-0 top-0 z-[500] h-44 bg-gradient-to-b from-[rgba(8,9,11,0.42)] to-transparent" />
 
-        {/* En haut à gauche : la commune en lettrage, le compte en étiquette */}
+        {/* En haut à gauche : la commune en lettrage, le compte en étiquette, puis la boutique */}
         <div className="pointer-events-none absolute left-5 z-[510] flex max-w-[calc(100%-8.5rem)] flex-col items-start" style={{ top: `calc(${haut} + 8px)` }}>
           <span
             key={commune}
@@ -1559,6 +1570,25 @@ export default function MapPage() {
           >
             {compte}
           </span>
+          {/* La boutique (Sabri, 14/11/2026 : « une petite étiquette sur
+              laquelle on pourrait cliquer ») : la troisième étiquette du coin,
+              de la famille de celles des stickers, posée sur l'écran et non
+              sur le plan. La cible fait 44 px ; seule la capsule se voit. */}
+          {!enContrats && (
+            <Link
+              href="/boutique"
+              onClick={() => geste("boutique")}
+              className="map-etiquette compte-entre pointer-events-auto -mt-1 -ml-1 flex h-11 items-center rounded-md px-1"
+            >
+              <span
+                className="inline-flex h-[22px] -rotate-[3deg] items-center gap-1 rounded-[5.5px] border-2 px-[7px] text-[10.5px] leading-none font-black tracking-[-0.1px] uppercase italic shadow-[0_1.5px_2.5px_rgba(0,0,0,0.2)]"
+                style={{ background: BLANC, color: ENCRE, borderColor: BLANC }}
+              >
+                <ShoppingBag className="size-3" strokeWidth={2.6} aria-hidden />
+                Boutique
+              </span>
+            </Link>
+          )}
         </div>
 
         {/* En haut à droite : la loupe (la Recherche, montée de la barre

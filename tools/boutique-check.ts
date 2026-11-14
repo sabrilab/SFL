@@ -22,7 +22,11 @@
 //  11. la place de la boutique dans l'app : son retour mène à Ma carte, celui
 //      de la grille et des fiches à la boutique ; elle est ouverte aux
 //      joueurs Bola ;
-//  12. les favoris gardés sur l'appareil : un contenu abîmé ne casse rien.
+//  12. les favoris gardés sur l'appareil : un contenu abîmé ne casse rien ;
+//  13. l'entrée par la Map (Sabri, 14/11) : l'étiquette « Boutique » est un
+//      lien vers /boutique, nommé par son texte, de 44 px, dans le coin du
+//      lettrage (hors du plan), effacée avec les contrats ; « Acheter par
+//      camp » prend toute la largeur sur ordinateur.
 //   npx tsx tools/boutique-check.ts
 import assert from "node:assert/strict";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
@@ -368,6 +372,37 @@ for (const p of PRODUITS) {
   g.localStorage = { getItem: () => { throw new Error("refusé"); } };
   assert.deepEqual(lireFavoris(), [], "stockage refusé : aucun favori");
   delete g.localStorage;
+}
+
+// 13 · L'entrée par la Map, et « Acheter par camp » sur ordinateur.
+{
+  const map = readFileSync(join(racine, "src/app/map/page.tsx"), "utf8");
+  const debut = map.indexOf("{/* En haut à gauche : la commune en lettrage");
+  const fin = map.indexOf("{/* En haut à droite", debut);
+  assert.ok(debut > 0 && fin > debut, "le coin du lettrage est lu");
+  const coin = map.slice(debut, fin);
+  const lien = /\{!enContrats && \(\s*<Link\s+href="\/boutique"([\s\S]*?)<\/Link>/.exec(coin);
+  assert.ok(lien, "l'étiquette est un lien vers /boutique, dans le coin du lettrage, effacé avec les contrats");
+  const corps = lien[1];
+  assert.ok(/\bh-11\b/.test(corps), "la cible fait 44 px de haut");
+  assert.ok(/pointer-events-auto/.test(corps), "seul le lien prend le doigt dans la colonne");
+  assert.ok(/>\s*Boutique\s*<\/span>/.test(corps), "son nom est son texte");
+  assert.ok(!/aria-label=/.test(corps), "pas de nom caché qui dirait autre chose que le texte");
+  assert.ok(/aria-hidden/.test(corps), "l'icône est muette");
+  assert.ok(/geste\("boutique"\)/.test(corps), "le geste est noté comme les autres");
+  assert.ok(!/#[0-9a-f]{3,8}\b/i.test(corps.replace(/rgba\([^)]*\)/g, "")), "aucune couleur écrite à la main : l'encre et le blanc de la Map");
+  assert.ok(/background: BLANC, color: ENCRE/.test(corps), "papier blanc, encre noire");
+  // Le cadrage des matchs laisse la bande du lettrage libre : l'étiquette y tient.
+  const plan = readFileSync(join(racine, "src/components/sfl/map/carte-map.tsx"), "utf8");
+  const marge = Number(/const MARGE_HAUT = (\d+);/.exec(plan)?.[1]);
+  assert.ok(marge >= 120, `la bande du haut reste libre de matchs (${marge} px)`);
+  // Pas une couche du plan : rien dans carte-map.tsx ne pose la boutique.
+  assert.ok(!/boutique/i.test(plan), "l'étiquette n'est pas un repère du plan");
+
+  const accueil = readFileSync(join(racine, "src/app/boutique/page.tsx"), "utf8");
+  const camps = /Acheter par camp<\/h2>\s*<div className="([^"]*)"/.exec(accueil)?.[1] ?? "";
+  assert.ok(camps.includes("grid-cols-2"), "les camps sont lus");
+  assert.ok(!/max-w-/.test(camps), "« Acheter par camp » n'est plus borné sur ordinateur");
 }
 
 console.log("boutique-check: ok");

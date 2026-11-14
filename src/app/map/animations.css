@@ -154,6 +154,14 @@
     scale: 0.9;
     transition-duration: 0.08s;
   }
+  /* L'étiquette de la boutique s'enfonce comme un bouton, où qu'on la touche dans ses 44 px. */
+  .map-etiquette > span {
+    transition: scale 0.18s cubic-bezier(0.3, 1.5, 0.5, 1);
+  }
+  .map-etiquette:active > span {
+    scale: 0.92;
+    transition-duration: 0.08s;
+  }
   /* La bascule plan / satellite : l'icône fait un demi-tour. */
   .map-calques svg {
     transition: rotate 0.5s cubic-bezier(0.3, 1.4, 0.5, 1);
@@ -332,4 +340,13 @@
   35% {
     opacity: 1;
   }
+}
+
+/* L'étiquette de la boutique au clavier : l'anneau blanc des boutons de la Map. */
+.map-etiquette {
+  outline: none;
+}
+.map-etiquette:focus-visible > span {
+  outline: 2px solid #f4f5f2;
+  outline-offset: 2px;
 }

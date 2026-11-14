@@ -27,7 +27,12 @@
 // Aucun sous-titre, aucune promo, rien de payable.
 //
 // Sur ordinateur (≥ 1024), les trois diapos du hero tiennent côte à côte,
-// comme les panneaux et les blocs.
+// comme les panneaux et les blocs ; les deux camps prennent toute la largeur
+// (Sabri, 14/11 : il restait un trou à droite), en tuiles 3:2 pour que la
+// rangée ne soit pas plus haute que l'écran.
+//
+// On y entre aussi depuis la Map, par l'étiquette « Boutique » (app/map) : le
+// retour y ramène.
 
 import Image from "next/image";
 import Link from "next/link";
@@ -142,10 +147,10 @@ export default function Boutique() {
 
       <section className="flex flex-col gap-4">
         <h2 className="titre-lettrage text-titre">Acheter par camp</h2>
-        <div className="-mx-5 grid grid-cols-2 gap-0.5 sm:mx-0 sm:gap-3 lg:max-w-2xl">
+        <div className="-mx-5 grid grid-cols-2 gap-0.5 sm:mx-0 sm:gap-3">
           {CAMPS.map((c) => (
             <Link key={c.titre} href={adresseGrille({ filtres: { couleurs: [c.couleur] } })} className="flex flex-col">
-              <Tuile src={c.vue} sizes="(max-width: 1023px) 50vw, 500px" />
+              <Tuile src={c.vue} sizes="(max-width: 1023px) 50vw, 600px" className="lg:aspect-[3/2]" />
               <span className="px-5 pt-3 text-lecture font-bold sm:px-1">{c.titre}</span>
             </Link>
           ))}
