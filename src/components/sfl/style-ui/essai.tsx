@@ -14,7 +14,7 @@
 
 import { useEffect, useState } from "react";
 import { useTheme } from "next-themes";
-import { estJour, estPelouse } from "@/lib/sfl/mode-pelouse";
+import { estJour, estPelouse, styleDuJour } from "@/lib/sfl/mode-pelouse";
 
 // Nouvelle clé le 04/11 : chaque téléphone repart du design actuel (Sabri :
 // « garder le design actuel », l'UI se décide plus tard).
@@ -70,7 +70,7 @@ export function EssaiStyleUi() {
     const html = document.documentElement;
     if (estPelouse(style)) {
       // La nuit, c'est le 16 (arrondi par styles-ui-4.css) ; le jour, le clair du style.
-      html.dataset.style = jour ? String(style) : "16";
+      html.dataset.style = jour ? String(styleDuJour(style)) : "16";
       html.dataset.famille = "pelouse";
       setTheme(jour ? "light" : "dark");
       return;

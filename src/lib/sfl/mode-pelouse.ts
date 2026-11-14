@@ -3,8 +3,11 @@
 // quand on regarde l'application »). Le jour va de 7 h à 20 h, heure du
 // téléphone ; ?mode=jour ou ?mode=nuit force l'un ou l'autre (captures, essais).
 
-export const PELOUSE = [24, 25, 26] as const;
-export const estPelouse = (style: number) => style >= 24 && style <= 26;
+export const PELOUSE = [16, 24, 25, 26] as const;
+/** Le 16 en fait partie depuis le 14/11 (Sabri y regardait encore les bandes) : son jour est Craie (24). */
+export const estPelouse = (style: number) => style === 16 || (style >= 24 && style <= 26);
+/** Le style posé le jour : Craie pour le 16, sinon le style lui-même. */
+export const styleDuJour = (style: number) => (style === 16 ? 24 : style);
 
 /** Vrai le jour (7 h – 20 h), sauf si l'adresse force le mode. */
 export function estJour(maintenant = new Date()): boolean {

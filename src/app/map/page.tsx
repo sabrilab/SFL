@@ -233,7 +233,7 @@ const teinteFantome = (): TeinteFantome =>
  */
 const ESSAIS = process.env.NEXT_PUBLIC_BOLA_ENV !== "production";
 /** Les styles d'interface à l'essai (?style=N, style-ui/essai.tsx) ont chacun leur plan ; sans style, le plan de l'app ne change pas. */
-const PLAN_DU_STYLE: Record<number, Ambiance> = { 12: "bulle", 13: "nuit-chaleur", 14: "trace", 15: "sticker", 16: "nuit-pelouse", 17: "gravure", 18: "bulle-gomme", 19: "nuit-bulle", 20: "bulle-peche", 21: "bulle-lilas", 22: "bulle-encre", 23: "bulle-verre", 24: "pelouse-craie", 25: "pelouse-gazon", 26: "pelouse-tribune" };
+const PLAN_DU_STYLE: Record<number, Ambiance> = { 12: "bulle", 13: "nuit-chaleur", 14: "trace", 15: "sticker", 16: "pelouse-craie", 17: "gravure", 18: "bulle-gomme", 19: "nuit-bulle", 20: "bulle-peche", 21: "bulle-lilas", 22: "bulle-encre", 23: "bulle-verre", 24: "pelouse-craie", 25: "pelouse-gazon", 26: "pelouse-tribune" };
 const ambianceDeLAdresse = (): Ambiance => {
   if (!ESSAIS) return "nuit-encre";
   const q = new URLSearchParams(window.location.search);
