@@ -379,7 +379,8 @@ export function usePresence(): PresenceView {
       rendezVous: rendezVousDuDimanche(server.convocation.heure, server.convocation.lieu),
       mine: surLaFeuille ? "present" : (rep[player.name] ?? null),
       ...reponses,
-      remplacants: remplacantsDe(jeViens, saison, jDuJour, revele ? server.convocation.teams : null, isHidden),
+      // Un retiré passe remplaçant ; un suspendu (carton rouge) jamais.
+      remplacants: sansSuspendus(saison, jDeLaConvocation, remplacantsDe(jeViens, saison, jDuJour, revele ? server.convocation.teams : null, isHidden)),
       ordreDesVenus: ordreDArrivee(reponses.presents, feuille.noms, (n) => server.quand[n]).filter((n) => reponses.presents.includes(n)),
       reponsesOuvertes: ouvert,
       equipesVisibles: revele,
@@ -408,7 +409,7 @@ export function usePresence(): PresenceView {
     rendezVous: rendezVousDuDimanche(localConv?.heure ?? NEXT_MATCH.heure, localConv?.lieu ?? NEXT_MATCH.lieu),
     mine: surLaFeuille ? "present" : localConv ? ((localConv.reponses[player.name] as Reponse | undefined) ?? null) : null,
     ...reponsesLocales,
-    remplacants: remplacantsDe(local.presents, saison, jDuJour, revele ? (localConv?.teams ?? null) : null, isHidden),
+    remplacants: sansSuspendus(saison, jDeLaConvocation, remplacantsDe(local.presents, saison, jDuJour, revele ? (localConv?.teams ?? null) : null, isHidden)),
     ordreDesVenus: ordreDArrivee(reponsesLocales.presents, feuille.noms, () => null).filter((n) => reponsesLocales.presents.includes(n)),
     reponsesOuvertes: ouvert,
     equipesVisibles: revele,
