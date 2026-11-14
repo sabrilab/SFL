@@ -338,7 +338,7 @@ assert.equal(
 // Les remplaçants restent dans la liste : « Je viens » sans équipe sur la feuille, ou dans la convocation.
 {
   const f: Saison = { ...coupee, entries: [...coupee.entries, newEntry(4, "Ana", "Noirs 1"), newEntry(4, "Bilal", "Blancs 1"), newEntry(4, "Kenza", null)] };
-  assert.deepEqual(remplacantsDe(["Ana", "Chris", "Bilal", "Sabri"], f, 4, null, (n) => n === "Sabri"), ["Chris"], "la feuille fait foi");
+  assert.deepEqual(remplacantsDe(["Ana", "Chris", "Bilal", "Sabri"], f, 4, null, (n) => n === "Sabri"), ["Chris", "Kenza"], "la feuille fait foi ; Kenza, sur la feuille sans équipe, est remplaçante (14/11)");
   assert.deepEqual(remplacantsDe(["Ana", "Chris"], coupee, 4, [{ players: ["Ana"] }], () => false), ["Chris"], "les équipes de la convocation");
   assert.deepEqual(remplacantsDe(["Ana", "Chris"], coupee, 4, null, () => false), [], "sans équipes, tout le monde vient");
 }

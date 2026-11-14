@@ -78,11 +78,54 @@ export function avecLaFeuille<T extends Reponses>(r: T, feuille: Feuille, masque
 }
 
 /**
+ * Les équipes de la feuille d'une journée, au format de la convocation
+ * (Sabri, 14/11/2026, veille de la J6 : « J'ai rajouté [Souley] à la main,
+ * donc rajoute-le aussi dans les compositions d'équipe »). Dès que l'admin a
+ * posé des équipes sur la feuille, ce sont elles qu'on montre sous « Les
+ * équipes de dimanche », et plus celles de la convocation, faites avant :
+ * un joueur ajouté à la main y entre, un joueur retiré en sort. Match par
+ * match (les Noirs puis les Blancs, journees[].matchsDuJour d'abord), les
+ * joueurs dans l'ordre de la feuille ; ni ligne vitrine, ni Xtratime.
+ * null tant que la feuille n'a pas d'équipe.
+ */
+export function equipesDeLaFeuille(
+  saison: Pick<Saison, "entries"> & { journees?: Saison["journees"] },
+  j: number | null
+): { name: string; players: string[] }[] | null {
+  if (j == null) return null;
+  const parEquipe = new Map<string, string[]>();
+  for (const e of saison.entries) {
+    if (e.j !== j || e.statut !== "Présent" || !e.team || e.vitrine || e.extraTime) continue;
+    const l = parEquipe.get(e.team) ?? [];
+    if (!l.includes(e.player)) l.push(e.player);
+    parEquipe.set(e.team, l);
+  }
+  if (!parEquipe.size) return null;
+  const ordre: string[] = [];
+  const meta = saison.journees?.find((m) => m.j === j);
+  for (const m of meta?.matchsDuJour ?? []) for (const t of m.equipes) if (parEquipe.has(t) && !ordre.includes(t)) ordre.push(t);
+  // Le reste : par numéro de match, les Noirs avant les Blancs.
+  const rang = (t: string) => {
+    const x = /^(Noirs|Blancs) (\d+)$/.exec(t);
+    return x ? Number(x[2]) * 2 + (x[1] === "Noirs" ? 0 : 1) : Number.MAX_SAFE_INTEGER;
+  };
+  const reste = [...parEquipe.keys()].filter((t) => !ordre.includes(t)).sort((a, b) => rang(a) - rang(b));
+  return [...ordre, ...reste].map((name) => ({ name, players: parEquipe.get(name)! }));
+}
+
+/**
  * Les remplaçants : ceux qui ont dit « Je viens » et qui ne sont dans aucune
  * équipe, pour qu'ils ne disparaissent pas de la liste (incident de la J4).
  * Les équipes de la feuille d'abord, dès qu'il y en a ; sinon celles de la
  * convocation, si `teams` est donné (null tant qu'elles ne se montrent pas).
  * Sans équipes, personne n'est remplaçant : tout le monde vient.
+ *
+ * Dès que la feuille a ses équipes, un joueur que l'admin en a retiré
+ * (Sabri, 14/11/2026 : « ces gens que je retire, tu les mets en
+ * remplaçant ») y passe aussi : un joueur des équipes de la convocation, ou
+ * une ligne de la feuille restée sans équipe (Présent ou Suspendu, jamais
+ * une absence). Un remplaçant ne prend pas la
+ * feuille du match (feuille-direct.ts : seuls les joueurs d'une équipe).
  */
 export function remplacantsDe(
   presents: string[],
@@ -94,5 +137,13 @@ export function remplacantsDe(
   const feuille = joueursDeLaFeuille(saison, j);
   const dedans = feuille.equipes ? new Set(feuille.noms) : teams?.length ? new Set(teams.flatMap((t) => t.players)) : null;
   if (!dedans) return [];
-  return [...new Set(presents)].filter((n) => !masque(n) && !dedans.has(n));
+  const retires = feuille.equipes
+    ? [
+        ...(teams ?? []).flatMap((t) => t.players),
+        ...saison.entries
+          .filter((e) => e.j === j && !e.team && !e.vitrine && !e.extraTime && (e.statut === "Présent" || e.statut === "Suspendu"))
+          .map((e) => e.player),
+      ]
+    : [];
+  return [...new Set([...presents, ...retires])].filter((n) => !masque(n) && !dedans.has(n));
 }

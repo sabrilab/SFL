@@ -138,11 +138,11 @@ export default function Discussions() {
           </div>
 
           {/* Vendredi 19h : les équipes composées tombent dans la conversation */}
-          {presence.equipesVisibles && presence.teams && presence.teams.length > 0 && (
+          {presence.equipesVisibles && presence.equipesDuDimanche && presence.equipesDuDimanche.length > 0 && (
             <div className="border-t border-contraste/8 px-4 py-3.5">
               <p className="mono-label text-primary">Les équipes de dimanche</p>
               <div className="mt-2.5 flex flex-col gap-2.5">
-                {equipesDeConvocation(presence.teams).map((t) => {
+                {equipesDeConvocation(presence.equipesDuDimanche).map((t) => {
                   const mine = t.joueurs.includes(player.name);
                   return (
                     <div key={t.nom}>
