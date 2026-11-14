@@ -42,6 +42,9 @@ export function creerMonde({ graine = 1, duree = JEU.duree, humains = [true, fal
     humains: [...humains], aides: [...aides],
     controle: [null, null],   // le joueur que joue chaque humain (index), null pour l'IA
     changeT: [-9, -9],
+    choixT: [-9, -9],         // le dernier changement de joueur demandé (LB / L1, stick droit) : la main ne bouge plus seule 1,5 s
+    renfort: [false, false],  // l'humain demande le pressing d'un coéquipier (RB / R1 en défense)
+    sortie: [false, false],   // l'humain demande la sortie de son gardien (Y / △ maintenu en défense)
     rng: creerHasard(graine),
     evts: [], journal,
     stats: { passes: 0, tirs: 0, tacles: 0, vols: 0, arrets: 0, buts: 0, epaules: 0, plongeons: 0, chutes: 0, antiBlocages: 0, demandes: 0, impacts: [] },
@@ -103,7 +106,7 @@ function majControle(m) {
     const c = m.controle[e];
     if (p && p.e === e && !p.gardien) { if (c !== p.i) { m.controle[e] = p.i; m.changeT[e] = m.t; } continue; }
     if (b.recepteur != null && m.joueurs[b.recepteur].e === e && !m.joueurs[b.recepteur].gardien) { m.controle[e] = b.recepteur; continue; }
-    if (m.t - m.changeT[e] < 0.6) continue;
+    if (m.t - m.changeT[e] < 0.6 || m.t - m.choixT[e] < 1.5) continue;
     const cur = m.joueurs[c ?? 0];
     let best = cur, bd = hypot(cur.p.x - b.p.x, cur.p.z - b.p.z);
     for (const j of m.joueurs) {
@@ -113,6 +116,42 @@ function majControle(m) {
     }
     if (best !== cur || c == null) { m.controle[e] = best.i; m.changeT[e] = m.t; }
   }
+}
+
+/**
+ * Changer de joueur (LB / L1, ou le stick droit poussé dans une direction) : sans direction, le coéquipier le plus
+ * près de la balle prédite à 0,4 s ; avec une direction (repère du jeu), celui qui est le plus dans cette direction
+ * depuis le joueur actuel. La main ne revient pas seule au plus proche pendant 1,5 s.
+ */
+export function changerJoueur(m, e, dir = null) {
+  const b = m.balle, cur = m.controle[e] != null ? m.joueurs[m.controle[e]] : null;
+  const px = b.p.x + b.v.x * 0.4, pz = b.p.z + b.v.z * 0.4;
+  let best = null, bs = -Infinity;
+  const L = dir ? hypot(dir.dx ?? 0, dir.dz ?? 0) : 0;
+  for (const o of m.joueurs) {
+    if (o.e !== e || o.gardien || o.absent || o === cur) continue;
+    let sc;
+    if (L > 1e-6 && cur) {
+      const rx = o.p.x - cur.p.x, rz = o.p.z - cur.p.z, d = hypot(rx, rz) || 1;
+      const c = (rx * dir.dx + rz * dir.dz) / (d * L);
+      if (c < 0.4) continue;
+      sc = c - d / 40;
+    } else sc = -hypot(o.p.x - px, o.p.z - pz);
+    if (sc > bs) { bs = sc; best = o; }
+  }
+  if (!best) return false;
+  m.controle[e] = best.i; m.changeT[e] = m.t; m.choixT[e] = m.t;
+  m.ev('changer', { e, j: best.i });
+  return true;
+}
+
+/** Le pressing (A / ✕ maintenu en défense) : le joueur va au porteur, ou à la balle, au trot plein et plus. */
+function presser(m, j) {
+  const b = m.balle, it = j.int;
+  const cx = b.p.x + b.v.x * 0.25 - j.p.x, cz = b.p.z + b.v.z * 0.25 - j.p.z, d = hypot(cx, cz);
+  if (d < 0.5) return;
+  it.dx = cx / d; it.dz = cz / d;
+  it.allure = 1; it.sprint = Math.max(it.sprint, d > 3 ? 0.6 : 0.25);
 }
 
 /** Copie l'intention d'un humain sur le joueur qu'il joue (les actions sont consommées une fois). */
@@ -134,6 +173,8 @@ function agir(m, j) {
   const p = porteur(m);
   if (a.type === 'tacle') { if (!p || p.e !== j.e) demanderTacle(m, j, !!a.glisse); return; }
   if (a.type === 'roulette') { roulette(m, j, a.dx ?? 1, a.dz ?? 0); return; }
+  if (a.type === 'crochet') { crochet(m, j, a.dx ?? 1, a.dz ?? 0); return; }
+  if (a.type === 'semelle') { semelle(m, j); return; }
   // une passe ou une frappe : il faut la balle à portée
   if (p && p.e !== j.e) return;
   if (demanderFrappe(m, j, a)) m.stats.demandes++;
@@ -150,6 +191,48 @@ function roulette(m, j, dx, dz) {
   j.intouchable = 0.75;
   for (const o of m.joueurs) if (o.e !== j.e && !o.gardien && !o.absent && hypot(o.p.x - j.p.x, o.p.z - j.p.z) < 2.6) { o.plante = 0.85; desequilibrer(m, o, 0.2); }
   m.ev('roulette', { j: j.i });
+}
+
+/**
+ * Le crochet (stick droit, quart de tour) : le porteur pique la balle de l'extérieur du pied vers ce côté, de 45 à
+ * 100° de sa course, freine et vire très court sur ses appuis (sim/corps.js, crochetT) ; le défenseur lancé devant
+ * lui est pris à contre-pied un instant.
+ */
+function crochet(m, j, dx, dz) {
+  const b = m.balle;
+  if (!libre(j) || porteur(m) !== j || b.p.y > 0.4 || hypot(b.p.x - j.p.x, b.p.z - j.p.z) > 1.0) return;
+  const L = hypot(dx, dz) || 1, ux = dx / L, uz = dz / L;
+  const fx = sin(j.cap), fz = cos(j.cap);
+  const cote = Math.sign(fz * ux - fx * uz) || 1; // > 0 : à gauche du cap
+  const ang = clamp(Math.acos(clamp(fx * ux + fz * uz, -1, 1)), (45 * Math.PI) / 180, (100 * Math.PI) / 180);
+  const h = j.cap + cote * ang;
+  const s = hypot(j.v.x, j.v.z);
+  const vb = clamp(1.4 + 0.5 * s, 2.2, 4.2);
+  b.v.x = sin(h) * vb; b.v.z = cos(h) * vb; b.v.y = 0;
+  b.w.z = -b.v.x / BALLON.R; b.w.x = b.v.z / BALLON.R;
+  b.dernier = j.i; b.dernierT = m.t; b.possesseur = j.i;
+  j.toucheT = m.t;
+  j.v.x *= 0.55; j.v.z *= 0.55;
+  j.crochetH = h; j.crochetT = 0.32;
+  for (const o of m.joueurs) {
+    if (o.e === j.e || o.gardien || o.absent) continue;
+    const rx = o.p.x - j.p.x, rz = o.p.z - j.p.z, d = hypot(rx, rz);
+    if (d < 2.4 && rx * fx + rz * fz > 0) { o.plante = Math.max(o.plante, 0.45); desequilibrer(m, o, 0.12); }
+  }
+  m.ev('crochet', { j: j.i });
+}
+
+/** L'arrêt sur la semelle (R3) : la balle meurt sous le pied, le porteur s'arrête sur ses appuis. */
+function semelle(m, j) {
+  const b = m.balle;
+  if (!libre(j) || porteur(m) !== j || b.p.y > 0.35 || hypot(b.p.x - j.p.x, b.p.z - j.p.z) > 1.0) return;
+  const s = hypot(j.v.x, j.v.z);
+  b.v.x = j.v.x * 0.25; b.v.z = j.v.z * 0.25;
+  b.w.x *= 0.2; b.w.y *= 0.2; b.w.z *= 0.2;
+  b.dernier = j.i; b.dernierT = m.t; b.possesseur = j.i;
+  j.toucheT = m.t;
+  lancerGeste(j, 'stop', { rm: true, echelle: clamp(s / 4, 0.3, 1.2), type: 'semelle', fin: 0.7 });
+  m.ev('semelle', { j: j.i });
 }
 
 /** Pendant la roulette, la balle suit la semelle par petites touches. */
@@ -227,6 +310,11 @@ export function pas(m, entrees = null) {
   }
 
   // ── le jeu ──
+  for (const e of [0, 1]) {
+    const src = m.humains[e] ? entrees?.[e] : null;
+    m.renfort[e] = !!src?.renfort; m.sortie[e] = !!src?.sortie;
+    if (src?.changer) changerJoueur(m, e, src.changer === true ? null : src.changer);
+  }
   majControle(m);
   for (const j of m.joueurs) {
     const e = j.e;
@@ -234,7 +322,9 @@ export function pas(m, entrees = null) {
     if (j.gardien) pasGardien(m, j);
     else if (m.humains[e] && m.controle[e] === j.i && entrees?.[e]) {
       copierIntention(j, entrees[e]);
-      if (porteur(m) === j && !j.int.protege) conduire(m, j, j.int);
+      const p = porteur(m);
+      if (entrees[e].presse && (!p || p.e !== e)) presser(m, j);
+      if (p === j && !j.int.protege) conduire(m, j, j.int);
       j.aide = m.aides[e];
     } else { pasIA(m, j); j.aide = 0; }
   }

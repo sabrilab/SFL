@@ -116,6 +116,8 @@ export function pasGardien(m, k) {
     const premier = m.joueurs.every((o) => o === k || o.gardien || o.absent || hypot(o.p.x - b.p.x, o.p.z - b.p.z) / 6.2 > tk - 0.1);
     if (premier) { cx = b.p.x; cz = b.p.z; vise = true; }
   }
+  // la sortie demandée par l'humain (Y / △ maintenu) : au porteur ou à la balle, dans les 10 m de son but
+  if (m.sortie?.[k.e] && dBut < 10 && b.p.y < 1.5) { cx = b.p.x + b.v.x * 0.2; cz = b.p.z + b.v.z * 0.2; vise = true; }
   const dx = cx - k.p.x, dz = cz - k.p.z, d = hypot(dx, dz);
   if (d > 0.15) {
     it.dx = dx / d; it.dz = dz / d;

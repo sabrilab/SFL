@@ -106,8 +106,10 @@ export function pasIA(m, j) {
     const prochain = b.recepteur != null && m.joueurs[b.recepteur].e === j.e ? b.recepteur : null;
     const hj = humain != null ? m.joueurs[humain] : null;
     const humainPresse = hj && hypot(hj.p.x - b.p.x, hj.p.z - b.p.z) < 4;
-    const chasseur = prochain ?? (humainPresse ? null : ia[0]?.i);
-    const couvreur = humainPresse ? ia[0]?.i : ia[1]?.i;
+    // (l'humain demande un renfort, RB / R1 : le plus proche de l'IA presse avec lui)
+    const seul = humainPresse && !m.renfort?.[j.e];
+    const chasseur = prochain ?? (seul ? null : ia[0]?.i);
+    const couvreur = seul ? ia[0]?.i : ia[1]?.i;
     if (j.i === chasseur) {
       const t = Math.min(0.7, hypot(b.p.x - j.p.x, b.p.z - j.p.z) / 6.5);
       cx = b.p.x + b.v.x * t; cz = b.p.z + b.v.z * t;

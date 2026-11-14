@@ -102,6 +102,7 @@ export function creerCorps(i, e, role) {
     recup: 0,              // ne peut plus toucher la balle pendant ce temps (s)
     plante: 0,             // planté (après un tacle raté, une roulette subie) : s
     intouchable: 0,
+    crochetT: 0, crochetH: 0, // un crochet en cours (monde.js) : le virage très court sur les appuis, vers crochetH
     regard: null,          // vers où regarde la tête (x, z), pour le rendu
     int: null,             // l'intention du pas
     pieds: [{ x: 0, z: 0 }, { x: 0, z: 0 }],
@@ -173,13 +174,14 @@ export function pasCorps(j, dt, balle) {
   j.recup = Math.max(0, j.recup - dt);
   j.plante = Math.max(0, j.plante - dt);
   j.intouchable = Math.max(0, j.intouchable - dt);
+  j.crochetT = Math.max(0, (j.crochetT ?? 0) - dt);
   j.d = Math.max(0, j.d - C.retourDes * dt);
 
   if (j.mode === 'geste' || j.mode === 'sol' || j.mode === 'releve' || j.mode === 'pivot') pasGeste(j, dt);
   else {
     let s = hypot(j.v.x, j.v.z);
     let h = s > 0.05 ? atan2(j.v.x, j.v.z) : j.cap;
-    const veut = it && (it.dx || it.dz) && it.allure > 0.02;
+    const veut = (it && (it.dx || it.dz) && it.allure > 0.02) || j.crochetT > 0;
     const vc = veut ? vitesseVoulue(j, it, balle) : 0;
     const accF = 1 - 0.6 * clamp(j.d, 0, 1);
     const aLat = C.aLat * (balle ? C.balleLat : 1) * accF;
@@ -197,10 +199,16 @@ export function pasCorps(j, dt, balle) {
       s = Math.max(0, s - C.frein * dt);
       j.v.x = sin(h) * s; j.v.z = cos(h) * s;
     } else {
-      const hv = atan2(it.dx, it.dz);
+      // (le crochet : la course va vers crochetH, quoi que dise le stick, le temps de virer)
+      const hv = j.crochetT > 0 ? j.crochetH : atan2(it.dx, it.dz);
       const delta = enrouler(hv - h);
       const ad = Math.abs(delta);
-      if (!it.contenir && !it.protege && s > C.pivotVitesse && ad > (150 * Math.PI) / 180) {
+      if (j.crochetT > 0) {
+        // virage sur les appuis : 8 rad/s au plus, vitesse tenue sous 4 m/s
+        h += clamp(delta, -8 * dt, 8 * dt);
+        s = Math.min(Math.max(s, 1.5), 4);
+        j.v.x = sin(h) * s; j.v.z = cos(h) * s;
+      } else if (!it.contenir && !it.protege && s > C.pivotVitesse && ad > (150 * Math.PI) / 180) {
         j.mode = 'frein';
         j.cible = hv;
       } else {
@@ -227,7 +235,7 @@ export function pasCorps(j, dt, balle) {
       if (it?.protege && r) capVoulu = enrouler(capVoulu + Math.PI); // dos à l'adversaire
       const dc = enrouler(capVoulu - j.cap);
       // en course, le buste suit la course (sinon le pied glisse) ; ailleurs, 6 rad/s au plus
-      const maxc = sp >= 0.6 && !(it?.contenir || it?.protege) ? Math.max(C.capMax, Math.min(C.lacetMax, aLat / Math.max(0.1, sp)) * 1.5) : C.capMax;
+      const maxc = j.crochetT > 0 ? 10 : sp >= 0.6 && !(it?.contenir || it?.protege) ? Math.max(C.capMax, Math.min(C.lacetMax, aLat / Math.max(0.1, sp)) * 1.5) : C.capMax;
       j.cap = enrouler(j.cap + clamp(dc, -maxc * dt, maxc * dt));
     }
   }
