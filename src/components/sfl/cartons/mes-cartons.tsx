@@ -18,12 +18,15 @@ export function MesCartons({ nom }: { nom: string }) {
   const suspension = c.suspensions.find((s) => !s.levee && !journeeJouee(saisonLue, s.j));
   return (
     <div className="flex w-full flex-wrap items-center justify-center gap-x-3 gap-y-1.5 text-encre-2" aria-label="Mes cartons">
-      <span className="flex items-center gap-2">
-        <SerieDeCartons rang={c.serie} />
-        <span className="mono-label tabular-nums">
-          {c.serie}/{REGLES_CARTONS.jaunesPourUnRouge}
+      {/* Seulement un rouge direct de l'admin (13/11/2026) : pas de série à montrer. */}
+      {c.cartons.some((x) => x.couleur === "jaune") && (
+        <span className="flex items-center gap-2">
+          <SerieDeCartons rang={c.serie} />
+          <span className="mono-label tabular-nums">
+            {c.serie}/{REGLES_CARTONS.jaunesPourUnRouge}
+          </span>
         </span>
-      </span>
+      )}
       {rouges > 0 && (
         <span className="flex items-center gap-1.5">
           <PetitCarton couleur="rouge" />

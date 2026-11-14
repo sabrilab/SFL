@@ -17,7 +17,11 @@
 //     « Je viens » à sa convocation, la composition automatique ne le place
 //     pas, l'admin non plus (integrite.ts, I9) — sauf si l'admin lève la
 //     suspension (Saison.suspensionsLevees) ;
-//   · après le rouge, la série repart de zéro.
+//   · après le rouge, la série repart de zéro ;
+//   · l'admin peut aussi donner un carton rouge direct (13/11/2026,
+//     Saison.cartonsRouges), avec un message : même suspension pour la
+//     journée choisie, même animation, même notification ; il ne touche pas
+//     à la série des jaunes. Le retirer (retirerCartonRouge) efface le carton.
 //
 // Rien n'est compté à la main : tout se relit dans les feuilles de la saison
 // publiée (sans les brouillons), si bien qu'un retard corrigé corrige les
@@ -27,7 +31,7 @@
 // n'en a pas. Pur : partagé par l'app et le serveur.
 
 import { estBrouillon } from "./saisie/brouillon";
-import { numeroSaison, type Saison, type SuspensionLevee } from "./saisie/types";
+import { numeroSaison, type CartonRougeDonne, type Saison, type SuspensionLevee } from "./saisie/types";
 
 export const REGLES_CARTONS = {
   /** La saison où naissent les cartons, et sa première journée qui compte. */
@@ -50,6 +54,10 @@ export interface Carton {
   rang: number;
   /** Rouge : la journée de la suspension. */
   suspenduPour?: number;
+  /** Rouge donné à la main par l'admin, hors série (rang 0). */
+  direct?: boolean;
+  /** Le message de l'admin qui l'accompagne. */
+  message?: string;
 }
 
 export interface Suspension {
@@ -75,12 +83,32 @@ export function debutDesCartons(numero: number): number | null {
   return numero === REGLES_CARTONS.saison ? REGLES_CARTONS.depuis : 1;
 }
 
+/** L'id stable d'un rouge direct : « s1-direct-j6-rouge » (jamais celui d'un rouge de série). */
+export const idCartonDirect = (numero: number, pour: number) => `s${numero}-direct-j${pour}-rouge`;
+
 /** Les cartons de toute la saison, joueur par joueur (clé : le nom sans casse). */
 export function cartonsDeLaSaison(saison: Saison): Map<string, CartonsDuJoueur> {
   const numero = numeroSaison(saison);
-  const depuis = debutDesCartons(numero);
   const out = new Map<string, CartonsDuJoueur>();
-  if (depuis == null) return out;
+  const levees = saison.suspensionsLevees ?? [];
+  const leveePour = (k: string, j: number) => levees.some((l) => cle(l.joueur) === k && l.j === j);
+  // Les rouges directs de l'admin (13/11/2026) : à toute saison, hors série.
+  const directs = (saison.cartonsRouges ?? []).filter((d) => d.joueur.trim() && d.pour > 0);
+  const ajouterDirects = () => {
+    for (const d of directs) {
+      const k = cle(d.joueur);
+      const c = out.get(k) ?? { joueur: d.joueur, cartons: [], serie: 0, suspensions: [] };
+      if (c.cartons.some((x) => x.id === idCartonDirect(numero, d.pour))) continue;
+      c.cartons.push({ id: idCartonDirect(numero, d.pour), joueur: c.joueur, couleur: "rouge", j: d.pour - 1, rang: 0, suspenduPour: d.pour, direct: true, ...(d.message?.trim() ? { message: d.message.trim() } : {}) });
+      if (!c.suspensions.some((s) => s.j === d.pour)) c.suspensions.push({ j: d.pour, levee: leveePour(k, d.pour) });
+      c.cartons.sort((a, b) => (a.suspenduPour ?? a.j + 1) - (b.suspenduPour ?? b.j + 1) || (a.couleur === b.couleur ? 0 : a.couleur === "jaune" ? -1 : 1));
+      c.suspensions.sort((a, b) => a.j - b.j);
+      out.set(k, c);
+    }
+    return out;
+  };
+  const depuis = debutDesCartons(numero);
+  if (depuis == null) return ajouterDirects();
   // Ce que la ligue voit : jamais une journée en brouillon. Une journée en
   // suspens (saisie/suspens.ts) garde ses cartons (décision D3 du 12/11 : le
   // retard a eu lieu, la discipline ne dépend pas du score) ; seul son −1
@@ -96,7 +124,6 @@ export function cartonsDeLaSaison(saison: Saison): Map<string, CartonsDuJoueur> 
     r.js.add(e.j);
     retards.set(k, r);
   }
-  const levees = saison.suspensionsLevees ?? [];
   for (const [k, { joueur, js }] of retards) {
     const cartons: Carton[] = [];
     const suspensions: Suspension[] = [];
@@ -107,13 +134,13 @@ export function cartonsDeLaSaison(saison: Saison): Map<string, CartonsDuJoueur> 
       if (serie === REGLES_CARTONS.jaunesPourUnRouge) {
         const pour = j + 1;
         cartons.push({ id: `s${numero}-j${j}-rouge`, joueur, couleur: "rouge", j, rang: serie, suspenduPour: pour });
-        suspensions.push({ j: pour, levee: levees.some((l) => cle(l.joueur) === k && l.j === pour) });
+        suspensions.push({ j: pour, levee: leveePour(k, pour) });
         serie = 0;
       }
     }
     out.set(k, { joueur, cartons, serie, suspensions });
   }
-  return out;
+  return ajouterDirects();
 }
 
 /** Les cartons d'un joueur (rien : aucun carton, série à zéro). */
@@ -161,6 +188,27 @@ export function retablirSuspension(saison: Saison, joueur: string, j: number): S
   return levees.length ? { ...reste, suspensionsLevees: levees } : reste;
 }
 
+/** L'admin donne un carton rouge direct à `joueur` : suspendu pour la J`pour`. Un seul par joueur et par journée. */
+export function donnerCartonRouge(saison: Saison, joueur: string, pour: number, message: string, par: string, le: Date): Saison {
+  const autres = (saison.cartonsRouges ?? []).filter((d) => !(cle(d.joueur) === cle(joueur) && d.pour === pour));
+  const m = message.trim().slice(0, MESSAGE_CARTON_MAX);
+  const donne: CartonRougeDonne = { joueur: joueur.trim(), pour, ...(m ? { message: m } : {}), par, le: le.toISOString() };
+  return { ...saison, cartonsRouges: [...autres, donne] };
+}
+
+/** Le carton rouge direct est retiré (l'admin s'était trompé) : plus de carton, plus de suspension. */
+export function retirerCartonRouge(saison: Saison, joueur: string, pour: number): Saison {
+  const avant = saison.cartonsRouges ?? [];
+  const restent = avant.filter((d) => !(cle(d.joueur) === cle(joueur) && d.pour === pour));
+  if (restent.length === avant.length) return saison;
+  const { cartonsRouges: _avant, ...reste } = saison;
+  void _avant;
+  return restent.length ? { ...reste, cartonsRouges: restent } : reste;
+}
+
+/** Le message d'un carton rouge direct : une ou deux lignes. */
+export const MESSAGE_CARTON_MAX = 140;
+
 /** Les cartons pas encore vus, dans l'ordre où ils ont été donnés. */
 export function cartonsAMontrer(cartons: readonly Carton[], vus: ReadonlySet<string>): Carton[] {
   return cartons.filter((c) => !vus.has(c.id));
@@ -169,7 +217,14 @@ export function cartonsAMontrer(cartons: readonly Carton[], vus: ReadonlySet<str
 /** « Carton jaune » · « Retard · J4 · 1/3 » ; « Carton rouge » · « Suspendu pour la J5 ». */
 export function texteCarton(c: Carton): { titre: string; ligne: string } {
   if (c.couleur === "rouge") return { titre: "Carton rouge", ligne: `Suspendu pour la J${c.suspenduPour}` };
+  // (Le message d'un rouge direct se lit à part : texteNotifCarton, CartonRecu.)
   return { titre: "Carton jaune", ligne: `Retard · J${c.j} · ${c.rang}/${REGLES_CARTONS.jaunesPourUnRouge}` };
+}
+
+/** Le texte de la notification : le message de l'admin s'il y en a un, puis la suspension. */
+export function texteNotifCarton(c: Carton): { titre: string; texte: string } {
+  const { titre, ligne } = texteCarton(c);
+  return { titre, texte: c.message ? `${c.message} ${ligne}.` : `${ligne}.` };
 }
 
 /** La clé de la notification d'un carton (annonces_envois) : une fois par carton. */

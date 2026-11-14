@@ -9,6 +9,10 @@ import {
   cartonsDeLaSaison,
   cleNotifCarton,
   debutDesCartons,
+  donnerCartonRouge,
+  idCartonDirect,
+  retirerCartonRouge,
+  texteNotifCarton,
   leverSuspension,
   retablirSuspension,
   sansSuspendus,
@@ -140,5 +144,43 @@ assert.deepEqual(pose.entries.filter((e) => e.j === 7).map((e) => e.player), ["I
 assert.deepEqual(bloquantsEcriture(nouveauxEcarts(s6, pose)), []);
 const venus = equipesDesVenus({ ...s6, journees: s6.journees.map((m) => (m.j === 7 ? { ...m, matchsDuJour: [{ equipes: ["Noirs 1", "Blancs 1"] as [string, string] }] } : m)) }, 7, ["Théo", "Ilyes", "Badis", "Sami"]);
 assert.ok(!venus?.some((t) => t.players.includes("Théo")), "les Je viens : sans lui");
+
+// 9 · Le rouge direct de l'admin (13/11/2026) : sans retard, suspendu pour la journée choisie, avec son message.
+const le = new Date("2026-11-13T17:00:00Z");
+const direct = donnerCartonRouge(base, "Sami", 6, "  Tu as reçu un carton rouge.  ", "Sabri", le);
+const cs = cartonsDe(direct, "sami");
+assert.equal(cs.cartons.length, 1);
+assert.deepEqual(cs.cartons[0], { id: idCartonDirect(1, 6), joueur: "Sami", couleur: "rouge", j: 5, rang: 0, suspenduPour: 6, direct: true, message: "Tu as reçu un carton rouge." });
+assert.equal(cs.serie, 0);
+assert.equal(suspenduPour(direct, "Sami", 6), true);
+assert.equal(suspenduPour(direct, "Sami", 7), false);
+assert.ok(suspendusPour(direct, 6).has("sami"));
+assert.deepEqual(sansSuspendus(direct, 6, ["Sami", "Théo"]), ["Théo"]);
+assert.deepEqual(texteNotifCarton(cs.cartons[0]), { titre: "Carton rouge", texte: "Tu as reçu un carton rouge. Suspendu pour la J6." });
+assert.deepEqual(texteNotifCarton({ ...cs.cartons[0], message: undefined }), { titre: "Carton rouge", texte: "Suspendu pour la J6." });
+assert.equal(cleNotifCarton(cs.cartons[0]), "carton-s1-direct-j6-rouge");
+// Pas de doublon pour le même joueur et la même journée ; le message se remplace.
+const redonne = donnerCartonRouge(direct, "sami", 6, "", "Sabri", le);
+assert.equal(redonne.cartonsRouges?.length, 1);
+assert.equal(cartonsDe(redonne, "Sami").cartons[0].message, undefined);
+// Levée : le carton reste, il peut jouer ; retiré : plus rien.
+const leveeDirect = leverSuspension(direct, "Sami", 6, "Sabri", le);
+assert.equal(suspenduPour(leveeDirect, "Sami", 6), false);
+assert.equal(cartonsDe(leveeDirect, "Sami").cartons.length, 1);
+const retire = retirerCartonRouge(direct, "SAMI", 6);
+assert.equal(retire.cartonsRouges, undefined);
+assert.equal(cartonsDe(retire, "Sami").cartons.length, 0);
+assert.equal(retirerCartonRouge(base, "Sami", 6), base, "rien à retirer : même saison");
+// Il s'ajoute aux jaunes sans toucher la série, dans l'ordre des journées.
+const melange = donnerCartonRouge(base, "Théo", 5, "", "Sabri", le);
+const ct = cartonsDe(melange, "Théo");
+const ct0 = cartonsDe(base, "Théo");
+assert.equal(ct.serie, ct0.serie);
+assert.equal(ct.cartons.length, ct0.cartons.length + 1);
+assert.ok(ct.cartons.findIndex((c) => c.direct) >= 0);
+assert.ok(suspenduPour(melange, "Théo", 5));
+// Avant les cartons de série (saison 0) : le rouge direct compte quand même.
+const s0 = donnerCartonRouge({ ...base, numero: 0 }, "Sami", 6, "", "Sabri", le);
+assert.equal(suspenduPour(s0, "Sami", 6), true);
 
 console.log("cartons-check : ok");

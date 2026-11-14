@@ -9,7 +9,8 @@
 // moment où il arrive en haut. Dessous : « Carton jaune », « Retard · J4 »,
 // et la série en trois petits cartons (1/3, 2/3, 3/3) ; au troisième, le
 // rouge suit : « Carton rouge », « Suspendu pour la J5 ». Plusieurs cartons :
-// l'un après l'autre. Rien d'autre à l'écran : le sigle SFL est imprimé sur
+// l'un après l'autre. Un rouge direct de l'admin (13/11/2026) n'a pas de
+// série : son message à la place. Rien d'autre à l'écran : le sigle SFL est imprimé sur
 // le carton (contrôle du 01/11 au soir : plus de « Sunday Five League » en
 // tête, plus de halo ; la matière dans carton.css).
 //
@@ -118,7 +119,12 @@ export function CartonRecu({
         <div key={`t-${c.id}`} className="carton-texte flex flex-col items-center gap-2.5 text-center">
           <h2 className="text-[30px] leading-none font-extrabold tracking-tight">{titre}</h2>
           <p className="mono-label text-white/60">{ligne}</p>
-          <SerieDeCartons rang={c.rang} rouge={c.couleur === "rouge"} className="mt-1" />
+          {c.direct ? (
+            // Un rouge direct de l'admin (13/11/2026) : pas de série, son message.
+            c.message && <p className="mt-2 max-w-[300px] text-lecture text-balance text-white/85">{c.message}</p>
+          ) : (
+            <SerieDeCartons rang={c.rang} rouge={c.couleur === "rouge"} className="mt-1" />
+          )}
         </div>
       </div>
 

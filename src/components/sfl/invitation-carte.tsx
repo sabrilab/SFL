@@ -236,17 +236,20 @@ export function aSuivre(saison: Saison, players: Player[], nom: string, suivable
   return [...fideles, ...hauts].slice(0, PROPOSES);
 }
 
-/** En dev, `?invitation`, `?invitation=notifs`, `?invitation=ville`, `?invitation=premier-match`, `?invitation=suivre`, `?invitation=divisions`, `?invitation=equipe`, `?invitation=charte`, `?invitation=nouveaute` (la dernière annoncée), `?invitation=manga`, `?invitation=resultat`, `?invitation=arbitre`, `?invitation=carton` (un 2e jaune) ou `?invitation=carton-rouge` (le 3e jaune, puis le rouge) la montre sans compte vérifié (captures). */
+/** En dev, `?invitation`, `?invitation=notifs`, `?invitation=ville`, `?invitation=premier-match`, `?invitation=suivre`, `?invitation=divisions`, `?invitation=equipe`, `?invitation=charte`, `?invitation=nouveaute` (la dernière annoncée), `?invitation=manga`, `?invitation=resultat`, `?invitation=arbitre`, `?invitation=carton` (un 2e jaune) `?invitation=carton-rouge` (le 3e jaune, puis le rouge) ou `?invitation=carton-direct` (un rouge de l'admin, avec son message) la montre sans compte vérifié (captures). */
 function apercu(): Invitation | null {
   if (process.env.NODE_ENV === "production" || typeof window === "undefined") return null;
   const v = new URLSearchParams(window.location.search).get("invitation");
-  if (v === "carton" || v === "carton-rouge") return "carton";
+  if (v === "carton" || v === "carton-rouge" || v === "carton-direct") return "carton";
   return v === null ? null : v === "notifs" || v === "ville" || v === "premier-match" || v === "suivre" || v === "divisions" || v === "equipe" || v === "charte" || v === "nouveaute" || v === "arbitre" || v === "manga" || v === "resultat" ? v : "carte";
 }
 
 /** Les cartons de l'aperçu (captures) : un 2e jaune, ou le 3e jaune et son rouge. */
 function cartonsDApercu(nom: string): Carton[] {
-  const rouge = new URLSearchParams(window.location.search).get("invitation") === "carton-rouge";
+  const v = new URLSearchParams(window.location.search).get("invitation");
+  if (v === "carton-direct")
+    return [{ id: "s1-direct-j6-rouge", joueur: nom, couleur: "rouge", j: 5, rang: 0, suspenduPour: 6, direct: true, message: "Tu as reçu un carton rouge." }];
+  const rouge = v === "carton-rouge";
   return rouge
     ? [
         { id: "s1-j6-jaune", joueur: nom, couleur: "jaune", j: 6, rang: 3 },

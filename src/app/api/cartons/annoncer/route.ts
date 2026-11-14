@@ -23,7 +23,7 @@ import { prevenir, type Envoi } from "@/lib/server/push-envoi";
 import { cleVapid } from "@/lib/server/web-push";
 import { appelant, estMembre, serveur } from "@/lib/sfl/serveur-ligue.server";
 import { lireSaisonServeur } from "@/lib/sfl/saison-serveur.server";
-import { cartonsDeLaSaison, cleNotifCarton, texteCarton } from "@/lib/sfl/cartons";
+import { cartonsDeLaSaison, cleNotifCarton, texteNotifCarton } from "@/lib/sfl/cartons";
 
 export const maxDuration = 30;
 
@@ -74,8 +74,8 @@ export async function POST(req: NextRequest) {
     const c = aPrevenir.find((x) => cleNotifCarton(x) === r.annonce && x.joueur === r.joueur);
     const uid = idDe.get(r.joueur);
     if (!c || !uid) continue;
-    const { titre, ligne } = texteCarton(c);
-    const envois = new Map<string, Envoi>([[uid, { notif: { titre, texte: `${ligne}.`, url: "/", tag: r.annonce }, motif: "carton", ref: r.annonce }]]);
+    const { titre, texte } = texteNotifCarton(c);
+    const envois = new Map<string, Envoi>([[uid, { notif: { titre, texte, url: "/", tag: r.annonce }, motif: "carton", ref: r.annonce }]]);
     const bilan = await prevenir(sb, cle, envois);
     if (bilan.recus.has(uid)) envoyes += 1;
     // Des téléphones, mais aucun n'a pris la notification : on réessaiera.

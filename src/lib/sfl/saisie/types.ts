@@ -232,6 +232,24 @@ export interface Saison {
    * eux-mêmes ne sont pas écrits : ils se lisent dans les retards.
    */
   suspensionsLevees?: SuspensionLevee[];
+  /**
+   * Les cartons rouges donnés à la main par l'admin (Sabri, 13/11/2026 :
+   * « Suspends le compte d'Anis Bouzenita et envoie-lui un message : […]
+   * carton rouge »), hors de toute série de retards : le joueur est suspendu
+   * pour la journée `pour` (lib/sfl/cartons.ts). Retirer la ligne retire le
+   * carton ; « Lever » (suspensionsLevees) le laisse mais le laisse jouer.
+   */
+  cartonsRouges?: CartonRougeDonne[];
+}
+
+/** Un carton rouge donné par l'admin : `joueur` suspendu pour la J`pour`. */
+export interface CartonRougeDonne {
+  joueur: string;
+  pour: number;
+  /** Ce que le joueur lit sous le carton et dans sa notification. */
+  message?: string;
+  par: string;
+  le: string;
 }
 
 /** Une suspension levée par l'admin : `joueur` peut jouer la J`j`. */
