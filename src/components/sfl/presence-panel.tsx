@@ -46,9 +46,9 @@ export function PresencePanel({ compact = false }: { compact?: boolean }) {
   const [vueAdmin, setVueAdmin] = useState(false);
   // Dès la J4, chaque équipe dit sa division : « Noirs · Match 2 · D1 ».
   const divisionDe = useMemo(() => {
-    const etat = p.teams?.length ? divisionsDeLaJournee(saison, p.journee, divisions) : null;
-    return new Map(etat && p.teams ? terrainsDesEquipes(p.teams, etat).flatMap(({ divisions: ds, equipes }) => equipes.map((e) => [e.name, ds] as const)) : []);
-  }, [saison, p.journee, p.teams, divisions]);
+    const etat = p.equipesDuDimanche?.length ? divisionsDeLaJournee(saison, p.journee, divisions) : null;
+    return new Map(etat && p.equipesDuDimanche ? terrainsDesEquipes(p.equipesDuDimanche, etat).flatMap(({ divisions: ds, equipes }) => equipes.map((e) => [e.name, ds] as const)) : []);
+  }, [saison, p.journee, p.equipesDuDimanche, divisions]);
 
   function copyRelances() {
     const list = p.sansReponse.join(", ");
@@ -126,11 +126,11 @@ export function PresencePanel({ compact = false }: { compact?: boolean }) {
         <span className="text-corps font-bold tabular-nums">{p.presents.length} déjà</span>
       </div>
 
-      {p.equipesVisibles && p.teams && p.teams.length > 0 ? (
+      {p.equipesVisibles && p.equipesDuDimanche && p.equipesDuDimanche.length > 0 ? (
         <div className="mt-4 border-t border-contraste/8 pt-3.5">
           <p className="mono-label text-primary">Les équipes de dimanche</p>
           <div className="mt-2 flex flex-col gap-3">
-            {equipesDeConvocation(p.teams).map((t) => (
+            {equipesDeConvocation(p.equipesDuDimanche).map((t) => (
               <div key={t.nom}>
                 <p className="mb-1.5 flex items-center gap-1.5 text-corps font-bold text-encre-2">
                   {t.camp && <PointMaillot camp={t.camp} />}

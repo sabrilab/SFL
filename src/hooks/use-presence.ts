@@ -33,7 +33,7 @@ import { NEXT_MATCH } from "@/lib/sfl/data";
 import { supabase } from "@/lib/supabase";
 import { logActivity } from "@/lib/sfl/activity";
 import { isHidden, publicOnly } from "@/lib/sfl/hidden";
-import { avecLaFeuille, joueursDeLaFeuille, jourMois, journeeDuJour, remplacantsDe } from "@/lib/sfl/presence-feuille";
+import { avecLaFeuille, equipesDeLaFeuille, joueursDeLaFeuille, jourMois, journeeDuJour, remplacantsDe } from "@/lib/sfl/presence-feuille";
 import { ordreDArrivee } from "@/lib/sfl/equipes-division";
 import { terrainDeJournee } from "@/lib/sfl/saisie/mutations";
 import { matchsDeJournee, rendezVousDe, type RendezVous } from "@/lib/sfl/matchs-du-jour";
@@ -95,6 +95,12 @@ export interface PresenceView {
   equipesVisibles: boolean;
   /** Les équipes composées par l'admin (null tant qu'il n'a rien validé). */
   teams: ConvocationTeam[] | null;
+  /**
+   * Les équipes à montrer aux joueurs : celles de la feuille du dimanche dès
+   * que l'admin y a posé des équipes (un ajout à la main y entre, un retiré
+   * en sort, lib/sfl/presence-feuille.ts, equipesDeLaFeuille) ; sinon `teams`.
+   */
+  equipesDuDimanche: ConvocationTeam[] | null;
   /** La convocation en base (public.convocations.id) ; null en local. L'admin y corrige une réponse. */
   convocationId: number | null;
   /**
@@ -373,11 +379,13 @@ export function usePresence(): PresenceView {
       rendezVous: rendezVousDuDimanche(server.convocation.heure, server.convocation.lieu),
       mine: surLaFeuille ? "present" : (rep[player.name] ?? null),
       ...reponses,
-      remplacants: remplacantsDe(jeViens, saison, jDuJour, revele ? server.convocation.teams : null, isHidden),
+      // Un retiré passe remplaçant ; un suspendu (carton rouge) jamais.
+      remplacants: sansSuspendus(saison, jDeLaConvocation, remplacantsDe(jeViens, saison, jDuJour, revele ? server.convocation.teams : null, isHidden)),
       ordreDesVenus: ordreDArrivee(reponses.presents, feuille.noms, (n) => server.quand[n]).filter((n) => reponses.presents.includes(n)),
       reponsesOuvertes: ouvert,
       equipesVisibles: revele,
       teams: server.convocation.teams ?? null,
+      equipesDuDimanche: equipesDeLaFeuille(saison, jDuJour) ?? server.convocation.teams ?? null,
       convocationId: server.convocation.id,
       suspendu: jSuspendu != null ? { j: jSuspendu } : null,
       answer,
@@ -401,11 +409,12 @@ export function usePresence(): PresenceView {
     rendezVous: rendezVousDuDimanche(localConv?.heure ?? NEXT_MATCH.heure, localConv?.lieu ?? NEXT_MATCH.lieu),
     mine: surLaFeuille ? "present" : localConv ? ((localConv.reponses[player.name] as Reponse | undefined) ?? null) : null,
     ...reponsesLocales,
-    remplacants: remplacantsDe(local.presents, saison, jDuJour, revele ? (localConv?.teams ?? null) : null, isHidden),
+    remplacants: sansSuspendus(saison, jDeLaConvocation, remplacantsDe(local.presents, saison, jDuJour, revele ? (localConv?.teams ?? null) : null, isHidden)),
     ordreDesVenus: ordreDArrivee(reponsesLocales.presents, feuille.noms, () => null).filter((n) => reponsesLocales.presents.includes(n)),
     reponsesOuvertes: ouvert,
     equipesVisibles: revele,
     teams: localConv?.teams ?? null,
+    equipesDuDimanche: equipesDeLaFeuille(saison, jDuJour) ?? localConv?.teams ?? null,
     convocationId: null,
     suspendu: jSuspendu != null ? { j: jSuspendu } : null,
     answer,
