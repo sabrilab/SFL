@@ -449,7 +449,7 @@ function DiapoComposant({ avantage, composant }: { avantage: Avantage; composant
  * maillots portés (Avantage.depose, gardés hors du dépôt) ne prennent sa
  * place qu'une fois chargés : absents, rien ne bouge ni ne reste vide.
  */
-function DiapoPhoto({ avantage, visuel, tot }: { avantage: Avantage; visuel: Visuel; tot: boolean }) {
+function DiapoPhoto({ avantage, visuel }: { avantage: Avantage; visuel: Visuel }) {
   const [deposeLa, setDeposeLa] = useState(false);
   const depose = deposeLa ? avantage.depose : undefined;
 
@@ -472,6 +472,7 @@ function DiapoPhoto({ avantage, visuel, tot }: { avantage: Avantage; visuel: Vis
     <div
       className={cn("bp-photo-carte dark", `bp-photo-carte--${avantage.part}`)}
       data-teindre={visuel.teindre && !depose ? "" : undefined}
+      data-voile-court={visuel.voileCourt && !depose ? "" : undefined}
       style={{ ["--teinte" as string]: visuel.teinte }}
     >
       {depose ? (
@@ -487,7 +488,7 @@ function DiapoPhoto({ avantage, visuel, tot }: { avantage: Avantage; visuel: Vis
           width={LARGEUR}
           height={hauteurDe(visuel)}
           alt={visuel.alt}
-          loading={tot ? undefined : "lazy"}
+          loading="lazy"
           decoding="async"
           draggable={false}
           className="bp-photo"
@@ -530,6 +531,7 @@ function DiapoParrainage({ vu }: { vu: boolean }) {
 function DiapoPrix({ plus, choix, onChoix, actionRef }: { plus: BolaPlus; choix: Formule | null; onChoix: (f: Formule | null) => void; actionRef: RefObject<HTMLDivElement | null> }) {
   return (
     <div className="bp-prix">
+      <div className="bp-prix__haut">
       <ul className="bp-bundle" aria-label="Ce que tu reçois">
         {BUNDLE.map((b, i) => (
           <li key={b}>
@@ -543,12 +545,14 @@ function DiapoPrix({ plus, choix, onChoix, actionRef }: { plus: BolaPlus; choix:
         ))}
       </ul>
       <p className="bp-grille" aria-label={`Grille officielle de la ${NOM_PART.sfl}`}>
+        <SigleLigue ligue="sfl" hauteur={10} className="bp-grille__sigle" />
         {GRILLE_SFL.map((g) => (
           <s key={g.par} className="tabular-nums whitespace-nowrap">
             {g.prix}&nbsp;€ / {g.par}
           </s>
         ))}
       </p>
+      </div>
       <Titre className="bp-etiquette-prix bp-prix__etiquette">Prix premiers joueurs</Titre>
       <OffreBolaPlus plus={plus} choix={choix} onChoix={onChoix} actionRef={actionRef} />
     </div>
@@ -563,15 +567,15 @@ function DiapoPrix({ plus, choix, onChoix, actionRef }: { plus: BolaPlus; choix:
 function BarreInteret({ note, occupe, cachee, onNoter, onVoirOffre }: { note: boolean; occupe: boolean; cachee: boolean; onNoter: () => void; onVoirOffre: () => void }) {
   return createPortal(
     <div className="bp-barre" data-cachee={cachee ? "" : undefined} inert={cachee}>
-      {note ? (
-        <button type="button" onClick={onVoirOffre} className="bp-barre__note text-lecture font-bold">
-          <CestNote />
-        </button>
-      ) : (
-        <button type="button" onClick={onNoter} disabled={occupe} className="bouton-principal h-[52px] w-full text-lecture font-bold disabled:opacity-40">
-          Je suis intéressé
-        </button>
-      )}
+      {/* Un seul bouton, dont le contenu change : jamais désactivé (aria-disabled), il garde le focus quand « Je suis intéressé » devient « C'est noté ». */}
+      <button
+        type="button"
+        aria-disabled={!note && occupe ? true : undefined}
+        onClick={() => (note ? onVoirOffre() : !occupe && onNoter())}
+        className={note ? "bp-barre__note text-lecture font-bold" : "bouton-principal h-[52px] w-full text-lecture font-bold aria-disabled:opacity-40"}
+      >
+        {note ? <CestNote /> : "Je suis intéressé"}
+      </button>
     </div>,
     document.body
   );
@@ -611,7 +615,9 @@ export function PageBolaPlus() {
   const plus = useBolaPlus();
   const [choix, setChoix] = useState<Formule | null>(null);
   const actionRef = useRef<HTMLDivElement | null>(null);
-  const railRef = useRef<HTMLOListElement>(null);
+  const railRef = useRef<HTMLDivElement>(null);
+  // La carte visée par le dernier saut (flèches, segments) : plusieurs ← → rapides avancent d'autant, sans attendre la fin du défilement doux.
+  const vise = useRef<number | null>(null);
   const liste = diapos();
   const n = liste.length;
   const iPrix = liste.findIndex((d) => d.id === "prix");
@@ -631,6 +637,7 @@ export function PageBolaPlus() {
         for (const e of entrees) {
           if (!e.isIntersecting) continue;
           const i = Number((e.target as HTMLElement).dataset.index);
+          if (vise.current === i) vise.current = null;
           setActif(i);
           setVus((v) => (v.has(i) ? v : new Set(v).add(i)));
         }
@@ -643,25 +650,30 @@ export function PageBolaPlus() {
 
   function aller(i: number) {
     const rail = railRef.current;
-    const li = rail?.children[Math.max(0, Math.min(n - 1, i))] as HTMLElement | undefined;
+    const j = Math.max(0, Math.min(n - 1, i));
+    const li = rail?.children[j] as HTMLElement | undefined;
     if (!rail || !li) return;
+    vise.current = j;
     const doux = !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     rail.scrollTo({ left: li.offsetLeft - (rail.clientWidth - li.offsetWidth) / 2, behavior: doux ? "smooth" : "auto" });
   }
 
-  function clavier(e: KeyboardEvent<HTMLOListElement>) {
-    const cible = e.key === "ArrowRight" ? actif + 1 : e.key === "ArrowLeft" ? actif - 1 : e.key === "Home" ? 0 : e.key === "End" ? n - 1 : null;
+  /** D'où partent ← et → : la carte visée par un saut en cours, sinon celle à l'écran. */
+  const depart = () => vise.current ?? actif;
+
+  function clavier(e: KeyboardEvent<HTMLDivElement>) {
+    const cible = e.key === "ArrowRight" ? depart() + 1 : e.key === "ArrowLeft" ? depart() - 1 : e.key === "Home" ? 0 : e.key === "End" ? n - 1 : null;
     if (cible === null) return;
     e.preventDefault();
     aller(cible);
   }
 
-  function rendu(d: Diapo, i: number) {
+  function rendu(d: Diapo) {
     if (d.id === "ouverture") return <DiapoOuverture />;
     if (d.id === "prix") return <DiapoPrix plus={plus} choix={choix} onChoix={setChoix} actionRef={actionRef} />;
     if ("avantage" in d) {
       const v = d.avantage.visuel;
-      return v.genre === "image" ? <DiapoPhoto avantage={d.avantage} visuel={v} tot={i <= 1} /> : <DiapoComposant avantage={d.avantage} composant={v.composant} />;
+      return v.genre === "image" ? <DiapoPhoto avantage={d.avantage} visuel={v} /> : <DiapoComposant avantage={d.avantage} composant={v.composant} />;
     }
     return <DiapoParrainage vu={vus.has(iParrainage)} />;
   }
@@ -672,17 +684,18 @@ export function PageBolaPlus() {
         <BoutonRetour />
       </div>
       <div className="bp-scene">
-        <ol ref={railRef} className="bp-rail" tabIndex={0} onKeyDown={clavier}>
+        {/* Le rail (role group des diapositives : le motif « carrousel » de l'APG) ; il prend le focus, avec son nom. */}
+        <div ref={railRef} className="bp-rail" tabIndex={0} aria-label="Cartes" onKeyDown={clavier} onPointerDown={() => (vise.current = null)}>
           {liste.map((d, i) => (
-            <li key={d.id} data-index={i} data-part={partDe(d)} className="bp-diapo" aria-roledescription="diapositive" aria-label={`${i + 1} sur ${n} : ${d.nom}`}>
-              {rendu(d, i)}
-            </li>
+            <div key={d.id} role="group" data-index={i} data-part={partDe(d)} className="bp-diapo" aria-roledescription="diapositive" aria-label={`${i + 1} sur ${n} : ${d.nom}`}>
+              {rendu(d)}
+            </div>
           ))}
-        </ol>
-        <button type="button" className="bp-fleche bp-fleche--avant" aria-label="Carte précédente" disabled={actif === 0} onClick={() => aller(actif - 1)}>
+        </div>
+        <button type="button" className="bp-fleche bp-fleche--avant" aria-label="Carte précédente" disabled={actif === 0} onClick={() => aller(depart() - 1)}>
           <ChevronLeft className="size-5" strokeWidth={2.4} aria-hidden />
         </button>
-        <button type="button" className="bp-fleche bp-fleche--apres" aria-label="Carte suivante" disabled={actif === n - 1} onClick={() => aller(actif + 1)}>
+        <button type="button" className="bp-fleche bp-fleche--apres" aria-label="Carte suivante" disabled={actif === n - 1} onClick={() => aller(depart() + 1)}>
           <ChevronRight className="size-5" strokeWidth={2.4} aria-hidden />
         </button>
       </div>

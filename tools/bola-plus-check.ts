@@ -561,7 +561,7 @@ async function banc() {
   const ordre = diapos().map((d) => d.id);
   assert.deepEqual(ordre, ["ouverture", ...AVANTAGES.map((a) => a.id), "parrainage", "prix"]);
   assert.equal(diapos([...AVANTAGES, { id: "studio", part: "plus", titre: "Ton studio", visuel: { genre: "composant", composant: "carte" } }]).length, ordre.length + 1, "un avantage de plus fait une carte de plus, sans rien d'autre");
-  assert.deepEqual(PARRAINAGE, { titre: "Ramène 5 abonnés.", sous: "Le tien est offert.", nombre: 5 });
+  assert.deepEqual(PARRAINAGE, { titre: "Ramène 5 abonnés.", sous: "Le tien est offert, tant qu'ils restent abonnés.", nombre: 5 });
   assert.equal(AFFICHE.alt, "", "l'ouverture : le stade est un décor");
   assert.deepEqual([...LARGEURS], [480, 780, 1170]);
   assert.equal(sourcesVisuel("affiche"), "/bola-plus/affiche-480.webp 480w, /bola-plus/affiche-780.webp 780w, /bola-plus/affiche-1170.webp 1170w");
@@ -708,6 +708,8 @@ async function banc() {
     assert.ok(/aria-current=\{i === actif \? "true" : undefined\}/.test(page) && /aria-label=\{`Aller à \$\{i \+ 1\} sur \$\{n\} : \$\{d\.nom\}`\}/.test(page), "les segments disent où l'on est");
     assert.ok(/e\.key === "ArrowRight"/.test(page) && /e\.key === "Home"/.test(page) && /e\.key === "End"/.test(page) && /onKeyDown=\{clavier\}/.test(page), "le clavier fait tourner le carrousel");
     assert.ok(/e\.stopPropagation\(\);/.test(offre), "les flèches des formules ne font pas tourner le carrousel");
+    assert.ok(/className="bp-rail" tabIndex=\{0\} aria-label="Cartes"/.test(page) && /role="group"[^>]*aria-roledescription="diapositive"/.test(page), "le rail et chaque diapositive ont un nom");
+    assert.ok(/vise\.current = j;/.test(page) && /const depart = \(\) => vise\.current \?\? actif;/.test(page) && /aller\(depart\(\) \+ 1\)/.test(page), "plusieurs ← → rapides avancent d'autant");
     assert.ok(/threshold: 0\.6/.test(page) && /root: rail/.test(page), "la carte active : les trois cinquièmes du rail");
     assert.ok(/behavior: doux \? "smooth" : "auto"/.test(page) && /prefers-reduced-motion: reduce/.test(page), "les sauts suivent « Réduire les animations »");
     assert.ok(/diapos\(\)/.test(page), "le carrousel lit la liste des cartes de la source");
@@ -719,7 +721,9 @@ async function banc() {
     assert.ok(/function interesser\(\) \{\s*suivre\.current = true;\s*noter\(choix\);\s*\}/.test(offre) && /onClick=\{interesser\}/.test(offre), "le bouton de l'offre note par le même noter");
     assert.ok(/aller\(iPrix\);/.test(page), "« C'est noté » mène à « Ton prix »");
     assert.equal(tsx.match(/useBolaPlus\(\)/g)?.length, 2, "un seul useBolaPlus pour la page (et celui de la tuile)");
-    assert.ok(/onClick=\{onNoter\} disabled=\{occupe\}/.test(barre), "la barre : bouton gelé pendant l'envoi");
+    assert.ok(/aria-disabled=\{!note && occupe \? true : undefined\}/.test(barre) && /!occupe && onNoter\(\)/.test(barre), "la barre : bouton gelé pendant l'envoi");
+    // Un seul bouton, jamais désactivé : le focus reste dessus quand « Je suis intéressé » devient « C'est noté ».
+    assert.ok(!/(?<!-)\bdisabled=/.test(barre) && barre.match(/<button/g)?.length === 1, "la barre : un seul bouton, qui garde le focus");
     assert.equal(offre.match(/disabled=\{occupe\}/g)?.length, 3, "l'offre : formules, bouton et « Annuler » gelés pendant l'envoi");
     assert.ok(/if \(!interet\) onChoix\(f\);\s*else if \(interet\.formule !== f\) noter\(f\);/.test(offre), "une fois noté, toucher une formule la change");
     // Les prix de l'offre : PRIX_FORMULE, avec le barré et la ligne dessous ; rien ne les cache.
@@ -732,7 +736,7 @@ async function banc() {
     assert.ok(/const \[deposeLa, setDeposeLa\] = useState\(false\);/.test(photo) && /const depose = deposeLa \? avantage\.depose : undefined;/.test(photo), "la carte montre le portant tant que le visuel déposé n'est pas chargé");
     assert.ok(/essai\.onload = \(\) => \{\s*if \(vivant && essai\.naturalWidth > 0\) setDeposeLa\(true\);/.test(photo) && !/onerror/.test(photo), "le visuel déposé ne passe devant qu'une fois chargé");
     assert.ok(/alt=\{visuel\.alt\}/.test(photo) && /alt=\{depose\.alt\}/.test(photo) && /alt=\{AFFICHE\.alt\}/.test(ouverture), "chaque visuel a son texte de remplacement");
-    assert.ok(/srcSet=\{sourcesVisuel\(/.test(photo) && /sizes=\{TAILLES\}/.test(photo) && /loading=\{tot \? undefined : "lazy"\}/.test(photo), "les visuels : trois tailles, chargés quand on y arrive");
+    assert.ok(/srcSet=\{sourcesVisuel\(/.test(photo) && /sizes=\{TAILLES\}/.test(photo) && /loading="lazy"/.test(photo), "les visuels : trois tailles, chargés quand on y arrive");
     // Les mots de l'écran : une liste fermée. Ni sous-titre, ni texte d'aide.
     const mots = [...new Set([...sansCommentaire.replace(/&apos;/g, "'").matchAll(/>\s*([^<>{}\n;()=]*[A-Za-zÀ-ÿ][^<>{}\n;()=]*?)\s*</g)].map((m) => m[1].trim()))].sort();
     assert.deepEqual(mots, ["Annuler", "Bola Plus", "C'est noté", "Je suis intéressé", "Offert", "Prix premiers joueurs", "Toi"], "les mots de l'écran : une liste fermée");
@@ -746,7 +750,7 @@ async function banc() {
     for (const m of sansNotes.matchAll(/rgb\((\d+) (\d+) (\d+)/g)) assert.ok(Math.max(+m[1], +m[2], +m[3]) - Math.min(+m[1], +m[2], +m[3]) <= 8, `une couleur écrite dans la feuille : ${m[0]}`);
     assert.ok(!/animation:|@keyframes/.test(sansNotes), "rien ne bouge en boucle");
     const reduit = /@media \(prefers-reduced-motion: reduce\) \{([\s\S]*)\}\s*$/.exec(css)?.[1] ?? "";
-    assert.ok(/\.bp-arc__rond,[\s\S]*transition: none;/.test(reduit), "mouvement réduit : rien ne glisse ni ne fond");
+    assert.ok(/\.bp-arc__rond,[\s\S]*\.bp-fleche \{\s*transition: none;/.test(reduit), "mouvement réduit : rien ne glisse ni ne fond (flèches comprises)");
     assert.ok(/\.bp-parrainage \.bp-arc__rond \{[^}]*background-color: var\(--bp-prix\);/.test(reduit), "mouvement réduit : les ronds de « Ramène 5 » sont pleins d'emblée");
     assert.ok(/html\[data-clavier\] \.bp-barre \{\s*display: none;/.test(css), "la barre s'efface sous le clavier");
     assert.ok(/@media \(pointer: fine\)/.test(css) && /\.bp-fleche \{\s*display: none;/.test(css), "les flèches : sur ordinateur seulement");

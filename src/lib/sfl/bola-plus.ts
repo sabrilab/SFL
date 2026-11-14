@@ -7,8 +7,9 @@
 // sont écrits ici seulement, en centimes entiers (des euros flottants
 // arrondis par toFixed tombent parfois sous le prix : 0,07 € en 3 fois
 // donnerait 3 × 0,02 €). Tout le reste se calcule ici : la
-// remise de l'annuel (1 − 16 890 / (12 × 1 990) = 29,27 %, affichée « −29 % »,
-// arrondie vers le bas pour ne jamais promettre plus) et l'échéance des
+// remise de l'annuel (1 − 16 890 / (12 × 1 990) = 29,27 %, « −29 % » arrondi
+// vers le bas pour ne jamais promettre plus ; calculée, plus affichée depuis
+// le 14/11 : le barré de la grille SFL suffit) et l'échéance des
 // 4 fois (16 890 / 4 = 4 222,5 centimes, arrondie au centime supérieur :
 // « 4 × 42,23 € sans frais » ; quatre échéances affichées font 168,92 €,
 // deux centimes au-dessus du prix, jamais en dessous). Aucun prestataire
@@ -246,6 +247,8 @@ export interface Visuel {
   rapport: number;
   /** Un visuel en noir et blanc : la feuille le teint dans la couleur de sa part. */
   teindre?: boolean;
+  /** Un voile bas plus court : le bas de l'image (le podium des cérémonies) reste lisible sous le titre. */
+  voileCourt?: boolean;
 }
 
 /**
@@ -313,12 +316,12 @@ export const AVANTAGES: readonly Avantage[] = [
     id: "ceremonies",
     part: "sfl",
     titre: "Les cérémonies officielles",
-    visuel: { genre: "image", image: "ceremonies", alt: "Image générée : un joueur lève le trophée noir sur le podium de marbre, ses coéquipiers applaudissent", teinte: "#22243a", rapport: RAPPORT_CARROUSEL },
+    visuel: { genre: "image", image: "ceremonies", alt: "Image générée : un joueur lève le trophée noir sur le podium de marbre, ses coéquipiers applaudissent", teinte: "#22243a", rapport: RAPPORT_CARROUSEL, voileCourt: true },
   },
 ];
 
-/** « Ramène 5 abonnés » (14/11 20:39) : seulement expliqué, ni suivi ni paiement. */
-export const PARRAINAGE = { titre: "Ramène 5 abonnés.", sous: "Le tien est offert.", nombre: 5 } as const;
+/** « Ramène 5 abonnés » (14/11 20:39) : seulement expliqué, ni suivi ni paiement ; offert tant que les cinq paient. */
+export const PARRAINAGE = { titre: "Ramène 5 abonnés.", sous: "Le tien est offert, tant qu'ils restent abonnés.", nombre: 5 } as const;
 
 /** Les diapositives du carrousel, dans l'ordre : l'ouverture, les avantages, « Ramène 5 », le prix. */
 export type Diapo = { id: "ouverture"; nom: string } | ({ id: string; nom: string } & { avantage: Avantage }) | { id: "parrainage"; nom: string } | { id: "prix"; nom: string };
