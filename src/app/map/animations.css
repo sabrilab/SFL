@@ -342,6 +342,15 @@
   }
 }
 
+/* L'étiquette de la boutique, tant que l'écran de chargement ou l'accueil la
+   couvrent : invisible (son entrée attend), elle ne prend ni le doigt ni le
+   clavier. */
+html:not([data-splash="fini"]) .map-etiquette,
+html:is([data-accueil="verif"], [data-accueil="ouvert"]) .map-etiquette {
+  pointer-events: none;
+  visibility: hidden;
+}
+
 /* L'étiquette de la boutique au clavier : l'anneau blanc des boutons de la Map. */
 .map-etiquette {
   outline: none;

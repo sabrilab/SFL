@@ -386,16 +386,32 @@ for (const p of PRODUITS) {
   const corps = lien[1];
   assert.ok(/\bh-11\b/.test(corps), "la cible fait 44 px de haut");
   assert.ok(/pointer-events-auto/.test(corps), "seul le lien prend le doigt dans la colonne");
-  assert.ok(/>\s*Boutique\s*<\/span>/.test(corps), "son nom est son texte");
+  // Son nom est son texte : « Boutique » entre deux balises, quelle que soit la mise en forme.
+  assert.ok(/>\s*Boutique\s*</.test(corps), "son nom est son texte");
   assert.ok(!/aria-label=/.test(corps), "pas de nom caché qui dirait autre chose que le texte");
   assert.ok(/aria-hidden/.test(corps), "l'icône est muette");
   assert.ok(/geste\("boutique"\)/.test(corps), "le geste est noté comme les autres");
   assert.ok(!/#[0-9a-f]{3,8}\b/i.test(corps.replace(/rgba\([^)]*\)/g, "")), "aucune couleur écrite à la main : l'encre et le blanc de la Map");
-  assert.ok(/background: BLANC, color: ENCRE/.test(corps), "papier blanc, encre noire");
+  assert.ok(/background:\s*BLANC,\s*color:\s*ENCRE,\s*borderColor:\s*ENCRE/.test(corps), "papier blanc, bord et encre noirs (la variante blanche de la famille) : elle tient sur des tuiles claires");
+  assert.ok(/prefetch=\{false\}/.test(corps), "la Map ne précharge pas la boutique à chaque ouverture");
   // Le cadrage des matchs laisse la bande du lettrage libre : l'étiquette y tient.
   const plan = readFileSync(join(racine, "src/components/sfl/map/carte-map.tsx"), "utf8");
   const marge = Number(/const MARGE_HAUT = (\d+);/.exec(plan)?.[1]);
   assert.ok(marge >= 120, `la bande du haut reste libre de matchs (${marge} px)`);
+  // Contrôle du 14/11 : la constante ne comptait ni l'encoche ni la hauteur
+  // d'un sticker. La page mesure la pile du coin et passe la marge ; le plan
+  // ne cadre plus jamais avec la constante seule.
+  assert.ok(/<div ref=\{coin\}/.test(coin), "la pile du coin est mesurée");
+  assert.ok(/new ResizeObserver\(mesurer\)/.test(map) && /offsetTop \+ el\.offsetHeight\) \+ HAUTEUR_REPERE/.test(map), "sa hauteur réelle, encoche comprise, plus celle d'un repère");
+  const repere = Number(/const HAUTEUR_REPERE = (\d+);/.exec(map)?.[1]);
+  assert.ok(repere >= 71, `un repère compte au moins la vignette du sticker (${repere} px)`);
+  assert.ok(/margeHaut=\{margeHaut\}/.test(map), "la marge mesurée est passée au plan");
+  assert.ok(/margeHautRef\.current = Math\.max\(MARGE_HAUT, margeHaut\)/.test(plan), "la constante reste un plancher");
+  const cadrages = plan.match(/marges\(map, [^,]+,/g) ?? [];
+  assert.ok(cadrages.length >= 4 && cadrages.every((c) => c.includes("margeHautRef.current")), "chaque cadrage prend la marge mesurée");
+  // Invisible derrière le chargement et l'accueil, elle ne prend ni le doigt ni le clavier.
+  const anim = readFileSync(join(racine, "src/app/map/animations.css"), "utf8");
+  assert.ok(/html:not\(\[data-splash="fini"\]\) \.map-etiquette,[\s\S]*?\{\s*pointer-events: none;\s*visibility: hidden;/.test(anim), "pas de lien invisible mais touchable avant son entrée");
   // Pas une couche du plan : rien dans carte-map.tsx ne pose la boutique.
   assert.ok(!/boutique/i.test(plan), "l'étiquette n'est pas un repère du plan");
 

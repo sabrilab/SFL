@@ -131,7 +131,9 @@ const ZOOM_FRANCE = 4;
 const ZOOM_MAX = 17.5;
 /** Le cadrage des matchs ne descend pas plus près que la rue. */
 const ZOOM_CADRE = 14;
-/** La place des surcouches : lettrage en haut, carrousel en bas. */
+/** La place des surcouches : lettrage en haut, carrousel en bas. Celle du
+ *  haut est un plancher : la page passe la vraie (`margeHaut`), mesurée sous
+ *  les étiquettes du coin et l'encoche, quand elle descend plus bas. */
 const MARGE_HAUT = 140;
 const MARGE_BAS = 380;
 /** Le premier vol, et l'écart entre deux stickers qui tombent. */
@@ -373,6 +375,7 @@ export function CarteMap({
   cadrerSur,
   matchsEnRetrait = false,
   margeBas = MARGE_BAS,
+  margeHaut = MARGE_HAUT,
   possibles = AUCUN_POSSIBLE,
   possibleChoisi = null,
   onPossible,
@@ -424,6 +427,8 @@ export function CarteMap({
   onPoint?: (id: string) => void;
   /** La place que prennent les surcouches du bas (moins quand le carrousel est replié). */
   margeBas?: number;
+  /** La place que prennent les surcouches du haut : aucun repère n'y est cadré (jamais moins que MARGE_HAUT). */
+  margeHaut?: number;
   className?: string;
 }) {
   const conteneur = useRef<HTMLDivElement>(null);
@@ -441,6 +446,7 @@ export function CarteMap({
   // Tout recomposer (regroupements et joueurs) : à chaque fin de zoom, et quand la liste change.
   const recomposer = useRef<() => void>(() => {});
   const margeBasRef = useRef(margeBas);
+  const margeHautRef = useRef(Math.max(MARGE_HAUT, margeHaut));
   // L'entrée de chaque sticker, en ms après `origine` (la fin du premier
   // vol). Les stickers sont refaits à chaque changement : on repose la
   // classe d'entrée, avec le retard qui reste, tant qu'elle n'est pas finie.
@@ -495,8 +501,9 @@ export function CarteMap({
     possibleRef.current = onPossible;
     vueRef.current = onVue;
     margeBasRef.current = margeBas;
+    margeHautRef.current = Math.max(MARGE_HAUT, margeHaut);
     retraitRef.current = matchsEnRetrait;
-  }, [onChoisir, onBulle, onPoint, onVille, onJoueur, onPossible, onVue, margeBas, matchsEnRetrait]);
+  }, [onChoisir, onBulle, onPoint, onVille, onJoueur, onPossible, onVue, margeBas, margeHaut, matchsEnRetrait]);
   const pointsActifs = !!onPoint;
 
   // La carte, une fois.
@@ -739,7 +746,7 @@ export function CarteMap({
     leve.current = repere(map, p.lat, p.lng, pointHtml(p.nom, variante), { classe: "ter-ancre", z: 800, actif: false });
     const h = map.getContainer().clientHeight;
     const ici = map.project([p.lng, p.lat]);
-    const cible = { x: map.getContainer().clientWidth / 2, y: Math.max(MARGE_HAUT + 50, h * 0.3) };
+    const cible = { x: map.getContainer().clientWidth / 2, y: Math.max(margeHautRef.current + 50, h * 0.3) };
     const ecart: [number, number] = [ici.x - cible.x, ici.y - cible.y];
     if (Math.abs(ecart[0]) + Math.abs(ecart[1]) > 24) map.panBy(ecart, { duration: calme() ? 0 : 650 });
   }, [possibleChoisi]);
@@ -805,7 +812,7 @@ export function CarteMap({
             return;
           }
           const b = dans.reduce((x, v) => x.extend([v.lng, v.lat]), new maplibregl.LngLatBounds([s.lng, s.lat], [s.lng, s.lat]));
-          cadrer(map, b, marges(map, MARGE_HAUT, margeBasRef.current, 90), ZOOM_MAX - 0.5, doux ? 0.9 : 0);
+          cadrer(map, b, marges(map, margeHautRef.current, margeBasRef.current, 90), ZOOM_MAX - 0.5, doux ? 0.9 : 0);
           return;
         }
         evente.current = null;
@@ -859,7 +866,7 @@ export function CarteMap({
       if (!s) return;
       const h = map.getContainer().clientHeight;
       const ici = map.project([s.lng, s.lat]);
-      const cible = { x: map.getContainer().clientWidth / 2, y: (MARGE_HAUT + Math.max(MARGE_HAUT, h - margeBasRef.current)) / 2 + 40 };
+      const cible = { x: map.getContainer().clientWidth / 2, y: (margeHautRef.current + Math.max(margeHautRef.current, h - margeBasRef.current)) / 2 + 40 };
       const ecart: [number, number] = [ici.x - cible.x, ici.y - cible.y];
       if (Math.abs(ecart[0]) + Math.abs(ecart[1]) > 24) map.panBy(ecart, { duration: doux ? 700 : 0 });
       return;
@@ -892,10 +899,10 @@ export function CarteMap({
         const survol = zone ? VOL * 1000 + PAUSE_ZONE : 0;
         origine.current = performance.now() + survol + VOL * 1000 - 250;
         volFini.current = performance.now() + survol + VOL * 1000;
-        const plonger = () => carte.current === map && cibleVol.current && cadrer(map, cibleVol.current, marges(map, MARGE_HAUT, margeBasRef.current), ZOOM_CADRE, VOL);
+        const plonger = () => carte.current === map && cibleVol.current && cadrer(map, cibleVol.current, marges(map, margeHautRef.current, margeBasRef.current), ZOOM_CADRE, VOL);
         if (!zone) return plonger();
         const b = zone.contour.reduce((x, p) => x.extend(p), new maplibregl.LngLatBounds(zone.contour[0], zone.contour[0]));
-        cadrer(map, b, marges(map, MARGE_HAUT + 60, margeBasRef.current), ZOOM_SURVOL, VOL);
+        cadrer(map, b, marges(map, margeHautRef.current + 60, margeBasRef.current), ZOOM_SURVOL, VOL);
         window.setTimeout(plonger, survol);
       };
       // Sous l'écran de chargement, puis sous l'accueil de l'app
@@ -906,7 +913,7 @@ export function CarteMap({
       else window.addEventListener(SPLASH_FINI, apresAccueil, { once: true });
     } else {
       aVole.current = true;
-      cadrer(map, boite(), marges(map, MARGE_HAUT, margeBasRef.current), ZOOM_CADRE, doux ? 0.8 : 0);
+      cadrer(map, boite(), marges(map, margeHautRef.current, margeBasRef.current), ZOOM_CADRE, doux ? 0.8 : 0);
     }
   }, [stickers, points, toi, choisi, fond, pointsActifs]);
 
@@ -1080,7 +1087,7 @@ export function CarteMap({
     const map = carte.current;
     if (!map) return;
     const duree = calme() ? 0 : 0.9;
-    const marge = marges(map, MARGE_HAUT, margeBasRef.current, 60);
+    const marge = marges(map, margeHautRef.current, margeBasRef.current, 60);
     if (!cadrerSur?.lieux.length) {
       if (ailleurs.current && maison.current) cadrer(map, maison.current, marge, ZOOM_CADRE, duree);
       ailleurs.current = false;
