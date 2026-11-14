@@ -47,6 +47,12 @@
 //       les mots de l'écran sont une liste fermée (ni sous-titre, ni texte
 //       d'aide, ni avantage écrit hors de la liste) ; une carte se voit sans
 //       script ; noir et blanc, dans la feuille comme dans les classes.
+//   9 · Bola Studio (14/11, bola-app#22) : un cinquième avantage, « Ton
+//       studio », dont le visuel est la scène du studio (la carte « Toi » sur
+//       le fond de l'affiche) et qui porte ses ballons du mois, lus dans
+//       lib/sfl/studio.ts ; le rail entre les avantages et l'offre ; les
+//       ballons sous chaque formule ; les recharges sous le bouton. Le
+//       catalogue lui-même est contrôlé par tools/studio-check.ts.
 //       Des mutants de la source sont rejoués : chaque garde doit les refuser.
 // Sans réseau : fetch est remplacé.
 //   npx tsx tools/bola-plus-check.ts
@@ -406,6 +412,9 @@ async function banc() {
     "components/sfl/bola-plus.css",
     "app/profil/bola-plus/page.tsx",
     "app/admin/activite/bola-plus.tsx",
+    "lib/sfl/studio.ts",
+    "components/sfl/studio-bola.tsx",
+    "components/sfl/studio-bola.css",
   ];
   const PAIEMENT = /stripe|paypal|lydia|sumup|mollie|adyen|checkout|apple ?pay|google ?pay|carte bancaire|\biban\b|\bcvc\b|klarna|\balma\b|\boney\b|scalapay|\bfloa\b|younited|cofidis|afterpay|clearpay/i;
   const sansPaiement = (f: string, texte: string) => {
@@ -464,18 +473,20 @@ async function banc() {
   assert.ok(!/onClick=\{annuler\}/.test(ecran), "« Annuler » passe par defaire");
 
   // 8 · Les avantages.
-  const TITRES = ["Tes maillots", "Tes matchs filmés", "Des cadeaux", "Les cérémonies officielles"];
+  const TITRES = ["Tes maillots", "Tes matchs filmés", "Des cadeaux", "Les cérémonies officielles", "Ton studio"];
   const INTERDIT = /\d|€|%|offert|gratuit|illimit|inclus|garanti|chaque|toujours|bientôt/i;
   const CHAMPS = ["alt", "id", "image", "numero", "teinte", "titre"];
   const DEPOSE = "/bola-plus/maillots-portes.webp";
   const avantagesJustes = (liste: readonly Avantage[]) => {
-    assert.deepEqual(liste.map((a) => a.titre), TITRES, "quatre avantages, dans l'ordre, aux titres exacts");
-    assert.deepEqual(liste.map((a) => a.numero), ["01", "02", "03", "04"]);
+    assert.deepEqual(liste.map((a) => a.titre), TITRES, "cinq avantages, dans l'ordre, aux titres exacts");
+    assert.deepEqual(liste.map((a) => a.numero), ["01", "02", "03", "04", "05"]);
+    // Seul « Ton studio » est la scène du studio, sur le fond de l'affiche.
+    assert.deepEqual(liste.filter((a) => a.studio).map((a) => [a.id, a.image]), [["studio", AFFICHE.image]], "« Ton studio » seul, sur le fond de l'affiche");
     assert.equal(new Set(liste.map((a) => a.id)).size, liste.length);
     for (const a of liste) {
       assert.ok(!INTERDIT.test(a.titre) && !INTERDIT.test(a.alt), `« ${a.titre} » : ni chiffre, ni prix, ni promesse`);
       assert.ok(a.titre.length <= 28, `« ${a.titre} » : 28 caractères au plus`);
-      assert.deepEqual(Object.keys(a).filter((k) => k !== "depose").sort(), CHAMPS, `« ${a.titre} » : un titre et son visuel, aucun autre texte`);
+      assert.deepEqual(Object.keys(a).filter((k) => k !== "depose" && k !== "studio").sort(), CHAMPS, `« ${a.titre} » : un titre et son visuel, aucun autre texte`);
       if (a.depose) {
         assert.equal(a.id, "maillots", "seule « Tes maillots » attend un visuel déposé");
         assert.deepEqual(Object.keys(a.depose).sort(), ["alt", "fichier"]);
@@ -513,7 +524,8 @@ async function banc() {
     }
     return total;
   };
-  const IMAGES = [AFFICHE.image, ...AVANTAGES.map((a) => a.image)];
+  // « Ton studio » reprend le fond de l'affiche (sa scène est composée par l'écran) : pas d'image à lui.
+  const IMAGES = [AFFICHE.image, ...AVANTAGES.filter((a) => !a.studio).map((a) => a.image)];
   assert.equal(new Set(IMAGES).size, 5, "cinq visuels distincts");
   const total = visuelsLa(IMAGES);
   assert.ok(total <= 1_500_000, `les visuels pèsent ${total} octets, au plus 1,5 Mo`);
@@ -568,9 +580,11 @@ async function banc() {
     assert.ok(/loading="lazy"/.test(carte) && /decoding="async"/.test(carte), "les cartes d'avantage sont chargées paresseusement");
     for (const b of [carte, affiche]) assert.ok(/width=\{LARGEUR\}/.test(b) && /height=\{HAUTEUR\}/.test(b) && /srcSet=\{sourcesVisuel\(/.test(b), "un visuel a sa largeur, sa hauteur et ses trois tailles");
     assert.ok(!/loading=/.test(affiche) && /fetchPriority="high"/.test(affiche), "l'affiche est chargée tout de suite");
-    // Une carte : son numéro, son titre, rien d'autre d'écrit.
+    // Une carte : son numéro, son titre, rien d'autre d'écrit ; « Ton studio » seule ajoute ses ballons du mois, lus dans studio.ts.
     assert.ok(/\{avantage\.numero\}/.test(carte) && /\{avantage\.titre\}/.test(carte), "la carte montre le numéro et le titre");
-    assert.equal(carte.match(/<(p|h[1-6]|span)\b/g)?.length, 2, "la carte n'écrit que le numéro et le titre");
+    assert.equal(carte.match(/<(p|h[1-6]|span)\b/g)?.length, 3, "la carte n'écrit que le numéro, le titre et les ballons du studio");
+    assert.ok(/\{avantage\.studio && <span className="bp-carte__mention tabular-nums">\{MENTION_STUDIO\}<\/span>\}/.test(carte), "les ballons du studio, seulement sur « Ton studio »");
+    assert.ok(/const studio = avantage\.studio \? <VisuelStudio alt=\{avantage\.alt\} \/> : null;/.test(carte) && /\{studio \?\? \(depose \? \(/.test(carte), "« Ton studio » montre la scène du studio, décrite");
     assert.ok(/AVANTAGES\.map\(/.test(page), "la page montre les avantages de la liste");
     // Les prix : une seule source.
     // (Hors commentaires ; « border-foreground/30 » est une opacité, pas un prix.)
@@ -621,10 +635,13 @@ async function banc() {
     assert.equal(affiche.match(/<(p|h[1-6])\b/g)?.length, 2, "l'affiche : un titre et la ligne des prix");
     assert.deepEqual(mots(carte), [], "la carte n'écrit rien en dur");
     assert.deepEqual(mots(page), [], "la page n'écrit rien en dur");
-    assert.deepEqual(balises(page), ["AfficheBolaPlus", "BarreInteret", "CarteAvantage", "OffreBolaPlus", "div", "ol"], "la page : l'affiche, les avantages de la liste, l'offre, la barre");
+    assert.deepEqual(balises(page), ["AfficheBolaPlus", "BarreInteret", "CarteAvantage", "OffreBolaPlus", "RailStudio", "div", "ol"], "la page : l'affiche, les avantages de la liste, Bola Studio, l'offre, la barre");
+    assert.ok(page.indexOf("<RailStudio />") > page.indexOf("</ol>") && page.indexOf("<RailStudio />") < page.indexOf("<div ref={offre}"), "Bola Studio entre les avantages et l'offre");
+    assert.ok(/<RechargesStudio \/>/.test(offre) && offre.indexOf("<RechargesStudio />") > offre.indexOf('className="bp-action"'), "les recharges sous le bouton de l'offre");
     assert.deepEqual(mots(barre), ["Je suis intéressé"]);
     assert.deepEqual(mots(offre), ["Annuler", "Je suis intéressé"]);
-    assert.ok(/mensuel: \{ euros: MENSUEL, par: "mois", detail: "Sans engagement" \},\s*annuel: \{ euros: ANNUEL, par: "an", detail: LIBELLE_REMISE, sous: LIBELLE_ECHEANCES \},/.test(tsx), "les deux formules : leurs prix et leurs détails, rien d'inventé");
+    assert.ok(/mensuel: \{ euros: MENSUEL, par: "mois", detail: "Sans engagement", ballons: BALLONS_FORMULE\.mensuel \},\s*annuel: \{ euros: ANNUEL, par: "an", detail: LIBELLE_REMISE, sous: LIBELLE_ECHEANCES, ballons: BALLONS_FORMULE\.annuel \},/.test(tsx), "les deux formules : leurs prix, leurs détails et leurs ballons (studio.ts), rien d'inventé");
+    assert.ok(/<span[^>]*>\{p\.ballons\}<\/span>/.test(offre) && offre.indexOf("{p.ballons}") > offre.indexOf("{p.sous"), "les ballons s'écrivent sous le prix, après les 4 fois");
     assert.ok(/\{p\.sous && <span[^>]*>\{p\.sous\}<\/span>\}/.test(offre) && offre.indexOf("{p.sous") > offre.indexOf("/ {p.par}"), "les 4 fois s'écrivent sous le prix de l'annuel");
     // Rien ne cache les prix de l'affiche ni les 4 fois, à aucune largeur.
     const CACHE = /(^|[\s:"])(hidden|sr-only|invisible|opacity-0)(?=[\s"])/;
@@ -632,7 +649,7 @@ async function banc() {
     assert.ok(ligneSous && !CACHE.test(ligneSous), "les 4 fois se voient");
     assert.ok(!CACHE.test(affiche), "les prix de l'affiche se voient");
     // « Tes maillots » : le portant d'abord ; le visuel déposé ne le remplace qu'une fois chargé.
-    assert.ok(/const \[deposeLa, setDeposeLa\] = useState\(false\);/.test(carte) && /const depose = deposeLa \? avantage\.depose : undefined;/.test(carte) && /\{depose \? \(/.test(carte), "la carte montre le portant tant que le visuel déposé n'est pas chargé");
+    assert.ok(/const \[deposeLa, setDeposeLa\] = useState\(false\);/.test(carte) && /const depose = deposeLa \? avantage\.depose : undefined;/.test(carte) && /\{studio \?\? \(depose \? \(/.test(carte), "la carte montre le portant tant que le visuel déposé n'est pas chargé");
     assert.ok(/essai\.onload = \(\) => \{\s*if \(vivant && essai\.naturalWidth > 0\) setDeposeLa\(true\);/.test(carte) && /essai\.src = fichier;/.test(carte), "le visuel déposé ne passe devant qu'une fois chargé");
     assert.ok(!/setDeposeLa\(true\)/.test(carte.replace(/essai\.onload = \(\) => \{\s*if \(vivant && essai\.naturalWidth > 0\) setDeposeLa\(true\);/, "")), "rien d'autre ne le fait passer devant");
     assert.ok(/src=\{depose\.fichier\}/.test(carte) && /alt=\{depose\.alt\}/.test(carte), "le visuel déposé a son fichier et son texte");

@@ -29,11 +29,16 @@
 // public (.gitignore le refuse) ; on ne le dépose qu'en local, pour les
 // captures. Sa mise en ligne attend l'accord écrit des joueurs pour cette
 // image et un autre chemin que le dépôt (le stockage de l'app). Image
-// générée : son texte de remplacement le dit. Quatre avantages, ceux que
+// générée : son texte de remplacement le dit. Cinq avantages, ceux que
 // Sabri a dits, dans ses mots : « ils auront des maillots », « on va filmer
-// les matchs », « ils auront des cadeaux », « cérémonies officielles ». Un
-// titre et rien d'autre : ni chiffre, ni date, ni phrase dessous. En ajouter
-// un demande son accord.
+// les matchs », « ils auront des cadeaux », « cérémonies officielles », et
+// depuis le 14/11 (bola-app#22) « Ton studio », les ballons du mois pour
+// Bola Studio (lib/sfl/studio.ts). Un titre et rien d'autre : ni chiffre, ni
+// date, ni phrase dessous ; seule « Ton studio » porte, à droite du titre,
+// ses ballons du mois (« 300 ⚽ / mois », écrits dans studio.ts), comme Sabri
+// l'a demandé. Son visuel n'est pas une image : la vraie carte « Toi » posée
+// dans le stade (studio-bola.tsx, VisuelStudio), sur le fond de l'affiche.
+// En ajouter un demande son accord.
 //
 // Pur : ni React ni réseau (tools/bola-plus-check.ts).
 
@@ -173,6 +178,8 @@ export interface Avantage extends Visuel {
   numero: string;
   titre: string;
   depose?: VisuelDepose;
+  /** « Ton studio » : son visuel est la scène du studio (la carte « Toi » dans le stade), et il porte ses ballons du mois. */
+  studio?: true;
 }
 
 /** L'affiche d'ouverture : le stade de Bola, la nuit. */
@@ -191,6 +198,7 @@ export const AVANTAGES: readonly Avantage[] = [
   { id: "matchs-filmes", numero: "02", titre: "Tes matchs filmés", image: "matchs-filmes", alt: "Une caméra au bord du terrain", teinte: "#4d4d4d" },
   { id: "cadeaux", numero: "03", titre: "Des cadeaux", image: "cadeaux", alt: "Un écrin noir fermé, posé sur du marbre", teinte: "#3e3e3e" },
   { id: "ceremonies", numero: "04", titre: "Les cérémonies officielles", image: "ceremonies", alt: "Un podium de marbre au centre du terrain", teinte: "#343434" },
+  { id: "studio", numero: "05", titre: "Ton studio", image: "affiche", alt: "Ta carte au milieu du stade, dans un cadre de prise de vue", teinte: "#3a3a3a", studio: true },
 ];
 
 /** L'adresse d'un visuel à une largeur donnée. */

@@ -1,0 +1,225 @@
+/* Bola Studio (studio-bola.tsx) : le rail des templates, leurs vignettes,
+   le visuel de « Ton studio », les recharges. Les vignettes sont des îlots
+   sombres, en noir et blanc, comme les cartes d'avantage (bola-plus.css).
+   Le rail s'accroche carte par carte (scroll-snap) ; une vignette vidéo
+   avance lentement son cadrage (st-cadrage) ; avec « Réduire les
+   animations », tout est fixe (fin du fichier). */
+
+/* ── Le rail ── */
+.st {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding-top: 34px;
+}
+.st-rail {
+  display: flex;
+  gap: 12px;
+  margin: 0;
+  padding: 0 20px 4px;
+  list-style: none;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x mandatory;
+  scroll-padding-inline: 20px;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.st-rail::-webkit-scrollbar {
+  display: none;
+}
+.st-item {
+  flex: 0 0 auto;
+  width: min(216px, 58vw);
+  scroll-snap-align: start;
+}
+.st-item__bouton {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  text-align: left;
+  -webkit-tap-highlight-color: transparent;
+}
+.st-item__bouton:active .st-scene {
+  scale: 0.98;
+}
+.st-item__bouton:focus-visible {
+  outline: 2px solid var(--foreground);
+  outline-offset: 4px;
+  border-radius: 22px;
+}
+
+/* ── Une vignette : le visuel recadré, les cartes posées dessus. ── */
+.st-scene {
+  position: relative;
+  aspect-ratio: 4 / 5;
+  overflow: hidden;
+  border-radius: 20px;
+  background: rgb(40 40 40);
+  color: #fff;
+  isolation: isolate;
+  transition: scale 0.2s ease;
+}
+.st-scene--grand {
+  border-radius: 24px;
+}
+.st-scene--plein {
+  position: absolute;
+  inset: 0;
+  aspect-ratio: auto;
+  border-radius: 0;
+}
+.st-scene__fond {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: var(--x) var(--y);
+  transform-origin: var(--x) var(--y);
+  scale: var(--z);
+  user-select: none;
+  -webkit-user-drag: none;
+}
+/* Un voile bas, pour que les cartes se détachent du gazon ; un liseré. */
+.st-scene::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(to top, rgb(0 0 0 / 0.38) 0%, transparent 34%);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.09);
+}
+.st-scene__cartes {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+}
+.st-carte {
+  position: absolute;
+  display: block;
+  filter: drop-shadow(0 10px 14px rgb(0 0 0 / 0.55));
+}
+.st-carte__dessin {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: block;
+  transform-origin: 0 0;
+}
+
+/* « La Une » : le logo en tête, comme le titre d'un magazine. */
+.st-une__logo {
+  position: absolute;
+  top: 7%;
+  left: 50%;
+  width: 62%;
+  translate: -50% 0;
+  user-select: none;
+}
+/* Le ballon : le symbole Bola, en haut à droite, au bout de sa course. */
+.st-ballon {
+  position: absolute;
+  top: 14%;
+  right: 16%;
+  width: 17%;
+  filter: drop-shadow(0 6px 10px rgb(0 0 0 / 0.6));
+  user-select: none;
+}
+.st-ballon--milieu {
+  top: 13%;
+  right: auto;
+  left: 50%;
+  width: 15%;
+  translate: -50% 0;
+}
+/* La compo : cinq cartes en rang, la face au milieu. */
+.st-rang {
+  position: absolute;
+  right: 0;
+  bottom: 34%;
+  left: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 2px;
+}
+.st-rang .st-carte {
+  filter: drop-shadow(0 6px 8px rgb(0 0 0 / 0.5));
+}
+/* « Ta saison » : trois plans. */
+.st-trois {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2px;
+  background: #000;
+}
+.st-trois > span {
+  position: relative;
+  overflow: hidden;
+}
+
+/* Une vidéo : le cadrage avance lentement, et revient. */
+.st-scene[data-video] .st-scene__fond {
+  animation: st-cadrage var(--duree, 8s) ease-in-out infinite alternate;
+}
+@keyframes st-cadrage {
+  from {
+    scale: var(--z);
+  }
+  to {
+    scale: calc(var(--z) * 1.12);
+  }
+}
+
+/* ── « Ton studio » : la scène plein cadre et les coins de repère. ── */
+.st-visuel {
+  position: absolute;
+  inset: 0;
+}
+.st-reperes {
+  position: absolute;
+  inset: 16% 10% 20%;
+  z-index: 1;
+  pointer-events: none;
+  --t: 1.5px;
+  --c: 22px;
+  background:
+    linear-gradient(#fff, #fff) top left / var(--c) var(--t),
+    linear-gradient(#fff, #fff) top left / var(--t) var(--c),
+    linear-gradient(#fff, #fff) top right / var(--c) var(--t),
+    linear-gradient(#fff, #fff) top right / var(--t) var(--c),
+    linear-gradient(#fff, #fff) bottom left / var(--c) var(--t),
+    linear-gradient(#fff, #fff) bottom left / var(--t) var(--c),
+    linear-gradient(#fff, #fff) bottom right / var(--c) var(--t),
+    linear-gradient(#fff, #fff) bottom right / var(--t) var(--c);
+  background-repeat: no-repeat;
+  opacity: 0.78;
+}
+.bp-carte__mention {
+  position: absolute;
+  z-index: 1;
+  right: 20px;
+  bottom: 22px;
+  font-size: 13px;
+  line-height: 1;
+  font-weight: 700;
+  color: rgb(255 255 255 / 0.78);
+}
+
+/* ── Les recharges : montrées, pas encore en vente. ── */
+.st-recharge {
+  opacity: 0.62;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .st-scene,
+  .st-scene[data-video] .st-scene__fond {
+    animation: none;
+    transition: none;
+  }
+}

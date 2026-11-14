@@ -21,8 +21,8 @@
   background: var(--teinte);
   color: #fff;
 }
-.bp-affiche img,
-.bp-carte img {
+.bp-affiche > img,
+.bp-carte > img {
   position: absolute;
   inset: 0;
   width: 100%;

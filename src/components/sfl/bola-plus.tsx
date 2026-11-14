@@ -11,15 +11,23 @@
 //     nouveautés ou la présentation d'un passe). De haut en bas :
 //       – AfficheBolaPlus : le stade de Bola la nuit, bord à bord, le retour,
 //         le nom et les deux prix ;
-//       – quatre CarteAvantage, une sous l'autre : un avantage par carte, son
+//       – cinq CarteAvantage, une sous l'autre : un avantage par carte, son
 //         visuel plein cadre, son numéro, son titre. Rien d'autre. « Tes
 //         maillots » montre d'abord le portant ; les maillots portés
 //         (Avantage.depose, un fichier gardé hors du dépôt) ne prennent sa
-//         place qu'une fois chargés : absents, rien ne bouge ni ne reste vide ;
+//         place qu'une fois chargés : absents, rien ne bouge ni ne reste vide.
+//         « Ton studio » (14/11, bola-app#22) : la vraie carte « Toi » dans le
+//         stade (studio-bola.tsx, VisuelStudio), et ses ballons du mois à
+//         droite du titre (lib/sfl/studio.ts) ;
+//       – RailStudio : « Bola Studio », les douze templates en rail, payés en
+//         ballons (studio-bola.tsx) ;
 //       – OffreBolaPlus : l'emblème, les deux formules à toucher (Mensuel
 //         19,90 € par mois, sans engagement ; Annuel 168,90 € par an, −29 %,
-//         et dessous « 4 × 42,23 € sans frais » ; retour du 13/11 01:44), puis
-//         « Je suis intéressé ». Le bouton marche avec ou sans formule ; une
+//         et dessous « 4 × 42,23 € sans frais » ; retour du 13/11 01:44 ;
+//         sous chaque prix, ses ballons : « 300 ⚽ / mois », et pour l'annuel
+//         « + 1 000 ⚽ offerts », lus dans lib/sfl/studio.ts), puis
+//         « Je suis intéressé », puis les recharges de ballons, « Bientôt »
+//         (RechargesStudio, sans geste). Le bouton marche avec ou sans formule ; une
 //         fois touché, il laisse la place à « C'est noté » et à « Annuler ».
 //         Les formules restent touchables : en toucher une change la formule
 //         notée. Après « Annuler », plus rien n'est coché. Au clavier : les
@@ -75,7 +83,9 @@ import {
   type Avantage,
   type Formule,
 } from "@/lib/sfl/bola-plus";
+import { BALLONS_FORMULE, MENTION_STUDIO } from "@/lib/sfl/studio";
 import { cn } from "@/lib/utils";
+import { RailStudio, RechargesStudio, VisuelStudio } from "@/components/sfl/studio-bola";
 import "@/components/sfl/ma-carte/rubriques.css";
 import "./bola-plus.css";
 
@@ -135,10 +145,10 @@ export function TuileBolaPlus() {
   );
 }
 
-/** Chaque formule : son prix, sa période, son détail à droite, et la ligne sous le prix (les 4 fois de l'annuel). */
-const PRIX: Record<Formule, { euros: string; par: string; detail: string; sous?: string }> = {
-  mensuel: { euros: MENSUEL, par: "mois", detail: "Sans engagement" },
-  annuel: { euros: ANNUEL, par: "an", detail: LIBELLE_REMISE, sous: LIBELLE_ECHEANCES },
+/** Chaque formule : son prix, sa période, son détail à droite, la ligne sous le prix (les 4 fois de l'annuel) et ses ballons. */
+const PRIX: Record<Formule, { euros: string; par: string; detail: string; sous?: string; ballons: string }> = {
+  mensuel: { euros: MENSUEL, par: "mois", detail: "Sans engagement", ballons: BALLONS_FORMULE.mensuel },
+  annuel: { euros: ANNUEL, par: "an", detail: LIBELLE_REMISE, sous: LIBELLE_ECHEANCES, ballons: BALLONS_FORMULE.annuel },
 };
 
 /** L'offre : l'emblème, les deux formules, « Je suis intéressé ». */
@@ -227,6 +237,7 @@ export function OffreBolaPlus({
                   <span className="text-corps font-medium text-encre-2">/ {p.par}</span>
                 </span>
                 {p.sous && <span className="text-[13px] leading-tight font-medium text-encre-2 tabular-nums">{p.sous}</span>}
+                <span className="text-[13px] leading-tight font-semibold text-foreground tabular-nums">{p.ballons}</span>
               </span>
               <span className="text-right text-corps leading-tight font-semibold text-encre-2 max-[359px]:w-min min-[360px]:whitespace-nowrap">{p.detail}</span>
               <span
@@ -267,6 +278,8 @@ export function OffreBolaPlus({
           </button>
         )}
       </div>
+
+      <RechargesStudio />
     </div>
   );
 }
@@ -339,6 +352,8 @@ function CarteAvantage({ avantage }: { avantage: Avantage }) {
   // garde son visuel, sans trou ni attente.
   const [deposeLa, setDeposeLa] = useState(false);
   const depose = deposeLa ? avantage.depose : undefined;
+  // « Ton studio » : la scène du studio (la carte « Toi » dans le stade) à la place d'une image.
+  const studio = avantage.studio ? <VisuelStudio alt={avantage.alt} /> : null;
 
   useEffect(() => {
     const fichier = avantage.depose?.fichier;
@@ -377,7 +392,7 @@ function CarteAvantage({ avantage }: { avantage: Avantage }) {
 
   return (
     <li ref={ref} className="bp-carte dark" data-attend={etat === "attend" ? "" : undefined} data-vue={etat === "vue" ? "" : undefined} style={{ ["--teinte" as string]: avantage.teinte }}>
-      {depose ? (
+      {studio ?? (depose ? (
         // Déjà chargé (l'essai ci-dessus) : il prend la place du portant.
         // eslint-disable-next-line @next/next/no-img-element -- un seul fichier déposé, sans tailles
         <img
@@ -402,11 +417,12 @@ function CarteAvantage({ avantage }: { avantage: Avantage }) {
           decoding="async"
           draggable={false}
         />
-      )}
+      ))}
       <span className="bp-carte__numero tabular-nums" style={{ fontFamily: ANTON }} aria-hidden>
         {avantage.numero}
       </span>
       <h2 className="bp-carte__titre titre-lettrage">{avantage.titre}</h2>
+      {avantage.studio && <span className="bp-carte__mention tabular-nums">{MENTION_STUDIO}</span>}
     </li>
   );
 }
@@ -465,6 +481,7 @@ export function PageBolaPlus() {
           <CarteAvantage key={a.id} avantage={a} />
         ))}
       </ol>
+      <RailStudio />
       <div ref={offre} className="bp-offre">
         <OffreBolaPlus plus={plus} choix={choix} onChoix={setChoix} actionRef={actionRef} />
       </div>
