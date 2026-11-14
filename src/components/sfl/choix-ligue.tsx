@@ -18,7 +18,7 @@
 // hauteur égale, les lettres de SFL et de BOLA ont la même taille.
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { ChevronDown } from "lucide-react";
 import { BoutonRecherche } from "@/components/layout/bouton-recherche";
 import { cn } from "@/lib/utils";
@@ -87,7 +87,7 @@ export function EnteteLigue({ actif, className, children }: { actif: Actif; clas
     <div className={cn("flex items-center justify-between", className)}>
       {horsSfl ? (
         <span className="flex items-center py-1.5 text-foreground">
-          <SigleLigue ligue="bola" hauteur={22} />
+          {actif === "/bola-team" ? <LogoTeam enTete /> : <SigleLigue ligue="bola" hauteur={22} />}
         </span>
       ) : (
       <div ref={ref} className="relative">
@@ -98,7 +98,7 @@ export function EnteteLigue({ actif, className, children }: { actif: Actif; clas
           onClick={() => setOuvert((o) => !o)}
           className="flex items-center gap-2 py-1.5 text-foreground"
         >
-          <SigleLigue ligue={ici.ligue} hauteur={22} />
+          {actif === "/bola-team" ? <LogoTeam enTete /> : <SigleLigue ligue={ici.ligue} hauteur={22} />}
           <ChevronDown className={cn("size-[18px] opacity-50 transition-transform", ouvert && "rotate-180")} />
         </button>
         {ouvert && (
@@ -135,19 +135,51 @@ export function EnteteLigue({ actif, className, children }: { actif: Actif; clas
   );
 }
 
+/** Le logo Bola Team (tools/logo-bola-team.ts, 14/11) : trois pistes que
+ *  Sabri départage. `l` : largeur pour 1 de haut ; `k` : hauteur pour 1 de
+ *  hauteur demandée, pour que les lettres de BOLA gardent la taille du sigle
+ *  Bola voisin (le bloc a deux lignes, l'insigne est un écu) ; `entete` :
+ *  sa hauteur dans l'en-tête des ligues, à côté du filtre Joueurs / Équipes. */
+const PISTES_TEAM = {
+  mot: { src: "/bola/team-mot.svg", l: 2101 / 237, k: 1, entete: 14 },
+  bloc: { src: "/bola/team-bloc.svg", l: 1233 / 410.1, k: 410.1 / 237, entete: 18 },
+  insigne: { src: "/bola/team-insigne.svg", l: 96 / 110, k: 1.9, entete: 18 },
+} as const;
+type PisteTeam = keyof typeof PISTES_TEAM;
+
+// Aperçu seulement, le temps du choix : ?logo-team=mot|bloc|insigne, retenu
+// sur l'appareil. À retirer avec les deux pistes écartées.
+const CLE_PISTE = "bola-logo-team";
+function lirePiste(): PisteTeam {
+  try {
+    const q = new URLSearchParams(window.location.search).get("logo-team");
+    if (q && q in PISTES_TEAM) localStorage.setItem(CLE_PISTE, q);
+    const v = localStorage.getItem(CLE_PISTE);
+    return v && v in PISTES_TEAM ? (v as PisteTeam) : "mot";
+  } catch {
+    return "mot";
+  }
+}
+const usePisteTeam = () => useSyncExternalStore(() => () => {}, lirePiste, () => "mot" as PisteTeam);
+
+/** Le logo Bola Team, à la couleur du texte. */
+export function LogoTeam({ hauteur = 12, enTete, className }: { hauteur?: number; enTete?: boolean; className?: string }) {
+  const p = PISTES_TEAM[usePisteTeam()];
+  const h = (enTete ? p.entete : hauteur) * p.k;
+  return (
+    <span
+      role="img"
+      aria-label="Bola Team"
+      className={cn("inline-block shrink-0 bg-current align-middle", className)}
+      style={{ height: h, width: p.l * h, mask: `url(${p.src}) center / contain no-repeat`, WebkitMask: `url(${p.src}) center / contain no-repeat` }}
+    />
+  );
+}
+
 /** Le sigle de la ligue d'un match (Map, fiche, ouverture d'un match) : le
- *  logo SFL ou Bola, à la couleur du texte ; Team, c'est « Bola Team » : le
- *  logo Bola suivi de TEAM (Sabri, 22/10). */
+ *  logo SFL, Bola ou Bola Team, à la couleur du texte. */
 export function SigleLigue({ ligue, hauteur = 12, className }: { ligue: "sfl" | "bola" | "team"; hauteur?: number; className?: string }) {
-  if (ligue === "team")
-    return (
-      <span role="img" aria-label="Bola Team" className={cn("inline-flex shrink-0 items-center", className)} style={{ gap: hauteur * 0.3 }}>
-        <SigleLigue ligue="bola" hauteur={hauteur} />
-        <span aria-hidden className="font-sans font-black tracking-[0.04em] uppercase italic" style={{ fontSize: hauteur * 0.95, lineHeight: `${hauteur}px` }}>
-          Team
-        </span>
-      </span>
-    );
+  if (ligue === "team") return <LogoTeam hauteur={hauteur} className={className} />;
   const b = BADGES[ligue === "sfl" ? 0 : 1];
   return (
     <span
