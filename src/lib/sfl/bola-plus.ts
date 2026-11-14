@@ -44,9 +44,13 @@
 // 13/11 01:45) : un seul fichier, public/bola-plus/maillots-portes.webp
 // (1170 px, 4:5), qui montre de vrais joueurs : il ne va jamais dans ce dépôt,
 // qui est public (.gitignore le refuse) ; absent, la carte garde le portant.
-// Les visuels générés le disent dans leur texte de remplacement.
+// Les visuels générés le disent dans leur texte de remplacement. Les
+// variables de la part Bola Plus (VARIABLES_PLUS) et la carte « Toi »
+// (CARTE_TOI) sont écrites ici une fois, pour la page et pour Bola Studio.
 //
 // Pur : ni React ni réseau (tools/bola-plus-check.ts).
+
+import type { Stats } from "./engine";
 
 /** Le prix du mois, en centimes : 19,90 €. */
 export const MENSUEL_CENTIMES = 1990;
@@ -229,6 +233,31 @@ export const PALETTE = {
   prix: "#D9FF3F",
   nuit: "#0A0A12",
 } as const;
+
+/**
+ * Les couleurs de la part Bola Plus en variables CSS : posées par la page
+ * (avec la SFL, le prix et la nuit) et par le panneau Bola Studio, porté hors
+ * de la page (studio-bola.tsx). Une seule table pour les deux.
+ */
+export const VARIABLES_PLUS = {
+  "--bp-plus-fond": PALETTE.plus.fond,
+  "--bp-plus-haut": PALETTE.plus.haut,
+  "--bp-plus-vif": PALETTE.plus.vif,
+  "--bp-plus-clair": PALETTE.plus.clair,
+  "--bp-plus-encre": PALETTE.plus.encre,
+  "--bp-plus-papier": PALETTE.plus.fondClair,
+} as const;
+
+/**
+ * La carte « Toi » de la page : une carte anonyme qui a déjà joué (sans nom
+ * ni photo), la même sur « Ta carte continue. » et dans les vignettes de
+ * Bola Studio. La note se calcule (ovr, engine.ts), elle ne s'écrit pas.
+ */
+export const CARTE_TOI = {
+  name: "Toi",
+  position: "ATT",
+  stats: { VIT: 76, TIR: 76, PAS: 77, DRI: 79, DEF: 75, PHY: 77 },
+} as const satisfies { name: string; position: string; stats: Stats };
 
 /** Les teintes réservées aux cartes de joueur (finitions-carte.ts) : la page s'en tient loin. */
 export const TEINTES_RESERVEES = { mvp: "#C99733", impact: "#E0262E", defensive: "#2A6AE6" } as const;

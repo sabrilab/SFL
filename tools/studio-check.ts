@@ -31,8 +31,8 @@
 //       entier) ; une recharge montre ses ballons (pas ses centimes) et son
 //       prix, sans geste ni focus ;
 //   7 · le raccord au carrousel Bola Plus (14/11) : « Ton studio » est un
-//       seul bouton (l'éventail des trois templates d'EVENTAIL_STUDIO, le
-//       trash talk au milieu, « Bola Studio » et le nombre de templates), lu
+//       seul bouton (l'éventail des trois templates d'EVENTAIL_STUDIO, la
+//       carte en vrai au milieu, « Bola Studio » et le nombre, décoratif), lu
 //       en entier (pas d'aria-label), qui ouvre le panneau ; sous le titre,
 //       les ballons du mois ; le panneau porte la phrase, le rail des douze et
 //       les recharges, et pousse la fiche d'un template dans la même feuille ;
@@ -43,7 +43,7 @@ import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { BALLONS_PAR_EURO } from "../src/lib/sfl/ballons";
-import { LARGEURS, fichierVisuel } from "../src/lib/sfl/bola-plus";
+import { CARTE_TOI, LARGEURS, PALETTE, VARIABLES_PLUS, fichierVisuel } from "../src/lib/sfl/bola-plus";
 import {
   BALLONS_FORMULE,
   BALLONS_PAR_MOIS,
@@ -126,11 +126,14 @@ const phraseJuste = (phrase: (budget: number, c: readonly Template[]) => string)
 };
 phraseJuste(equivalence);
 assert.deepEqual(BALLONS_FORMULE, { mensuel: `300${NB}⚽ / mois`, annuel: `300${NB}⚽ / mois + 1${FIN}000${NB}⚽${NB}offerts` }, "« offerts » ne part pas seul à la ligne");
-// L'éventail de « Ton studio » : trois vrais templates, le trash talk au milieu.
+// L'éventail de « Ton studio » : trois vrais templates qui se lisent en petit. Au milieu, la carte entière
+// (« Ma carte en vrai ») ; ni le trash talk (carte coupée, adversaire flou) ni L'entrée (des colonnes, personne).
+const ILLISIBLES_EN_PETIT = ["trash-talk", "entree"];
 const eventailJuste = (ids: readonly string[]) => {
   assert.equal(ids.length, 3, "trois templates en éventail");
   assert.equal(new Set(ids).size, 3, "trois templates différents");
-  assert.equal(ids[1], "trash-talk", "le trash talk au milieu");
+  assert.equal(ids[1], "carte-en-vrai", "la carte en vrai au milieu");
+  for (const id of ids) assert.ok(!ILLISIBLES_EN_PETIT.includes(id), `${id} : ne se lit pas en vignette`);
   for (const id of ids) assert.ok(TEMPLATES.some((t) => t.id === id), `${id} : un template du catalogue`);
 };
 eventailJuste(EVENTAIL_STUDIO);
@@ -174,18 +177,20 @@ const ecran = lire("components/sfl/studio-bola.tsx");
 const page = lire("components/sfl/bola-plus.tsx");
 const feuille = lire("components/sfl/studio-bola.css");
 const source = lire("lib/sfl/studio.ts");
-const NOMBRES = /(?<![\w.[-])(49|79|99|199|299|399|499|599|300|1000|1100|2400|500|499|999|1999)(?![\w\]%])|\d+\s*(⚽|&nbsp;⚽)|4,99|9,99|19,99/;
-// Dans la page Bola Plus (qui a ses propres chiffres : les stats de la carte « Toi », la taille du logo), on cherche les ballons seulement.
-const BALLONS_PAGE = /(?<![\w.[-])(300|1100|2400)(?![\w\]%])|\d+\s*(⚽|&nbsp;⚽)/;
+const NOMBRES = /(?<![\w.[-])(49|79|99|199|299|399|499|599|300|1000|1100|2400|500|499|999|1999)(?![\w\]%])|\d+\s*(⚽|&nbsp;⚽)|(?<![\w.,])1(?:[\s\u00a0\u202f]|&nbsp;)000(?![\w\]%])|4,99|9,99|19,99/;
 const uneSource = (nom: string, t: string, nombres: RegExp = NOMBRES) => {
   const code = sansNotes(t).replace(/\[[\d.]+(px|em|%)?\]/g, "").replace(/-\[[^\]]*\]/g, "");
   const trouve = nombres.exec(code);
   assert.equal(trouve, null, `${nom} écrit un prix ou des ballons en dur : ${trouve?.[0]}`);
 };
 uneSource("studio-bola.tsx", ecran);
-// La lune de l'emblème (300 / 236) est une proportion du dos de la carte, pas des ballons.
-const pageSansLune = page.replace("const LUNE = (300 / 236) * ROSACE.r1;", "");
-uneSource("bola-plus.tsx", pageSansLune, BALLONS_PAGE);
+// La page Bola Plus a deux chiffres à elle, retirés mot pour mot (et seulement ceux-là) : la lune de l'emblème
+// (300 / 236, une proportion du dos de la carte) et la taille du logo (1000 × 237). Les stats de « Toi » sont
+// dans CARTE_TOI (lib/sfl/bola-plus.ts). Tout le reste passe par NOMBRES, le même garde que l'écran du studio.
+const NEUTRES_PAGE = ["const LUNE = (300 / 236) * ROSACE.r1;", "width={1000} height={237}"];
+for (const n of NEUTRES_PAGE) assert.equal(page.split(n).length, 2, `la page porte une fois et une seule : ${n}`);
+const pageSansLune = NEUTRES_PAGE.reduce((t, n) => t.replace(n, ""), page);
+uneSource("bola-plus.tsx", pageSansLune);
 const INTERDIT = /stripe|paypal|checkout|apple ?pay|google ?pay|carte bancaire|klarna|higgsfield|magnific|fetch\(|supabase|localStorage|spendBallons|addBallons|getBalance|acheter|payer/i;
 const propre = (nom: string, t: string) => {
   const trouve = INTERDIT.exec(sansNotes(t));
@@ -208,7 +213,20 @@ const PUBLIC = join(__dirname, "..", "public");
 for (const t of TEMPLATES) for (const l of LARGEURS) assert.ok(existsSync(join(PUBLIC, fichierVisuel(t.scene.fond, l))), `${t.nom} : ${fichierVisuel(t.scene.fond, l)}`);
 for (const f of ["bola/logo-blanc.svg", "bola/symbole-blanc.svg"]) assert.ok(existsSync(join(PUBLIC, f)), f);
 assert.ok(/<BolaCard \{\.\.\.TOI\}/.test(ecran) && /<DosCarte /.test(ecran), "la vraie carte « Toi », face et dos");
-assert.ok(/const TOI = \{ name: "Toi", position: "MC", overall: 75 \} as const;/.test(ecran) && !/photo=|username=/.test(ecran), "une carte anonyme : « Toi », sans photo ni pseudo");
+assert.ok(/const TOI = \{ name: CARTE_TOI\.name, position: CARTE_TOI\.position, overall: ovr\(CARTE_TOI\.stats\) \};/.test(ecran) && /stats=\{CARTE_TOI\.stats\}/.test(ecran) && !/photo=|username=/.test(ecran), "une carte anonyme : « Toi », sans photo ni pseudo, la même que dans le carrousel");
+const toiJuste = (src: string) => {
+  assert.ok(!/(?:VIT|TIR|PAS|DRI|DEF|PHY):\s*\d/.test(sansNotes(src)), "les stats de « Toi » ne s'écrivent que dans CARTE_TOI");
+  assert.ok(/stats=\{CARTE_TOI\.stats\}/.test(src) && /ovr\(CARTE_TOI\.stats\)/.test(src), "« Toi » : CARTE_TOI et sa note calculée");
+};
+toiJuste(ecran);
+toiJuste(page);
+assert.equal(CARTE_TOI.name, "Toi", "la carte « Toi » est anonyme");
+// Les variables de Bola Plus, clé par clé : chaque teinte de PALETTE.plus, une fois, rien d'autre.
+const variablesJustes = (v: Record<string, string>) => {
+  const attendu: Record<string, string> = Object.fromEntries(Object.entries(PALETTE.plus).map(([k, c]) => [`--bp-plus-${k === "fondClair" ? "papier" : k}`, c]));
+  assert.deepEqual({ ...v }, attendu, "VARIABLES_PLUS : les six teintes de PALETTE.plus, clé par clé");
+};
+variablesJustes(VARIABLES_PLUS);
 const feuilleJuste = (css: string) => {
   const reduit = /@media \(prefers-reduced-motion: reduce\) \{([\s\S]*)\}\s*$/.exec(css)?.[1] ?? "";
   assert.ok(/\.st-scene\[data-video\] \.st-scene__fond[^{]*\{[^}]*animation: none;/.test(reduit), "mouvement réduit : le cadrage d'une vidéo s'arrête");
@@ -260,12 +278,13 @@ const ecranJuste = (tsx: string) => {
   assert.ok(/<FicheTemplate t=\{fiche\} onFermer=\{\(\) => setFiche\(null\)\} \/>/.test(contenu), "la fiche est poussée dans le panneau");
   // Le panneau et la fiche, portés hors de la page, reçoivent les couleurs de Bola Plus.
   assert.ok(/<SheetContent side="bottom" className=\{FEUILLE_STUDIO\} style=\{COULEURS_STUDIO\}>/.test(panneau) && /<SheetContent side="bottom" className=\{FEUILLE_STUDIO\} style=\{COULEURS_STUDIO\}>/.test(fiche), "le panneau et la fiche ont les couleurs de Bola Plus");
-  assert.ok(/"--bp-plus-vif": PALETTE\.plus\.vif,/.test(tsx) && /"--bp-plus-fond": PALETTE\.plus\.fond,/.test(tsx), "les couleurs viennent de PALETTE");
+  assert.ok(/const COULEURS_STUDIO = VARIABLES_PLUS as CSSProperties;/.test(tsx) && !/"--bp-/.test(sansNotes(tsx)), "le panneau pose VARIABLES_PLUS, sans recopier une variable");
   // « Ton studio » : un seul bouton, lu en entier, qui ouvre le panneau ; les ballons du mois sous le titre.
   const visuel = bloc(tsx, "VisuelStudio");
   assert.equal(visuel.match(/<button\b/g)?.length, 1, "« Ton studio » : un seul bouton");
   assert.ok(/<button type="button" className="st-eventail" onClick=\{\(\) => setOuvert\(true\)\}>/.test(visuel), "le bouton ouvre le panneau, sans aria-label (il se lit en entier)");
   assert.ok(/EVENTAIL\.map\(/.test(visuel) && /<SceneStudio /.test(visuel) && /\{TEMPLATES\.length\}/.test(visuel), "l'éventail, et le nombre de templates");
+  assert.ok(/<span className="st-eventail__nombre tabular-nums" aria-hidden>\s*\{TEMPLATES\.length\}/.test(visuel), "le nombre de templates, décoratif : le bouton se lit « Bola Studio », pas « Bola Studio 12 »");
   assert.ok(/<PanneauStudio ouvert=\{ouvert\} onFermer=\{\(\) => setOuvert\(false\)\} \/>/.test(visuel), "le panneau est branché");
   assert.ok(/<p className="bp-texte__sous st-mention tabular-nums">\{MENTION_STUDIO\}<\/p>/.test(bloc(tsx, "MentionStudio")), "les ballons du mois sous le titre");
   const rech = tsx.slice(tsx.indexOf("export function RechargesStudio("));
@@ -318,16 +337,21 @@ refuse("une recharge sous le taux", () => rechargesJustes(RECHARGES_STUDIO.map((
 refuse("une recharge moins généreuse que la précédente", () => rechargesJustes(RECHARGES_STUDIO.map((r, i) => (i === 2 ? { ...r, ballons: 2100 } : r))));
 refuse("un prix en dur dans l'écran", () => uneSource("écran", ecran.replace("{prixDe(t)}", "299&nbsp;⚽")));
 assert.ok(pageSansLune.includes("{BALLONS_FORMULE[f]}") && ecran.includes("{prixDe(t)}") && ecran.includes("{MENTION_STUDIO}"), "les mutants de source ont prise");
-refuse("des ballons en dur dans la page", () => uneSource("page", pageSansLune.replace("{BALLONS_FORMULE[f]}", "300 ⚽ / mois"), BALLONS_PAGE));
-refuse("les offerts de l'annuel en dur dans la page", () => uneSource("page", pageSansLune.replace("{BALLONS_FORMULE[f]}", '{f === "annuel" ? "+ 1 000 ⚽ offerts" : ""}'), BALLONS_PAGE));
+refuse("des ballons en dur dans la page", () => uneSource("page", pageSansLune.replace("{BALLONS_FORMULE[f]}", "300 ⚽ / mois")));
+refuse("les offerts de l'annuel en dur dans la page", () => uneSource("page", pageSansLune.replace("{BALLONS_FORMULE[f]}", '{f === "annuel" ? "+ 1 000 ⚽ offerts" : ""}')));
+assert.ok(pageSansLune.includes("const COMPOSANTS"), "le mutant du studio a prise");
+refuse("« + 1000 offerts » en dur sous « Ton studio »", () => uneSource("page", pageSansLune.replace("const COMPOSANTS", 'const X = <span>{"+ 1000 offerts"}</span>;\nconst COMPOSANTS')));
+refuse("« 1 000 offerts à l'annuel » en dur", () => uneSource("page", pageSansLune.replace("const COMPOSANTS", 'const X = <span>{"1 000 offerts à l\'annuel"}</span>;\nconst COMPOSANTS')));
 refuse("les ballons du mois en dur sous « Ton studio »", () => uneSource("écran", ecran.replace("{MENTION_STUDIO}", "300 ⚽ / mois")));
 // Le raccord au carrousel.
 const mf = (de: string, vers: string) => {
   assert.ok(feuille.includes(de), `le mutant a prise : ${de.slice(0, 40)}`);
   return feuille.replace(de, vers);
 };
-refuse("l'éventail sans le trash talk au milieu", () => eventailJuste(["maillot-a-ton-nom", "entree", "trash-talk"]));
-refuse("l'éventail d'un template inconnu", () => eventailJuste(["maillot-a-ton-nom", "trash-talk", "absent"]));
+refuse("l'éventail sans la carte en vrai au milieu", () => eventailJuste(["carte-en-vrai", "maillot-a-ton-nom", "ta-saison"]));
+refuse("le trash talk, illisible en petit, dans l'éventail", () => eventailJuste(["maillot-a-ton-nom", "carte-en-vrai", "trash-talk"]));
+refuse("L'entrée, sans personne, dans l'éventail", () => eventailJuste(["entree", "carte-en-vrai", "ta-saison"]));
+refuse("l'éventail d'un template inconnu", () => eventailJuste(["maillot-a-ton-nom", "carte-en-vrai", "absent"]));
 refuse("la carte posée sur les joueurs de la cérémonie", () => scenesJustes(TEMPLATES.map((t) => (t.id === "celebration" ? { ...t, scene: { fond: "ceremonies", x: 50, y: 66, zoom: 1.5, pose: "tenue" } } : t))));
 refuse("le rang de cartes devant les joueurs de la cérémonie", () => scenesJustes(TEMPLATES.map((t) => (t.id === "convocation" ? { ...t, scene: { ...t.scene, fond: "ceremonies" } } : t))));
 refuse("la carte sur le duel filmé", () => scenesJustes(TEMPLATES.map((t) => (t.id === "option-hd" ? { ...t, scene: { ...t.scene, pose: "tenue" } } : t))));
@@ -343,6 +367,12 @@ refuse("une couleur dans la feuille", () => feuilleJuste(mf("rgb(0 0 0 / 0.42)",
 refuse("un violet écrit dans la feuille", () => feuilleJuste(mf("background: var(--bp-plus-vif);", "background: #7c3aed;")));
 refuse("un violet mélangé en dur", () => feuilleJuste(mf("color-mix(in srgb, var(--bp-plus-vif) 40%", "color-mix(in srgb, rgb(124 58 237) 40%")));
 refuse("le vert de la SFL dans le studio", () => feuilleJuste(mf("background: var(--bp-plus-vif);", "background: var(--bp-sfl-vif);")));
+refuse("une variable de Bola Plus oubliée", () => variablesJustes(Object.fromEntries(Object.entries(VARIABLES_PLUS).filter(([k]) => k !== "--bp-plus-haut"))));
+refuse("une variable de Bola Plus d'une autre teinte", () => variablesJustes({ ...VARIABLES_PLUS, "--bp-plus-clair": PALETTE.sfl.clair }));
+refuse("une variable recopiée dans le panneau", () => ecranJuste(m("const COULEURS_STUDIO = VARIABLES_PLUS as CSSProperties;", 'const COULEURS_STUDIO = { ...VARIABLES_PLUS, "--bp-plus-vif": "#7C3AED" } as CSSProperties;')));
+refuse("une autre carte « Toi » dans le studio", () => toiJuste(ecran.replace("stats={CARTE_TOI.stats}", "stats={{ VIT: 76, TIR: 73, PAS: 77, DRI: 75, DEF: 72, PHY: 74 }}")));
+refuse("une autre note pour « Toi » dans la page", () => toiJuste(page.replace("overall={ovr(CARTE_TOI.stats)}", "overall={75}")));
+refuse("le nombre de templates lu seul", () => ecranJuste(m('<span className="st-eventail__nombre tabular-nums" aria-hidden>', '<span className="st-eventail__nombre tabular-nums">')));
 refuse("un appel réseau", () => propre("écran", ecran + "\nfetch('/api/studio');"));
 refuse("un débit du porte-monnaie", () => propre("écran", ecran + "\nspendBallons(moi, 299);"));
 refuse("le mouvement réduit oublié", () => feuilleJuste(feuille.replace(/@media \(prefers-reduced-motion: reduce\) \{[\s\S]*$/, "")));

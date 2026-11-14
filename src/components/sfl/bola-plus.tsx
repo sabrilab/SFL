@@ -68,11 +68,12 @@ import { LOGO_BOLA } from "@/components/sfl/finitions-carte";
 import { RosaceBola } from "@/components/sfl/motif-carte";
 import { BoutonRetour } from "@/components/layout/bouton-retour";
 import { useBolaPlus, type BolaPlus } from "@/hooks/use-bola-plus";
-import { ovr, type Stats } from "@/lib/sfl/engine";
+import { ovr } from "@/lib/sfl/engine";
 import {
   AFFICHE,
   BOLA_PLUS_SEUL,
   BUNDLE,
+  CARTE_TOI,
   FONCTIONS_BOLA_PLUS,
   FORMULES,
   GRILLE_SFL,
@@ -83,6 +84,7 @@ import {
   PALETTE,
   PARRAINAGE,
   PRIX_FORMULE,
+  VARIABLES_PLUS,
   diapos,
   fichierVisuel,
   sourcesVisuel,
@@ -381,8 +383,6 @@ function DiapoOuverture() {
   );
 }
 
-/** Les stats de la carte « Toi » : une carte qui a déjà joué (note 77), sans nom ni photo. */
-const STATS_TOI: Stats = { VIT: 76, TIR: 76, PAS: 77, DRI: 79, DEF: 75, PHY: 77 };
 /** La carte à taille 1 : 254 px de large, 1656/1024 de haut (bola-card.tsx). */
 const HAUTEUR_CARTE = 254 * (1656 / 1024);
 
@@ -393,7 +393,7 @@ function VisuelCarte() {
   const taille = h > 0 ? Math.max(0.5, Math.min(0.92, (h - 8) / HAUTEUR_CARTE)) : 0.8;
   return (
     <div ref={ref} className="bp-visuel-carte" aria-hidden>
-      <BolaCard name="Toi" position="ATT" overall={ovr(STATS_TOI)} stats={STATS_TOI} highlightStats={["DRI"]} size={taille} />
+      <BolaCard name={CARTE_TOI.name} position={CARTE_TOI.position} overall={ovr(CARTE_TOI.stats)} stats={CARTE_TOI.stats} highlightStats={["DRI"]} size={taille} />
     </div>
   );
 }
@@ -611,12 +611,7 @@ const partDe = (d: Diapo): Part | "prix" | "deux" => ("avantage" in d ? d.avanta
 
 /** Les couleurs de la page (lib/sfl/bola-plus.ts, PALETTE), en variables CSS. */
 const COULEURS = {
-  "--bp-plus-fond": PALETTE.plus.fond,
-  "--bp-plus-haut": PALETTE.plus.haut,
-  "--bp-plus-vif": PALETTE.plus.vif,
-  "--bp-plus-clair": PALETTE.plus.clair,
-  "--bp-plus-encre": PALETTE.plus.encre,
-  "--bp-plus-papier": PALETTE.plus.fondClair,
+  ...VARIABLES_PLUS,
   "--bp-sfl-fond": PALETTE.sfl.fond,
   "--bp-sfl-vif": PALETTE.sfl.vif,
   "--bp-sfl-clair": PALETTE.sfl.clair,

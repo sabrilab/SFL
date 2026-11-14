@@ -23,8 +23,9 @@
 //     durée et le prix, jamais le micro-texte de la carte ;
 //   · VisuelStudio : le visuel de la carte « Ton studio » du carrousel
 //     (bola-plus.tsx, COMPOSANTS.studio) : trois vrais templates en éventail
-//     (EVENTAIL_STUDIO), le trash talk au milieu, et « Bola Studio » avec le
-//     nombre de templates. Le tout est un bouton : il ouvre le panneau.
+//     (EVENTAIL_STUDIO), la carte en vrai au milieu, et « Bola Studio » avec le
+//     nombre de templates (décoratif : le bouton se lit « Bola Studio »).
+//     Le tout est un bouton : il ouvre le panneau.
 //     MentionStudio : sous le titre « Ton studio », les ballons du mois
 //     (« 300 ⚽ / mois », MENTION_STUDIO) ;
 //   · PanneauStudio : une feuille du bas, aux couleurs de Bola Plus :
@@ -44,9 +45,10 @@
 // Le ballon ⚽ d'un prix en Anton (la fiche, les recharges) est réduit à
 // 0,7 em sur la ligne de base (Prix) : l'émoji ne domine pas le chiffre.
 //
-// Couleurs : celles de la page (PALETTE de lib/sfl/bola-plus.ts, en
-// variables --bp-*), posées aussi sur le panneau, qui est porté hors de la
-// page. Aucune teinte écrite dans la feuille de style. Les vignettes sont
+// Couleurs : celles de la part Bola Plus (VARIABLES_PLUS de
+// lib/sfl/bola-plus.ts, la même table que la page), posées aussi sur le
+// panneau, qui est porté hors de la page. La feuille de style n'écrit aucune
+// teinte hors du noir, du blanc et des gris. Les vignettes sont
 // des îlots sombres (classe dark) dans les deux modes. Pas de texte d'aide :
 // des noms, des durées, des prix.
 
@@ -57,7 +59,7 @@ import { DosCarte } from "@/components/sfl/dos-carte";
 import { matiereDe } from "@/components/sfl/finitions-carte";
 import { ANTON } from "@/components/sfl/actus/ecran";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
-import { PALETTE, fichierVisuel, sourcesVisuel } from "@/lib/sfl/bola-plus";
+import { CARTE_TOI, VARIABLES_PLUS, fichierVisuel, sourcesVisuel } from "@/lib/sfl/bola-plus";
 import {
   ESPACE_LARGE,
   EVENTAIL_STUDIO,
@@ -74,15 +76,15 @@ import {
   type Scene,
   type Template,
 } from "@/lib/sfl/studio";
-import type { Stats } from "@/lib/sfl/engine";
+import { ovr } from "@/lib/sfl/engine";
 import "./studio-bola.css";
 
 /* ---------------------------- La carte « Toi » ---------------------------- */
 
-// La carte anonyme : « Toi », sans photo, sans pseudo, les chiffres de la
-// carte de départ (une carte qui n'est celle de personne).
-const TOI = { name: "Toi", position: "MC", overall: 75 } as const;
-const STATS_TOI: Stats = { VIT: 76, TIR: 73, PAS: 77, DRI: 75, DEF: 72, PHY: 74 };
+// La carte anonyme : « Toi », sans photo, sans pseudo : la même que « Ta
+// carte continue. » dans le carrousel (CARTE_TOI, lib/sfl/bola-plus.ts), la
+// note calculée par ovr.
+const TOI = { name: CARTE_TOI.name, position: CARTE_TOI.position, overall: ovr(CARTE_TOI.stats) };
 // Dessinée à 0,7 (178 px, le palier « complète » : papier, cadre, chiffres),
 // puis mise à l'échelle de la scène.
 const TAILLE = 0.7;
@@ -95,7 +97,7 @@ function CarteToi({ largeur, dos = false, style }: { largeur: number; dos?: bool
   return (
     <span className="st-carte" style={{ width: largeur, height: H_CARTE * k, ...style }}>
       <span className="st-carte__dessin" style={{ width: L_CARTE, height: H_CARTE, transform: `scale(${k})` }}>
-        {dos ? <DosCarte matiere={matiereDe("base")} nom={TOI.name} size={TAILLE} /> : <BolaCard {...TOI} stats={STATS_TOI} size={TAILLE} />}
+        {dos ? <DosCarte matiere={matiereDe("base")} nom={TOI.name} size={TAILLE} /> : <BolaCard {...TOI} stats={CARTE_TOI.stats} size={TAILLE} />}
       </span>
     </span>
   );
@@ -277,17 +279,10 @@ export function SceneStudio({ scene, video, cadre, className }: { scene: Scene; 
 /* -------------------------------- Le rail -------------------------------- */
 
 /**
- * Les couleurs de Bola Plus (PALETTE), posées sur le panneau et la fiche :
+ * Les couleurs de Bola Plus (VARIABLES_PLUS, la table que pose aussi la page), sur le panneau et la fiche :
  * portés hors de la page, ils ne reçoivent pas ses variables.
  */
-const COULEURS_STUDIO = {
-  "--bp-plus-fond": PALETTE.plus.fond,
-  "--bp-plus-haut": PALETTE.plus.haut,
-  "--bp-plus-vif": PALETTE.plus.vif,
-  "--bp-plus-clair": PALETTE.plus.clair,
-  "--bp-plus-encre": PALETTE.plus.encre,
-  "--bp-plus-papier": PALETTE.plus.fondClair,
-} as CSSProperties;
+const COULEURS_STUDIO = VARIABLES_PLUS as CSSProperties;
 
 /** Le panneau et la fiche : une feuille du bas qui défile si l'écran est court. */
 const FEUILLE_STUDIO = "st-feuille max-h-[92dvh] overflow-y-auto rounded-t-[28px] pb-[calc(env(safe-area-inset-bottom,0px)+1.5rem)]";
@@ -410,7 +405,9 @@ export function VisuelStudio() {
         </span>
         <span className="st-eventail__nom">
           Bola Studio
-          <span className="st-eventail__nombre tabular-nums">{TEMPLATES.length}</span>
+          <span className="st-eventail__nombre tabular-nums" aria-hidden>
+            {TEMPLATES.length}
+          </span>
           <ChevronRight className="size-4" strokeWidth={2.6} aria-hidden />
         </span>
       </button>

@@ -38,7 +38,8 @@
 // dans le violet de Bola Plus. Une vidéo est un cadrage qui bouge lentement,
 // arrêté avec « Réduire les animations ».
 // La carte « Ton studio » du carrousel Bola Plus montre trois de ces
-// templates en éventail (EVENTAIL_STUDIO), le trash talk au milieu.
+// templates en éventail (EVENTAIL_STUDIO) : la carte en vrai au milieu, qui
+// se lit en petit, et un sujet dans chaque vignette.
 //
 // Pur : ni React ni réseau.
 
@@ -298,8 +299,14 @@ export const BALLONS_FORMULE = {
 /** La carte « Ton studio » du carrousel, sous son titre : « 300 ⚽ / mois ». */
 export const MENTION_STUDIO = BALLONS_FORMULE.mensuel;
 
-/** Les trois templates de l'éventail de « Ton studio » : à gauche, au milieu (le trash talk), à droite. */
-export const EVENTAIL_STUDIO = ["maillot-a-ton-nom", "trash-talk", "entree"] as const;
+/**
+ * Les trois templates de l'éventail de « Ton studio » : à gauche, au milieu,
+ * à droite. Au milieu, « Ma carte en vrai » : la carte « Toi » entière, qui se
+ * lit en petit ; à droite, Ta saison (le joueur au trophée). Le trash talk (carte
+ * coupée, adversaire flou) et L'entrée (des colonnes, personne) ne se lisent
+ * pas à cette taille (contrôle visuel du 14/11) : ils restent dans le rail.
+ */
+export const EVENTAIL_STUDIO = ["maillot-a-ton-nom", "carte-en-vrai", "ta-saison"] as const;
 
 /** Une recharge de ballons : son prix en centimes entiers et ce qu'elle donne. */
 export interface RechargeStudio {

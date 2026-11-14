@@ -66,6 +66,7 @@ import {
   BOLA_PLUS_SEUL,
   BOLA_PLUS_SEUL_CENTIMES,
   BUNDLE,
+  CARTE_TOI,
   ECHEANCES,
   FONCTIONS_BOLA_PLUS,
   GRILLE_SFL,
@@ -754,7 +755,7 @@ async function banc() {
     const CACHE = /(^|[\s:"])(hidden|sr-only|invisible|opacity-0)(?=[\s"])/;
     assert.ok(!CACHE.test(offre) && !CACHE.test(ouverture), "les prix se voient");
     // La vraie carte « Toi », sans photo ni nom de joueur.
-    assert.ok(/<BolaCard name="Toi" /.test(carte) && !/photo=/.test(carte), "« Ta carte » : la vraie carte « Toi », sans photo");
+    assert.ok(/<BolaCard name=\{CARTE_TOI\.name\} /.test(carte) && CARTE_TOI.name === "Toi" && !/photo=/.test(carte), "« Ta carte » : la vraie carte « Toi », sans photo");
     // « Tes maillots » : le portant d'abord ; le visuel déposé ne le remplace qu'une fois chargé.
     assert.ok(/const \[deposeLa, setDeposeLa\] = useState\(false\);/.test(photo) && /const depose = deposeLa \? avantage\.depose : undefined;/.test(photo), "la carte montre le portant tant que le visuel déposé n'est pas chargé");
     assert.ok(/essai\.onload = \(\) => \{\s*if \(vivant && essai\.naturalWidth > 0\) setDeposeLa\(true\);/.test(photo) && !/onerror/.test(photo), "le visuel déposé ne passe devant qu'une fois chargé");
@@ -812,13 +813,15 @@ async function banc() {
   refuse("l'annuel qui barre 280 € sans le dire", () => grilleJuste(SFL_OFFICIEL, { ...BARRE, annuel: 28000 }, MENSUEL_CENTIMES, ANNUEL_CENTIMES));
   refuse("le bundle sans la SFL", () => bundleJuste(BUNDLE.filter((b) => b !== "sfl")));
   // Les avantages.
-  refuse("un titre changé", () => avantagesJustes(AVANTAGES.map((a, i) => (i === 3 ? { ...a, titre: "Ton kit complet" } : a))));
+  refuse("un titre changé", () => avantagesJustes(AVANTAGES.map((a) => (a.id === "maillots" ? { ...a, titre: "Ton kit complet" } : a))));
   refuse("deux avantages de plus", () => avantagesJustes([...AVANTAGES, { ...AVANTAGES[0], id: "x" }, { ...AVANTAGES[0], id: "y" }]));
   refuse("un identifiant en double", () => avantagesJustes([...AVANTAGES, AVANTAGES[1]]));
   refuse("un avantage sans part connue", () => avantagesJustes(AVANTAGES.map((a, i) => (i === 0 ? ({ ...a, part: "club" } as unknown as Avantage) : a))));
   const iSfl = AVANTAGES.findIndex((a) => a.part === "sfl");
   refuse("une part SFL avant Bola Plus", () => avantagesJustes([AVANTAGES[iSfl], ...AVANTAGES.filter((_, i) => i !== iSfl)]));
-  refuse("une promesse chiffrée", () => avantagesJustes(AVANTAGES.map((a, i) => (i === 4 ? { ...a, titre: "3 cadeaux par saison" } : a))));
+  refuse("une promesse chiffrée", () => avantagesJustes(AVANTAGES.map((a) => (a.id === "cadeaux" ? { ...a, titre: "3 cadeaux par saison" } : a))));
+  // La même promesse dans la ligne du dessous, que le titre exact ne garde pas : seul le garde « ni chiffre » la refuse.
+  refuse("une promesse chiffrée sous le titre", () => avantagesJustes(AVANTAGES.map((a) => (a.id === "cadeaux" ? { ...a, sous: "3 cadeaux par saison" } : a))));
   refuse("une description ajoutée", () => avantagesJustes(AVANTAGES.map((a) => ({ ...a, description: "Chaque saison." }) as Avantage)));
   refuse("un visuel généré qui ne le dit pas", () => avantagesJustes(AVANTAGES.map((a) => (a.id === "cadeaux" && a.visuel.genre === "image" ? { ...a, visuel: { ...a.visuel, alt: "Des crampons verts" } } : a))));
   refuse("un joueur nommé dans le visuel déposé", () => avantagesJustes(AVANTAGES.map((a) => (a.depose ? { ...a, depose: { ...a.depose, alt: "Image générée : Inès, Léo et Nolan portent les maillots" } } : a))));
@@ -847,7 +850,7 @@ async function banc() {
   refuse("le mouvement réduit oublié", () => ecranJuste(ecran, mute("reduit", style, /@media \(prefers-reduced-motion: reduce\) \{[\s\S]*$/, "")));
   refuse("les segments muets", () => ecranJuste(mute("segments", ecran, 'aria-current={i === actif ? "true" : undefined}', ""), style));
   refuse("un texte d'aide", () => ecranJuste(mute("aide", ecran, "      <div className=\"bp-pied\" aria-hidden />", "      <p>Glisse pour voir la suite.</p>\n      <div className=\"bp-pied\" aria-hidden />"), style));
-  refuse("une fausse carte à la place de la vraie", () => ecranJuste(mute("carte", ecran, '<BolaCard name="Toi" ', '<BolaCard name="Toi" photo="/bola/joueur.jpg" '), style));
+  refuse("une fausse carte à la place de la vraie", () => ecranJuste(mute("carte", ecran, '<BolaCard name={CARTE_TOI.name} ', '<BolaCard name={CARTE_TOI.name} photo="/bola/joueur.jpg" '), style));
   refuse("le barré retiré", () => ecranJuste(mute("barré", ecran, "                  <Barre somme={p.barre} />\n", ""), style));
   refuse("les 4 fois en dur", () => ecranJuste(mute("4 fois", ecran, "{p.sous}</span>", "4 × 42,23 € sans frais</span>"), style));
   refuse("les prix cachés sur petit écran", () => ecranJuste(mute("caché", ecran, 'className="bp-formule__sous tabular-nums"', 'className="bp-formule__sous tabular-nums max-[359px]:hidden"'), style));

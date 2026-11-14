@@ -334,6 +334,19 @@
   vertical-align: baseline;
 }
 
+/* Écran court (375 × 667) : le panneau tient sans défiler, et la fiche d'un
+   template garde son titre, ce que tu reçois et son prix à l'écran ; la
+   vignette, toujours en 4/5, se borne à la hauteur qui reste. */
+@media (max-height: 700px) {
+  .st-panneau {
+    padding-top: 22px;
+  }
+  .st-scene--grand {
+    width: min(100%, 52svh * 0.8);
+    margin-inline: auto;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .st-scene,
   .st-eventail__place,
