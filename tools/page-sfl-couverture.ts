@@ -15,22 +15,27 @@
 //     joueurs dont l'accord hors-app était « oui » (ACCORDS). Les cartes au
 //     format compact (podiums, carte de départ, les trois titres) sont posées
 //     en colonnes décalées, le mur penché de 7°, sur un fond transparent :
-//     la page passe entre les cartes, en clair comme en sombre.
+//     la page passe entre les cartes, en clair comme en sombre. Le mur est en
+//     noir et blanc (contrôle du 14/11 : pas de drapeaux ni d'or, de bleu et
+//     de rouge en décor) ; le banc le recompose (imagesMur) et compare les
+//     empreintes : ses pixels viennent bien des cartes d'ACCORDS.
 // Le stade « Olympe » (les piliers de marbre) n'est pas sur la machine qui a
 // écrit cet outil : une variante de plus = une entrée de VARIANTES.
 //
 // Chaque variante a deux formats :
 //   · le téléphone, en portrait 9:14 (720 × 1120 et 1029 × 1600, srcset) ;
-//     le cadre (CADRE) garde le sujet de la photo ; 250 ko au plus ;
+//     le cadre (`cadre`) garde le sujet de la photo ; 250 ko au plus ;
 //   · l'ordinateur, une bande 16:9 (1200 × 675 pour une photo de 1200 px de
-//     large ; 1600 × 900 pour le mur, dessiné à cette taille).
+//     large ; 1600 × 900 pour le mur, dessiné à cette taille). Les photos du
+//     moodboard n'existent qu'en 1200 px de large : la bande est un peu douce
+//     sur un grand écran ; rien n'est agrandi ni généré pour la remplacer.
 // WebP (sharp, déjà installé), sans métadonnées.
 //
 //   npx tsx tools/page-sfl-couverture.ts
 // Puis relire les images, et tools/page-sfl-check.ts (12 · la couverture).
 
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import sharp from "sharp";
 import { ACCORDS, CARTE_MONTEE, PODIUMS, TITRES } from "../src/lib/sfl/page-sfl-instantane";
@@ -50,18 +55,19 @@ const TELEPHONE = [
 ] as const;
 
 type Variante =
-  | { cle: "a" | "c"; nom: string; photo: string; cadre: { x: number; yBande: number } }
+  | { cle: "a" | "c"; nom: string; photo: string; cadre: { x: number; haut: number; yBande: number } }
   | { cle: "b"; nom: string; cartes: true };
 
 /**
  * Les variantes. `cadre.x` : le centre du recadrage portrait, de 0 (à gauche)
- * à 1 ; `cadre.yBande` : le centre de la bande de l'ordinateur, de 0 (en
- * haut) à 1.
+ * à 1 ; `cadre.haut` : la part de la photo retirée en haut du portrait (les
+ * pieds coupés au bord des ombres, contrôle du 14/11) ; `cadre.yBande` : le
+ * centre de la bande de l'ordinateur, de 0 (en haut) à 1.
  */
 const VARIANTES: Variante[] = [
-  { cle: "a", nom: "La cage", photo: "cage-2", cadre: { x: 0.6, yBande: 0.36 } },
+  { cle: "a", nom: "La cage", photo: "cage-2", cadre: { x: 0.6, haut: 0, yBande: 0.36 } },
   { cle: "b", nom: "Les cartes", cartes: true },
-  { cle: "c", nom: "Les ombres", photo: "ombres-1", cadre: { x: 0.5, yBande: 0.3 } },
+  { cle: "c", nom: "Les ombres", photo: "ombres-1", cadre: { x: 0.5, haut: 0.05, yBande: 0.3 } },
 ];
 
 const empreinte = (b: Buffer) => createHash("sha256").update(b).digest("hex");
@@ -94,9 +100,10 @@ async function photo(v: Extract<Variante, { photo: string }>): Promise<{ telepho
   const meta = await sharp(source).metadata();
   const L = meta.width!;
   const H = meta.height!;
-  const lPortrait = Math.round((H * 9) / 14);
+  const haut0 = Math.round(v.cadre.haut * H);
+  const lPortrait = Math.round(((H - haut0) * 9) / 14);
   const gauche = Math.max(0, Math.min(L - lPortrait, Math.round(v.cadre.x * L - lPortrait / 2)));
-  const portrait = sharp(source).extract({ left: gauche, top: 0, width: lPortrait, height: H });
+  const portrait = sharp(source).extract({ left: gauche, top: haut0, width: lPortrait, height: H - haut0 });
   const telephone: Ecrite[] = [];
   for (const [l, h] of TELEPHONE) {
     const b = await webp(portrait.clone().resize(l, h, { kernel: "lanczos3" }), POIDS_TELEPHONE, false);
@@ -160,11 +167,30 @@ async function mur(l: number, h: number, largeur: number): Promise<Buffer> {
     .toBuffer();
   const penche = await sharp(toile).rotate(-7, { background: { r: 0, g: 0, b: 0, alpha: 0 } }).png().toBuffer();
   const m = await sharp(penche).metadata();
+  // En noir et blanc (contrôle du 14/11) : les drapeaux et l'or, le bleu et le rouge des cartes à titre ne
+  // deviennent pas un décor ; la page reste noir et blanc, et le mur ne jaunit plus en clair.
   return sharp(penche)
     .extract({ left: Math.round((m.width! - l) / 2), top: Math.round((m.height! - h) / 2), width: l, height: h })
+    .grayscale()
     .png()
     .toBuffer();
 }
+
+/**
+ * Les images du mur, telles que l'outil les écrit : le téléphone (deux
+ * largeurs) puis la bande de l'ordinateur. Déterministe : le banc les
+ * recompose et compare leurs empreintes à celles des fichiers (les pixels du
+ * mur, pas seulement la liste des noms, viennent des cartes d'ACCORDS).
+ */
+export async function imagesMur(): Promise<{ telephone: { l: number; h: number; b: Buffer }[]; ordinateur: { l: number; h: number; b: Buffer } }> {
+  const telephone: { l: number; h: number; b: Buffer }[] = [];
+  // La carte fait 36 % de la largeur du portrait : environ 140 px sur un téléphone de 390.
+  for (const [l, h] of TELEPHONE) telephone.push({ l, h, b: await webp(sharp(await mur(l, h, Math.round(l * 0.36))), POIDS_TELEPHONE, true) });
+  return { telephone, ordinateur: { l: 1600, h: 900, b: await webp(sharp(await mur(1600, 900, 240)), POIDS_ORDINATEUR, true) } };
+}
+
+/** Les joueurs du mur, sans doublon, dans l'ordre alphabétique : ce que le module généré écrit dans `cartes`. */
+export const nomsDuMur = () => [...new Set(cartesDuMur().map((c) => c.nom))].sort((x, y) => x.localeCompare(y, "fr"));
 
 async function principal() {
   const dossier = join(RACINE, "public", DOSSIER);
@@ -176,12 +202,10 @@ async function principal() {
       const { telephone, ordinateur } = await photo(v);
       sortie[v.cle] = { nom: v.nom, source: `/actus/couvertures/${v.photo}-1200.webp`, cartes: [], telephone, ordinateur };
     } else {
-      const telephone: Ecrite[] = [];
-      // La carte fait 36 % de la largeur du portrait : environ 140 px sur un téléphone de 390.
-      for (const [l, h] of TELEPHONE) telephone.push(ecrire(`b-${l}.webp`, await webp(sharp(await mur(l, h, Math.round(l * 0.36))), POIDS_TELEPHONE, true), l, h));
-      const ordinateur = ecrire("b-ordinateur.webp", await webp(sharp(await mur(1600, 900, 240)), POIDS_ORDINATEUR, true), 1600, 900);
-      const noms = [...new Set(cartesDuMur().map((c) => c.nom))].sort((x, y) => x.localeCompare(y, "fr"));
-      sortie[v.cle] = { nom: v.nom, source: null, cartes: noms, telephone, ordinateur };
+      const m = await imagesMur();
+      const telephone = m.telephone.map((t) => ecrire(`b-${t.l}.webp`, t.b, t.l, t.h));
+      const ordinateur = ecrire("b-ordinateur.webp", m.ordinateur.b, m.ordinateur.l, m.ordinateur.h);
+      sortie[v.cle] = { nom: v.nom, source: null, cartes: nomsDuMur(), telephone, ordinateur };
     }
   }
   const ts = `// GÉNÉRÉ par tools/page-sfl-couverture.ts : ne pas modifier à la main.
@@ -226,4 +250,3 @@ if (process.argv[1]?.endsWith("page-sfl-couverture.ts")) void principal();
 
 // Pour le banc : les cartes que le mur a le droit de prendre.
 export const cartesPermises = () => cartesDuMur();
-export const lireSource = (src: string) => readFileSync(join(RACINE, "public", src));

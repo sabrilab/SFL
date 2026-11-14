@@ -328,7 +328,8 @@ export function PageSfl() {
         <div className="relative isolate flex min-h-[calc(100svh-env(safe-area-inset-top))] flex-col justify-end">
           <Couverture />
           <header className={cn(COLONNE, "flex flex-col items-center pt-11 pb-12 text-center min-[960px]:pt-[clamp(48px,12.5vh,112px)] min-[960px]:pb-[clamp(40px,9vh,96px)] [@media(max-height:480px)]:pt-6 [@media(max-height:480px)]:pb-6")}>
-            <p className={ETIQUETTE}>{HAUT_SFL.etiquette}</p>
+            {/* Sur la photo, l'étiquette passe d'un cran plus foncée que dans la page (encre-2) : le gris de la page s'y perdait. */}
+            <p className={cn(ETIQUETTE, "text-encre-2")}>{HAUT_SFL.etiquette}</p>
             <span
               role="img"
               aria-label={HAUT_SFL.sigle}
@@ -356,11 +357,11 @@ export function PageSfl() {
           </header>
         </div>
 
-        {/* 2 · La semaine */}
+        {/* 2 · La semaine : sur téléphone, mt-12 et le pb-12 du haut font l'écart d'avant la couverture (96 px). */}
         <section
           data-apparait
           aria-labelledby="sfl-semaine"
-          className={cn(COLONNE, APPARAIT, "mt-24 min-[960px]:mt-40 min-[960px]:grid min-[960px]:grid-cols-12 min-[960px]:gap-x-16")}
+          className={cn(COLONNE, APPARAIT, "mt-12 min-[960px]:mt-40 min-[960px]:grid min-[960px]:grid-cols-12 min-[960px]:gap-x-16")}
         >
           <div className="min-[960px]:col-span-5">
             <p className={ETIQUETTE}>{SEMAINE_SFL.etiquette}</p>

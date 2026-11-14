@@ -74,23 +74,23 @@ export const VARIANTES_COUVERTURE = {
         "src": "/sfl/couverture/b-720.webp",
         "largeur": 720,
         "hauteur": 1120,
-        "sha256": "8b279fb38cbe3a40d6ab65e7d4c3e8246bcb1352cf77fb41b3b23bb2b54d01b8",
-        "octets": 73592
+        "sha256": "69a25539573a1649d4cc9d485dd1698561533d7d16dd7fffb9f63c14a9eaa244",
+        "octets": 61154
       },
       {
         "src": "/sfl/couverture/b-1029.webp",
         "largeur": 1029,
         "hauteur": 1600,
-        "sha256": "2ee052ef5d7bcc0ddb187c796ecb6b503aba9ab13afa180d7fd234e828ee27ce",
-        "octets": 111604
+        "sha256": "004fa5bed53a30791958efdd2e0ef10ff638355ed8c0d8c97957af21a590ade8",
+        "octets": 93792
       }
     ],
     "ordinateur": {
       "src": "/sfl/couverture/b-ordinateur.webp",
       "largeur": 1600,
       "hauteur": 900,
-      "sha256": "45be42d81137dc20361d8f0b703e7d7f6c5d5dbfc12ea2e6a000b66bac7b9f5a",
-      "octets": 140732
+      "sha256": "94f74251a7be25b4dc49eeaaa88a116728d9aae1399fab70fda5217f9aee3a58",
+      "octets": 115876
     }
   },
   "c": {
@@ -102,15 +102,15 @@ export const VARIANTES_COUVERTURE = {
         "src": "/sfl/couverture/c-720.webp",
         "largeur": 720,
         "hauteur": 1120,
-        "sha256": "2cfcfbb7ba8ddc533724f527aa883411ecf79badfa6a993ba173baedc7b17094",
-        "octets": 188898
+        "sha256": "8195a977e15625ded40220ca5dda258ab826dfb678828ff3e7d0b3799ef87bf3",
+        "octets": 191252
       },
       {
         "src": "/sfl/couverture/c-1029.webp",
         "largeur": 1029,
         "hauteur": 1600,
-        "sha256": "b028e752195ff2fdbd44e51ee5f2f8548264ba532e7f67f712095abd34011acb",
-        "octets": 239326
+        "sha256": "977b04ab3315464cf73b1c5714ab65a7392d3fc3b5dfa19f4030d07d36a62856",
+        "octets": 243920
       }
     ],
     "ordinateur": {

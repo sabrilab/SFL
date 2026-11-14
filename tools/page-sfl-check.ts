@@ -63,13 +63,21 @@
 //       vieille ou datée dans le futur, accord retiré, joueur hors accords.md).
 //  12 · la couverture du haut (14/11) : la variante de la page est a « La
 //       cage » ; la production ne lit jamais l'adresse (?couverture= n'existe
-//       qu'en dev) ; l'image est décorative, chargée tout de suite, avec ses
-//       dimensions, et la hauteur du haut ne vient que de la fenêtre ; chaque
-//       image existe dans public/sfl/couverture, à l'empreinte, aux
+//       qu'en dev et sur un aperçu, et seul lireAdresse la lit) ; la boîte est
+//       décorative (aria-hidden), traversée par les gestes, sous le contenu ;
+//       l'image a sa bande d'ordinateur, sizes 100vw, alt vide, ses
+//       dimensions, et se charge tout de suite ; les quatre voiles et celui
+//       du mur sont posés et remplis ; le haut est isolé et sa hauteur ne
+//       vient que de la fenêtre. Ces règles sont ancrées sur l'élément
+//       qu'elles visent, commentaires retirés, et prouvées par 12 mutants
+//       (contrôle du 14/11 : des regex libres en laissaient passer huit).
+//       Chaque image existe dans public/sfl/couverture, à l'empreinte, aux
 //       dimensions et au poids écrits par tools/page-sfl-couverture.ts
 //       (250 ko au plus pour le téléphone) ; une photo vient du moodboard des
-//       Actus (lib/sfl/couvertures.ts), le mur ne montre que des joueurs
-//       d'ACCORDS ; aucun fichier orphelin.
+//       Actus (lib/sfl/couvertures.ts) ; le mur est RECOMPOSÉ ici à partir
+//       des cartes d'ACCORDS (imagesMur, déterministe) et comparé au pixel
+//       près (empreinte) aux fichiers servis, et sa liste de joueurs est
+//       exactement celle du mur (nomsDuMur) ; aucun fichier orphelin.
 // Ce qu'il ne tient pas : le rendu (les captures), ce qu'une chaîne
 // construite à l'exécution pourrait écrire dans la page, et SURTOUT L'ACCORD
 // LUI-MÊME. Ce banc ne contrôle que l'instantané avec lui-même : un joueur
@@ -116,7 +124,7 @@ import { sigleSfl } from "./sigle-sfl";
 import { APERCU_LIEN, composer, empreinte, sigleSerre } from "./sigle-sfl-exports";
 import { COUVERTURES } from "../src/lib/sfl/couvertures";
 import { VARIANTES_COUVERTURE, type ImageCouverture } from "../src/lib/sfl/page-sfl-couverture";
-import { POIDS_ORDINATEUR, POIDS_TELEPHONE, cartesPermises } from "./page-sfl-couverture";
+import { POIDS_ORDINATEUR, POIDS_TELEPHONE, cartesPermises, imagesMur, nomsDuMur } from "./page-sfl-couverture";
 import { empechement, fautesInstantane, nomsDeSaison, podiumSansTrou, slug, type Lecture, type LigneJoueur } from "./page-sfl-instantane";
 
 const RACINE = join(__dirname, "..");
@@ -749,23 +757,103 @@ verifier(new Set(TITRES.cartes.map((c) => c.nom)).size === TITRES.cartes.length 
 // 12 · La couverture du haut (14/11) : des images déjà validées, rien d'autre ; aucun joueur hors d'ACCORDS ; un poids tenu.
 assert.deepEqual(imports(lire(COUVERTURE)), ["@/lib/sfl/page-sfl-couverture", "react"], "12 · la couverture importe autre chose que ses images");
 assert.deepEqual(imports(lire(IMAGES_COUVERTURE)), [], "12 · les images de la couverture importent quelque chose : elles ne tiennent que des données");
+// Le code de la couverture et du haut : chaque règle est ancrée sur l'élément qu'elle vise (contrôle du 14/11 :
+// des regex libres laissaient passer huit mutants), et les commentaires sont retirés avant de chercher.
+const nettoyer = (t: string) => t.replace(/\{\/\*[\s\S]*?\*\/\}/g, "").replace(/^\s*\/\/.*$/gm, "").replace(/\/\*\*[\s\S]*?\*\//g, "");
+function fautesCouverture(source: string, haut: string): string[] {
+  const f: string[] = [];
+  const v = (ok: boolean, m: string) => {
+    if (!ok) f.push(m);
+  };
+  const cv = nettoyer(source);
+  const pg = nettoyer(haut);
+  v(/^export const COUVERTURE_SFL: CleCouverture = "a";$/m.test(cv), "12 · la variante de la page n'est plus a « La cage » (la recommandée)");
+  // L'adresse n'est lue que par lireAdresse, dont la première ligne rend la variante de la page hors essai ;
+  // l'essai, c'est le dev ou un aperçu Vercel, jamais la production.
+  v(/^const ESSAI = process\.env\.NODE_ENV !== "production" \|\| process\.env\.NEXT_PUBLIC_BOLA_ENV === "preview";$/m.test(cv), "12 · l'essai par l'adresse n'est plus limité au dev et aux aperçus");
+  const lecteur = /^function lireAdresse\(\): CleCouverture \{\n {2}if \(!ESSAI\) return COUVERTURE_SFL;\n[\s\S]*?\n\}$/m.exec(cv);
+  v(lecteur !== null, "12 · lireAdresse ne commence plus par rendre la variante de la page hors essai");
+  const horsLecteur = lecteur ? cv.replace(lecteur[0], "") : cv;
+  v(!/location|URLSearchParams|searchParams|useSearchParams|document\.|history\./.test(horsLecteur), "12 · la couverture lit l'adresse ailleurs que dans lireAdresse (la production la lirait)");
+  v((cv.match(/\bESSAI\b/g) ?? []).length === 2, "12 · ESSAI sert ailleurs que dans lireAdresse");
+  v(/useSyncExternalStore\(rien, lireAdresse, \(\) => COUVERTURE_SFL\)/.test(cv), "12 · le HTML servi ne porte plus la variante de la page");
+  // La boîte : décorative, sous le contenu, sans toucher aux gestes.
+  v(
+    /<div\n\s+aria-hidden\n\s+data-couverture=\{cle\}\n\s+className="pointer-events-none absolute inset-x-0 bottom-0 -z-10 overflow-hidden"\n/.test(cv),
+    "12 · la boîte de la couverture n'est plus décorative (aria-hidden), traversée par les gestes (pointer-events-none) ou sous le contenu (-z-10)"
+  );
+  v((cv.match(/aria-hidden/g) ?? []).length === 1, "12 · aria-hidden prend une valeur, ou il y en a plusieurs");
+  // L'image : une seule, et la bande de l'ordinateur dès 960 px.
+  v(/<picture>\n\s+<source media="\(min-width: 960px\)" srcSet=\{v\.ordinateur\.src\} width=\{v\.ordinateur\.largeur\} height=\{v\.ordinateur\.hauteur\} \/>\n\s+<img\n/.test(cv), "12 · la bande de l'ordinateur (<source media>) manque");
+  const img = /<img\n([\s\S]*?)\/>/.exec(cv)?.[1] ?? "";
+  v((cv.match(/<img\b/g) ?? []).length === 1 && (cv.match(/<source\b/g) ?? []).length === 1, "12 · plus d'une image, ou plus d'une source, dans la couverture");
+  const attributs = new Map([...img.matchAll(/^\s+([\w-]+)=(\{[^\n]*\}|"[^"\n]*")$/gm)].map((m) => [m[1], m[2]]));
+  v(attributs.get("alt") === '""' && attributs.get("sizes") === '"100vw"', "12 · l'image de couverture n'est plus décorative (alt vide), ou sizes n'est plus 100vw");
+  v(attributs.get("srcSet") === "{`${petite.src} ${petite.largeur}w, ${grande.src} ${grande.largeur}w`}" && attributs.get("src") === "{petite.src}", "12 · le srcset du téléphone a changé");
+  v(attributs.get("loading") === '"eager"' && attributs.get("fetchPriority") === '"high"', "12 · l'image de couverture ne se charge plus tout de suite, en priorité");
+  v(attributs.get("width") === "{petite.largeur}" && attributs.get("height") === "{petite.hauteur}", "12 · l'image de couverture n'a plus ses dimensions");
+  v(attributs.get("className") === '"absolute inset-0 size-full object-cover object-top select-none"', "12 · l'image ne remplit plus la boîte de la couverture");
+  // Les quatre voiles (téléphone et ordinateur, clair et sombre) et celui du mur : chacun à sa place, chacun rempli.
+  const voiles: [string, string][] = [
+    ["absolute inset-0 min-[960px]:hidden dark:hidden", "VOILE.clair"],
+    ["absolute inset-0 hidden dark:block min-[960px]:dark:hidden", "VOILE.sombre"],
+    ["absolute inset-0 hidden min-[960px]:block dark:min-[960px]:hidden", "VOILE_ORDINATEUR.clair"],
+    ["absolute inset-0 hidden dark:min-[960px]:block", "VOILE_ORDINATEUR.sombre"],
+  ];
+  for (const [classe, voile] of voiles)
+    v(cv.includes(`<div className="${classe}" style={{ background: ${voile} }} />`), `12 · le voile ${voile} n'est plus posé (${classe})`);
+  for (const [objet, cles] of [["VOILE", ["sombre", "clair"]], ["VOILE_ORDINATEUR", ["sombre", "clair"]], ["VOILE_MUR", ["telephone", "ordinateur"]]] as const) {
+    const corps = new RegExp(`^const ${objet} = \\{\\n([\\s\\S]*?)\\n\\};$`, "m").exec(cv)?.[1] ?? "";
+    for (const c of cles) {
+      const ligne = new RegExp(`^ {2}${c}: \`([^\`]*)\`,$`, "m").exec(corps)?.[1] ?? "";
+      v(/gradient\(/.test(ligne) && (ligne.match(/\$\{fond\((\d+)\)\}/g) ?? []).length >= 2, `12 · le voile ${objet}.${c} est vide`);
+    }
+  }
+  v(/var\(--background\) calc\(100% - 440px\)\)`,$/m.test(cv) && /var\(--background\) max\(80%, calc\(100% - 120px\)\)\)`,$/m.test(cv), "12 · le voile du téléphone n'est plus plein en bas (le haut ne se fond plus dans la page)");
+  v(/\{cle === "b" && <div className="absolute inset-0 min-\[960px\]:hidden" style=\{\{ background: VOILE_MUR\.telephone \}\} \/>\}/.test(cv) && /\{cle === "b" && <div className="absolute inset-0 hidden min-\[960px\]:block" style=\{\{ background: VOILE_MUR\.ordinateur \}\} \/>\}/.test(cv), "12 · le mur des cartes n'a plus son voile derrière le contenu");
+  // Le haut : la boîte qui porte la couverture, sa hauteur venue de la fenêtre, isolée (sinon l'image en -z-10 passe sous le fond du cadre).
+  v(
+    /<div className="relative isolate flex min-h-\[calc\(100svh-env\(safe-area-inset-top\)\)\] flex-col justify-end">\n\s+<Couverture \/>\n\s+<header className=\{cn\(COLONNE, /.test(pg),
+    "12 · le haut n'est plus posé sur sa couverture (isolate), ou sa hauteur ne vient plus de la fenêtre"
+  );
+  v((pg.match(/<Couverture \/>/g) ?? []).length === 1, "12 · la couverture est posée plusieurs fois");
+  return f;
+}
 const couverture = lire(COUVERTURE);
-verifier(/export const COUVERTURE_SFL: CleCouverture = "a";/.test(couverture), "12 · la variante de la page n'est plus a « La cage » (la recommandée)");
-verifier(
-  /if \(process\.env\.NODE_ENV === "production"\) return COUVERTURE_SFL;/.test(couverture) && /useSyncExternalStore\(rien, lireAdresse, \(\) => COUVERTURE_SFL\)/.test(couverture),
-  "12 · la production lit l'adresse, ou le HTML servi ne porte plus la variante de la page"
-);
-verifier((couverture.match(/<img\b/g) ?? []).length === 1 && /alt=""/.test(couverture) && /aria-hidden/.test(couverture), "12 · l'image de couverture n'est plus décorative (alt vide, aria-hidden), ou il y en a plusieurs");
-verifier(/loading="eager"/.test(couverture) && /fetchPriority="high"/.test(couverture) && !/loading="lazy"/.test(couverture), "12 · l'image de couverture ne se charge plus tout de suite, en priorité");
-verifier(/width=\{petite\.largeur\}/.test(couverture) && /height=\{petite\.hauteur\}/.test(couverture), "12 · l'image de couverture n'a plus ses dimensions");
-verifier(/<Couverture \/>/.test(page) && /min-h-\[calc\(100svh-env\(safe-area-inset-top\)\)\]/.test(page), "12 · le haut n'est plus posé sur sa couverture, ou sa hauteur ne vient plus de la fenêtre");
+const fautesDuHaut = fautesCouverture(couverture, page);
+fautes.push(...fautesDuHaut);
+// Preuve par mutants (contrôle du 14/11, M1 à M10 sauf M7 et M8, prouvés plus bas sur les images) : chacun doit être refusé.
+// Elle part du code tel qu'il est : s'il est déjà refusé, ses fautes sont dites, et la preuve attend qu'il soit juste.
+const muter = (t: string, a: string, b: string) => {
+  assert.ok(t.includes(a), `12 · mutant périmé : « ${a.slice(0, 60)} » n'est plus dans le code`);
+  return t.replace(a, b);
+};
+const mutantsCouverture: [string, () => [string, string]][] = [
+  ["M1 l'adresse lue hors de lireAdresse", () => [muter(couverture, "  const v = VARIANTES_COUVERTURE[cle];", '  const force = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("couverture") : null;\n  const v = VARIANTES_COUVERTURE[(force as CleCouverture) ?? cle];'), page]],
+  ["M1b l'essai ouvert en production", () => [muter(couverture, '|| process.env.NEXT_PUBLIC_BOLA_ENV === "preview"', '|| process.env.NEXT_PUBLIC_BOLA_ENV !== "development"'), page]],
+  ["M2 <source> de l'ordinateur retirée", () => [muter(couverture, '<source media="(min-width: 960px)"', '<template data-x="(min-width: 960px)"'), page]],
+  ["M3 sizes=300vw", () => [muter(couverture, 'sizes="100vw"', 'sizes="300vw"'), page]],
+  ["M4 voiles vidés", () => [muter(muter(couverture, "style={{ background: VOILE.clair }}", "style={{}}"), "style={{ background: VOILE.sombre }}", "style={{}}"), page]],
+  ["M4b voile vidé à la source", () => [muter(couverture, "  clair: `linear-gradient(to bottom, ", "  clair: `none, (to bottom, "), page]],
+  ["M5 isolate retiré", () => [couverture, muter(page, "relative isolate flex", "relative flex")]],
+  ["M6 aria-hidden={false}", () => [muter(couverture, "      aria-hidden\n", "      aria-hidden={false}\n"), page]],
+  ["M9 pointer-events-none retiré", () => [muter(couverture, "pointer-events-none ", ""), page]],
+  [
+    "M10 hauteur réservée gardée en commentaire seulement",
+    () => [couverture, muter(page, '<div className="relative isolate flex min-h-[calc(100svh-env(safe-area-inset-top))] flex-col justify-end">', '{/* min-h-[calc(100svh-env(safe-area-inset-top))] */}<div className="relative isolate flex flex-col justify-end">')],
+  ],
+  ["mur sans son voile", () => [muter(couverture, "style={{ background: VOILE_MUR.telephone }}", "style={{}}"), page]],
+  ["variante par défaut changée", () => [muter(couverture, 'export const COUVERTURE_SFL: CleCouverture = "a";', 'export const COUVERTURE_SFL: CleCouverture = "b";'), page]],
+];
+if (fautesDuHaut.length === 0) for (const [quoi, m] of mutantsCouverture) assert.ok(fautesCouverture(...m()).length > 0, `12 · le contrôle de la couverture laisse passer : ${quoi}`);
+
 const sourcesValidees = new Set(COUVERTURES.map((c) => `/actus/couvertures/${c.id}-1200.webp`));
 const permises = new Set(cartesPermises().map((c) => c.nom));
 const servisCouverture = new Set<string>();
 for (const [cle, v] of Object.entries(VARIANTES_COUVERTURE)) {
   verifier(v.source === null ? cle === "b" : sourcesValidees.has(v.source), `12 · la variante ${cle} vient d'une image hors du moodboard des Actus (${v.source})`);
   verifier(v.cartes.every((n) => (ACCORDS as readonly string[]).includes(n) && permises.has(n)), `12 · le mur de la variante ${cle} montre un joueur hors d'ACCORDS`);
-  verifier(v.source === null ? v.cartes.length > 0 : v.cartes.length === 0, `12 · la variante ${cle} : une photo avec des joueurs, ou un mur sans`);
+  verifier(v.source === null ? pareil([...v.cartes], nomsDuMur()) : v.cartes.length === 0, `12 · la variante ${cle} : la liste des joueurs n'est pas celle du mur (${v.cartes.join(", ")}), ou une photo en a`);
   verifier(v.telephone.length === 2 && v.telephone[0].largeur < v.telephone[1].largeur, `12 · la variante ${cle} n'a plus ses deux largeurs de téléphone`);
   const toutes: [ImageCouverture, number][] = [...v.telephone.map((i): [ImageCouverture, number] => [i, POIDS_TELEPHONE]), [v.ordinateur, POIDS_ORDINATEUR]];
   for (const [i, max] of toutes) {
@@ -782,9 +870,33 @@ for (const [cle, v] of Object.entries(VARIANTES_COUVERTURE)) {
   }
 }
 for (const f of readdirSync(join(RACINE, "public/sfl/couverture"))) verifier(servisCouverture.has(`/sfl/couverture/${f}`), `12 · public/sfl/couverture/${f} n'est cité par aucune variante (orphelin)`);
+// Les pixels du mur : l'outil est déterministe ; le banc recompose le mur à partir des cartes d'ACCORDS
+// (imagesMur) et compare chaque empreinte à celle du fichier servi. Une autre image mise à la place, même
+// avec son empreinte recopiée dans le module, est refusée (contrôle du 14/11, M7) ; un nom retiré de la
+// liste sans toucher aux pixels aussi (M8, plus haut : la liste doit être celle de nomsDuMur).
+const murRecompose = (async () => {
+  const f: string[] = [];
+  const mur = VARIANTES_COUVERTURE.b;
+  const m = await imagesMur();
+  const attendues = [...m.telephone, m.ordinateur];
+  const servies = [...mur.telephone, mur.ordinateur];
+  if (attendues.length !== servies.length) return ["12 · le mur n'a plus ses trois images"];
+  attendues.forEach((a, k) => {
+    const s = servies[k];
+    const fichier = join(RACINE, "public", s.src);
+    const ok = existsSync(fichier) && empreinte(readFileSync(fichier)) === empreinte(a.b) && s.largeur === a.l && s.hauteur === a.h;
+    if (!ok) f.push(`12 · ${s.src} n'est pas le mur recomposé à partir des cartes d'ACCORDS (relancer tools/page-sfl-couverture.ts)`);
+  });
+  // Le mutant M7 : une autre image du dossier à la place de b-720 ne passe pas.
+  const autre = readFileSync(join(RACINE, "public", VARIANTES_COUVERTURE.c.telephone[0].src));
+  assert.notEqual(empreinte(autre), empreinte(m.telephone[0].b), "12 · le contrôle du mur laisse passer une autre image (M7)");
+  // Le mutant M8 : un nom retiré de la liste est refusé.
+  assert.ok(!pareil(mur.cartes.slice(1), nomsDuMur()), "12 · le contrôle du mur laisse passer un nom retiré (M8)");
+  return f;
+})();
 
-void coinsOpaques.then((opaques) => {
-  fautes.push(...opaques);
+void Promise.all([coinsOpaques, murRecompose]).then(([opaques, mur]) => {
+  fautes.push(...opaques, ...mur);
   assert.equal(fautes.length, 0, `\n${fautes.join("\n")}`);
-  console.log(`page-sfl : ok (${textes.length} textes, ${effectif.length} noms cherchés, ${dossiers.length} adresses essayées à la porte, ${CLASSEMENT_SFL.bareme.length} points du barème, ${CARTE_SFL.lignes.length} gestes rejoués, ${ACCORDS.length} joueurs et ${images.length} images dans l'instantané, ${mutants.length} mutants refusés)`);
+  console.log(`page-sfl : ok (${textes.length} textes, ${effectif.length} noms cherchés, ${dossiers.length} adresses essayées à la porte, ${CLASSEMENT_SFL.bareme.length} points du barème, ${CARTE_SFL.lignes.length} gestes rejoués, ${ACCORDS.length} joueurs et ${images.length} images dans l'instantané, ${mutants.length + mutantsCouverture.length + 2} mutants refusés)`);
 });
