@@ -144,3 +144,25 @@
   color: inherit !important;
   opacity: 0.72;
 }
+
+/* ───────────── La Map de nuit : numérique, sans bandes ─────────────
+   Sabri, 14/11 : « il ne faut pas que tu mettes les bandes au niveau de la
+   map », « un peu plus digital ». Plus de bandes de tonte ni de projecteurs :
+   une grille de points fine qui glisse avec le plan (--sx, --sy), une trame
+   de repères plus large, un vignettage doux. Rien ne bouge seul (aucune
+   animation), le texte du plan garde tout son contraste. */
+:root[data-famille="pelouse"].dark .sc--a {
+  inset: 0;
+  background:
+    radial-gradient(circle, rgba(169, 223, 174, 0.16) 0.9px, transparent 1.3px) 0 0 / 22px 22px,
+    linear-gradient(rgba(169, 223, 174, 0.05) 1px, transparent 1px) 0 0 / 132px 132px,
+    linear-gradient(90deg, rgba(169, 223, 174, 0.05) 1px, transparent 1px) 0 0 / 132px 132px;
+  background-position: var(--sx, 0px) var(--sy, 0px);
+  mix-blend-mode: normal;
+  animation: none;
+}
+:root[data-famille="pelouse"].dark .sc--b { display: none; }
+:root[data-famille="pelouse"].dark .sc--c {
+  background: radial-gradient(120% 85% at 50% 45%, transparent 55%, rgba(3, 10, 6, 0.6));
+  box-shadow: none;
+}

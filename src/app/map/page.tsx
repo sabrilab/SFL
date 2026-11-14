@@ -245,7 +245,7 @@ const ambianceDeLAdresse = (): Ambiance => {
       style = Number(localStorage.getItem("bola-style-ui-2") ?? 0);
     } catch {}
   }
-  if (estPelouse(style) && !estJour()) return "nuit-pelouse";
+  if (estPelouse(style) && !estJour()) return "nuit-numerique";
   return PLAN_DU_STYLE[style] ?? "nuit-encre";
 };
 /** Dans un aperçu, /?zones=demo ajoute une zone qui vient de s'ouvrir (Lens) et une zone fermée (Paris), pour voir le récit. */
