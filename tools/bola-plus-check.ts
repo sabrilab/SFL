@@ -28,25 +28,21 @@
 //       paiement en plusieurs fois ; « Klarna » n'est nulle part dans src/) ; la route, la tuile de Ma
 //       carte et la section de l'admin sont branchées ; après « Annuler », rien
 //       ne reste coché, et le bouton fait 44 px.
-//   8 · les avantages (retour de Sabri, 12/11 23:08) : quatre, dans l'ordre, aux
-//       titres exacts ; un titre et rien d'autre (ni chiffre, ni prix, ni
-//       promesse) ; chaque visuel est là aux trois largeurs, en WebP, léger ;
-//       les cartes se chargent quand on y arrive, l'affiche tout de suite ;
-//       « Réduire les animations » est traité ; les prix ne sont écrits qu'une
-//       fois (aucun montant en dur dans l'écran, ni dans la tuile ni dans
-//       l'admin) ; l'annuel montre « 4 × 42,23 € sans frais » sous son prix ;
-//       « Tes maillots » prend l'image des maillots portés par un seul fichier
-//       déposé (public/bola-plus/maillots-portes.webp, 1170 px, 4:5), qui ne
-//       remplace le portant qu'une fois chargé ; ce fichier montre de vrais
-//       joueurs : .gitignore le refuse, et son texte dit « Image générée »
-//       sans nommer personne ; aucun prix ni les 4 fois ne se cachent (ni
-//       hidden, ni sr-only, ni invisible) ; aucun montant ni « euros » hors de
-//       la source ; la remise s'arrondit vers le bas dans la source même ;
-//       le bouton collé note comme celui de l'offre, et ne s'efface
-//       que lorsque le bouton de l'offre arrive (jamais d'écran sans bouton) ;
-//       les mots de l'écran sont une liste fermée (ni sous-titre, ni texte
-//       d'aide, ni avantage écrit hors de la liste) ; une carte se voit sans
-//       script ; noir et blanc, dans la feuille comme dans les classes.
+//   8 · le carrousel (retours de Sabri du 14/11, 20:34 → 20:47) : la grille
+//       officielle de la SFL et le prix premiers joueurs dans la seule
+//       source (barrés au-dessus des prix, saison < 140 €, année < 280 € et
+//       < 12 × 35 €, 4 échéances qui couvrent le prix, remises 43 % et 32 %
+//       calculées, jamais affichées) ; le bundle complet ; les avantages (une
+//       part et un identifiant chacun, les six attendus dans l'ordre, un de
+//       plus permis : Bola Studio) ; les visuels (trois largeurs, WebP,
+//       légers, « Image générée : » pour ceux qui le sont) ; la palette loin
+//       de l'or, du rouge et du cobalt des cartes, sans la braise, et ses
+//       contrastes ; la feuille sans aucune teinte écrite (tout passe par les
+//       variables de la page) ; l'écran : carrousel aimanté, segments,
+//       clavier, mouvement réduit, une seule barre « Je suis intéressé »
+//       effacée sur « Ton prix », la vraie carte « Toi », aucun montant en
+//       dur, une liste fermée de mots. « Tes maillots » prend l'image des
+//       maillots portés par un seul fichier déposé, refusé par .gitignore.
 //       Des mutants de la source sont rejoués : chaque garde doit les refuser.
 // Sans réseau : fetch est remplacé.
 //   npx tsx tools/bola-plus-check.ts
@@ -59,22 +55,36 @@ import {
   ANNUEL,
   ANNUEL_CENTIMES,
   AVANTAGES,
+  BARRE,
+  BOLA_PLUS_SEUL,
+  BOLA_PLUS_SEUL_CENTIMES,
+  BUNDLE,
   ECHEANCES,
+  FONCTIONS_BOLA_PLUS,
+  GRILLE_SFL,
   LARGEURS,
   LIBELLE_ECHEANCES,
   LIBELLE_REMISE,
   MENSUEL,
   MENSUEL_CENTIMES,
+  NOM_BUNDLE,
+  PALETTE,
+  PARRAINAGE,
+  PRIX_FORMULE,
   REMISE,
-  RAPPORT_VISUEL,
+  REMISE_GRILLE,
   REMISE_POUR_CENT,
+  SFL_OFFICIEL,
+  TEINTES_RESERVEES,
   avecEssai,
   compter,
+  diapos,
   echeance,
   fichierVisuel,
   interetDe,
   lireEssais,
   montant,
+  prix,
   sourcesVisuel,
   type Avantage,
   type LigneInteret,
@@ -459,46 +469,156 @@ async function banc() {
   // L'écran : après « Annuler », rien ne reste coché ; le bouton fait 44 px de haut.
   const ecran = src("components/sfl/bola-plus.tsx");
   assert.ok(/function defaire\(\) \{\s*suivre\.current = true;\s*onChoix\(null\);\s*annuler\(\);\s*\}/.test(ecran), "« Annuler » décoche la formule");
-  assert.ok(/<OffreBolaPlus plus=\{plus\} choix=\{choix\} onChoix=\{setChoix\} actionRef=\{actionRef\} \/>/.test(ecran), "l'offre reçoit le choix de la page");
+  assert.ok(/<DiapoPrix plus=\{plus\} choix=\{choix\} onChoix=\{setChoix\} actionRef=\{actionRef\} \/>/.test(ecran) && /<OffreBolaPlus plus=\{plus\} choix=\{choix\} onChoix=\{onChoix\} actionRef=\{actionRef\} \/>/.test(ecran), "l'offre reçoit le choix de la page");
   assert.ok(/onClick=\{defaire\}[\s\S]{0,120}min-h-11/.test(ecran), "« Annuler » : une cible de 44 px");
   assert.ok(!/onClick=\{annuler\}/.test(ecran), "« Annuler » passe par defaire");
 
-  // 8 · Les avantages.
-  const TITRES = ["Tes maillots", "Tes matchs filmés", "Des cadeaux", "Les cérémonies officielles"];
-  const INTERDIT = /\d|€|%|offert|gratuit|illimit|inclus|garanti|chaque|toujours|bientôt/i;
-  const CHAMPS = ["alt", "id", "image", "numero", "teinte", "titre"];
+  // 8 · Le carrousel.
+  // La grille de la SFL et le prix premiers joueurs : une seule source, des barrés au-dessus des prix.
+  type Grille = { mois: number; saison: { prix: number; reference: number }; annee: { prix: number; reference: number } };
+  const grilleJuste = (g: Grille, barre: typeof BARRE, mois: number, an: number) => {
+    assert.ok(g.saison.prix < g.saison.reference && g.saison.reference === 14000, "la saison : 119,90 € au lieu de 140 €");
+    assert.ok(g.annee.prix < g.annee.reference && g.annee.reference === 28000, "l'année : 249,90 € au lieu de 280 €");
+    assert.ok(g.annee.prix < 12 * g.mois, "l'année coûte moins que douze mois sans engagement");
+    assert.equal(barre.mensuel, g.mois, "le mensuel barre le mois de la grille");
+    assert.equal(barre.annuel, g.annee.prix, "l'annuel barre l'année de la grille");
+    assert.ok(barre.mensuel > mois && barre.annuel > an, "chaque barré est au-dessus de son prix");
+    assert.ok(ECHEANCES * echeance(an, ECHEANCES) >= an, "quatre échéances couvrent le prix");
+  };
+  assert.equal(BOLA_PLUS_SEUL_CENTIMES, 990);
+  assert.deepEqual(SFL_OFFICIEL, { mois: 3500, saison: { prix: 11990, reference: 14000 }, annee: { prix: 24990, reference: 28000 } });
+  grilleJuste(SFL_OFFICIEL, BARRE, MENSUEL_CENTIMES, ANNUEL_CENTIMES);
+  assert.deepEqual(REMISE_GRILLE, { mensuel: 43, annuel: 32 }, "−43 % et −32 % contre la grille, arrondis vers le bas");
+  assert.equal(prix(3500), "35");
+  assert.equal(prix(24990), "249,90");
+  assert.equal(BOLA_PLUS_SEUL, "9,90");
+  assert.deepEqual(GRILLE_SFL, [
+    { prix: "35", par: "mois" },
+    { prix: "119,90", par: "saison" },
+    { prix: "249,90", par: "an" },
+  ]);
+  assert.deepEqual(PRIX_FORMULE, {
+    mensuel: { euros: MENSUEL, par: "mois", barre: "35", sous: "Sans engagement" },
+    annuel: { euros: ANNUEL, par: "an", barre: "249,90", sous: LIBELLE_ECHEANCES },
+  });
+  // Le bundle : Bola Plus, les maillots, les stats, la carte, la SFL.
+  const bundleJuste = (b: readonly string[]) => assert.deepEqual([...b], ["bola-plus", "maillots", "stats", "carte", "sfl"], "le bundle est complet, dans l'ordre");
+  bundleJuste(BUNDLE);
+  assert.deepEqual(Object.keys(NOM_BUNDLE).sort(), [...BUNDLE].sort());
+  assert.deepEqual(
+    FONCTIONS_BOLA_PLUS.map((f) => f.nom),
+    ["Ton équipe", "Trash talk", "Skins et aspects", "Quêtes et missions"]
+  );
+
+  // Les avantages : une part et un identifiant chacun ; les six attendus, dans l'ordre ; un de plus permis (Bola Studio).
+  const ATTENDUS = [
+    ["carte", "plus", "Ta carte continue."],
+    ["bola-plus", "plus", "Bola Plus"],
+    ["maillots", "sfl", "Tes maillots"],
+    ["matchs-filmes", "sfl", "Tes matchs filmés"],
+    ["cadeaux", "sfl", "Des cadeaux"],
+    ["ceremonies", "sfl", "Les cérémonies officielles"],
+  ] as const;
+  const INTERDIT = /\d|€|%|gratuit|illimit|inclus|garanti|chaque|toujours|bientôt/i;
   const DEPOSE = "/bola-plus/maillots-portes.webp";
   const avantagesJustes = (liste: readonly Avantage[]) => {
-    assert.deepEqual(liste.map((a) => a.titre), TITRES, "quatre avantages, dans l'ordre, aux titres exacts");
-    assert.deepEqual(liste.map((a) => a.numero), ["01", "02", "03", "04"]);
-    assert.equal(new Set(liste.map((a) => a.id)).size, liste.length);
+    assert.equal(new Set(liste.map((a) => a.id)).size, liste.length, "un identifiant par avantage");
+    const ids = liste.map((a) => a.id);
+    let avant = -1;
+    for (const [id, part, titre] of ATTENDUS) {
+      const i = ids.indexOf(id);
+      assert.ok(i > avant, `« ${titre} » est là, à sa place`);
+      avant = i;
+      assert.equal(liste[i].part, part, `« ${titre} » : sa part`);
+      assert.equal(liste[i].titre, titre, `« ${titre} » : son titre exact`);
+    }
+    assert.ok(liste.length <= ATTENDUS.length + 1, "un avantage de plus au plus (Bola Studio)");
+    // Les violettes d'abord, puis les vertes : on glisse de Bola Plus à la SFL.
+    const parts = liste.map((a) => a.part);
+    assert.deepEqual(parts, [...parts].sort((x, y) => (x === y ? 0 : x === "plus" ? -1 : 1)), "les avantages de Bola Plus avant ceux de la SFL");
     for (const a of liste) {
-      assert.ok(!INTERDIT.test(a.titre) && !INTERDIT.test(a.alt), `« ${a.titre} » : ni chiffre, ni prix, ni promesse`);
-      assert.ok(a.titre.length <= 28, `« ${a.titre} » : 28 caractères au plus`);
-      assert.deepEqual(Object.keys(a).filter((k) => k !== "depose").sort(), CHAMPS, `« ${a.titre} » : un titre et son visuel, aucun autre texte`);
+      assert.ok(a.part === "plus" || a.part === "sfl", `« ${a.titre} » : une part connue`);
+      assert.ok(!INTERDIT.test(a.titre) && !(a.sous && INTERDIT.test(a.sous)), `« ${a.titre} » : ni chiffre, ni prix, ni promesse`);
+      assert.ok(a.titre.length <= 28 && (a.sous ?? "").length <= 28, `« ${a.titre} » : peu de mots`);
+      assert.deepEqual(Object.keys(a).filter((k) => !["depose", "sous"].includes(k)).sort(), ["id", "part", "titre", "visuel"], `« ${a.titre} » : un titre et son visuel, rien d'autre`);
+      if (a.visuel.genre === "image") {
+        assert.ok(a.visuel.alt && !/\d|€|%/.test(a.visuel.alt), `« ${a.titre} » : un visuel décrit`);
+        if (a.visuel.rapport === 1.5) assert.ok(a.visuel.alt.startsWith("Image générée : "), `« ${a.titre} » : son visuel dit qu'il est généré`);
+      }
       if (a.depose) {
         assert.equal(a.id, "maillots", "seule « Tes maillots » attend un visuel déposé");
         assert.deepEqual(Object.keys(a.depose).sort(), ["alt", "fichier"]);
         assert.equal(a.depose.fichier, DEPOSE, "un seul fichier à déposer");
-        assert.ok(a.depose.alt && !INTERDIT.test(a.depose.alt), "le visuel déposé : décrit, ni chiffre, ni prix, ni promesse");
-        // Il montre de vrais joueurs, en image générée : il le dit, et ne nomme personne (le dépôt est public).
         assert.ok(a.depose.alt.startsWith("Image générée : "), "le visuel déposé dit qu'il est généré");
         const noms = a.depose.alt.slice("Image générée : ".length).match(/@|\b[A-ZÀ-Ý][\p{L}'’-]*/gu) ?? [];
         assert.deepEqual(noms.filter((m) => m !== "SFL" && m !== "BOLA" && m !== "Bola"), [], "le visuel déposé ne nomme aucun joueur");
       }
-      assert.match(a.teinte, /^#([0-9a-f]{2})\1\1$/, `« ${a.titre} » : une teinte grise`);
     }
   };
   avantagesJustes(AVANTAGES);
   assert.equal(AVANTAGES.filter((a) => a.depose).length, 1, "« Tes maillots » est prête pour les maillots portés");
-  const afficheJuste = (alt: string) => assert.ok(!INTERDIT.test(alt), "l'affiche : ni chiffre, ni prix, ni promesse");
-  afficheJuste(AFFICHE.alt);
+  // Les cartes du carrousel : l'ouverture, les avantages, « Ramène 5 », le prix.
+  const ordre = diapos().map((d) => d.id);
+  assert.deepEqual(ordre, ["ouverture", ...AVANTAGES.map((a) => a.id), "parrainage", "prix"]);
+  assert.equal(diapos([...AVANTAGES, { id: "studio", part: "plus", titre: "Ton studio", visuel: { genre: "composant", composant: "carte" } }]).length, ordre.length + 1, "un avantage de plus fait une carte de plus, sans rien d'autre");
+  assert.deepEqual(PARRAINAGE, { titre: "Ramène 5 abonnés.", sous: "Le tien est offert.", nombre: 5 });
+  assert.equal(AFFICHE.alt, "", "l'ouverture : le stade est un décor");
   assert.deepEqual([...LARGEURS], [480, 780, 1170]);
   assert.equal(sourcesVisuel("affiche"), "/bola-plus/affiche-480.webp 480w, /bola-plus/affiche-780.webp 780w, /bola-plus/affiche-1170.webp 1170w");
 
+  // La palette : loin de l'or, du rouge et du cobalt des cartes ; pas de braise ; des contrastes AA.
+  const rvb = (h: string) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+  const teinte = (h: string) => {
+    const [r, g, b] = rvb(h).map((v) => v / 255);
+    const max = Math.max(r, g, b);
+    const min = Math.min(r, g, b);
+    const d = max - min;
+    // Une teinte presque neutre (la nuit) n'a pas de couleur à comparer.
+    if (d < 0.12) return null;
+    const t = max === r ? ((g - b) / d) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
+    return (t * 60 + 360) % 360;
+  };
+  const ecart = (a: number, b: number) => Math.min(Math.abs(a - b), 360 - Math.abs(a - b));
+  const lum = (h: string) => {
+    const [r, g, b] = rvb(h).map((v) => v / 255).map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  };
+  const contraste = (a: string, b: string) => {
+    const [x, y] = [lum(a), lum(b)].sort((m, n) => n - m);
+    return (x + 0.05) / (y + 0.05);
+  };
+  type Palette = { plus: { [k in keyof typeof PALETTE.plus]: string }; sfl: { [k in keyof typeof PALETTE.sfl]: string }; prix: string; nuit: string };
+  const couleurs = (p: Palette) => [...Object.values(p.plus), ...Object.values(p.sfl), p.prix, p.nuit];
+  const paletteJuste = (p: Palette) => {
+    for (const c of couleurs(p)) {
+      assert.match(c, /^#[0-9A-F]{6}$/i);
+      assert.notEqual(c.toUpperCase(), "#FF8A4C", "la braise est réservée au « Il manque N »");
+      const t = teinte(c);
+      if (t === null) continue;
+      for (const [nom, r] of Object.entries(TEINTES_RESERVEES)) assert.ok(ecart(t, teinte(r)!) >= 30, `${c} est trop près de la teinte ${nom} (${Math.round(ecart(t, teinte(r)!))}°)`);
+    }
+    for (const [texte, fond] of [
+      ["#FFFFFF", p.plus.fond],
+      [p.plus.clair, p.plus.fond],
+      ["#FFFFFF", p.plus.vif],
+      ["#FFFFFF", p.sfl.fond],
+      ["#FFFFFF", p.sfl.encre],
+      [p.prix, p.nuit],
+      [p.prix, p.plus.fond],
+      [p.prix, p.sfl.fond],
+      [p.nuit, p.prix],
+      [p.plus.encre, "#FFFFFF"],
+      [p.sfl.encre, "#FFFFFF"],
+      [p.plus.fond, p.plus.fondClair],
+      [p.plus.encre, p.plus.fondClair],
+    ])
+      assert.ok(contraste(texte, fond) >= 4.5, `${texte} sur ${fond} : ${contraste(texte, fond).toFixed(1)}, au moins 4,5`);
+  };
+  paletteJuste(PALETTE);
+
   // Les visuels : chacun à ses trois largeurs, en WebP (en-tête RIFF…WEBP), léger ; rien d'autre dans le dossier.
   const PUBLIC = join(__dirname, "..", "public");
-  const POIDS: Record<number, number> = { 480: 70_000, 780: 90_000, 1170: 150_000 };
+  const POIDS: Record<number, number> = { 480: 70_000, 780: 250_000, 1170: 250_000 };
   const visuelsLa = (images: readonly string[], dossier = PUBLIC) => {
     let total = 0;
     for (const image of images) {
@@ -513,11 +633,10 @@ async function banc() {
     }
     return total;
   };
-  const IMAGES = [AFFICHE.image, ...AVANTAGES.map((a) => a.image)];
+  const IMAGES = [AFFICHE.image, ...AVANTAGES.flatMap((a) => (a.visuel.genre === "image" ? [a.visuel.image] : []))];
   assert.equal(new Set(IMAGES).size, 5, "cinq visuels distincts");
   const total = visuelsLa(IMAGES);
-  assert.ok(total <= 1_500_000, `les visuels pèsent ${total} octets, au plus 1,5 Mo`);
-  // Le visuel déposé, s'il est là : un WebP de 1170 px de large au plus 250 ko ; il est le seul ajout permis.
+  assert.ok(total <= 2_000_000, `les visuels pèsent ${total} octets, au plus 2 Mo`);
   // La taille d'un WebP, lue dans son en-tête (VP8X, VP8 ou VP8L).
   const tailleWebp = (o: Buffer) => {
     const bloc = o.subarray(12, 16).toString("latin1");
@@ -529,6 +648,12 @@ async function banc() {
     }
     throw new Error(`WebP inconnu : ${bloc}`);
   };
+  // Le rapport de chaque visuel : celui qu'il déclare.
+  for (const a of AVANTAGES) {
+    if (a.visuel.genre !== "image") continue;
+    const { largeur, hauteur } = tailleWebp(readFileSync(join(PUBLIC, fichierVisuel(a.visuel.image, 780))));
+    assert.ok(Math.abs(hauteur - largeur * a.visuel.rapport) <= 2, `${a.visuel.image} : ${largeur} × ${hauteur}, rapport ${a.visuel.rapport}`);
+  }
   const deposeJuste = (dossier = PUBLIC) => {
     const f = join(dossier, DEPOSE);
     if (!existsSync(f)) return false;
@@ -536,7 +661,7 @@ async function banc() {
     assert.ok(o.subarray(0, 4).toString("latin1") === "RIFF" && o.subarray(8, 12).toString("latin1") === "WEBP", `${DEPOSE} : du WebP`);
     assert.ok(o.length <= 250_000, `${DEPOSE} : ${o.length} octets, au plus 250 000`);
     const { largeur, hauteur } = tailleWebp(o);
-    assert.ok(largeur === 1170 && Math.abs(hauteur - 1170 * RAPPORT_VISUEL) <= 1, `${DEPOSE} : ${largeur} × ${hauteur}, attendu 1170 × 1462 (4:5)`);
+    assert.ok(largeur === 1170 && Math.abs(hauteur - 1170 * 1.25) <= 1, `${DEPOSE} : ${largeur} × ${hauteur}, attendu 1170 × 1462 (4:5)`);
     return true;
   };
   // Il montre de vrais joueurs : .gitignore le garde hors du dépôt public.
@@ -560,104 +685,78 @@ async function banc() {
       const fin = tsx.indexOf("\n}\n", debut);
       return tsx.slice(debut, fin);
     };
-    const carte = bloc("CarteAvantage");
-    const affiche = bloc("AfficheBolaPlus");
-    const barre = bloc("BarreInteret");
     const page = bloc("PageBolaPlus");
-    // Les cartes se chargent quand on y arrive, à leur taille ; l'affiche tout de suite.
-    assert.ok(/loading="lazy"/.test(carte) && /decoding="async"/.test(carte), "les cartes d'avantage sont chargées paresseusement");
-    for (const b of [carte, affiche]) assert.ok(/width=\{LARGEUR\}/.test(b) && /height=\{HAUTEUR\}/.test(b) && /srcSet=\{sourcesVisuel\(/.test(b), "un visuel a sa largeur, sa hauteur et ses trois tailles");
-    assert.ok(!/loading=/.test(affiche) && /fetchPriority="high"/.test(affiche), "l'affiche est chargée tout de suite");
-    // Une carte : son numéro, son titre, rien d'autre d'écrit.
-    assert.ok(/\{avantage\.numero\}/.test(carte) && /\{avantage\.titre\}/.test(carte), "la carte montre le numéro et le titre");
-    assert.equal(carte.match(/<(p|h[1-6]|span)\b/g)?.length, 2, "la carte n'écrit que le numéro et le titre");
-    assert.ok(/AVANTAGES\.map\(/.test(page), "la page montre les avantages de la liste");
-    // Les prix : une seule source.
-    // (Hors commentaires ; « border-foreground/30 » est une opacité, pas un prix.)
-    const sansCommentaire = tsx.replace(/^\s*\/\/.*$/gm, "");
-    assert.ok(!/(?<![\w/[-])(19|20|168|29|30|42|90|1990|16890|4223)(?![\w\]])/.test(sansCommentaire.replace(/size-\[\d+px\]|\[\d+px\]/g, "")), "aucun prix écrit en dur dans l'écran");
-    assert.ok(!/sans frais|en \d+ fois|×/.test(sansCommentaire), "les 4 fois ne s'écrivent que dans l'offre (lib/sfl/bola-plus.ts)");
-    assert.ok(/\{MENSUEL\}/.test(affiche) && /\{ANNUEL\}/.test(affiche) && /\{LIBELLE_REMISE\}/.test(affiche), "l'affiche lit les prix de l'offre");
-    // Le bouton, ses états.
-    for (const mot of ["Je suis intéressé", "C&apos;est noté", "Annuler"]) assert.ok(tsx.includes(mot), `« ${mot} » est toujours là`);
-    // La barre collée : le même geste que le bouton de l'offre, dans <body>, effacée quand l'offre est à l'écran.
-    assert.ok(/onNoter=\{\(\) => plus\.noter\(choix\)\}/.test(page), "la barre collée note par le noter de la page");
     const offre = bloc("OffreBolaPlus");
-    assert.ok(/function interesser\(\) \{\s*suivre\.current = true;\s*noter\(choix\);\s*\}/.test(offre) && /onClick=\{interesser\}/.test(offre), "le bouton de l'offre note par le même noter");
-    assert.equal(tsx.match(/useBolaPlus\(\)/g)?.length, 2, "un seul useBolaPlus pour la page (et celui de la tuile)");
+    const barre = bloc("BarreInteret");
+    const photo = bloc("DiapoPhoto");
+    const ouverture = bloc("DiapoOuverture");
+    const carte = bloc("VisuelCarte");
+    const tuile = bloc("TuileBolaPlus");
+    const sansCommentaire = tsx.replace(/^\s*\/\/.*$/gm, "").replace(/\{\/\*[\s\S]*?\*\/\}/g, "");
+    // Aucun montant en dur, aucune couleur écrite : tout vient de lib/sfl/bola-plus.ts.
+    assert.ok(!/(?<![\w/[.-])(19|20|35|119|140|168|249|280|29|30|32|42|43|90|990|1990|16890|3500|4223)(?![\w\]])/.test(sansCommentaire.replace(/size-\[\d+px\]|\[\d+px\]/g, "")), "aucun prix écrit en dur dans l'écran");
+    assert.ok(!/sans frais|en \d+ fois|×/.test(sansCommentaire), "les 4 fois ne s'écrivent que dans la source");
+    assert.ok(!/#[0-9a-f]{3,8}\b/i.test(sansCommentaire), "aucune teinte écrite dans l'écran (PALETTE)");
+    assert.ok(/"--bp-prix": PALETTE\.prix/.test(tsx) && /style=\{COULEURS\}/.test(page), "la page pose la palette en variables");
+    const COULEUR = /\b(red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)-\d/;
+    assert.equal(COULEUR.exec(sansCommentaire)?.[0] ?? null, null, "une classe de couleur de Tailwind dans l'écran");
+    // La tuile de Ma carte reste en noir et blanc : la couleur ne sort pas de la page.
+    assert.ok(!/bp-|PALETTE/.test(tuile), "la tuile de Ma carte n'a pas les couleurs de la page");
+    // Le carrousel : aimanté, nommé, une diapositive par carte, segments et clavier.
+    assert.ok(/aria-roledescription="carrousel"/.test(page) && /aria-roledescription="diapositive"/.test(page), "le carrousel et ses diapositives sont nommés");
+    assert.ok(/aria-label=\{`\$\{i \+ 1\} sur \$\{n\} : \$\{d\.nom\}`\}/.test(page), "chaque diapositive dit sa place");
+    assert.ok(/aria-current=\{i === actif \? "true" : undefined\}/.test(page) && /aria-label=\{`Aller à \$\{i \+ 1\} sur \$\{n\} : \$\{d\.nom\}`\}/.test(page), "les segments disent où l'on est");
+    assert.ok(/e\.key === "ArrowRight"/.test(page) && /e\.key === "Home"/.test(page) && /e\.key === "End"/.test(page) && /onKeyDown=\{clavier\}/.test(page), "le clavier fait tourner le carrousel");
+    assert.ok(/e\.stopPropagation\(\);/.test(offre), "les flèches des formules ne font pas tourner le carrousel");
+    assert.ok(/threshold: 0\.6/.test(page) && /root: rail/.test(page), "la carte active : les trois cinquièmes du rail");
+    assert.ok(/behavior: doux \? "smooth" : "auto"/.test(page) && /prefers-reduced-motion: reduce/.test(page), "les sauts suivent « Réduire les animations »");
+    assert.ok(/diapos\(\)/.test(page), "le carrousel lit la liste des cartes de la source");
+    assert.ok(/const COMPOSANTS: Record<ComposantAvantage, \(\) => ReactNode> = \{/.test(tsx), "les visuels dessinés passent par COMPOSANTS");
+    // Une seule barre « Je suis intéressé », effacée sur « Ton prix » où le bouton est dans la carte.
     assert.ok(/createPortal\(/.test(barre) && /document\.body/.test(barre), "la barre collée est portée dans <body>");
-    assert.ok(/cachee=\{offreVue\}/.test(page) && /inert=\{cachee\}/.test(barre), "la barre s'efface quand l'offre est à l'écran");
-    assert.ok(/prefers-reduced-motion: reduce/.test(page), "le saut vers l'offre est immédiat avec « Réduire les animations »");
-    // La feuille de style : le mouvement réduit, le clavier.
+    assert.ok(/cachee=\{actif === iPrix\}/.test(page) && /inert=\{cachee\}/.test(barre), "la barre s'efface sur « Ton prix »");
+    assert.ok(/onNoter=\{\(\) => plus\.noter\(choix\)\}/.test(page), "la barre collée note par le noter de la page");
+    assert.ok(/function interesser\(\) \{\s*suivre\.current = true;\s*noter\(choix\);\s*\}/.test(offre) && /onClick=\{interesser\}/.test(offre), "le bouton de l'offre note par le même noter");
+    assert.ok(/aller\(iPrix\);/.test(page), "« C'est noté » mène à « Ton prix »");
+    assert.equal(tsx.match(/useBolaPlus\(\)/g)?.length, 2, "un seul useBolaPlus pour la page (et celui de la tuile)");
+    assert.ok(/onClick=\{onNoter\} disabled=\{occupe\}/.test(barre), "la barre : bouton gelé pendant l'envoi");
+    assert.equal(offre.match(/disabled=\{occupe\}/g)?.length, 3, "l'offre : formules, bouton et « Annuler » gelés pendant l'envoi");
+    assert.ok(/if \(!interet\) onChoix\(f\);\s*else if \(interet\.formule !== f\) noter\(f\);/.test(offre), "une fois noté, toucher une formule la change");
+    // Les prix de l'offre : PRIX_FORMULE, avec le barré et la ligne dessous ; rien ne les cache.
+    assert.ok(/const p = PRIX_FORMULE\[f\];/.test(offre) && /<Barre somme=\{p\.barre\} \/>/.test(offre) && /\{p\.sous\}/.test(offre), "chaque formule : son prix, son barré, sa ligne");
+    const CACHE = /(^|[\s:"])(hidden|sr-only|invisible|opacity-0)(?=[\s"])/;
+    assert.ok(!CACHE.test(offre) && !CACHE.test(ouverture), "les prix se voient");
+    // La vraie carte « Toi », sans photo ni nom de joueur.
+    assert.ok(/<BolaCard name="Toi" /.test(carte) && !/photo=/.test(carte), "« Ta carte » : la vraie carte « Toi », sans photo");
+    // « Tes maillots » : le portant d'abord ; le visuel déposé ne le remplace qu'une fois chargé.
+    assert.ok(/const \[deposeLa, setDeposeLa\] = useState\(false\);/.test(photo) && /const depose = deposeLa \? avantage\.depose : undefined;/.test(photo), "la carte montre le portant tant que le visuel déposé n'est pas chargé");
+    assert.ok(/essai\.onload = \(\) => \{\s*if \(vivant && essai\.naturalWidth > 0\) setDeposeLa\(true\);/.test(photo) && !/onerror/.test(photo), "le visuel déposé ne passe devant qu'une fois chargé");
+    assert.ok(/alt=\{visuel\.alt\}/.test(photo) && /alt=\{depose\.alt\}/.test(photo) && /alt=\{AFFICHE\.alt\}/.test(ouverture), "chaque visuel a son texte de remplacement");
+    assert.ok(/srcSet=\{sourcesVisuel\(/.test(photo) && /sizes=\{TAILLES\}/.test(photo) && /loading=\{tot \? undefined : "lazy"\}/.test(photo), "les visuels : trois tailles, chargés quand on y arrive");
+    // Les mots de l'écran : une liste fermée. Ni sous-titre, ni texte d'aide.
+    const mots = [...new Set([...sansCommentaire.replace(/&apos;/g, "'").matchAll(/>\s*([^<>{}\n;()=]*[A-Za-zÀ-ÿ][^<>{}\n;()=]*?)\s*</g)].map((m) => m[1].trim()))].sort();
+    assert.deepEqual(mots, ["Annuler", "Bola Plus", "C'est noté", "Je suis intéressé", "Offert", "Prix premiers joueurs", "Toi"], "les mots de l'écran : une liste fermée");
+    // La feuille : aimantée, sans teinte écrite (seulement les variables de la page), le mouvement réduit traité.
+    const sansNotes = css.replace(/\/\*[\s\S]*?\*\//g, "");
+    assert.ok(/scroll-snap-type: x mandatory;/.test(sansNotes) && /scroll-snap-align: center;/.test(sansNotes) && /scroll-snap-stop: always;/.test(sansNotes), "le rail est aimanté, carte par carte");
+    assert.ok(/overscroll-behavior-x: contain;/.test(sansNotes), "le rail ne fait pas reculer la page");
+    assert.ok(!/#[0-9a-f]{3,8}\b/i.test(sansNotes.replace(/#fff\b/g, "")), "pas d'autre teinte écrite que le blanc dans la feuille");
+    assert.ok(!/\b(hsla?|hwb|lab|lch|oklab|oklch)\(/.test(sansNotes), "aucune teinte écrite dans la feuille");
+    assert.ok(!/:\s*[^;{}]*\b(gold|red|orange|yellow|green|blue|purple|pink|brown|tomato|coral|salmon|crimson|orangered|goldenrod|navy|teal|cyan|magenta|violet|indigo|maroon|olive|lime|aqua|fuchsia|khaki|tan|beige)\b/.test(sansNotes), "aucune couleur nommée dans la feuille");
+    for (const m of sansNotes.matchAll(/rgb\((\d+) (\d+) (\d+)/g)) assert.ok(Math.max(+m[1], +m[2], +m[3]) - Math.min(+m[1], +m[2], +m[3]) <= 8, `une couleur écrite dans la feuille : ${m[0]}`);
+    assert.ok(!/animation:|@keyframes/.test(sansNotes), "rien ne bouge en boucle");
     const reduit = /@media \(prefers-reduced-motion: reduce\) \{([\s\S]*)\}\s*$/.exec(css)?.[1] ?? "";
-    assert.ok(/\.bp-carte,\s*\.bp-carte\[data-attend\],\s*\.bp-carte\[data-vue\] \{[^}]*opacity: 1;[^}]*transition: none;/.test(reduit), "mouvement réduit : les cartes sont là d'emblée");
-    assert.ok(/\.bp-barre[^{]*\{[^}]*transition: none;/.test(reduit), "mouvement réduit : la barre ne fond pas");
+    assert.ok(/\.bp-arc__rond,[\s\S]*transition: none;/.test(reduit), "mouvement réduit : rien ne glisse ni ne fond");
+    assert.ok(/\.bp-parrainage \.bp-arc__rond \{[^}]*background-color: var\(--bp-prix\);/.test(reduit), "mouvement réduit : les ronds de « Ramène 5 » sont pleins d'emblée");
     assert.ok(/html\[data-clavier\] \.bp-barre \{\s*display: none;/.test(css), "la barre s'efface sous le clavier");
-    assert.ok(!/scroll-snap|animation:|@keyframes/.test(css), "ni accroche ni animation en boucle");
-    // Les blocs de la feuille : l'affiche et la carte gardent leur forme ; une carte se voit sans script,
-    // n'attend que par [data-attend] et revient par [data-vue] ; la barre reste au-dessus des onglets.
+    assert.ok(/@media \(pointer: fine\)/.test(css) && /\.bp-fleche \{\s*display: none;/.test(css), "les flèches : sur ordinateur seulement");
     const regle = (selecteur: string) => {
       const i = css.indexOf(`\n${selecteur} {`);
       assert.ok(i >= 0, `${selecteur} est dans la feuille`);
       return css.slice(i, css.indexOf("}", i));
     };
-    assert.ok(/aspect-ratio: 4 \/ 5;/.test(regle(".bp-carte")), "la carte garde sa forme");
-    assert.ok(/aspect-ratio: 4 \/ 5;/.test(regle(".bp-affiche")), "l'affiche garde sa forme");
-    assert.ok(!/opacity|translate/.test(regle(".bp-carte")), "sans script, une carte se voit");
-    assert.ok(/opacity: 0;/.test(regle(".bp-carte[data-attend]")), "une carte hors de l'écran attend");
-    assert.ok(/opacity: 1;[\s\S]*transition:/.test(regle(".bp-carte[data-vue]")), "une carte vue est là");
     assert.ok(/z-index: 30;/.test(regle(".bp-barre")) && /bottom: calc\(max\(calc\(env\(safe-area-inset-bottom\) - 4px\), 14px\) \+ 62px \+ 10px\);/.test(regle(".bp-barre")), "la barre est au-dessus des onglets");
-    // La carte : elle attend hors de l'écran, puis arrive ; son visuel est décrit et à sa taille.
-    assert.ok(/setEtat\("attend"\)/.test(carte) && /avant === "attend" \? "vue" : avant/.test(carte), "la carte attend puis arrive");
-    assert.ok(/data-attend=\{etat === "attend" \? "" : undefined\}/.test(carte) && /data-vue=\{etat === "vue" \? "" : undefined\}/.test(carte), "la carte porte son état");
-    assert.ok(/alt=\{avantage\.alt\}/.test(carte) && /alt=\{AFFICHE\.alt\}/.test(affiche), "chaque visuel a son texte de remplacement");
-    for (const b of [carte, affiche]) assert.ok(/sizes=\{TAILLES\}/.test(b), "un visuel dit sa taille à l'écran");
-    // Les mots de l'écran : une liste fermée. Ni sous-titre, ni texte d'aide, ni avantage hors de la liste.
-    const rendu = (b: string) => b.slice(Math.max(b.lastIndexOf("  return ("), b.lastIndexOf("  return createPortal("))).replace(/^\s*\/\/.*$/gm, "");
-    const mots = (b: string) => [...rendu(b).matchAll(/>([^<>{}]*[A-Za-zÀ-ÿ][^<>{}]*)</g)].map((m) => m[1].trim()).sort();
-    const balises = (b: string) => [...new Set([...rendu(b).matchAll(/<([A-Za-z][\w]*)/g)].map((m) => m[1]))].sort();
-    assert.deepEqual(mots(affiche), ["/ an", "/ mois", "Bola Plus"], "l'affiche : le nom et les deux prix");
-    assert.deepEqual(balises(affiche), ["BoutonRetour", "div", "h1", "header", "img", "p", "span"]);
-    assert.equal(affiche.match(/<(p|h[1-6])\b/g)?.length, 2, "l'affiche : un titre et la ligne des prix");
-    assert.deepEqual(mots(carte), [], "la carte n'écrit rien en dur");
-    assert.deepEqual(mots(page), [], "la page n'écrit rien en dur");
-    assert.deepEqual(balises(page), ["AfficheBolaPlus", "BarreInteret", "CarteAvantage", "OffreBolaPlus", "div", "ol"], "la page : l'affiche, les avantages de la liste, l'offre, la barre");
-    assert.deepEqual(mots(barre), ["Je suis intéressé"]);
-    assert.deepEqual(mots(offre), ["Annuler", "Je suis intéressé"]);
-    assert.ok(/mensuel: \{ euros: MENSUEL, par: "mois", detail: "Sans engagement" \},\s*annuel: \{ euros: ANNUEL, par: "an", detail: LIBELLE_REMISE, sous: LIBELLE_ECHEANCES \},/.test(tsx), "les deux formules : leurs prix et leurs détails, rien d'inventé");
-    assert.ok(/\{p\.sous && <span[^>]*>\{p\.sous\}<\/span>\}/.test(offre) && offre.indexOf("{p.sous") > offre.indexOf("/ {p.par}"), "les 4 fois s'écrivent sous le prix de l'annuel");
-    // Rien ne cache les prix de l'affiche ni les 4 fois, à aucune largeur.
-    const CACHE = /(^|[\s:"])(hidden|sr-only|invisible|opacity-0)(?=[\s"])/;
-    const ligneSous = offre.split("\n").find((l) => l.includes("{p.sous && ")) ?? "";
-    assert.ok(ligneSous && !CACHE.test(ligneSous), "les 4 fois se voient");
-    assert.ok(!CACHE.test(affiche), "les prix de l'affiche se voient");
-    // « Tes maillots » : le portant d'abord ; le visuel déposé ne le remplace qu'une fois chargé.
-    assert.ok(/const \[deposeLa, setDeposeLa\] = useState\(false\);/.test(carte) && /const depose = deposeLa \? avantage\.depose : undefined;/.test(carte) && /\{depose \? \(/.test(carte), "la carte montre le portant tant que le visuel déposé n'est pas chargé");
-    assert.ok(/essai\.onload = \(\) => \{\s*if \(vivant && essai\.naturalWidth > 0\) setDeposeLa\(true\);/.test(carte) && /essai\.src = fichier;/.test(carte), "le visuel déposé ne passe devant qu'une fois chargé");
-    assert.ok(!/setDeposeLa\(true\)/.test(carte.replace(/essai\.onload = \(\) => \{\s*if \(vivant && essai\.naturalWidth > 0\) setDeposeLa\(true\);/, "")), "rien d'autre ne le fait passer devant");
-    assert.ok(/src=\{depose\.fichier\}/.test(carte) && /alt=\{depose\.alt\}/.test(carte), "le visuel déposé a son fichier et son texte");
-    assert.equal(carte.match(/loading="lazy"/g)?.length, 2, "les deux visuels de la carte sont chargés paresseusement");
-    // Les boutons : gelés pendant l'envoi ; la barre dit « C'est noté » une fois noté, pas avant.
-    assert.equal(offre.match(/disabled=\{occupe\}/g)?.length, 3, "l'offre : formules, bouton et « Annuler » gelés pendant l'envoi");
-    assert.ok(/onClick=\{onNoter\} disabled=\{occupe\}/.test(barre), "la barre : bouton gelé pendant l'envoi");
-    assert.ok(/\{note \? \([\s\S]*onClick=\{onVoirOffre\}[\s\S]*\) : \([\s\S]*onClick=\{onNoter\}/.test(barre), "la barre : « C'est noté » une fois noté, le bouton avant");
-    assert.ok(/if \(!interet\) onChoix\(f\);\s*else if \(interet\.formule !== f\) noter\(f\);/.test(offre), "une fois noté, toucher une formule la change");
-    assert.ok(/behavior: doux \? "smooth" : "auto"/.test(page), "le saut vers l'offre suit « Réduire les animations »");
-    // La barre s'efface quand le BOUTON de l'offre arrive à sa place, pas quand l'offre commence.
-    assert.ok(/const MARGE_BARRE = "0px 0px -120px 0px";/.test(tsx), "la marge de la barre");
-    assert.ok(/const el = actionRef\.current;[\s\S]*rootMargin: MARGE_BARRE/.test(page) && /actionRef=\{actionRef\}/.test(page), "la page regarde le bouton de l'offre");
-    assert.ok(/<div ref=\{blocRef\} tabIndex=\{-1\} className="bp-action">\s*\{interet \? \(/.test(offre) && /const blocRef = actionRef \?\? interneRef;/.test(offre), "l'offre donne le bloc de son bouton");
-    // Clavier : les flèches dans les formules, le focus rendu au bloc du bouton.
-    assert.ok(/onKeyDown=\{fleches\}/.test(offre) && /blocRef\.current\?\.focus\(\{ preventScroll: true \}\)/.test(offre), "clavier : flèches et focus");
-    // Noir et blanc : aucune classe de couleur dans l'écran (le rouge d'« Annuler », bouton--rouge, est celui de l'app).
-    const COULEUR = /\b(red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)-\d|\b(gold|or|braise)\b(?=[^\n]*")/;
-    assert.equal(COULEUR.exec(sansCommentaire.replace(/"[^"]*"/g, (c) => (/className|^"[\w\s:[\]().%/&>-]*"$/.test(c) ? c : '""')))?.[0] ?? null, null, "une classe de couleur dans l'écran");
-    const sansNotes = css.replace(/\/\*[\s\S]*?\*\//g, "");
-    assert.ok(!/\b(hsla?|hwb|lab|lch|oklab|oklch|color|color-mix)\(/.test(sansNotes), "la feuille n'écrit ses teintes qu'en rgb gris");
-    assert.ok(!/:\s*[^;{}]*\b(gold|red|orange|yellow|green|blue|purple|pink|brown|tomato|coral|salmon|crimson|orangered|goldenrod|navy|teal|cyan|magenta|violet|indigo|maroon|olive|lime|aqua|fuchsia|khaki|tan|beige)\b/.test(sansNotes), "aucune couleur nommée dans la feuille");
-    // Noir et blanc : aucune couleur écrite dans la feuille.
-    for (const m of css.matchAll(/rgb\((\d+) (\d+) (\d+)/g)) assert.ok(Math.max(+m[1], +m[2], +m[3]) - Math.min(+m[1], +m[2], +m[3]) <= 8, `une couleur dans la feuille : ${m[0]}`);
-    assert.ok(!/#[0-9a-f]{3,8}\b/i.test(css.replace(/#fff\b/g, "")), "pas d'autre teinte que le blanc dans la feuille");
+    assert.ok(/height: 44px;/.test(regle(".bp-segments")), "les segments se touchent sur 44 px");
   };
   ecranJuste(ecran, style);
 
@@ -679,77 +778,62 @@ async function banc() {
     if (m === source) sansEffet.push(nom);
     return m;
   };
-  refuse("un titre changé", () => avantagesJustes(AVANTAGES.map((a, i) => (i === 0 ? { ...a, titre: "Ton kit complet" } : a))));
-  refuse("un avantage de plus", () => avantagesJustes([...AVANTAGES, { ...AVANTAGES[0], id: "x", numero: "05", titre: "Tes stats" }]));
-  refuse("une promesse chiffrée", () => avantagesJustes(AVANTAGES.map((a, i) => (i === 2 ? { ...a, titre: "Des cadeaux offerts" } : a))));
+  // La grille et le bundle.
+  refuse("un barré sous son prix", () => grilleJuste(SFL_OFFICIEL, { ...BARRE, mensuel: 1500 }, MENSUEL_CENTIMES, ANNUEL_CENTIMES));
+  refuse("l'année plus chère que douze mois", () => grilleJuste({ ...SFL_OFFICIEL, annee: { prix: 43000, reference: 28000 } }, BARRE, MENSUEL_CENTIMES, ANNUEL_CENTIMES));
+  refuse("la saison au-dessus de 140 €", () => grilleJuste({ ...SFL_OFFICIEL, saison: { prix: 15000, reference: 14000 } }, BARRE, MENSUEL_CENTIMES, ANNUEL_CENTIMES));
+  refuse("l'annuel qui barre 280 € sans le dire", () => grilleJuste(SFL_OFFICIEL, { ...BARRE, annuel: 28000 }, MENSUEL_CENTIMES, ANNUEL_CENTIMES));
+  refuse("le bundle sans la SFL", () => bundleJuste(BUNDLE.filter((b) => b !== "sfl")));
+  // Les avantages.
+  refuse("un titre changé", () => avantagesJustes(AVANTAGES.map((a, i) => (i === 3 ? { ...a, titre: "Ton kit complet" } : a))));
+  refuse("deux avantages de plus", () => avantagesJustes([...AVANTAGES, { ...AVANTAGES[0], id: "x" }, { ...AVANTAGES[0], id: "y" }]));
+  refuse("un identifiant en double", () => avantagesJustes([...AVANTAGES, AVANTAGES[1]]));
+  refuse("un avantage sans part connue", () => avantagesJustes(AVANTAGES.map((a, i) => (i === 0 ? ({ ...a, part: "club" } as unknown as Avantage) : a))));
+  refuse("une part SFL avant Bola Plus", () => avantagesJustes([AVANTAGES[2], ...AVANTAGES.filter((_, i) => i !== 2)]));
+  refuse("une promesse chiffrée", () => avantagesJustes(AVANTAGES.map((a, i) => (i === 4 ? { ...a, titre: "3 cadeaux par saison" } : a))));
   refuse("une description ajoutée", () => avantagesJustes(AVANTAGES.map((a) => ({ ...a, description: "Chaque saison." }) as Avantage)));
+  refuse("un visuel généré qui ne le dit pas", () => avantagesJustes(AVANTAGES.map((a) => (a.id === "cadeaux" && a.visuel.genre === "image" ? { ...a, visuel: { ...a.visuel, alt: "Des crampons verts" } } : a))));
+  refuse("un joueur nommé dans le visuel déposé", () => avantagesJustes(AVANTAGES.map((a) => (a.depose ? { ...a, depose: { ...a.depose, alt: "Image générée : Inès, Léo et Nolan portent les maillots" } } : a))));
+  refuse("un second fichier déposé", () => avantagesJustes(AVANTAGES.map((a, i) => (i === 3 ? { ...a, depose: { fichier: "/bola-plus/camera-portee.webp", alt: "Image générée : une caméra" } } : a))));
   refuse("une image retirée", () => visuelsLa([...IMAGES, "absente"]));
-  refuse("lazy retiré", () => ecranJuste(mute("lazy", ecran, '        loading="lazy"\n', ""), style));
-  refuse("un prix en dur", () => ecranJuste(mute("prix", ecran, "{MENSUEL}&nbsp;€\n          </span>\n          / mois", "20&nbsp;€\n          </span>\n          / mois"), style));
-  refuse("la barre branchée ailleurs", () => ecranJuste(mute("barre", ecran, "onNoter={() => plus.noter(choix)}", "onNoter={voirOffre}"), style));
-  refuse("une phrase sous un titre", () => ecranJuste(mute("phrase", ecran, "{avantage.titre}</h2>", "{avantage.titre}</h2>\n      <p>Chaque saison.</p>"), style));
+  // La palette.
+  refuse("l'or des MVP", () => paletteJuste({ ...PALETTE, prix: "#D4A537" }));
+  refuse("le rouge d'Impact", () => paletteJuste({ ...PALETTE, plus: { ...PALETTE.plus, vif: "#E11D48" } }));
+  refuse("le cobalt de la Défensive", () => paletteJuste({ ...PALETTE, plus: { ...PALETTE.plus, vif: "#2563EB" } }));
+  refuse("la braise", () => paletteJuste({ ...PALETTE, prix: "#FF8A4C" }));
+  refuse("un vert illisible sur blanc", () => paletteJuste({ ...PALETTE, sfl: { ...PALETTE.sfl, encre: "#34D399" } }));
+  // L'écran.
+  refuse("un prix en dur", () => ecranJuste(mute("prix", ecran, "{p.euros}&nbsp;€\n          </span>\n          <span className=\"bp-ouverture__par\">", "19,90&nbsp;€\n          </span>\n          <span className=\"bp-ouverture__par\">"), style));
+  refuse("une teinte dans l'écran", () => ecranJuste(mute("teinte", ecran, '"--bp-prix": PALETTE.prix,', '"--bp-prix": "#D9FF3F",'), style));
+  refuse("une couleur dans la feuille", () => ecranJuste(ecran, mute("couleur", style, "background: var(--bp-prix);\n  color: var(--bp-nuit);", "background: #d9ff3f;\n  color: var(--bp-nuit);")));
+  refuse("une couleur nommée", () => ecranJuste(ecran, mute("nommée", style, "color: var(--bp-prix);\n}", "color: lime;\n}")));
+  refuse("une classe de couleur", () => ecranJuste(mute("classe", ecran, 'className="bp-offert__mot"', 'className="bp-offert__mot text-lime-300"'), style));
+  refuse("la tuile en couleurs", () => ecranJuste(mute("tuile", ecran, '"tuile tuile--plus col-span-2', '"tuile tuile--plus bp-part--plus col-span-2'), style));
+  refuse("le rail sans aimant", () => ecranJuste(ecran, mute("aimant", style, "scroll-snap-type: x mandatory;", "")));
+  refuse("une carte sautée d'un geste", () => ecranJuste(ecran, mute("stop", style, "scroll-snap-stop: always;", "scroll-snap-stop: normal;")));
   refuse("la barre jamais effacée", () => ecranJuste(mute("inert", ecran, " inert={cachee}", ""), style));
-  refuse("le mouvement réduit oublié", () => ecranJuste(ecran, mute("reduit", style, /@media \(prefers-reduced-motion: reduce\) \{[\s\S]*$/, "")));
-  refuse("une couleur dans la feuille", () => ecranJuste(ecran, mute("couleur", style, "rgb(255 255 255 / 0.09)", "rgb(255 138 76 / 0.09)")));
-  // Les mutants du contrôle du 13/11.
-  refuse("la carte sans forme", () => ecranJuste(ecran, mute("forme", style, ".bp-carte {\n  position: relative;\n  aspect-ratio: 4 / 5;", ".bp-carte {\n  position: relative;")));
-  refuse("l'affiche sans forme", () => ecranJuste(ecran, mute("forme affiche", style, ".bp-affiche {\n  position: relative;\n  aspect-ratio: 4 / 5;", ".bp-affiche {\n  position: relative;")));
-  refuse("une carte cachée sans script", () => ecranJuste(ecran, mute("cachée", style, "  color: #fff;\n}\n/* Hors de l'écran", "  color: #fff;\n  opacity: 0;\n}\n/* Hors de l'écran")));
-  refuse("une carte jamais revenue", () => ecranJuste(mute("vue", ecran, 'avant === "attend" ? "vue" : avant', "avant"), style));
-  refuse("[data-vue] sans opacité", () => ecranJuste(ecran, mute("data-vue", style, ".bp-carte[data-vue] {\n  opacity: 1;", ".bp-carte[data-vue] {")));
-  refuse("un sous-titre dans l'affiche", () => ecranJuste(mute("sous-titre", ecran, "</h1>", "</h1>\n        <p>Tout ce que tu gagnes en t'abonnant.</p>"), style));
-  refuse("un texte d'aide dans la page", () => ecranJuste(mute("aide", ecran, "      </ol>", '      </ol>\n      <p className="px-5">Choisis ta formule puis touche le bouton.</p>'), style));
-  refuse("un avantage écrit hors de la liste", () => ecranJuste(mute("en dur", ecran, "      </ol>", '      <li className="bp-carte dark"><h2 className="bp-carte__titre">Ta place garantie</h2></li>\n      </ol>'), style));
-  refuse("un visuel sans description", () => ecranJuste(mute("alt", ecran, "alt={avantage.alt}", 'alt=""'), style));
-  refuse("une promesse dans l'affiche", () => afficheJuste("Tout est offert"));
-  refuse("un détail de formule inventé", () => ecranJuste(mute("détail", ecran, 'detail: "Sans engagement"', 'detail: "Satisfait ou remboursé"'), style));
-  refuse("une couleur nommée", () => ecranJuste(ecran, mute("nommée", style, "  color: #fff;\n  text-shadow", "  color: gold;\n  text-shadow")));
-  refuse("une couleur hsl", () => ecranJuste(ecran, mute("hsl", style, "  color: #fff;\n  text-shadow", "  color: hsl(20 100% 65%);\n  text-shadow")));
-  refuse("une classe de couleur", () => ecranJuste(mute("classe", ecran, 'className="bp-carte__titre titre-lettrage"', 'className="bp-carte__titre titre-lettrage text-amber-400"'), style));
-  refuse("la barre inversée", () => ecranJuste(mute("inversée", ecran, "      {note ? (", "      {!note ? ("), style));
-  refuse("la barre sous les onglets", () => ecranJuste(ecran, mute("z", style, "z-index: 30;", "z-index: -1;")));
-  refuse("la barre sur les onglets", () => ecranJuste(ecran, mute("bas", style, "bottom: calc(max(calc(env(safe-area-inset-bottom) - 4px), 14px) + 62px + 10px);", "bottom: 0;")));
-  refuse("la barre sans gel", () => ecranJuste(mute("gel barre", ecran, "onClick={onNoter} disabled={occupe}", "onClick={onNoter}"), style));
-  refuse("le bouton de l'offre sans gel", () => ecranJuste(mute("gel offre", ecran, "onClick={interesser}\n            disabled={occupe}", "onClick={interesser}"), style));
-  refuse("la formule figée une fois noté", () => ecranJuste(mute("formule", ecran, "    else if (interet.formule !== f) noter(f);\n", ""), style));
+  refuse("la barre effacée ailleurs", () => ecranJuste(mute("cachee", ecran, "cachee={actif === iPrix}", "cachee={actif === 0}"), style));
+  refuse("la barre branchée ailleurs", () => ecranJuste(mute("barre", ecran, "onNoter={() => plus.noter(choix)}", "onNoter={() => aller(iPrix)}"), style));
+  refuse("les flèches des formules qui font tourner le carrousel", () => ecranJuste(mute("stop", ecran, "    e.stopPropagation();\n", ""), style));
   refuse("le saut toujours animé", () => ecranJuste(mute("saut", ecran, 'behavior: doux ? "smooth" : "auto"', 'behavior: "smooth"'), style));
-  refuse("un visuel sans sizes", () => ecranJuste(mute("sizes", ecran, "          sizes={TAILLES}\n          width={LARGEUR}\n          height={HAUTEUR}\n          alt={avantage.alt}", "          width={LARGEUR}\n          height={HAUTEUR}\n          alt={avantage.alt}"), style));
-  // Les mutants du retour du 13/11 (les prix, les 4 fois, le visuel déposé).
+  refuse("le mouvement réduit oublié", () => ecranJuste(ecran, mute("reduit", style, /@media \(prefers-reduced-motion: reduce\) \{[\s\S]*$/, "")));
+  refuse("les segments muets", () => ecranJuste(mute("segments", ecran, 'aria-current={i === actif ? "true" : undefined}', ""), style));
+  refuse("un texte d'aide", () => ecranJuste(mute("aide", ecran, "      <div className=\"bp-pied\" aria-hidden />", "      <p>Glisse pour voir la suite.</p>\n      <div className=\"bp-pied\" aria-hidden />"), style));
+  refuse("une fausse carte à la place de la vraie", () => ecranJuste(mute("carte", ecran, '<BolaCard name="Toi" ', '<BolaCard name="Toi" photo="/bola/joueur.jpg" '), style));
+  refuse("le barré retiré", () => ecranJuste(mute("barré", ecran, "                  <Barre somme={p.barre} />\n", ""), style));
+  refuse("les 4 fois en dur", () => ecranJuste(mute("4 fois", ecran, "{p.sous}</span>", "4 × 42,23 € sans frais</span>"), style));
+  refuse("les prix cachés sur petit écran", () => ecranJuste(mute("caché", ecran, 'className="bp-formule__sous tabular-nums"', 'className="bp-formule__sous tabular-nums max-[359px]:hidden"'), style));
+  refuse("le visuel déposé avant d'être chargé", () => ecranJuste(mute("d'emblée", ecran, "useState(false);\n  const depose = deposeLa", "useState(true);\n  const depose = deposeLa"), style));
+  refuse("le visuel déposé même en erreur", () => ecranJuste(mute("erreur", ecran, "    essai.src = fichier;", "    essai.onerror = () => setDeposeLa(true);\n    essai.src = fichier;"), style));
+  refuse("Klarna nommé", () => sansPaiement("bola-plus.tsx", mute("klarna", ecran, "Je suis intéressé\n          </button>\n        )}\n      </div>\n    </div>", "Je suis intéressé avec Klarna\n          </button>\n        )}\n      </div>\n    </div>")));
+  refuse("un montant en dur dans la tuile", () => uneSource("tuile", ecran.replace('whitespace-nowrap">Bola Plus</span>', 'whitespace-nowrap">Bola Plus · 19,90 €</span>')));
+  refuse("un ancien prix dans l'admin", () => aucunMontant("admin", "<span>20 € par mois</span>"));
+  // Les mutants des prix (13/11).
   refuse("l'échéance par toFixed", () => echeanceJuste((c, n) => (c / 100 / n).toFixed(2).replace(".", ",")));
-  refuse("l'échéance arrondie au plus proche", () => echeanceJuste((c, n) => montant(Math.round(c / n))));
   refuse("l'échéance arrondie vers le bas", () => echeanceJuste((c, n) => montant(Math.floor(c / n))));
   refuse("la remise arrondie vers le haut", () => remiseJuste((m, a) => Math.ceil(((12 * m - a) * 100) / (12 * m))));
-  refuse("la remise écrite en dur", () => remiseJuste(() => 30));
-  refuse("un prix en euros flottants", () => sourceJuste(mute("flottant", offreSource, "export const echeance = (centimes: number, n: number) => Math.ceil(centimes / n);", "export const echeance = (centimes: number, n: number) => Number((centimes / 100 / n).toFixed(2)) * 100;")));
   refuse("un prix écrit deux fois", () => sourceJuste(mute("deux fois", offreSource, "export const MENSUEL = montant(MENSUEL_CENTIMES);", "export const MENSUEL = montant(1990);")));
   refuse("les 4 fois sur le prix du mois", () => sourceJuste(mute("4 fois mois", offreSource, "montant(echeance(ANNUEL_CENTIMES, ECHEANCES))", "montant(echeance(12 * MENSUEL_CENTIMES, ECHEANCES))")));
-  refuse("le nouveau prix en dur dans l'affiche", () => ecranJuste(mute("19,90", ecran, "{ANNUEL}&nbsp;€", "168,90&nbsp;€"), style));
-  refuse("les 4 fois en dur dans l'écran", () => ecranJuste(mute("4 fois en dur", ecran, "sous: LIBELLE_ECHEANCES", 'sous: "4 × 42,23 € sans frais"'), style));
-  refuse("les 4 fois retirés", () => ecranJuste(mute("4 fois retirés", ecran, ", sous: LIBELLE_ECHEANCES", ""), style));
-  refuse("les 4 fois au-dessus du prix", () => {
-    const ligne = ecran.split("\n").find((l) => l.includes("{p.sous && ")) ?? "";
-    const sansLigne = mute("4 fois haut", ecran, `${ligne}\n`, "");
-    ecranJuste(mute("4 fois haut", sansLigne, '                <span className="mono-label', `${ligne}\n                <span className="mono-label`), style);
-  });
-  refuse("un montant en dur dans la tuile", () => uneSource("tuile", ecran.replace('whitespace-nowrap">Bola Plus</span>', 'whitespace-nowrap">Bola Plus · 19,90 €</span>')));
-  refuse("Klarna nommé", () => sansPaiement("bola-plus.tsx", mute("klarna", ecran, "sous: LIBELLE_ECHEANCES", 'sous: "Payable avec Klarna"')));
-  refuse("Alma nommé", () => sansPaiement("bola-plus.ts", "export const AVEC = 'Alma';"));
-  refuse("le visuel déposé avant d'être chargé", () => ecranJuste(mute("d'emblée", ecran, "useState(false);\n  const depose = deposeLa", "useState(true);\n  const depose = deposeLa"), style));
-  refuse("le visuel déposé toujours essayé", () => ecranJuste(mute("toujours", ecran, "const depose = deposeLa ? avantage.depose : undefined;", "const depose = avantage.depose;"), style));
-  refuse("le visuel déposé même en erreur", () => ecranJuste(mute("erreur", ecran, "    essai.src = fichier;", "    essai.onerror = () => setDeposeLa(true);\n    essai.src = fichier;"), style));
-  // Les mutants du contrôle des prix (13/11).
-  refuse("la remise arrondie au plus proche dans la source", () => sourceJuste(mute("round source", offreSource, "export const REMISE_POUR_CENT = Math.floor(", "export const REMISE_POUR_CENT = Math.round(")));
-  refuse("le libellé de la remise recalculé à part", () => sourceJuste(mute("libellé remise", offreSource, "export const LIBELLE_REMISE = `−${REMISE_POUR_CENT}\\u00a0%`;", "export const LIBELLE_REMISE = `−${Math.round(REMISE * 100)}\\u00a0%`;")));
-  refuse("les 4 fois cachés", () => ecranJuste(mute("4 fois cachés", ecran, '{p.sous && <span className="', '{p.sous && <span className="hidden '), style));
-  refuse("les 4 fois cachés sur petit écran", () => ecranJuste(mute("4 fois petits", ecran, '{p.sous && <span className="', '{p.sous && <span className="max-[359px]:hidden '), style));
-  refuse("les 4 fois pour lecteur d'écran seulement", () => ecranJuste(mute("4 fois sr", ecran, '{p.sous && <span className="', '{p.sous && <span className="sr-only '), style));
-  refuse("les prix de l'affiche cachés sur petit écran", () => ecranJuste(mute("affiche cachée", ecran, '<p className="mt-3 flex', '<p className="max-[359px]:hidden mt-3 flex'), style));
-  refuse("un ancien prix dans l'admin", () => aucunMontant("admin", "<span>20 € par mois</span>"));
-  refuse("un ancien prix annuel dans l'admin", () => aucunMontant("admin", "<span>168 € par an</span>"));
-  refuse("un prix en lettres dans la tuile", () => aucunMontant("tuile", ecran.replace('aria-label={interet ? "Bola Plus, c\'est noté" : "Bola Plus"}', 'aria-label="Bola Plus, vingt euros"')));
-  refuse("un joueur nommé dans le visuel déposé", () => avantagesJustes(AVANTAGES.map((a) => (a.depose ? { ...a, depose: { ...a.depose, alt: "Image générée : Inès, Léo et Nolan portent les maillots" } } : a))));
-  refuse("un joueur cité par son pseudo", () => avantagesJustes(AVANTAGES.map((a) => (a.depose ? { ...a, depose: { ...a.depose, alt: "Image générée : @nolan et deux joueurs portent les maillots" } } : a))));
-  refuse("le visuel déposé présenté comme une photo", () => avantagesJustes(AVANTAGES.map((a) => (a.depose ? { ...a, depose: { ...a.depose, alt: "Trois joueurs de la SFL portent les maillots" } } : a))));
   refuse("un visuel déposé trop petit", () => {
     // Un faux dossier public où le visuel déposé n'a que 780 px de large.
     const faux = mkdtempSync(join(tmpdir(), "bola-plus-"));
@@ -761,9 +845,6 @@ async function banc() {
       rmSync(faux, { recursive: true, force: true });
     }
   });
-  refuse("un second fichier déposé", () => avantagesJustes(AVANTAGES.map((a, i) => (i === 1 ? { ...a, depose: { fichier: "/bola-plus/camera-portee.webp", alt: "Une caméra" } } : a))));
-  refuse("le visuel déposé ailleurs", () => avantagesJustes(AVANTAGES.map((a) => (a.depose ? { ...a, depose: { ...a.depose, fichier: "/bola-plus/maillots-portes-1170.webp" } } : a))));
-  refuse("la barre effacée dès le haut de l'offre", () => ecranJuste(mute("trou", ecran, "const el = actionRef.current;", "const el = offre.current;"), style));
 
   assert.deepEqual(sansEffet, [], "des mutants sans effet");
 
