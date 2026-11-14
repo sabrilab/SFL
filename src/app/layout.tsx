@@ -32,6 +32,8 @@ import { Accueil, ApresAccueil } from "@/components/sfl/accueil/accueil";
 import { PorteSfl } from "@/components/sfl/porte-sfl";
 import { EssaiDesign } from "@/components/ds/essai-design";
 import { LangueDocument, SCRIPT_LANGUE } from "@/lib/i18n/langue";
+import { SCRIPT_APPARENCE, CLE_THEME } from "@/lib/sfl/apparence";
+import { ApparenceAuto } from "@/components/layout/apparence";
 
 // Typographie de l'app BOLA, celle de la Map (Sabri, 22/10 : « uniformise le
 // tout ») : Inter pour tout ce qui se lit (celle du site), au plus gras pour
@@ -98,6 +100,7 @@ export default function RootLayout({
           premier rendu : lib/i18n/langue.tsx. */}
       <head>
         <script dangerouslySetInnerHTML={{ __html: SCRIPT_LANGUE }} />
+        <script dangerouslySetInnerHTML={{ __html: SCRIPT_APPARENCE }} />
       </head>
       {/* body ne défile jamais lui-même (overflow hidden, hauteur figée à
           celle de l'écran) : c'est le conteneur interne juste en dessous
@@ -106,12 +109,12 @@ export default function RootLayout({
           cadre" toute l'appli (header, tab bar) au lieu de rester contenu
           dans une simple liste qui rebondit sur elle-même. */}
       <body className="h-dvh overflow-hidden overscroll-none touch-manipulation">
-        {/* Clair, sombre ou Auto (qui suit le téléphone), au choix de chaque
-            joueur : le rond en haut de Ma carte, ou les réglages. Le sombre
-            reste le thème de qui n'a rien choisi. Le choix est gardé sur le
-            téléphone (bola-theme). */}
-        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem storageKey="bola-theme" disableTransitionOnChange>
+        {/* La Pelouse (14/11) : Auto par défaut, clair de 7 h à 20 h et sombre
+            la nuit ; Clair ou Sombre au choix de chaque joueur, le rond en haut
+            de Ma carte ou les réglages (lib/sfl/apparence.ts). */}
+        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false} storageKey={CLE_THEME} disableTransitionOnChange>
           <CouleurTheme />
+          <ApparenceAuto />
           <EssaiStyleUi />
           <LangueDocument />
           <SeasonProvider>
