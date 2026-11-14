@@ -14,12 +14,14 @@
 
 import { useEffect, useState } from "react";
 import { useTheme } from "next-themes";
-import { estJour, estPelouse, styleDuJour } from "@/lib/sfl/mode-pelouse";
+import { estPelouse, styleDuJour } from "@/lib/sfl/mode-pelouse";
+import { modeResolu, styleDuMode } from "@/lib/sfl/apparence";
 
-// Nouvelle clé le 04/11 : chaque téléphone repart du design actuel (Sabri :
-// « garder le design actuel », l'UI se décide plus tard).
-const CLE = "bola-style-ui-2";
-export const STYLES_UI = ["Origine", "Galet", "Or", "Vestiaire", "Pelouse", "Velours", "Affiche", "Affiche nuit", "Riso", "Billet", "Pop", "Brutal", "Bulle", "Chaleur", "Trace", "Sticker", "Pelouse", "Gravure", "Bulle", "Bulle nuit", "Bulle pêche", "Bulle lilas", "Bulle encre", "Bulle verre", "Pelouse craie", "Pelouse gazon", "Pelouse tribune"] as const;
+// Nouvelle clé le 14/11 : la Pelouse est le style de l'app (Sabri : « publier
+// partout ») ; chaque aperçu repart d'elle. Le style 0 et le 16 sont la Pelouse
+// de l'app (components/layout/apparence.tsx) ; les autres restent à l'essai.
+const CLE = "bola-style-ui-3";
+export const STYLES_UI = ["Pelouse", "Galet", "Or", "Vestiaire", "Pelouse", "Velours", "Affiche", "Affiche nuit", "Riso", "Billet", "Pop", "Brutal", "Bulle", "Chaleur", "Trace", "Sticker", "Pelouse", "Gravure", "Bulle", "Bulle nuit", "Bulle pêche", "Bulle lilas", "Bulle encre", "Bulle verre", "Pelouse craie", "Pelouse gazon", "Pelouse tribune"] as const;
 const SOMBRES = new Set([3, 5, 7, 13, 16, 19]);
 /** 18 et 23 suivent le réglage Apparence (clair, sombre, auto) : ils ont leurs deux modes (Sabri, 03/11). */
 const DEUX_MODES = new Set([18, 23]);
@@ -48,40 +50,43 @@ export function EssaiStyleUi() {
   const { setTheme } = useTheme();
 
   useEffect(() => {
+    if (process.env.NEXT_PUBLIC_BOLA_ENV === "production") return;
     // eslint-disable-next-line react-hooks/set-state-in-effect -- lu après l'hydratation : le serveur ne connaît ni l'adresse ni le téléphone.
     setStyle(lire());
   }, []);
 
-  // La famille Pelouse change de mode avec l'heure : relu chaque minute.
-  const [jour, setJour] = useState(true);
-  useEffect(() => {
-    if (!estPelouse(style)) return;
-    const relire = () => setJour(estJour());
-    relire();
-    const id = window.setInterval(relire, 60_000);
-    document.addEventListener("visibilitychange", relire);
-    return () => {
-      window.clearInterval(id);
-      document.removeEventListener("visibilitychange", relire);
-    };
-  }, [style]);
+  // Le style de l'app (0, 16) : l'apparence garde la main. Un autre : à l'essai.
+  const essai = style !== 0 && style !== 16;
 
   useEffect(() => {
     const html = document.documentElement;
-    if (estPelouse(style)) {
-      // La nuit, c'est le 16 (arrondi par styles-ui-4.css) ; le jour, le clair du style.
-      html.dataset.style = jour ? String(styleDuJour(style)) : "16";
+    if (!essai) {
+      delete html.dataset.essai;
+      const m = modeResolu();
+      setTheme(m);
       html.dataset.famille = "pelouse";
-      setTheme(jour ? "light" : "dark");
+      html.dataset.style = styleDuMode(m);
       return;
     }
-    if (style) html.dataset.style = String(style);
-    else delete html.dataset.style;
+    html.dataset.essai = "1";
+    if (estPelouse(style)) {
+      // 24 à 26 : leur clair le jour, le 16 la nuit, selon l'heure.
+      const relire = () => {
+        const m = modeResolu();
+        html.dataset.style = m === "light" ? String(styleDuJour(style)) : "16";
+        html.dataset.famille = "pelouse";
+        setTheme(m);
+      };
+      relire();
+      const id = window.setInterval(relire, 60_000);
+      return () => window.clearInterval(id);
+    }
+    html.dataset.style = String(style);
     if (style >= AFFICHE && style <= 11) html.dataset.famille = "affiche";
     else if (style >= 18 && style <= 23) html.dataset.famille = "bulle";
     else delete html.dataset.famille;
-    if (style && !DEUX_MODES.has(style)) setTheme(SOMBRES.has(style) ? "dark" : "light");
-  }, [style, jour, setTheme]);
+    if (!DEUX_MODES.has(style)) setTheme(SOMBRES.has(style) ? "dark" : "light");
+  }, [style, essai, setTheme]);
 
   if (process.env.NEXT_PUBLIC_BOLA_ENV === "production" || !style) return null;
   // ?pastille=0 : les captures sans la pastille.
@@ -90,7 +95,7 @@ export function EssaiStyleUi() {
     <button
       type="button"
       onClick={() => {
-        const n = (style % (STYLES_UI.length - 1)) + 1;
+        const n = (style + 1) % STYLES_UI.length;
         try {
           localStorage.setItem(CLE, String(n));
         } catch {}
@@ -99,7 +104,6 @@ export function EssaiStyleUi() {
       className="fixed top-[calc(env(safe-area-inset-top,0px)+4px)] left-1/2 z-[9999] -translate-x-1/2 rounded-full bg-foreground px-3 py-1 text-[11px] font-bold tracking-[0.6px] text-background uppercase opacity-80"
     >
       Style {style} · {STYLES_UI[style]}
-      {estPelouse(style) && (jour ? " · jour" : " · nuit")}
     </button>
   );
 }

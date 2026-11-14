@@ -6,17 +6,16 @@
 // plein ; il fait un demi-tour à chaque bascule (une animation, pas une
 // transition : next-themes coupe les transitions le temps de changer de
 // couleurs). Le toucher prend le mode opposé à celui qu'on voit ; « Auto »,
-// qui suit le téléphone, est dans les réglages avec les deux autres
-// (reglages/page.tsx).
+// clair le jour et sombre la nuit (lib/sfl/apparence.ts), se reprend dans les
+// réglages (reglages/page.tsx).
 
 import { useState } from "react";
-import { useTheme } from "next-themes";
+import { ecrireApparence } from "@/lib/sfl/apparence";
 import { useModeClair } from "@/hooks/use-mode-clair";
 import { useIsClient } from "@/hooks/use-is-client";
 import { cn } from "@/lib/utils";
 
 export function BoutonTheme({ className }: { className?: string }) {
-  const { setTheme } = useTheme();
   const clair = useModeClair();
   const isClient = useIsClient();
   const [tours, setTours] = useState(0);
@@ -24,7 +23,7 @@ export function BoutonTheme({ className }: { className?: string }) {
     <button
       type="button"
       onClick={() => {
-        setTheme(clair ? "dark" : "light");
+        ecrireApparence(clair ? "sombre" : "clair");
         setTours((n) => n + 1);
       }}
       aria-label={!isClient ? "Mode clair ou sombre" : clair ? "Passer en mode sombre" : "Passer en mode clair"}

@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useTheme } from "next-themes";
+import { useApparence } from "@/components/layout/apparence";
+import { ecrireApparence } from "@/lib/sfl/apparence";
 import {
   Moon,
   Sun,
@@ -29,15 +30,15 @@ import { ReglageLangue } from "@/components/sfl/langue/choix-langue";
 // téléphone (le mot d'iOS). Le sombre reste le défaut. Le même choix se fait
 // d'un toucher en haut de Ma carte (bouton-theme.tsx), entre clair et sombre.
 const THEME_OPTIONS = [
-  { value: "light", label: "Clair", icon: Sun },
-  { value: "dark", label: "Sombre", icon: Moon },
-  { value: "system", label: "Auto", icon: SunMoon },
+  { value: "clair", label: "Clair", icon: Sun },
+  { value: "sombre", label: "Sombre", icon: Moon },
+  { value: "auto", label: "Auto", icon: SunMoon },
 ] as const;
 
 export default function ReglagesPage() {
-  const { theme, setTheme } = useTheme();
+  const apparence = useApparence();
   const isClient = useIsClient();
-  const current = isClient ? (theme ?? "dark") : null;
+  const current = isClient ? apparence : null;
   const { me } = useMyPlayer();
   const admin = isClient && isAdmin(me);
   const t = useT();
@@ -68,7 +69,7 @@ export default function ReglagesPage() {
                 type="button"
                 role="radio"
                 aria-checked={active}
-                onClick={() => setTheme(value)}
+                onClick={() => ecrireApparence(value)}
                 className={cn(
                   "flex flex-1 flex-col items-center gap-1.5 rounded-xl py-3 text-xs font-semibold",
                   active ? "bouton-principal" : "bouton-discret text-encre-3"
