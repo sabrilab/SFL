@@ -6,8 +6,9 @@
 //       (« +399 ⚽ », « +5 s ») ; les durées s'écrivent « Image », « 5 s »… ;
 //       le modèle et les crédits ne sont jamais à l'écran ;
 //   2 · la phrase « 300 ⚽ = un trash talk ou six images » : calculée, et
-//       juste (n × prix ≤ 300 < (n + 1) × prix, pour le trash talk et pour
-//       l'image la moins chère) ; les ballons des deux formules ;
+//       juste, contre des attendus écrits à la main (accord « un » / « une »,
+//       aucune quantité nulle, jamais lettres et chiffres mêlés ; rien ne
+//       tient : une erreur) ; les ballons des deux formules ;
 //   3 · les recharges : centimes entiers, jamais moins de ballons que le taux
 //       de base (lib/sfl/ballons.ts, BALLONS_PAR_EURO), et le bonus de chacune
 //       (1, 101, 401 ballons) ; plus chère, plus généreuse ;
@@ -16,8 +17,16 @@
 //       fichiers du studio ; aucun prestataire nommé ;
 //   5 · les vignettes : chaque fond est un visuel de public/bola-plus/ à ses
 //       trois largeurs ; la carte est la vraie (BolaCard, DosCarte) ; une
-//       vidéo bouge, et s'arrête avec « Réduire les animations » ; le rail
-//       s'accroche au doigt ; noir et blanc dans la feuille.
+//       vidéo bouge (data-video posé), et s'arrête avec « Réduire les
+//       animations », transition comprise ; le rail s'accroche au doigt ;
+//       noir et blanc dans la feuille ;
+//   6 · ce qui se voit et se lit : rien de caché (hidden, sr-only…) dans
+//       l'écran du studio ; les mots écrits en dur sont une liste fermée (ni
+//       texte d'aide ni sous-titre) ; le rail montre la durée et le prix,
+//       la feuille aussi ; la scène est cachée aux lecteurs d'écran, le
+//       bouton d'un template n'a pas d'aria-label (son texte se lit en
+//       entier) ; une recharge montre ses ballons (pas ses centimes) et son
+//       prix, sans geste ni focus.
 //   Des mutants sont rejoués : chaque garde doit les refuser.
 //   npx tsx tools/studio-check.ts
 import assert from "node:assert/strict";
@@ -39,6 +48,7 @@ import {
   equivalence,
   prixDe,
   prixRecharge,
+  sceneStudio,
   type RechargeStudio,
   type Template,
 } from "../src/lib/sfl/studio";
@@ -87,20 +97,27 @@ assert.throws(() => ballons(1.5));
 assert.equal(BALLONS_PAR_MOIS, 300);
 assert.equal(OFFERTS_ANNUEL, 1000);
 assert.equal(PHRASE_INCLUS, `300${NB}⚽ = un trash talk ou six images`);
+// Les attendus, écrits à la main (prix du catalogue : trash talk 299, image la moins chère 49).
+const PHRASES: [number, string][] = [
+  [49, "une image"],
+  [98, "deux images"],
+  [299, "un trash talk ou six images"],
+  [300, "un trash talk ou six images"],
+  [598, "deux trash talks ou douze images"],
+  [600, "deux trash talks ou douze images"],
+  [637, "2 trash talks ou 13 images"],
+  [1000, "3 trash talks ou 20 images"],
+];
 const phraseJuste = (phrase: (budget: number, c: readonly Template[]) => string) => {
-  for (const budget of [0, 48, 49, 98, 298, 299, 300, 598, 600, 1000]) {
-    const trash = TEMPLATES.find((t) => t.id === "trash-talk")!.prix;
-    const image = Math.min(...TEMPLATES.filter((t) => t.rendu.genre === "image").map((t) => t.prix));
-    const [nT, nI] = [Math.floor(budget / trash), Math.floor(budget / image)];
-    // n × prix ≤ budget < (n + 1) × prix : jamais plus que ce qu'on peut payer, jamais moins.
-    assert.ok(nT * trash <= budget && budget < (nT + 1) * trash);
-    const lettres = ["zéro", "un", "deux", "trois", "quatre", "cinq", "six", "sept", "huit", "neuf", "dix", "onze", "douze"];
-    const mot = (n: number, m: string) => `${lettres[n] ?? n} ${m}${n > 1 ? "s" : ""}`;
-    assert.equal(phrase(budget, TEMPLATES), `${mot(nT, "trash talk")} ou ${mot(nI, "image")}`, `${budget} ballons`);
-  }
+  for (const [budget, attendu] of PHRASES) assert.equal(phrase(budget, TEMPLATES), attendu, `${budget} ballons`);
+  // Rien ne tient : ce n'est pas une phrase, c'est une erreur.
+  for (const budget of [0, 48]) assert.throws(() => phrase(budget, TEMPLATES), `${budget} ballons ne paient rien`);
 };
 phraseJuste(equivalence);
-assert.deepEqual(BALLONS_FORMULE, { mensuel: `300${NB}⚽ / mois`, annuel: `300${NB}⚽ / mois + 1${FIN}000${NB}⚽ offerts` });
+assert.deepEqual(BALLONS_FORMULE, { mensuel: `300${NB}⚽ / mois`, annuel: `300${NB}⚽ / mois + 1${FIN}000${NB}⚽${NB}offerts` }, "« offerts » ne part pas seul à la ligne");
+assert.equal(sceneStudio("affiche").pose, "vise", "« Ton studio » : le ballon au centre, sans carte");
+assert.throws(() => sceneStudio("absente"), "« Ton studio » : un fond inconnu est refusé");
+assert.equal(ballons(1100, NB), `1${NB}100`, "en Anton : l'espace large");
 assert.equal(MENTION_STUDIO, BALLONS_FORMULE.mensuel);
 
 // 3 · Les recharges.
@@ -170,6 +187,43 @@ const feuilleJuste = (css: string) => {
 };
 feuilleJuste(feuille);
 
+// 6 · Ce qui se voit et se lit.
+const bloc = (tsx: string, nom: string) => {
+  const debut = tsx.indexOf(`function ${nom}(`);
+  assert.ok(debut >= 0, `${nom} est trouvée`);
+  return tsx.slice(debut, tsx.indexOf("\n}\n", debut));
+};
+const CACHE = /(^|[\s:"])(hidden|sr-only|invisible|opacity-0)(?=[\s"])|\shidden(?=[\s>={/])/;
+const ecranJuste = (tsx: string) => {
+  const code = sansNotes(tsx);
+  const cache = CACHE.exec(code);
+  assert.equal(cache, null, `quelque chose est caché dans l'écran du studio : ${cache?.[0]}`);
+  // Les mots écrits en dur : une liste fermée (entre deux balises ; le code entre « > » et « < » est écarté).
+  const mots = [...code.matchAll(/>([^<>{}]*[A-Za-zÀ-ÿ][^<>{}]*)</g)].map((m) => m[1].trim()).filter((t) => t && !/[;()=]/.test(t)).sort();
+  assert.deepEqual(mots, ["Bientôt", "Bola Studio", "Recharges"], "les mots écrits en dur dans l'écran du studio");
+  const scene = bloc(tsx, "SceneStudio");
+  assert.ok(/<div\s+ref=\{ref\}\s+aria-hidden\s/.test(scene), "la scène est cachée aux lecteurs d'écran");
+  assert.ok(/data-video=\{video \? "" : undefined\}/.test(scene), "une vidéo porte data-video");
+  const item = bloc(tsx, "CarteTemplate");
+  assert.ok(!/aria-label/.test(item), "le bouton d'un template se lit en entier (pas d'aria-label)");
+  assert.ok(/\{t\.nom\}/.test(item) && /\{t\.recoit\}/.test(item) && /<Meta t=\{t\} \/>/.test(item), "le rail : nom, ce que tu reçois, durée et prix");
+  const meta = bloc(tsx, "Meta");
+  assert.ok(/\{dureeDe\(t\)\}/.test(meta) && /\{prixDe\(t\)\}/.test(meta), "la durée et le prix d'un template");
+  const fiche = bloc(tsx, "FicheTemplate");
+  assert.ok(/\{t\.nom\}/.test(fiche) && /\{t\.recoit\}/.test(fiche) && /\{dureeDe\(t\)\}/.test(fiche) && /texte=\{prixDe\(t\)\}/.test(fiche), "la feuille : nom, ce que tu reçois, durée et prix");
+  const rail = bloc(tsx, "RailStudio");
+  assert.ok(/<p[^>]*>\{PHRASE_INCLUS\}<\/p>/.test(rail), "la phrase des ballons du mois se voit");
+  const rech = tsx.slice(tsx.indexOf("export function RechargesStudio("));
+  assert.ok(/ballons\(r\.ballons, ESPACE_LARGE\)/.test(rech) && /\{prixRecharge\(r\)\}/.test(rech) && !/r\.centimes\)/.test(rech.replace("key={r.centimes}", "")), "une recharge : ses ballons et son prix");
+  assert.ok(!/<button|onClick|href=|role=|tabIndex/.test(rech), "une recharge : ni geste, ni focus");
+};
+ecranJuste(ecran);
+const reduitJuste = (css: string) => {
+  const reduit = /@media \(prefers-reduced-motion: reduce\) \{([\s\S]*)\}\s*$/.exec(css)?.[1] ?? "";
+  assert.ok(/\.st-scene,[^{]*\{[^}]*transition: none;/.test(reduit), "mouvement réduit : la vignette ne s'enfonce pas");
+};
+reduitJuste(feuille);
+
 // Les mutants.
 const refuse = (nom: string, essai: () => void) => {
   let passe = true;
@@ -186,6 +240,25 @@ refuse("un prix nul", () => catalogueJuste(TEMPLATES.map((t, i) => (i === 0 ? { 
 refuse("l'option HD sans son +", () => catalogueJuste(TEMPLATES.map((t) => ({ ...t, supplement: undefined }))));
 refuse("une phrase arrondie au plus proche", () => phraseJuste((b, c) => equivalence(Math.round(b / 299) * 299, c)));
 refuse("une phrase écrite en dur", () => phraseJuste(() => "un trash talk ou six images"));
+refuse("« un image »", () => phraseJuste((b, c) => equivalence(b, c).replace(/^une /, "un ")));
+refuse("une quantité nulle écrite", () => phraseJuste((b, c) => (b < 299 ? `zéro trash talk ou ${equivalence(b, c)}` : equivalence(b, c))));
+refuse("lettres et chiffres mêlés", () => phraseJuste((b, c) => equivalence(b, c).replace("3 trash", "trois trash")));
+refuse("rien ne tient, sans erreur", () => phraseJuste((b, c) => (b < 49 ? "" : equivalence(b, c))));
+const m = (de: string, vers: string) => {
+  assert.ok(ecran.includes(de), `le mutant a prise : ${de}`);
+  return ecran.replace(de, vers);
+};
+refuse("M1 une recharge en centimes", () => ecranJuste(m("ballons(r.ballons, ESPACE_LARGE)", "ballons(r.centimes, ESPACE_LARGE)")));
+refuse("M2 data-video jamais posé", () => ecranJuste(m('data-video={video ? "" : undefined}', "data-video={undefined}")));
+refuse("M4 le prix retiré du rail", () => ecranJuste(m('<span className="text-foreground">{prixDe(t)}</span>', "")));
+refuse("M5 la phrase cachée", () => ecranJuste(m("<p className=\"text-corps", "<p hidden className=\"text-corps")));
+refuse("M5 bis la phrase en sr-only", () => ecranJuste(m("<p className=\"text-corps", "<p className=\"sr-only text-corps")));
+refuse("M6 la transition gardée en mouvement réduit", () => reduitJuste(feuille.replace(/(@media \(prefers-reduced-motion: reduce\) \{[\s\S]*)transition: none;/, "$1")));
+refuse("M8 un texte d'aide dans le rail", () => ecranJuste(m("      <ul className=\"st-rail\">", "      <p>Choisis un template pour créer ta vidéo</p>\n      <ul className=\"st-rail\">")));
+refuse("M9 une recharge touchable", () => ecranJuste(m('<li key={r.centimes} className=', '<li key={r.centimes} role="button" tabIndex={0} className=')));
+refuse("M14 un aria-label qui cache le contenu", () => ecranJuste(m('className="st-item__bouton">', 'className="st-item__bouton" aria-label={t.nom}>')));
+refuse("la scène lue par un lecteur d'écran", () => ecranJuste(m("      aria-hidden\n", "")));
+refuse("la durée retirée de la feuille", () => ecranJuste(m("                  {dureeDe(t)}\n                </span>\n              </span>", "                </span>\n              </span>")));
 refuse("une recharge sous le taux", () => rechargesJustes(RECHARGES_STUDIO.map((r, i) => (i === 0 ? { ...r, ballons: 450 } : r))));
 refuse("une recharge moins généreuse que la précédente", () => rechargesJustes(RECHARGES_STUDIO.map((r, i) => (i === 2 ? { ...r, ballons: 2100 } : r))));
 refuse("un prix en dur dans l'écran", () => uneSource("écran", ecran.replace("{prixDe(t)}", "299&nbsp;⚽")));

@@ -28,6 +28,12 @@
 .st-rail::-webkit-scrollbar {
   display: none;
 }
+/* Sur un grand écran, la colonne s'arrête avant l'écran : le rail s'y efface en fondu au lieu d'être coupé net. */
+@media (min-width: 431px) {
+  .st-rail {
+    mask-image: linear-gradient(to right, #000 calc(100% - 36px), transparent);
+  }
+}
 .st-item {
   flex: 0 0 auto;
   width: min(216px, 58vw);
@@ -128,12 +134,21 @@
   filter: drop-shadow(0 6px 10px rgb(0 0 0 / 0.6));
   user-select: none;
 }
-.st-ballon--milieu {
-  top: 13%;
+/* L'affiche : le ballon entre la face et le dos, à mi-hauteur des cartes (bottom posé par la scène). */
+.st-ballon--contre {
+  top: auto;
+  right: auto;
+  left: 50%;
+  width: 12%;
+  translate: -50% 50%;
+}
+/* « Ton studio » : le ballon au centre des coins de repère, posé sur le gazon. */
+.st-ballon--vise {
+  top: 50%;
   right: auto;
   left: 50%;
   width: 15%;
-  translate: -50% 0;
+  translate: -50% -50%;
 }
 /* La compo : cinq cartes en rang, la face au milieu. */
 .st-rang {
@@ -161,6 +176,11 @@
 .st-trois > span {
   position: relative;
   overflow: hidden;
+}
+
+/* « Trash talk » : l'adversaire, coupé au bord du cadre. */
+.st-scene[data-pose="provoc"] .st-carte {
+  filter: drop-shadow(0 16px 20px rgb(0 0 0 / 0.6));
 }
 
 /* Une vidéo : le cadrage avance lentement, et revient. */
@@ -211,9 +231,14 @@
   color: rgb(255 255 255 / 0.78);
 }
 
-/* ── Les recharges : montrées, pas encore en vente. ── */
+/* ── Les recharges : montrées, pas encore en vente (atténuées, le texte reste lisible). ── */
 .st-recharge {
-  opacity: 0.62;
+  opacity: 0.74;
+}
+/* Le ballon ⚽ d'un prix en Anton : réduit, sur la ligne de base. */
+.st-prix__ballon {
+  font-size: 0.7em;
+  vertical-align: baseline;
 }
 
 @media (prefers-reduced-motion: reduce) {

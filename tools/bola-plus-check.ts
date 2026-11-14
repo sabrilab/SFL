@@ -51,7 +51,8 @@
 //       studio », dont le visuel est la scène du studio (la carte « Toi » sur
 //       le fond de l'affiche) et qui porte ses ballons du mois, lus dans
 //       lib/sfl/studio.ts ; le rail entre les avantages et l'offre ; les
-//       ballons sous chaque formule ; les recharges sous le bouton. Le
+//       ballons sous chaque formule, visibles ; les recharges sous le
+//       bouton ; le fond de « Ton studio » lu dans l'avantage. Le
 //       catalogue lui-même est contrôlé par tools/studio-check.ts.
 //       Des mutants de la source sont rejoués : chaque garde doit les refuser.
 // Sans réseau : fetch est remplacé.
@@ -584,7 +585,7 @@ async function banc() {
     assert.ok(/\{avantage\.numero\}/.test(carte) && /\{avantage\.titre\}/.test(carte), "la carte montre le numéro et le titre");
     assert.equal(carte.match(/<(p|h[1-6]|span)\b/g)?.length, 3, "la carte n'écrit que le numéro, le titre et les ballons du studio");
     assert.ok(/\{avantage\.studio && <span className="bp-carte__mention tabular-nums">\{MENTION_STUDIO\}<\/span>\}/.test(carte), "les ballons du studio, seulement sur « Ton studio »");
-    assert.ok(/const studio = avantage\.studio \? <VisuelStudio alt=\{avantage\.alt\} \/> : null;/.test(carte) && /\{studio \?\? \(depose \? \(/.test(carte), "« Ton studio » montre la scène du studio, décrite");
+    assert.ok(/const studio = avantage\.studio \? <VisuelStudio fond=\{avantage\.image\} alt=\{avantage\.alt\} \/> : null;/.test(carte) && /\{studio \?\? \(depose \? \(/.test(carte), "« Ton studio » montre la scène du studio, décrite");
     assert.ok(/AVANTAGES\.map\(/.test(page), "la page montre les avantages de la liste");
     // Les prix : une seule source.
     // (Hors commentaires ; « border-foreground/30 » est une opacité, pas un prix.)
@@ -647,6 +648,8 @@ async function banc() {
     const CACHE = /(^|[\s:"])(hidden|sr-only|invisible|opacity-0)(?=[\s"])/;
     const ligneSous = offre.split("\n").find((l) => l.includes("{p.sous && ")) ?? "";
     assert.ok(ligneSous && !CACHE.test(ligneSous), "les 4 fois se voient");
+    const ligneBallons = offre.split("\n").find((l) => l.includes("{p.ballons}")) ?? "";
+    assert.ok(ligneBallons && !CACHE.test(ligneBallons) && !/\shidden[\s>={]/.test(ligneBallons), "les ballons des formules se voient");
     assert.ok(!CACHE.test(affiche), "les prix de l'affiche se voient");
     // « Tes maillots » : le portant d'abord ; le visuel déposé ne le remplace qu'une fois chargé.
     assert.ok(/const \[deposeLa, setDeposeLa\] = useState\(false\);/.test(carte) && /const depose = deposeLa \? avantage\.depose : undefined;/.test(carte) && /\{studio \?\? \(depose \? \(/.test(carte), "la carte montre le portant tant que le visuel déposé n'est pas chargé");
@@ -757,6 +760,9 @@ async function banc() {
   // Les mutants du contrôle des prix (13/11).
   refuse("la remise arrondie au plus proche dans la source", () => sourceJuste(mute("round source", offreSource, "export const REMISE_POUR_CENT = Math.floor(", "export const REMISE_POUR_CENT = Math.round(")));
   refuse("le libellé de la remise recalculé à part", () => sourceJuste(mute("libellé remise", offreSource, "export const LIBELLE_REMISE = `−${REMISE_POUR_CENT}\\u00a0%`;", "export const LIBELLE_REMISE = `−${Math.round(REMISE * 100)}\\u00a0%`;")));
+  refuse("les ballons des formules cachés", () => ecranJuste(mute("ballons cachés", ecran, '<span className="text-[13px] leading-tight font-semibold text-foreground tabular-nums">{p.ballons}', '<span className="hidden text-[13px] leading-tight font-semibold text-foreground tabular-nums">{p.ballons}'), style));
+  refuse("les ballons des formules en attribut hidden", () => ecranJuste(mute("ballons hidden", ecran, '<span className="text-[13px] leading-tight font-semibold text-foreground tabular-nums">{p.ballons}', '<span hidden className="text-[13px] leading-tight font-semibold text-foreground tabular-nums">{p.ballons}'), style));
+  refuse("le fond de « Ton studio » écrit en dur", () => ecranJuste(mute("fond en dur", ecran, "<VisuelStudio fond={avantage.image}", '<VisuelStudio fond="affiche"'), style));
   refuse("les 4 fois cachés", () => ecranJuste(mute("4 fois cachés", ecran, '{p.sous && <span className="', '{p.sous && <span className="hidden '), style));
   refuse("les 4 fois cachés sur petit écran", () => ecranJuste(mute("4 fois petits", ecran, '{p.sous && <span className="', '{p.sous && <span className="max-[359px]:hidden '), style));
   refuse("les 4 fois pour lecteur d'écran seulement", () => ecranJuste(mute("4 fois sr", ecran, '{p.sous && <span className="', '{p.sous && <span className="sr-only '), style));

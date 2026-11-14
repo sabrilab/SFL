@@ -11,10 +11,18 @@
 //     carte anonyme « Toi » (BolaCard, ou son dos, DosCarte) posée selon la
 //     scène, le logo ou le symbole Bola. Une vidéo : le cadrage avance
 //     lentement (studio-bola.css), arrêté avec « Réduire les animations ».
-//     Les cartes ne se montent qu'une fois la vignette mesurée et proche de
-//     l'écran : douze vignettes ne pèsent rien tant qu'on ne les voit pas ;
-//   · VisuelStudio : le visuel de l'avantage « Ton studio » (bola-plus.tsx) :
-//     la carte « Toi » au milieu du stade, dans les coins de repère ;
+//     Les cartes ne se montent qu'une fois la vignette mesurée et proche :
+//     à une largeur de rail d'avance dans le rail, à un écran d'avance dans
+//     la page (useProche observe le conteneur qui défile vraiment) ; douze
+//     vignettes ne pèsent rien tant qu'on ne les voit pas. Chaque visuel dit
+//     au navigateur sa taille réelle, grossissement compris (sizes) : une
+//     vignette agrandie dans la feuille charge la grande image, pas la molle.
+//     La scène est décorative (aria-hidden) : un lecteur d'écran lit le nom,
+//     ce que tu reçois, la durée et le prix, jamais le micro-texte de la
+//     carte ;
+//   · VisuelStudio : le visuel de l'avantage « Ton studio » (bola-plus.tsx),
+//     sur le fond que porte l'avantage : le stade, le ballon au centre des
+//     coins de repère, sans carte (sceneStudio, lib/sfl/studio.ts) ;
 //   · RailStudio : « Bola Studio », la phrase des ballons du mois
 //     (« 300 ⚽ = un trash talk ou six images », calculée), puis les douze
 //     templates en rail horizontal, au doigt, accroché carte par carte
@@ -22,14 +30,19 @@
 //     prix. Toucher un template l'ouvre en grand dans une feuille (la même
 //     fiche, la vignette à la largeur de l'écran). Aucun bouton d'achat :
 //     rien ne s'achète encore ;
-//   · RechargesStudio : les trois recharges, sous les formules, marquées
-//     « Bientôt », sans geste.
+//   · RechargesStudio : les trois recharges, sous le bouton de l'offre,
+//     marquées « Bientôt », sans geste ni focus ; leurs chiffres en Anton
+//     prennent l'espace insécable large (« 1 100 », pas « 1100 »).
+//
+// Le ballon ⚽ d'un prix en Anton (la feuille, les recharges) est réduit à
+// 0,7 em sur la ligne de base (Prix) : l'émoji ne domine pas le chiffre.
+// Sur un grand écran, le rail s'efface en fondu au bord de la colonne.
 //
 // Noir et blanc : les visuels sont gris, l'encre est celle de l'app ; les
 // vignettes sont des îlots sombres (classe dark), comme les cartes
 // d'avantage. Pas de texte d'aide : des noms, des durées, des prix.
 
-import { useEffect, useRef, useState, type CSSProperties, type RefObject } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from "react";
 import { Play } from "lucide-react";
 import { BolaCard } from "@/components/sfl/bola-card";
 import { DosCarte } from "@/components/sfl/dos-carte";
@@ -38,6 +51,7 @@ import { ANTON } from "@/components/sfl/actus/ecran";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { fichierVisuel, sourcesVisuel } from "@/lib/sfl/bola-plus";
 import {
+  ESPACE_LARGE,
   PHRASE_INCLUS,
   RECHARGES_STUDIO,
   TEMPLATES,
@@ -45,6 +59,7 @@ import {
   dureeDe,
   prixDe,
   prixRecharge,
+  sceneStudio,
   type Fond,
   type Scene,
   type Template,
@@ -91,30 +106,47 @@ function useLargeur(ref: RefObject<HTMLElement | null>) {
   return l;
 }
 
-/** Proche de l'écran (une largeur d'écran d'avance) : une fois vu, le reste. */
+/**
+ * Proche (une largeur de rail, ou un écran, d'avance) : une fois vu, le reste.
+ * La marge ne vaut que pour le conteneur qui défile : le rail pour une
+ * vignette du rail, #app-scroll pour la page ; la feuille, hors des deux, est
+ * déjà à l'écran.
+ */
 function useProche(ref: RefObject<HTMLElement | null>) {
   const [proche, setProche] = useState(false);
   useEffect(() => {
     const el = ref.current;
     if (!el || proche) return;
-    const o = new IntersectionObserver(([e]) => e.isIntersecting && setProche(true), { rootMargin: "100% 100% 100% 100%" });
+    const rail = el.closest<HTMLElement>(".st-rail");
+    const page = document.getElementById("app-scroll");
+    const root = rail ?? (page?.contains(el) ? page : null);
+    const o = new IntersectionObserver(([e]) => e.isIntersecting && setProche(true), { root, rootMargin: rail ? "0px 100%" : "100% 0px" });
     o.observe(el);
     return () => o.disconnect();
   }, [ref, proche]);
   return proche;
 }
 
-const TAILLES_FOND = "(min-width: 430px) 430px, 100vw";
+/** La largeur d'une vignette à l'écran : dans le rail, ou à la largeur de la page (la feuille, « Ton studio »). */
+export type Cadre = "rail" | "page";
+const LARGEUR_CADRE: Record<Cadre, string> = { rail: "min(216px, 58vw)", page: "min(430px, 100vw)" };
+
+/**
+ * La taille du visuel pour le navigateur : la largeur de la vignette, par la
+ * part qu'il en occupe, par son grossissement (et les 12 % du cadrage d'une
+ * vidéo) : une vignette très grossie charge la grande image.
+ */
+const taillesFond = (cadre: Cadre, part: number, zoom: number, video: boolean) => `calc(${LARGEUR_CADRE[cadre]} * ${Math.round(part * zoom * (video ? 1.12 : 1) * 100) / 100})`;
 
 /** Un visuel de public/bola-plus/, recadré sur son point (x, y) et grossi. */
-function Fond({ fond, x, y, zoom, className }: { fond: Fond; x: number; y: number; zoom: number; className?: string }) {
+function Fond({ fond, x, y, zoom, sizes, className }: { fond: Fond; x: number; y: number; zoom: number; sizes: string; className?: string }) {
   return (
     // eslint-disable-next-line @next/next/no-img-element -- déjà à ses trois tailles (public/bola-plus)
     <img
       className={className ?? "st-scene__fond"}
       src={fichierVisuel(fond, 480)}
       srcSet={sourcesVisuel(fond)}
-      sizes={TAILLES_FOND}
+      sizes={sizes}
       alt=""
       loading="lazy"
       decoding="async"
@@ -139,20 +171,25 @@ function Cartes({ pose, l }: { pose: Scene["pose"]; l: number }) {
           <CarteToi largeur={l * 0.5} style={{ left: "50%", bottom: "8%", transform: "translateX(-50%)" }} />
         </>
       );
-    case "affiche":
+    case "affiche": {
+      // En miroir : la face et le dos droits, à la même hauteur, le ballon entre les deux.
+      const w = l * 0.34;
+      const milieu = `calc(14% + ${(w * (1656 / 1024)) / 2}px)`;
       return (
         <>
           {/* eslint-disable-next-line @next/next/no-img-element -- le symbole Bola : le ballon */}
-          <img className="st-ballon st-ballon--milieu" src="/bola/symbole-blanc.svg" alt="" draggable={false} />
-          <CarteToi largeur={l * 0.34} style={{ left: "8%", bottom: "14%" }} />
-          <CarteToi largeur={l * 0.34} dos style={{ right: "8%", bottom: "14%" }} />
+          <img className="st-ballon st-ballon--contre" src="/bola/symbole-blanc.svg" alt="" draggable={false} style={{ bottom: milieu }} />
+          <CarteToi largeur={w} style={{ left: "7%", bottom: "14%" }} />
+          <CarteToi largeur={w} dos style={{ right: "7%", bottom: "14%" }} />
         </>
       );
-    case "face-a-face":
+    }
+    case "provoc":
+      // De très près, penchée vers l'objectif ; l'adversaire, coupé au bord, flou.
       return (
         <>
-          <CarteToi largeur={l * 0.4} dos style={{ left: "52%", bottom: "16%", transform: "rotate(7deg)" }} />
-          <CarteToi largeur={l * 0.4} style={{ right: "52%", bottom: "12%", transform: "rotate(-7deg)" }} />
+          <CarteToi largeur={l * 0.46} dos style={{ right: "-24%", bottom: "20%", transform: "rotate(9deg)", filter: "blur(3px) brightness(0.7)" }} />
+          <CarteToi largeur={l * 0.66} style={{ left: "6%", bottom: "-6%", transform: "perspective(560px) rotateY(18deg) rotate(-6deg)" }} />
         </>
       );
     case "sortie":
@@ -179,6 +216,9 @@ function Cartes({ pose, l }: { pose: Scene["pose"]; l: number }) {
         </span>
       );
     }
+    case "vise":
+      // eslint-disable-next-line @next/next/no-img-element -- le symbole Bola : le ballon, au centre du cadre
+      return <img className="st-ballon st-ballon--vise" src="/bola/symbole-blanc.svg" alt="" draggable={false} />;
     case "fond":
       return null;
   }
@@ -191,14 +231,19 @@ const PLANS: { fond: Fond; x: number; y: number }[] = [
   { fond: "ceremonies", x: 50, y: 60 },
 ];
 
-/** La vignette d'une scène : le visuel, les cartes, et pour une vidéo le cadrage qui avance. */
-export function SceneStudio({ scene, video, className }: { scene: Scene; video?: number; className?: string }) {
+/**
+ * La vignette d'une scène : le visuel, les cartes, et pour une vidéo le
+ * cadrage qui avance. Décorative (aria-hidden) : ce qu'elle montre est dit à
+ * côté (le nom, ce que tu reçois), ou par le libellé de « Ton studio ».
+ */
+export function SceneStudio({ scene, video, cadre, className }: { scene: Scene; video?: number; cadre: Cadre; className?: string }) {
   const ref = useRef<HTMLDivElement>(null);
   const l = useLargeur(ref);
   const proche = useProche(ref);
   return (
     <div
       ref={ref}
+      aria-hidden
       className={`st-scene dark ${className ?? ""}`}
       data-pose={scene.pose}
       data-video={video ? "" : undefined}
@@ -208,12 +253,12 @@ export function SceneStudio({ scene, video, className }: { scene: Scene; video?:
         <span className="st-trois">
           {PLANS.map((p) => (
             <span key={p.fond}>
-              <Fond fond={p.fond} x={p.x} y={p.y} zoom={1} />
+              <Fond fond={p.fond} x={p.x} y={p.y} zoom={1} sizes={taillesFond(cadre, 1 / 3, 1, !!video)} />
             </span>
           ))}
         </span>
       ) : (
-        <Fond fond={scene.fond} x={scene.x} y={scene.y} zoom={scene.zoom} />
+        <Fond fond={scene.fond} x={scene.x} y={scene.y} zoom={scene.zoom} sizes={taillesFond(cadre, 1, scene.zoom, !!video)} />
       )}
       {l && proche ? (
         <span className="st-scene__cartes">
@@ -224,17 +269,28 @@ export function SceneStudio({ scene, video, className }: { scene: Scene; video?:
   );
 }
 
-/** Le visuel de l'avantage « Ton studio » : la carte « Toi » au milieu du stade, dans les coins de repère. */
-export function VisuelStudio({ alt }: { alt: string }) {
+/** Le visuel de l'avantage « Ton studio » : sur le fond de l'avantage, le ballon au centre des coins de repère. */
+export function VisuelStudio({ fond, alt }: { fond: string; alt: string }) {
   return (
     <span className="st-visuel" role="img" aria-label={alt}>
-      <SceneStudio scene={{ fond: "affiche", x: 50, y: 60, zoom: 1.12, pose: "tenue" }} className="st-scene--plein" />
+      <SceneStudio scene={sceneStudio(fond)} cadre="page" className="st-scene--plein" />
       <span className="st-reperes" />
     </span>
   );
 }
 
 /* -------------------------------- Le rail -------------------------------- */
+
+/** Un prix en Anton : le chiffre, et le ballon ⚽ réduit sur la ligne de base. */
+function Prix({ texte, className }: { texte: string; className?: string }): ReactNode {
+  const [chiffre, ...reste] = texte.split(/[\u00a0 ](?=⚽)/);
+  return (
+    <span className={className} style={{ fontFamily: ANTON }}>
+      {chiffre}
+      {reste.length > 0 && <span className="st-prix__ballon">&nbsp;⚽</span>}
+    </span>
+  );
+}
 
 /** Une fiche : la durée (avec le triangle de lecture pour une vidéo) et le prix. */
 function Meta({ t }: { t: Template }) {
@@ -253,8 +309,8 @@ function Meta({ t }: { t: Template }) {
 function CarteTemplate({ t, onOuvrir }: { t: Template; onOuvrir: () => void }) {
   return (
     <li className="st-item">
-      <button type="button" onClick={onOuvrir} className="st-item__bouton" aria-label={`${t.nom}, ${dureeDe(t)}, ${prixDe(t)}`}>
-        <SceneStudio scene={t.scene} video={t.rendu.genre === "video" ? t.rendu.secondes : undefined} />
+      <button type="button" onClick={onOuvrir} className="st-item__bouton">
+        <SceneStudio scene={t.scene} video={t.rendu.genre === "video" ? t.rendu.secondes : undefined} cadre="rail" />
         <span className="flex flex-col gap-1.5 px-1 pt-3">
           <span className="text-[15px] leading-tight font-bold tracking-[-0.2px]">{t.nom}</span>
           <span className="line-clamp-2 min-h-[2.5em] text-[13px] leading-[1.25] text-encre-2">{t.recoit}</span>
@@ -272,7 +328,7 @@ function FicheTemplate({ t, onFermer }: { t: Template | null; onFermer: () => vo
       <SheetContent side="bottom" className="rounded-t-3xl">
         {t && (
           <div className="mx-auto flex w-full max-w-[430px] flex-col gap-4 px-3 pt-3 pb-8">
-            <SceneStudio scene={t.scene} video={t.rendu.genre === "video" ? t.rendu.secondes : undefined} className="st-scene--grand" />
+            <SceneStudio scene={t.scene} video={t.rendu.genre === "video" ? t.rendu.secondes : undefined} cadre="page" className="st-scene--grand" />
             <div className="flex flex-col gap-2 px-1">
               <SheetTitle className="text-[24px] leading-none font-black tracking-[-0.04em]">{t.nom}</SheetTitle>
               <p className="text-corps leading-snug text-encre-2">{t.recoit}</p>
@@ -281,9 +337,7 @@ function FicheTemplate({ t, onFermer }: { t: Template | null; onFermer: () => vo
                   {t.rendu.genre === "video" && <Play className="size-3.5 fill-current" aria-hidden />}
                   {dureeDe(t)}
                 </span>
-                <span className="text-[28px] leading-none tabular-nums" style={{ fontFamily: ANTON }}>
-                  {prixDe(t)}
-                </span>
+                <Prix texte={prixDe(t)} className="text-[28px] leading-none tabular-nums" />
               </span>
             </div>
           </div>
@@ -329,10 +383,8 @@ export function RechargesStudio() {
       <ul className="grid grid-cols-3 gap-2">
         {RECHARGES_STUDIO.map((r) => (
           <li key={r.centimes} className="st-recharge glass flex flex-col items-center gap-2 rounded-[20px] px-2 py-4 text-center">
-            <span className="text-[22px] leading-none tabular-nums" style={{ fontFamily: ANTON }}>
-              {ballons(r.ballons)}&nbsp;⚽
-            </span>
-            <span className="text-[13px] leading-none font-semibold text-encre-2 tabular-nums">{prixRecharge(r)}&nbsp;€</span>
+            <Prix texte={`${ballons(r.ballons, ESPACE_LARGE)} ⚽`} className="text-[22px] leading-none tabular-nums" />
+            <span className="text-[13px] leading-none font-semibold text-foreground tabular-nums">{prixRecharge(r)}&nbsp;€</span>
           </li>
         ))}
       </ul>

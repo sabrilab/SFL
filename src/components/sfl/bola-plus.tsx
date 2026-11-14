@@ -16,9 +16,10 @@
 //         maillots » montre d'abord le portant ; les maillots portés
 //         (Avantage.depose, un fichier gardé hors du dépôt) ne prennent sa
 //         place qu'une fois chargés : absents, rien ne bouge ni ne reste vide.
-//         « Ton studio » (14/11, bola-app#22) : la vraie carte « Toi » dans le
-//         stade (studio-bola.tsx, VisuelStudio), et ses ballons du mois à
-//         droite du titre (lib/sfl/studio.ts) ;
+//         « Ton studio » (14/11, bola-app#22) : le stade de son visuel, le
+//         ballon au centre des coins de repère, sans carte (studio-bola.tsx,
+//         VisuelStudio), et ses ballons du mois à droite du titre
+//         (lib/sfl/studio.ts) ;
 //       – RailStudio : « Bola Studio », les douze templates en rail, payés en
 //         ballons (studio-bola.tsx) ;
 //       – OffreBolaPlus : l'emblème, les deux formules à toucher (Mensuel
@@ -43,8 +44,9 @@
 //
 // Aucun paiement, aucun formulaire, aucun texte d'aide : les titres, les deux
 // prix (et les 4 fois de l'annuel, sans nom de prestataire), le bouton. Les
-// montants sont écrits et calculés dans lib/sfl/bola-plus.ts, jamais ici. Les quatre avantages sont ceux que Sabri a dits ; leurs
-// titres sont dans lib/sfl/bola-plus.ts, pas ici.
+// montants sont écrits et calculés dans lib/sfl/bola-plus.ts, jamais ici. Les cinq avantages sont ceux que Sabri a dits ; leurs
+// titres sont dans lib/sfl/bola-plus.ts, pas ici. Le rail Bola Studio et les
+// recharges lisent leurs prix et leurs ballons dans lib/sfl/studio.ts.
 //
 // Les visuels (public/bola-plus/, 4:5, noir et blanc) sont les mêmes en clair
 // et en sombre : l'affiche et les cartes sont des îlots sombres (classe dark),
@@ -352,8 +354,8 @@ function CarteAvantage({ avantage }: { avantage: Avantage }) {
   // garde son visuel, sans trou ni attente.
   const [deposeLa, setDeposeLa] = useState(false);
   const depose = deposeLa ? avantage.depose : undefined;
-  // « Ton studio » : la scène du studio (la carte « Toi » dans le stade) à la place d'une image.
-  const studio = avantage.studio ? <VisuelStudio alt={avantage.alt} /> : null;
+  // « Ton studio » : la scène du studio (le stade de son visuel, le ballon au centre des coins de repère) à la place d'une image.
+  const studio = avantage.studio ? <VisuelStudio fond={avantage.image} alt={avantage.alt} /> : null;
 
   useEffect(() => {
     const fichier = avantage.depose?.fichier;
@@ -449,7 +451,7 @@ function BarreInteret({ note, occupe, cachee, onNoter, onVoirOffre }: { note: bo
   );
 }
 
-/** La page Bola Plus : l'affiche, les quatre avantages, l'offre, et le bouton toujours sous le pouce. */
+/** La page Bola Plus : l'affiche, les cinq avantages, le rail Bola Studio, l'offre (et ses recharges), et le bouton toujours sous le pouce. */
 export function PageBolaPlus() {
   const plus = useBolaPlus();
   const [choix, setChoix] = useState<Formule | null>(null);
