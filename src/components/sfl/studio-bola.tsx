@@ -4,54 +4,64 @@
 // bola-app#22 : « Rends-moi visuellement l'artefact dans le module qui
 // présente son abonnement »). Ce que le joueur en voit ; les templates, les
 // prix, les ballons et les recharges sont dans lib/sfl/studio.ts, jamais ici.
+// Depuis le carrousel en couleurs de Bola Plus (SFL#268, retours du 14/11) :
+// le studio vit DANS le carrousel, dans la part Bola Plus (violet).
 //
 //   · SceneStudio : la vignette d'un template, composée avec ce qui existe
-//     (aucune image générée) : un visuel de public/bola-plus/ recadré (le
-//     stade de piliers, le portant, la caméra, le socle, le podium), la vraie
-//     carte anonyme « Toi » (BolaCard, ou son dos, DosCarte) posée selon la
-//     scène, le logo ou le symbole Bola. Une vidéo : le cadrage avance
-//     lentement (studio-bola.css), arrêté avec « Réduire les animations ».
-//     Les cartes ne se montent qu'une fois la vignette mesurée et proche :
-//     à une largeur de rail d'avance dans le rail, à un écran d'avance dans
-//     la page (useProche observe le conteneur qui défile vraiment) ; douze
-//     vignettes ne pèsent rien tant qu'on ne les voit pas. Chaque visuel dit
-//     au navigateur sa taille réelle, grossissement compris (sizes) : une
-//     vignette agrandie dans la feuille charge la grande image, pas la molle.
-//     La scène est décorative (aria-hidden) : un lecteur d'écran lit le nom,
-//     ce que tu reçois, la durée et le prix, jamais le micro-texte de la
-//     carte ;
-//   · VisuelStudio : le visuel de l'avantage « Ton studio » (bola-plus.tsx),
-//     sur le fond que porte l'avantage : le stade, le ballon au centre des
-//     coins de repère, sans carte (sceneStudio, lib/sfl/studio.ts) ;
-//   · RailStudio : « Bola Studio », la phrase des ballons du mois
-//     (« 300 ⚽ = un trash talk ou six images », calculée), puis les douze
-//     templates en rail horizontal, au doigt, accroché carte par carte
-//     (scroll-snap) : la vignette, le nom, ce que tu reçois, la durée, le
-//     prix. Toucher un template l'ouvre en grand dans une feuille (la même
-//     fiche, la vignette à la largeur de l'écran). Aucun bouton d'achat :
-//     rien ne s'achète encore ;
-//   · RechargesStudio : les trois recharges, sous le bouton de l'offre,
-//     marquées « Bientôt », sans geste ni focus ; leurs chiffres en Anton
-//     prennent l'espace insécable large (« 1 100 », pas « 1100 »).
+//     (aucune image générée pour le studio) : un visuel de public/bola-plus/
+//     recadré, la vraie carte anonyme « Toi » (BolaCard, ou son dos,
+//     DosCarte) posée selon la scène, le logo ou le symbole Bola. Le fond est
+//     teint dans le violet de Bola Plus (fusion « color », comme le stade de
+//     l'ouverture) ; la carte « Toi » garde ses vraies couleurs, par-dessus.
+//     Une vidéo : le cadrage avance lentement (studio-bola.css), arrêté avec
+//     « Réduire les animations ». Les cartes ne se montent qu'une fois la
+//     vignette mesurée et proche : à une largeur d'avance dans le rail ou le
+//     carrousel, à un écran d'avance dans la page (useProche observe le
+//     conteneur qui défile vraiment). Chaque visuel dit au navigateur sa
+//     taille réelle, grossissement compris (sizes). La scène est décorative
+//     (aria-hidden) : un lecteur d'écran lit le nom, ce que tu reçois, la
+//     durée et le prix, jamais le micro-texte de la carte ;
+//   · VisuelStudio : le visuel de la carte « Ton studio » du carrousel
+//     (bola-plus.tsx, COMPOSANTS.studio) : trois vrais templates en éventail
+//     (EVENTAIL_STUDIO), le trash talk au milieu, et « Bola Studio » avec le
+//     nombre de templates. Le tout est un bouton : il ouvre le panneau.
+//     MentionStudio : sous le titre « Ton studio », les ballons du mois
+//     (« 300 ⚽ / mois », MENTION_STUDIO) ;
+//   · PanneauStudio : une feuille du bas, aux couleurs de Bola Plus :
+//     « Bola Studio » (la police des titres du carrousel), la phrase des
+//     ballons du mois (« 300 ⚽ = un trash talk ou six images », calculée),
+//     les douze templates en rail horizontal, au doigt, accroché carte par
+//     carte (scroll-snap) : la vignette, le nom, ce que tu reçois, la durée,
+//     le prix. Toucher un template pousse sa fiche dans la même feuille (le
+//     retour en haut à gauche, components/ui/sheet.tsx). Aucun bouton
+//     d'achat : rien ne s'achète encore. Le rail est dans une feuille, pas
+//     dans la carte : un rail horizontal dans un carrousel horizontal se
+//     disputerait le doigt et les flèches du clavier ;
+//   · RechargesStudio : les trois recharges, au bas du panneau, marquées
+//     « Bientôt », sans geste ni focus ; leurs chiffres en Anton prennent
+//     l'espace insécable large (« 1 100 », pas « 1100 »).
 //
-// Le ballon ⚽ d'un prix en Anton (la feuille, les recharges) est réduit à
+// Le ballon ⚽ d'un prix en Anton (la fiche, les recharges) est réduit à
 // 0,7 em sur la ligne de base (Prix) : l'émoji ne domine pas le chiffre.
-// Sur un grand écran, le rail s'efface en fondu au bord de la colonne.
 //
-// Noir et blanc : les visuels sont gris, l'encre est celle de l'app ; les
-// vignettes sont des îlots sombres (classe dark), comme les cartes
-// d'avantage. Pas de texte d'aide : des noms, des durées, des prix.
+// Couleurs : celles de la page (PALETTE de lib/sfl/bola-plus.ts, en
+// variables --bp-*), posées aussi sur le panneau, qui est porté hors de la
+// page. Aucune teinte écrite dans la feuille de style. Les vignettes sont
+// des îlots sombres (classe dark) dans les deux modes. Pas de texte d'aide :
+// des noms, des durées, des prix.
 
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from "react";
-import { Play } from "lucide-react";
+import { ChevronRight, Play } from "lucide-react";
 import { BolaCard } from "@/components/sfl/bola-card";
 import { DosCarte } from "@/components/sfl/dos-carte";
 import { matiereDe } from "@/components/sfl/finitions-carte";
 import { ANTON } from "@/components/sfl/actus/ecran";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
-import { fichierVisuel, sourcesVisuel } from "@/lib/sfl/bola-plus";
+import { PALETTE, fichierVisuel, sourcesVisuel } from "@/lib/sfl/bola-plus";
 import {
   ESPACE_LARGE,
+  EVENTAIL_STUDIO,
+  MENTION_STUDIO,
   PHRASE_INCLUS,
   RECHARGES_STUDIO,
   TEMPLATES,
@@ -59,7 +69,7 @@ import {
   dureeDe,
   prixDe,
   prixRecharge,
-  sceneStudio,
+  template,
   type Fond,
   type Scene,
   type Template,
@@ -108,16 +118,16 @@ function useLargeur(ref: RefObject<HTMLElement | null>) {
 
 /**
  * Proche (une largeur de rail, ou un écran, d'avance) : une fois vu, le reste.
- * La marge ne vaut que pour le conteneur qui défile : le rail pour une
- * vignette du rail, #app-scroll pour la page ; la feuille, hors des deux, est
- * déjà à l'écran.
+ * La marge ne vaut que pour le conteneur qui défile : le rail du panneau ou
+ * le carrousel pour une vignette qui y glisse, #app-scroll pour la page ; la
+ * fiche, hors de tout cela, est déjà à l'écran.
  */
 function useProche(ref: RefObject<HTMLElement | null>) {
   const [proche, setProche] = useState(false);
   useEffect(() => {
     const el = ref.current;
     if (!el || proche) return;
-    const rail = el.closest<HTMLElement>(".st-rail");
+    const rail = el.closest<HTMLElement>(".st-rail, .bp-rail");
     const page = document.getElementById("app-scroll");
     const root = rail ?? (page?.contains(el) ? page : null);
     const o = new IntersectionObserver(([e]) => e.isIntersecting && setProche(true), { root, rootMargin: rail ? "0px 100%" : "100% 0px" });
@@ -127,7 +137,7 @@ function useProche(ref: RefObject<HTMLElement | null>) {
   return proche;
 }
 
-/** La largeur d'une vignette à l'écran : dans le rail, ou à la largeur de la page (la feuille, « Ton studio »). */
+/** La largeur d'une vignette à l'écran : dans le rail (ou l'éventail, à peine plus étroit), ou à la largeur de la page (la fiche). */
 export type Cadre = "rail" | "page";
 const LARGEUR_CADRE: Record<Cadre, string> = { rail: "min(216px, 58vw)", page: "min(430px, 100vw)" };
 
@@ -161,8 +171,6 @@ function Cartes({ pose, l }: { pose: Scene["pose"]; l: number }) {
   switch (pose) {
     case "tenue":
       return <CarteToi largeur={l * 0.5} style={{ left: "50%", bottom: "9%", transform: "translateX(-50%) rotate(-8deg)" }} />;
-    case "podium":
-      return <CarteToi largeur={l * 0.26} style={{ left: "50%", bottom: "41%", transform: "translateX(-50%)" }} />;
     case "une":
       return (
         <>
@@ -216,9 +224,6 @@ function Cartes({ pose, l }: { pose: Scene["pose"]; l: number }) {
         </span>
       );
     }
-    case "vise":
-      // eslint-disable-next-line @next/next/no-img-element -- le symbole Bola : le ballon, au centre du cadre
-      return <img className="st-ballon st-ballon--vise" src="/bola/symbole-blanc.svg" alt="" draggable={false} />;
     case "fond":
       return null;
   }
@@ -269,17 +274,23 @@ export function SceneStudio({ scene, video, cadre, className }: { scene: Scene; 
   );
 }
 
-/** Le visuel de l'avantage « Ton studio » : sur le fond de l'avantage, le ballon au centre des coins de repère. */
-export function VisuelStudio({ fond, alt }: { fond: string; alt: string }) {
-  return (
-    <span className="st-visuel" role="img" aria-label={alt}>
-      <SceneStudio scene={sceneStudio(fond)} cadre="page" className="st-scene--plein" />
-      <span className="st-reperes" />
-    </span>
-  );
-}
-
 /* -------------------------------- Le rail -------------------------------- */
+
+/**
+ * Les couleurs de Bola Plus (PALETTE), posées sur le panneau et la fiche :
+ * portés hors de la page, ils ne reçoivent pas ses variables.
+ */
+const COULEURS_STUDIO = {
+  "--bp-plus-fond": PALETTE.plus.fond,
+  "--bp-plus-haut": PALETTE.plus.haut,
+  "--bp-plus-vif": PALETTE.plus.vif,
+  "--bp-plus-clair": PALETTE.plus.clair,
+  "--bp-plus-encre": PALETTE.plus.encre,
+  "--bp-plus-papier": PALETTE.plus.fondClair,
+} as CSSProperties;
+
+/** Le panneau et la fiche : une feuille du bas qui défile si l'écran est court. */
+const FEUILLE_STUDIO = "st-feuille max-h-[92dvh] overflow-y-auto rounded-t-[28px] pb-[calc(env(safe-area-inset-bottom,0px)+1.5rem)]";
 
 /** Un prix en Anton : le chiffre, et le ballon ⚽ réduit sur la ligne de base. */
 function Prix({ texte, className }: { texte: string; className?: string }): ReactNode {
@@ -325,12 +336,12 @@ function CarteTemplate({ t, onOuvrir }: { t: Template; onOuvrir: () => void }) {
 function FicheTemplate({ t, onFermer }: { t: Template | null; onFermer: () => void }) {
   return (
     <Sheet open={!!t} onOpenChange={(o) => !o && onFermer()}>
-      <SheetContent side="bottom" className="rounded-t-3xl">
+      <SheetContent side="bottom" className={FEUILLE_STUDIO} style={COULEURS_STUDIO}>
         {t && (
           <div className="mx-auto flex w-full max-w-[430px] flex-col gap-4 px-3 pt-3 pb-8">
             <SceneStudio scene={t.scene} video={t.rendu.genre === "video" ? t.rendu.secondes : undefined} cadre="page" className="st-scene--grand" />
             <div className="flex flex-col gap-2 px-1">
-              <SheetTitle className="text-[24px] leading-none font-black tracking-[-0.04em]">{t.nom}</SheetTitle>
+              <SheetTitle className="bp-titre st-fiche__titre">{t.nom}</SheetTitle>
               <p className="text-corps leading-snug text-encre-2">{t.recoit}</p>
               <span className="mt-1 flex items-baseline justify-between gap-3">
                 <span className="flex items-center gap-1.5 text-corps font-semibold text-encre-2 tabular-nums">
@@ -347,25 +358,70 @@ function FicheTemplate({ t, onFermer }: { t: Template | null; onFermer: () => vo
   );
 }
 
-/** « Bola Studio » : la phrase des ballons du mois, puis les douze templates. */
-export function RailStudio() {
-  const [ouvert, setOuvert] = useState<Template | null>(null);
+/**
+ * Le panneau « Bola Studio » : la phrase des ballons du mois, les douze
+ * templates en rail, puis les recharges. Une feuille du bas ; la fiche d'un
+ * template y est poussée (components/ui/sheet.tsx).
+ */
+function PanneauStudio({ ouvert, onFermer }: { ouvert: boolean; onFermer: () => void }) {
+  const [fiche, setFiche] = useState<Template | null>(null);
   return (
-    <section className="st" aria-labelledby="st-titre">
-      <div className="flex flex-col gap-2 px-5">
-        <h2 id="st-titre" className="text-[26px] leading-none font-black tracking-[-0.045em] whitespace-nowrap">
-          Bola Studio
-        </h2>
-        <p className="text-corps leading-tight font-semibold text-encre-2 tabular-nums">{PHRASE_INCLUS}</p>
-      </div>
-      <ul className="st-rail">
-        {TEMPLATES.map((t) => (
-          <CarteTemplate key={t.id} t={t} onOuvrir={() => setOuvert(t)} />
-        ))}
-      </ul>
-      <FicheTemplate t={ouvert} onFermer={() => setOuvert(null)} />
-    </section>
+    <Sheet open={ouvert} onOpenChange={(o) => !o && onFermer()}>
+      <SheetContent side="bottom" className={FEUILLE_STUDIO} style={COULEURS_STUDIO}>
+        <div className="st-panneau mx-auto w-full max-w-[430px]">
+          <div className="flex flex-col gap-2 px-5">
+            <SheetTitle className="bp-titre st-panneau__titre">Bola Studio</SheetTitle>
+            <p className="st-panneau__phrase tabular-nums">{PHRASE_INCLUS}</p>
+          </div>
+          <ul className="st-rail">
+            {TEMPLATES.map((t) => (
+              <CarteTemplate key={t.id} t={t} onOuvrir={() => setFiche(t)} />
+            ))}
+          </ul>
+          <div className="px-5">
+            <RechargesStudio />
+          </div>
+        </div>
+        <FicheTemplate t={fiche} onFermer={() => setFiche(null)} />
+      </SheetContent>
+    </Sheet>
   );
+}
+
+/** Les trois templates de l'éventail, dans l'ordre : à gauche, au milieu, à droite. */
+const EVENTAIL = EVENTAIL_STUDIO.map(template);
+
+/**
+ * « Ton studio », la carte du carrousel : trois vrais templates en éventail et
+ * « Bola Studio » avec le nombre de templates. Un seul bouton : il ouvre le
+ * panneau. Ses mots se lisent en entier (pas d'aria-label).
+ */
+export function VisuelStudio() {
+  const [ouvert, setOuvert] = useState(false);
+  return (
+    <>
+      <button type="button" className="st-eventail" onClick={() => setOuvert(true)}>
+        <span className="st-eventail__cartes">
+          {EVENTAIL.map((t, i) => (
+            <span key={t.id} className="st-eventail__place" data-place={i}>
+              <SceneStudio scene={t.scene} video={t.rendu.genre === "video" ? t.rendu.secondes : undefined} cadre="rail" />
+            </span>
+          ))}
+        </span>
+        <span className="st-eventail__nom">
+          Bola Studio
+          <span className="st-eventail__nombre tabular-nums">{TEMPLATES.length}</span>
+          <ChevronRight className="size-4" strokeWidth={2.6} aria-hidden />
+        </span>
+      </button>
+      <PanneauStudio ouvert={ouvert} onFermer={() => setOuvert(false)} />
+    </>
+  );
+}
+
+/** Sous le titre « Ton studio » : les ballons du mois. */
+export function MentionStudio() {
+  return <p className="bp-texte__sous st-mention tabular-nums">{MENTION_STUDIO}</p>;
 }
 
 /* ------------------------------ Les recharges ------------------------------ */

@@ -30,13 +30,15 @@
 // La scène de chaque template : la vignette qui dit ce que le joueur reçoit,
 // composée par l'écran avec ce qui existe déjà (aucune image générée pour le
 // studio) : un visuel de public/bola-plus/ (le stade de piliers la nuit, le
-// portant des maillots, la caméra, le socle, le podium), recadré, et la vraie
-// carte anonyme « Toi » (BolaCard, DosCarte), ou le symbole Bola pour le
-// ballon. Une vidéo est un cadrage qui bouge lentement, arrêté avec
-// « Réduire les animations ».
-// L'avantage « Ton studio » de Bola Plus a sa scène à lui (sceneStudio) :
-// le stade, le ballon au centre des coins de repère, sans carte (la carte
-// « Toi » est déjà dans les vignettes du rail, juste dessous).
+// portant des maillots, et depuis le carrousel du 14/11 les visuels de la
+// part SFL, où jouent des joueurs génériques : le duel filmé, les cadeaux sur
+// le socle, la cérémonie et ses confettis), recadré, et la vraie carte
+// anonyme « Toi » (BolaCard, DosCarte), ou le symbole Bola pour le ballon ;
+// la carte n'est jamais posée sur un joueur de l'image. L'écran teint le fond
+// dans le violet de Bola Plus. Une vidéo est un cadrage qui bouge lentement,
+// arrêté avec « Réduire les animations ».
+// La carte « Ton studio » du carrousel Bola Plus montre trois de ces
+// templates en éventail (EVENTAIL_STUDIO), le trash talk au milieu.
 //
 // Pur : ni React ni réseau.
 
@@ -55,7 +57,6 @@ export const estFond = (image: string): image is Fond => (FONDS as readonly stri
 /**
  * La mise en scène d'une vignette :
  *   · tenue : la carte, de près, penchée, comme tenue en main ;
- *   · podium : la carte debout sur le socle ou le podium du fond ;
  *   · une : la carte en couverture, le logo Bola en tête ;
  *   · affiche : la face et le dos, droits, en miroir, le ballon entre les deux
  *     (le « contre » de l'affiche) ;
@@ -66,11 +67,9 @@ export const estFond = (image: string): image is Fond => (FONDS as readonly stri
  *   · loin : la carte petite, au bout de l'allée de piliers ;
  *   · ballon : le symbole Bola (le ballon) au bout de sa course, la carte en bas ;
  *   · rang : cinq cartes en rang, la face au milieu ;
- *   · vise : le ballon (le symbole Bola) au centre, sans carte : le visuel de
- *     « Ton studio », dans ses coins de repère ;
  *   · fond : le visuel seul.
  */
-export type Pose = "tenue" | "podium" | "une" | "affiche" | "provoc" | "sortie" | "trois" | "loin" | "ballon" | "rang" | "vise" | "fond";
+export type Pose = "tenue" | "une" | "affiche" | "provoc" | "sortie" | "trois" | "loin" | "ballon" | "rang" | "fond";
 
 export interface Scene {
   fond: Fond;
@@ -97,12 +96,6 @@ export interface Template {
   credits: number | null;
   scene: Scene;
 }
-
-/** La scène de l'avantage « Ton studio » : le stade, le ballon au centre, sans carte (son fond vient de l'avantage). */
-export const sceneStudio = (image: string): Scene => {
-  if (!estFond(image)) throw new Error(`sceneStudio : ${image} n'est pas un visuel de public/bola-plus/`);
-  return { fond: image, x: 50, y: 60, zoom: 1.2, pose: "vise" };
-};
 
 /** Les ballons de Bola Plus, chaque mois, aux deux formules. */
 export const BALLONS_PAR_MOIS = 300;
@@ -160,7 +153,7 @@ export const TEMPLATES: readonly Template[] = [
     prix: 199,
     modele: null,
     credits: null,
-    scene: { fond: "ceremonies", x: 50, y: 66, zoom: 1.5, pose: "podium" },
+    scene: { fond: "ceremonies", x: 80, y: 8, zoom: 2.2, pose: "tenue" },
   },
   {
     id: "trash-talk",
@@ -231,7 +224,7 @@ export const TEMPLATES: readonly Template[] = [
     prix: 599,
     modele: null,
     credits: null,
-    scene: { fond: "ceremonies", x: 50, y: 40, zoom: 1.2, pose: "rang" },
+    scene: { fond: "affiche", x: 50, y: 46, zoom: 1.1, pose: "rang" },
   },
 ];
 
@@ -292,7 +285,7 @@ export function equivalence(budget: number, catalogue: readonly Template[] = TEM
   return parts.map((p) => quantite(p.n, p.mot, p.feminin, chiffres)).join(" ou ");
 }
 
-/** « 300 ⚽ = un trash talk ou six images » : en tête du rail. */
+/** « 300 ⚽ = un trash talk ou six images » : en tête du panneau Bola Studio. */
 export const PHRASE_INCLUS = `${ballons(BALLONS_PAR_MOIS)} ⚽ = ${equivalence(BALLONS_PAR_MOIS)}`;
 
 /** Les ballons de chaque formule, sous son prix. */
@@ -302,8 +295,11 @@ export const BALLONS_FORMULE = {
   annuel: `${ballons(BALLONS_PAR_MOIS)} ⚽ / mois + ${ballons(OFFERTS_ANNUEL)} ⚽ offerts`,
 } as const;
 
-/** L'avantage « Ton studio » de Bola Plus : « 300 ⚽ / mois ». */
+/** La carte « Ton studio » du carrousel, sous son titre : « 300 ⚽ / mois ». */
 export const MENTION_STUDIO = BALLONS_FORMULE.mensuel;
+
+/** Les trois templates de l'éventail de « Ton studio » : à gauche, au milieu (le trash talk), à droite. */
+export const EVENTAIL_STUDIO = ["maillot-a-ton-nom", "trash-talk", "entree"] as const;
 
 /** Une recharge de ballons : son prix en centimes entiers et ce qu'elle donne. */
 export interface RechargeStudio {

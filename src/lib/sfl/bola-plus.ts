@@ -34,7 +34,8 @@
 //
 // Ce que la page montre (le carrousel, bola-plus.tsx) : l'ouverture, les
 // avantages (AVANTAGES, une liste de données : un avantage de plus s'ajoute
-// ici sans toucher au carrousel ; Bola Studio y entre ainsi), « Ramène 5
+// ici sans toucher au carrousel ; Bola Studio y est entré ainsi, « Ton
+// studio », après « Bola Plus » : bola-app#22), « Ramène 5
 // abonnés » (PARRAINAGE, seulement expliqué : aucun suivi ni paiement), puis
 // « Ton prix ». Chaque avantage appartient à une part : « plus » (violet,
 // Bola Plus) ou « sfl » (vert terrain, la ligue) ; la palette (PALETTE) est
@@ -268,11 +269,11 @@ export const NOM_PART: Record<Part, string> = { plus: "Bola Plus", sfl: "SFL" };
 
 /**
  * Les visuels dessinés par le code (bola-plus.tsx, COMPOSANTS) : la vraie
- * carte « Toi », la liste de Bola Plus. Bola Studio y ajoute « studio » (et
- * sa ligne dans COMPOSANTS), puis son avantage dans AVANTAGES, après
- * « bola-plus » : le carrousel, ses segments et sa palette suivent seuls.
+ * carte « Toi », la liste de Bola Plus, et « studio » : l'éventail de Bola
+ * Studio (components/sfl/studio-bola.tsx, ses templates et ses ballons dans
+ * lib/sfl/studio.ts). Le carrousel, ses segments et sa palette suivent seuls.
  */
-export type ComposantAvantage = "carte" | "bola-plus";
+export type ComposantAvantage = "carte" | "bola-plus" | "studio";
 
 /** Le visuel d'un avantage : une image de public/bola-plus/, ou un composant de l'app. */
 export type VisuelAvantage = ({ genre: "image" } & Visuel) | { genre: "composant"; composant: ComposantAvantage };
@@ -293,6 +294,7 @@ export const AFFICHE: Visuel = { image: "affiche", alt: "", teinte: "#2a2440", r
 export const AVANTAGES: readonly Avantage[] = [
   { id: "carte", part: "plus", titre: "Ta carte continue.", sous: "Tes stats te suivent.", visuel: { genre: "composant", composant: "carte" } },
   { id: "bola-plus", part: "plus", titre: "Bola Plus", visuel: { genre: "composant", composant: "bola-plus" } },
+  { id: "studio", part: "plus", titre: "Ton studio", visuel: { genre: "composant", composant: "studio" } },
   {
     id: "maillots",
     part: "sfl",

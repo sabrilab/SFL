@@ -1,16 +1,49 @@
-/* Bola Studio (studio-bola.tsx) : le rail des templates, leurs vignettes,
-   le visuel de « Ton studio », les recharges. Les vignettes sont des îlots
-   sombres, en noir et blanc, comme les cartes d'avantage (bola-plus.css).
-   Le rail s'accroche carte par carte (scroll-snap) ; une vignette vidéo
-   avance lentement son cadrage (st-cadrage) ; avec « Réduire les
+/* Bola Studio (studio-bola.tsx) dans le carrousel Bola Plus : l'éventail
+   de la carte « Ton studio », le panneau (le rail des templates, les
+   recharges), les vignettes. Couleurs de la part Bola Plus, lues dans les
+   variables --bp-plus-* (PALETTE, posées par la page et sur le panneau) :
+   aucune teinte écrite ici. Les vignettes sont des îlots sombres ; leur fond
+   est teint en violet (fusion « color »), la carte « Toi » garde ses vraies
+   couleurs. Le rail s'accroche carte par carte (scroll-snap) ; une vignette
+   vidéo avance lentement son cadrage (st-cadrage) ; avec « Réduire les
    animations », tout est fixe (fin du fichier). */
 
-/* ── Le rail ── */
-.st {
+/* ── Le panneau : « Bola Studio », la phrase, le rail, les recharges. ── */
+.st-panneau {
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  padding-top: 34px;
+  gap: 16px;
+  padding-top: 30px;
+}
+/* La feuille du panneau et de la fiche : la nuit violette en sombre, le papier lilas en clair. */
+[data-slot="sheet-content"].st-feuille {
+  background:
+    radial-gradient(90% 40% at 50% 0%, color-mix(in srgb, var(--bp-plus-vif) 34%, transparent), transparent 75%),
+    var(--bp-plus-fond);
+  color: #fff;
+}
+:root:not(.dark) [data-slot="sheet-content"].st-feuille {
+  background:
+    radial-gradient(90% 40% at 50% 0%, color-mix(in srgb, var(--bp-plus-vif) 16%, transparent), transparent 75%),
+    var(--bp-plus-papier);
+  color: var(--bp-plus-fond);
+}
+.st-panneau__titre,
+.st-fiche__titre {
+  font-size: 34px;
+  color: var(--bp-plus-clair);
+}
+.st-fiche__titre {
+  font-size: 30px;
+}
+:root:not(.dark) :is(.st-panneau__titre, .st-fiche__titre) {
+  color: var(--bp-plus-encre);
+}
+.st-panneau__phrase {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.25;
 }
 .st-rail {
   display: flex;
@@ -27,12 +60,6 @@
 }
 .st-rail::-webkit-scrollbar {
   display: none;
-}
-/* Sur un grand écran, la colonne s'arrête avant l'écran : le rail s'y efface en fondu au lieu d'être coupé net. */
-@media (min-width: 431px) {
-  .st-rail {
-    mask-image: linear-gradient(to right, #000 calc(100% - 36px), transparent);
-  }
 }
 .st-item {
   flex: 0 0 auto;
@@ -61,7 +88,7 @@
   aspect-ratio: 4 / 5;
   overflow: hidden;
   border-radius: 20px;
-  background: rgb(40 40 40);
+  background: var(--bp-plus-fond);
   color: #fff;
   isolation: isolate;
   transition: scale 0.2s ease;
@@ -87,6 +114,21 @@
   user-select: none;
   -webkit-user-drag: none;
 }
+/* Le fond teint dans le violet de Bola Plus (fusion « color », comme le
+   stade de l'ouverture) ; les cartes, posées au-dessus, gardent leurs couleurs. */
+.st-scene::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  mix-blend-mode: color;
+  background: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--bp-plus-vif) 80%, transparent),
+    color-mix(in srgb, var(--bp-plus-vif) 55%, transparent)
+  );
+}
 /* Un voile bas, pour que les cartes se détachent du gazon ; un liseré. */
 .st-scene::after {
   content: "";
@@ -102,6 +144,9 @@
   position: absolute;
   inset: 0;
   z-index: 1;
+}
+.st-trois {
+  z-index: 0;
 }
 .st-carte {
   position: absolute;
@@ -141,14 +186,6 @@
   left: 50%;
   width: 12%;
   translate: -50% 50%;
-}
-/* « Ton studio » : le ballon au centre des coins de repère, posé sur le gazon. */
-.st-ballon--vise {
-  top: 50%;
-  right: auto;
-  left: 50%;
-  width: 15%;
-  translate: -50% -50%;
 }
 /* La compo : cinq cartes en rang, la face au milieu. */
 .st-rang {
@@ -196,42 +233,98 @@
   }
 }
 
-/* ── « Ton studio » : la scène plein cadre et les coins de repère. ── */
-.st-visuel {
-  position: absolute;
-  inset: 0;
+/* ── « Ton studio » : l'éventail, un seul bouton qui ouvre le panneau. ── */
+.st-eventail {
+  position: relative;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  min-height: 0;
+  margin: 0 -8px;
+  color: inherit;
+  -webkit-tap-highlight-color: transparent;
 }
-.st-reperes {
-  position: absolute;
-  inset: 16% 10% 20%;
-  z-index: 1;
-  pointer-events: none;
-  --t: 1.5px;
-  --c: 22px;
-  background:
-    linear-gradient(#fff, #fff) top left / var(--c) var(--t),
-    linear-gradient(#fff, #fff) top left / var(--t) var(--c),
-    linear-gradient(#fff, #fff) top right / var(--c) var(--t),
-    linear-gradient(#fff, #fff) top right / var(--t) var(--c),
-    linear-gradient(#fff, #fff) bottom left / var(--c) var(--t),
-    linear-gradient(#fff, #fff) bottom left / var(--t) var(--c),
-    linear-gradient(#fff, #fff) bottom right / var(--c) var(--t),
-    linear-gradient(#fff, #fff) bottom right / var(--t) var(--c);
-  background-repeat: no-repeat;
-  opacity: 0.78;
+.st-eventail:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+  border-radius: 22px;
 }
-.bp-carte__mention {
+.st-eventail__cartes {
+  position: relative;
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+  container-type: size;
+}
+.st-eventail__place {
   position: absolute;
+  top: 50%;
+  display: block;
+  width: min(48cqw, 72cqh * 0.8);
+  filter: drop-shadow(0 14px 22px rgb(0 0 0 / 0.42));
+  transition: scale 0.2s ease;
+}
+.st-eventail__place[data-place="0"] {
+  left: 0;
+  translate: -6% -56%;
+  rotate: -9deg;
+}
+.st-eventail__place[data-place="2"] {
+  right: 0;
+  translate: 6% -56%;
+  rotate: 9deg;
+}
+.st-eventail__place[data-place="1"] {
+  left: 50%;
   z-index: 1;
-  right: 20px;
-  bottom: 22px;
-  font-size: 13px;
-  line-height: 1;
+  width: min(66cqw, 98cqh * 0.8);
+  translate: -50% -46%;
+}
+.st-eventail:active .st-eventail__place {
+  scale: 0.98;
+}
+/* « Bola Studio » et ses douze : la pilule violette, comme l'étiquette de la part. */
+.st-eventail__nom {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 12px 0 16px;
+  border-radius: 999px;
+  font-size: 15px;
   font-weight: 700;
-  color: rgb(255 255 255 / 0.78);
+  white-space: nowrap;
+  color: #fff;
+  background: var(--bp-plus-vif);
+  box-shadow: 0 8px 20px color-mix(in srgb, var(--bp-plus-vif) 40%, transparent);
+}
+.st-eventail__nombre {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--bp-plus-fond);
+  background: #fff;
+}
+/* Sous « Ton studio » : les ballons du mois. */
+.st-mention {
+  font-size: 18px;
+  font-weight: 800;
 }
 
 /* ── Les recharges : montrées, pas encore en vente (atténuées, le texte reste lisible). ── */
+.st-panneau .st-recharge {
+  background: color-mix(in srgb, var(--bp-plus-vif) 8%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--bp-plus-vif) 22%, transparent);
+}
 .st-recharge {
   opacity: 0.74;
 }
@@ -243,6 +336,7 @@
 
 @media (prefers-reduced-motion: reduce) {
   .st-scene,
+  .st-eventail__place,
   .st-scene[data-video] .st-scene__fond {
     animation: none;
     transition: none;

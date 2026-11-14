@@ -10,14 +10,19 @@
 //   · PageBolaPlus : un carrousel horizontal (retours de Sabri du 14/11, 20:34
 //     → 20:47 : « en mode carrousel », « de belles couleurs »), une carte à la
 //     fois, qu'on fait glisser au doigt, comme la présentation d'un passe de
-//     jeu. Neuf cartes : l'ouverture (le stade teint en violet et vert, le
+//     jeu. Dix cartes : l'ouverture (le stade teint en violet et vert, le
 //     gros logo BOLA et le petit sigle SFL dessous, le prix premiers joueurs),
 //     puis les avantages de la liste (AVANTAGES : « Ta carte continue. » avec
-//     la vraie carte « Toi », « Bola Plus » et ses fonctions, puis la part SFL
+//     la vraie carte « Toi », « Bola Plus » et ses fonctions, « Ton studio »
+//     (Bola Studio, bola-app#22 : trois templates en éventail qui ouvrent le
+//     panneau des douze, et « 300 ⚽ / mois » sous le titre ; studio-bola.tsx),
+//     puis la part SFL
 //     en photos : maillots, matchs filmés, cadeaux, cérémonies), « Ramène 5
 //     abonnés. », et « Ton prix » : le bundle, la grille officielle de la SFL
-//     barrée, l'étiquette « Prix premiers joueurs », les deux formules et
-//     « Je suis intéressé ». Chaque carte porte l'étiquette de sa part :
+//     barrée, l'étiquette « Prix premiers joueurs », les deux formules (sous
+//     chacune, ses ballons de Bola Studio : « 300 ⚽ / mois », et pour l'annuel
+//     « + 1 000 ⚽ offerts », lus dans lib/sfl/studio.ts) et « Je suis
+//     intéressé ». Chaque carte porte l'étiquette de sa part :
 //     la pilule violette de Bola Plus (la lune Bola) ou l'étiquette verte de
 //     la SFL (son vrai sigle) ; on glisse des violettes aux vertes.
 //
@@ -44,8 +49,9 @@
 // cartes) ; la piste Archivo (téléchargée chez Google au build) n'est
 // branchée que si Sabri la retient : en développement, « ?police=b » la
 // demande à la feuille, qui retombe sur Barlow tant que la police n'est pas
-// chargée. Un avantage de plus (Bola Studio) s'ajoute dans AVANTAGES et, s'il
-// dessine son visuel, dans COMPOSANTS : rien d'autre à toucher ici.
+// chargée. Un avantage de plus s'ajoute dans AVANTAGES et, s'il dessine son
+// visuel, dans COMPOSANTS (et sa ligne sous le titre dans PIEDS) : rien
+// d'autre à toucher ici. Bola Studio est entré ainsi.
 //
 // L'emblème de la tuile n'est pas une image : la rosace guillochée du dos de
 // la carte et la lune Bola en son centre (motif-carte.tsx, finitions-carte.ts),
@@ -87,7 +93,9 @@ import {
   type Part,
   type Visuel,
 } from "@/lib/sfl/bola-plus";
+import { BALLONS_FORMULE } from "@/lib/sfl/studio";
 import { cn } from "@/lib/utils";
+import { MentionStudio, VisuelStudio } from "@/components/sfl/studio-bola";
 import "@/components/sfl/ma-carte/rubriques.css";
 import "./bola-plus.css";
 
@@ -274,6 +282,7 @@ export function OffreBolaPlus({
                   <Barre somme={p.barre} />
                 </span>
                 <span className="bp-formule__sous tabular-nums">{p.sous}</span>
+                <span className="bp-formule__ballons tabular-nums">{BALLONS_FORMULE[f]}</span>
               </span>
               <span aria-hidden className="bp-formule__rond">
                 {choisie && <Check className="size-3.5" strokeWidth={3.5} />}
@@ -418,15 +427,20 @@ function VisuelBolaPlus() {
   );
 }
 
-/** Les visuels dessinés par le code. Bola Studio ajoute ici sa ligne (studio: VisuelStudio). */
+/** Les visuels dessinés par le code. */
 const COMPOSANTS: Record<ComposantAvantage, () => ReactNode> = {
   carte: VisuelCarte,
   "bola-plus": VisuelBolaPlus,
+  studio: VisuelStudio,
 };
+
+/** Ce qu'un visuel dessiné ajoute sous son titre : les ballons du mois de « Ton studio ». */
+const PIEDS: Partial<Record<ComposantAvantage, () => ReactNode>> = { studio: MentionStudio };
 
 /** Un avantage dessiné par le code : son étiquette, son visuel, son titre et sa ligne. */
 function DiapoComposant({ avantage, composant }: { avantage: Avantage; composant: ComposantAvantage }) {
   const Dessin = COMPOSANTS[composant];
+  const Pied = PIEDS[composant];
   const titreEnHaut = composant === "bola-plus";
   return (
     <div className={cn("bp-texte", `bp-texte--${avantage.part}`)}>
@@ -437,6 +451,7 @@ function DiapoComposant({ avantage, composant }: { avantage: Avantage; composant
         <div>
           <Titre className="bp-texte__titre">{avantage.titre}</Titre>
           {avantage.sous && <p className="bp-texte__sous">{avantage.sous}</p>}
+          {Pied && <Pied />}
         </div>
       )}
     </div>
