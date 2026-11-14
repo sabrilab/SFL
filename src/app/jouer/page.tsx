@@ -11,7 +11,9 @@
 //
 // Gestes, dans le bas de l'écran : glisser = courir (loin = sprint) ; toucher =
 // passe (ou tacle en défense) ; coup sec vers la droite = frappe ; coup sec
-// vers le haut ou le bas = roulette. La caméra est sur le côté, comme à la télé. Pas de texte d'aide : un pouce fantôme montre le geste tant
+// vers le haut ou le bas = roulette ; sans la balle, coup sec vers le porteur = tacle glissé. Depuis bola-app#23, le
+// match est une simulation physique à pas fixe (lib/jeu/sim) : élan, contacts, ballon libre, gardiens qui lisent la
+// trajectoire ; ?banc&graine=N rejoue le même match. La caméra est sur le côté, comme à la télé. Pas de texte d'aide : un pouce fantôme montre le geste tant
 // qu'on n'a pas touché l'écran.
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
