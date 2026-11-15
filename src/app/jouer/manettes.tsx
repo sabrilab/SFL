@@ -11,6 +11,8 @@
 // stick ou croix pour changer de côté, B / ○ revenir au milieu, Menu / Options lancer) ; « Jouer » au doigt lance
 // aussi. Deux manettes du même côté : refusé, l'icône a un petit choc. Noir et blanc, Inter ; avec « Réduire les
 // animations », les manettes changent de colonne sans glisser et le choc devient un simple clignement.
+// (bola-app#26, lot 3) Sous « Jouer », « Touches » ouvre le schéma des touches (./touches.tsx) ; Vue / Share sur une
+// manette aussi, aux boutons de sa marque.
 //
 // L'état vient de lib/jeu/entrees/manettes.js par un abonnement (useSyncExternalStore) : la page ne relit rien.
 
@@ -119,7 +121,7 @@ export function ManettesVues({ magasin }: { magasin: MagasinManettes }) {
 
 const COLONNE = ["16.67%", "50%", "83.33%"];
 
-export function EcranManettes({ magasin, reduit, onJouer }: { magasin: MagasinManettes; reduit: boolean; onJouer: () => void }) {
+export function EcranManettes({ magasin, reduit, onJouer, onTouches }: { magasin: MagasinManettes; reduit: boolean; onJouer: () => void; onTouches: () => void }) {
   const inst = useSyncExternalStore(magasin.abonner, magasin.instantane, magasin.instantane);
   const pads = inst.pads;
   const marques = Array.from(new Set(pads.filter((p) => p.reconnue).map((p) => (p.marque === "playstation" ? "playstation" : "xbox")))) as PadVu["marque"][];
@@ -183,6 +185,15 @@ export function EcranManettes({ magasin, reduit, onJouer }: { magasin: MagasinMa
           className="h-14 w-full max-w-[320px] rounded-full bg-white text-[17px] font-bold text-black"
         >
           Jouer
+        </button>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onTouches();
+          }}
+          className="-mt-1 h-10 px-5 text-[14px] font-semibold uppercase tracking-[0.18em] text-white/70"
+        >
+          Touches
         </button>
       </div>
 

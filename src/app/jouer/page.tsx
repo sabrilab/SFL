@@ -11,7 +11,8 @@
 //
 // Gestes, dans le bas de l'écran : glisser = courir (loin = sprint) ; toucher =
 // passe (ou tacle en défense) ; coup sec vers la droite = frappe ; coup sec
-// vers le haut ou le bas = roulette ; sans la balle, coup sec vers le porteur = tacle glissé. Depuis bola-app#23, le
+// vers le haut ou le bas = roulette ; sans la balle, coup sec vers le porteur = tacle glissé ; un second doigt = le stick
+// droit des gestes techniques (bola-app#26, lot 3). Depuis bola-app#23, le
 // match est une simulation physique à pas fixe (lib/jeu/sim) : élan, contacts, ballon libre, gardiens qui lisent la
 // trajectoire ; ?banc&graine=N rejoue le même match. La caméra est sur le côté, comme à la télé. Pas de texte d'aide : un pouce fantôme montre le geste tant
 // qu'on n'a pas touché l'écran (pas quand on joue à la manette).
@@ -21,7 +22,8 @@
 // Noirs contre Blancs). A / ✕ ou Menu sur une manette, avant le match, l'ouvre aussi ; Menu / Options ou « Jouer » le
 // lance. Une manette branchée ou débranchée en plein match ne l'arrête pas : l'IA reprend son équipe. Menu / Options
 // met en pause (deux barres au milieu, sans texte ; Échap ou P au clavier ; un toucher sur le voile reprend). Sur
-// l'écran d'attente, une manette branchée apparaît tout de suite en petit au-dessus de « Jouer ».
+// l'écran d'attente, une manette branchée apparaît tout de suite en petit au-dessus de « Jouer ». (bola-app#26, lot 3)
+// L'écran Manettes ouvre le schéma des touches (./touches.tsx ; Vue / Share sur la manette aussi).
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
@@ -32,6 +34,7 @@ import { isAdmin } from "@/lib/sfl/admin";
 import { photoPerso, rafraichirPhotos } from "@/lib/sfl/photos";
 import { cn } from "@/lib/utils";
 import { EcranManettes, ManettesVues, type MagasinManettes } from "./manettes";
+import { SchemaTouches, type Appareil } from "./touches";
 
 type Etat = {
   phase: "attente" | "intro" | "engagement" | "jeu" | "but" | "fin";
@@ -68,6 +71,8 @@ export default function JouerPage() {
   const boite = useRef<HTMLDivElement>(null);
   const match = useRef<Match | null>(null);
   const [salon, setSalon] = useState(false);
+  // le schéma des touches (bola-app#26, lot 3), ouvert depuis l'écran Manettes : l'appareil montré d'abord
+  const [touches, setTouches] = useState<Appareil | null>(null);
   const [reduit, setReduit] = useState(false);
   // (les manettes appellent ces deux-là depuis la boucle du jeu : on passe par des références)
   const ouvrirSalon = useRef<() => void>(() => {});
@@ -83,6 +88,7 @@ export default function JouerPage() {
     lancer.current = () => {
       if (!match.current) return;
       setSalon(false);
+      setTouches(null);
       match.current.demarrer();
     };
   }, [phaseVue]);
@@ -105,6 +111,7 @@ export default function JouerPage() {
           surProgres: (p: number) => setProgres(p),
           surSalon: () => ouvrirSalon.current(),
           surDemarrer: () => lancer.current(),
+          surTouches: (marque: string) => setTouches((t) => (t ? null : marque === "playstation" ? "playstation" : "xbox")),
         })) as unknown as Match;
         if (fini) {
           m.detruire();
@@ -198,8 +205,17 @@ export default function JouerPage() {
 
       {/* l'écran Manettes */}
       {salon && magasin && (phase === "attente" || phase === "fin") && (
-        <EcranManettes magasin={magasin} reduit={reduit} onJouer={() => lancer.current()} />
+        <EcranManettes
+          magasin={magasin}
+          reduit={reduit}
+          onJouer={() => lancer.current()}
+          onTouches={() => {
+            const pads = magasin.instantane().pads.filter((p) => p.reconnue);
+            setTouches(pads.length && pads.every((p) => p.marque === "playstation") ? "playstation" : "xbox");
+          }}
+        />
       )}
+      {salon && touches && (phase === "attente" || phase === "fin") && <SchemaTouches depart={touches} onFermer={() => setTouches(null)} />}
 
       {/* avant, et après */}
       {!salon && (phase === "attente" || phase === "fin") && (
