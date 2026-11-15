@@ -24,7 +24,12 @@
 --   4 · le déclencheur : la main bouge librement avant la révélation, sans
 --       toucher à la fin des matchs ; une journée révélée garde la main
 --       qu'elle avait (un geste tardif est retiré, un geste effacé est
---       remis), une correction de stat passe ; publier_saison de même ;
+--       remis), une correction de stat passe ; publier_saison de même, y
+--       compris quand la publication tardive rouvre une feuille (les deux
+--       passages d'insert … on conflict) ; la première écriture passe ;
+--       publier_saison rend la main gardée (`mains`) ; une main qui
+--       révélerait la journée sur-le-champ est refusée, fermer à l'instant
+--       reste accepté ;
 --   5 · les deux fonctions sont fermées aux joueurs.
 -- Les essais de 3 et 4 se font « maintenant » : entre minuit et 0 h 02, un
 -- geste « d'il y a une minute » date de la veille, et ces lignes sont
@@ -255,12 +260,16 @@ update public.saison set data = jsonb_set(data #- '{journees,0,votesFermesLe}', 
 select pg_temp.vrai('V4 révélée : la fermeture changée en ouverture est remise', pg_temp.lu(5, 'votesFermesLe') = (select geste from t4b)
   and pg_temp.lu(5, 'votesOuvertsLe') is null);
 -- publier_saison (l'admin) : même garde, et la publication passe.
-select pg_temp.vrai('V4 publier_saison, révélée, un geste tardif : publié', (pg_temp.en('Ilyes', format('public.publier_saison(%L::jsonb, 0, %s, false)',
+create temp table pub4 as select pg_temp.en('Ilyes', format('public.publier_saison(%L::jsonb, 0, %s, false)',
   jsonb_build_object('numero', 1, 'roster', '[]'::jsonb, 'convocations', '[]'::jsonb,
     'journees', jsonb_build_array(jsonb_build_object('j', 5, 'date', pg_temp.jour(-7), 'sflTime', true, 'mvpAuto', true, 'finDesMatchs', (select f from t4b),
       'votesOuvertsLe', (select geste from t4b))),
     'entries', pg_temp.match(5, 'Victoire', 2)),
-  (select version from public.saison where id = 1))) ->> 'ok') = 'true');
+  (select version from public.saison where id = 1))) as r;
+select pg_temp.vrai('V4 publier_saison, révélée, un geste tardif : publié', ((select r from pub4) ->> 'ok') = 'true', (select r::text from pub4));
+select pg_temp.vrai('V4 publier_saison rend la main gardée (`mains`) : l''appareil de l''admin la reprend',
+  ((select r from pub4) -> 'mains' -> '5' ->> 'votesFermesLe') = (select geste from t4b)
+  and jsonb_typeof((select r from pub4) -> 'mains' -> '5' -> 'votesOuvertsLe') = 'null', (select (r -> 'mains')::text from pub4));
 select pg_temp.vrai('V4 publier_saison, révélée : la main d''avant, la correction passée', pg_temp.lu(5, 'votesOuvertsLe') is null
   and pg_temp.lu(5, 'votesFermesLe') = (select geste from t4b)
   and (select (data -> 'entries' -> 0 ->> 'buts')::int from public.saison where id = 1) = 2);
@@ -276,6 +285,73 @@ select pg_temp.vrai('V4 publier_saison, la J6 du jour : le geste gardé, la fin 
   and pg_temp.lu(6, 'finDesMatchs') is not null and pg_temp.lu(5, 'votesFermesLe') = (select geste from t4b));
 select pg_temp.vrai('V4 la J6 gardée ouverte : le vote tient jusqu''à minuit', not pg_temp.en_journee()
   or public.fin_du_vote(1, 6) = ((((now() at time zone 'Europe/Paris')::date + 1)::timestamp) at time zone 'Europe/Paris'));
+
+-- Une publication tardive qui change la main ET rouvre une feuille (relecture
+-- du 15/11) : publier_saison fait insert … on conflict, le déclencheur passe
+-- deux fois. Au passage INSERT la main tardive doit déjà être remise, sinon
+-- la révélation se lit avec elle (minuit), la fin des matchs est effacée et
+-- la journée révélée est décomptée. La J5 du jour : finie il y a 3 h, fermée
+-- à la main il y a 2 h, donc révélée depuis 1 h. (Avant 2 h 05 du matin, ces
+-- gestes datent de la veille : les lignes sont passées.)
+create function pg_temp.apres_2h() returns boolean language sql stable as $$
+  select ((now() - interval '2 hours 5 minutes') at time zone 'Europe/Paris')::date = (now() at time zone 'Europe/Paris')::date
+$$;
+delete from public.fins_des_matchs;
+insert into public.fins_des_matchs (saison, j, jour, fin)
+  values (1, 5, (now() at time zone 'Europe/Paris')::date, now() - interval '3 hours');
+create temp table t4c as select pg_temp.iso(now() - interval '3 hours') as f, pg_temp.iso(now() - interval '2 hours') as ferme,
+  pg_temp.iso(now() - interval '61 minutes') as tardif;
+select pg_temp.poser(jsonb_build_object('numero', 1, 'roster', '[]'::jsonb, 'convocations', '[]'::jsonb,
+  'journees', jsonb_build_array(jsonb_build_object('j', 5, 'date', pg_temp.jour(), 'sflTime', true, 'mvpAuto', true, 'finDesMatchs', (select f from t4c),
+    'votesFermesLe', (select ferme from t4c))),
+  'entries', pg_temp.match(5, 'Victoire')));
+select pg_temp.vrai('V4 la J5 du jour, fermée à la main il y a 2 h : révélée', not pg_temp.apres_2h()
+  or now() >= public.revelation_meta((select data -> 'journees' -> 0 from public.saison where id = 1), (now() at time zone 'Europe/Paris')::date, now() - interval '3 hours'));
+select pg_temp.vrai('V4 publier_saison, révélée, la main changée et une feuille rouverte : publié', (pg_temp.en('Ilyes', format('public.publier_saison(%L::jsonb, 0, %s, false)',
+  jsonb_build_object('numero', 1, 'roster', '[]'::jsonb, 'convocations', '[]'::jsonb,
+    'journees', jsonb_build_array(jsonb_build_object('j', 5, 'date', pg_temp.jour(), 'sflTime', true, 'mvpAuto', true,
+      'votesOuvertsLe', (select tardif from t4c))),
+    'entries', pg_temp.match(5, 'Victoire') || jsonb_build_array(
+      jsonb_build_object('j', 5, 'player', 'Kader', 'team', 'Noirs 2', 'statut', 'Présent', 'result', null, 'buts', 0, 'passes', 0))),
+  (select version from public.saison where id = 1))) ->> 'ok') = 'true');
+select pg_temp.vrai('V4 … la fin des matchs gardée, la main d''avant remise : la journée reste comptée', not pg_temp.apres_2h()
+  or (pg_temp.lu(5, 'finDesMatchs') = (select f from t4c)
+    and exists (select 1 from public.fins_des_matchs where saison = 1 and j = 5)
+    and pg_temp.lu(5, 'votesFermesLe') = (select ferme from t4c) and pg_temp.lu(5, 'votesOuvertsLe') is null
+    and not public.vote_ouvert(1, 5)),
+  coalesce(pg_temp.lu(5, 'finDesMatchs'), 'null') || ' / ouverts ' || coalesce(pg_temp.lu(5, 'votesOuvertsLe'), 'null') || ' / fermés ' || coalesce(pg_temp.lu(5, 'votesFermesLe'), 'null'));
+-- Une main qui révélerait la journée sur-le-champ est refusée (relecture du
+-- 15/11 : annuler après l'heure de la règle un « Garder les votes ouverts »,
+-- ou rétablir une vieille fermeture). La J5 du jour gardée ouverte il y a
+-- 2 h (révélation à minuit) ; un document rétablit une fermeture d'il y a
+-- 2 h, dont la révélation est passée depuis 1 h.
+delete from public.fins_des_matchs;
+insert into public.fins_des_matchs (saison, j, jour, fin)
+  values (1, 5, (now() at time zone 'Europe/Paris')::date, now() - interval '3 hours');
+select pg_temp.poser(jsonb_build_object('numero', 1, 'roster', '[]'::jsonb, 'convocations', '[]'::jsonb,
+  'journees', jsonb_build_array(jsonb_build_object('j', 5, 'date', pg_temp.jour(), 'sflTime', true, 'mvpAuto', true, 'finDesMatchs', (select f from t4c),
+    'votesOuvertsLe', (select ferme from t4c))),
+  'entries', pg_temp.match(5, 'Victoire')));
+update public.saison set data = jsonb_set(data #- '{journees,0,votesOuvertsLe}', '{journees,0,votesFermesLe}', to_jsonb((select ferme from t4c))) where id = 1;
+select pg_temp.vrai('V4 une main qui révélerait la journée sur-le-champ : refusée, la main d''avant reste', not pg_temp.apres_2h()
+  or (pg_temp.lu(5, 'votesOuvertsLe') = (select ferme from t4c) and pg_temp.lu(5, 'votesFermesLe') is null and public.vote_ouvert(1, 5)),
+  'ouverts ' || coalesce(pg_temp.lu(5, 'votesOuvertsLe'), 'null') || ' / fermés ' || coalesce(pg_temp.lu(5, 'votesFermesLe'), 'null'));
+-- Fermer à l'instant reste accepté : la révélation est dans une heure.
+update public.saison set data = jsonb_set(data #- '{journees,0,votesOuvertsLe}', '{journees,0,votesFermesLe}', to_jsonb(pg_temp.iso(now()))) where id = 1;
+select pg_temp.vrai('V4 fermer à l''instant : accepté', pg_temp.lu(5, 'votesFermesLe') = pg_temp.iso(now()) and pg_temp.lu(5, 'votesOuvertsLe') is null
+  and pg_temp.lu(5, 'finDesMatchs') = (select f from t4c));
+
+-- La première publication (table vide : un seul passage, INSERT) passe avec une main.
+alter table public.saison disable trigger user;
+delete from public.saison;
+alter table public.saison enable trigger user;
+delete from public.fins_des_matchs;
+insert into public.saison (id, data, version, seed)
+  values (1, jsonb_build_object('numero', 1, 'roster', '[]'::jsonb, 'convocations', '[]'::jsonb,
+    'journees', jsonb_build_array(jsonb_build_object('j', 6, 'date', pg_temp.jour(), 'sflTime', true, 'mvpAuto', true, 'votesOuvertsLe', pg_temp.iso(now()))),
+    'entries', pg_temp.match(6, 'Nul')), 1, 0);
+select pg_temp.vrai('V4 première écriture (table vide) : la main gardée, la fin des matchs posée', pg_temp.lu(6, 'votesOuvertsLe') = pg_temp.iso(now())
+  and pg_temp.lu(6, 'finDesMatchs') is not null);
 
 -- ═══ 5 · Les droits ═══
 select pg_temp.vrai('V5 fin_du_vote_meta et revelation_meta fermées aux joueurs',
