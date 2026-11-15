@@ -100,6 +100,7 @@ import { feuilleDeConvocation, feuilleDeJournee, type TerrainFeuille } from "@/l
 import { MesDispos } from "@/components/sfl/matchs/mes-dispos";
 import { OuvrirMatch } from "@/components/sfl/matchs/ouvrir-match";
 import { Invitations, invitationsDe } from "@/components/sfl/matchs/invitations";
+import { VoteDuJourMap } from "@/components/sfl/vote-du-jour";
 import { InvitationsEquipe } from "@/components/sfl/equipe/invitation-map";
 import { useMonEquipe } from "@/hooks/use-mon-equipe";
 import { useParties } from "@/hooks/use-parties";
@@ -1674,6 +1675,9 @@ export default function MapPage() {
             molette, le pincement et le glisser de la souris au plan, sur
             ordinateur (map/gestes-ordinateur.ts). */}
         <div data-traverse className="absolute inset-x-0 z-[510] flex flex-col items-center gap-3" style={{ bottom: bas }}>
+          {/* Le vote du jour, tant qu'il est ouvert et que j'y vote : son étiquette, qui ouvre le vote
+              dans une feuille (Ilyes, 15/11 ; vote-du-jour.tsx). Jamais pour un joueur Bola. */}
+          {!sansSfl && me && <VoteDuJourMap me={me} />}
           <InvitationsEquipe invitations={invitationsEquipe} moi={moi} />
           <Invitations invitations={invitations} onOuvrir={(p) => choisirSticker(`m${p.id}`)} />
           <div data-traverse className="flex w-full items-center justify-between gap-2 px-4">

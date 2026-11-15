@@ -60,7 +60,6 @@ const LECTEURS_DU_DIRECT = new Set([
   "app/api/ligue/annoncer/route.ts",
   "app/map/page.tsx",
   "components/sfl/actus/course.tsx",
-  "components/sfl/actus/fil.tsx",
   "components/sfl/admin/resultats-votes.tsx",
   "components/sfl/cartons/mes-cartons.tsx",
   "components/sfl/direct/direct-du-match.tsx",
@@ -68,6 +67,7 @@ const LECTEURS_DU_DIRECT = new Set([
   "components/sfl/invitation-carte.tsx",
   "components/sfl/season-provider.tsx",
   "components/sfl/vitrine.tsx", // une variable à lui, pas le direct
+  "components/sfl/vote-du-jour.tsx",
   "components/sfl/vote-figures.tsx",
   "hooks/use-feuilles-direct.ts",
   "hooks/use-presence.ts",

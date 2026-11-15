@@ -111,7 +111,7 @@ import { ligneDuRendezVous } from "@/lib/sfl/matchs-du-jour";
 import { legendes, saisonsPalmares, type SaisonPalmares } from "@/lib/sfl/palmares";
 import { cn } from "@/lib/utils";
 import { ANTON } from "./ecran";
-import { VoteDuJour } from "./fil";
+import { VoteDuJour } from "@/components/sfl/vote-du-jour";
 import { DivisionsApres } from "./divisions-apres";
 import { CouvertureRubrique, RubriqueActu, RubriqueBesoin, RubriqueEnjeux, RubriqueRival, RubriqueToi } from "./pelouse";
 import { couverturesDuDimanche, sources, type Couverture } from "@/lib/sfl/couvertures";
@@ -1038,8 +1038,6 @@ function EpoqueEnCours({ epoques, vue, onVue, classement, exploit }: PropsEpoque
       videos={videosDe.get(une.j)}
       avant={
         <>
-          {/* Le soir du match, le vote est dans son dimanche, juste après la feuille. */}
-          {recapDabord && <VoteDuJour me={me} />}
           {/* Le vote fini, la révélation : les divisions après la journée (revelation.ts). */}
           <DivisionsApres j={une.j} me={me} />
           <RubriqueToi j={dernier} date={une.journee?.date ?? ""} />
@@ -1064,7 +1062,6 @@ function EpoqueEnCours({ epoques, vue, onVue, classement, exploit }: PropsEpoque
         className={cn("contents md:flex md:flex-col md:gap-[var(--fib-21)]", semaineCollante && "md:sticky md:top-[var(--fib-21)]")}
       >
         {aVenir && <Convocation p={presence} />}
-        {!recapDabord && <VoteDuJour me={me} />}
         <VideosDuFil videos={videosDe.get(null) ?? []} />
       </div>
       <div className="contents md:grid md:gap-[var(--fib-21)] xl:col-span-2 xl:grid-cols-2">
@@ -1092,6 +1089,9 @@ function EpoqueEnCours({ epoques, vue, onVue, classement, exploit }: PropsEpoque
         <VueMatchs />
       ) : (
         <>
+          {/* Le vote ouvert, juste sous la rangée de la Pépite d'Or, avant tout le reste
+              (Ilyes, 15/11 : « bien visibles, qu'on les trouve partout » ; vote-du-jour.tsx). */}
+          <VoteDuJour me={me} />
           <RailJournees etapes={etapes} deplier={deplier} />
           {/* Le jour du match, la feuille qui se remplit, avant tout le reste. */}
           {/* Son lien mène à la feuille en direct (la Map), pas au récap, qui attend la révélation. */}

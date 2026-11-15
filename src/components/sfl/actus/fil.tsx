@@ -12,12 +12,8 @@ import { ChevronRight, MessageCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useMyPlayer } from "@/components/sfl/player-provider";
 import { useSeason } from "@/components/sfl/season-provider";
-import { VoteFigures } from "@/components/sfl/vote-figures";
 import { useIdentites } from "@/hooks/use-identites";
-import { useIsClient } from "@/hooks/use-is-client";
 import { buteursDe, type Actu } from "@/lib/sfl/actus";
-import { voteOuvertA } from "@/lib/sfl/revelation";
-import { useMaintenant } from "@/hooks/use-missions";
 import { dernierBilan, nomDivision } from "@/lib/sfl/divisions";
 import { rankPlayers } from "@/lib/sfl/engine";
 import { isHidden } from "@/lib/sfl/hidden";
@@ -26,7 +22,6 @@ import { entryPP } from "@/lib/sfl/saisie/engine";
 import { rangPepiteApres } from "@/lib/sfl/rangs";
 import { journeeJouee } from "@/lib/sfl/saisie/mutations";
 import { TROPHEES, NOM_METAL, metal } from "@/lib/sfl/trophees";
-import { journeeAvecVote } from "@/lib/sfl/votes";
 import { preparerPiece, type PieceLigue } from "@/lib/sfl/vestiaire";
 import { Ecran } from "./ecran";
 import { CineBadge, CineChiffre, CineCourse, CineDuo, CineEquipe, CineMontent, CineMvp, CinePodium, CinePresents, CineRecap, CineScore, CineSurface, CineToi, FORMAT_EQUIPE, FORMAT_MVP, FORMAT_SCORE } from "./cinematiques";
@@ -458,26 +453,3 @@ export function TonDimanche({ j, date }: { j: number; date: string }) {
 }
 
 /* ---------------------------------- Le fil ---------------------------------- */
-
-export function VoteDuJour({ me }: { me: string }) {
-  const isClient = useIsClient();
-  // Le direct : la feuille remplie ouvre le vote bien avant la révélation.
-  const { journeesDirect: journees, saisonLue } = useSeason();
-  // Se relit chaque minute, à l'heure du serveur : à la fin du vote, la
-  // section disparaît d'elle-même.
-  const maintenant = useMaintenant();
-  if (!isClient) return null;
-  const ouvertes = journees.filter((j) => journeeAvecVote(j) && voteOuvertA(saisonLue, j.j, maintenant));
-  return (
-    <>
-      {ouvertes.map((j) => (
-        <section key={j.j} className="glass mx-4 flex flex-col gap-3 rounded-[26px] p-[18px] md:mx-0">
-          <h2 className="text-titre font-bold tracking-tight">
-            Vote du jour <span className="text-encre-3">· J{j.j}</span>
-          </h2>
-          <VoteFigures journee={j} me={me} />
-        </section>
-      ))}
-    </>
-  );
-}
