@@ -110,7 +110,9 @@ export function VoteFigures({ journee, me }: { journee: Journee; me: string }) {
                   {ouvert ? `${urne.votants}/${urne.inscrits} ont voté` : "Pas encore ouvert"}
                 </span>
               </div>
-              <div className="-mx-5 flex gap-3 overflow-x-auto px-5 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              {/* La rangée défile : de l'air autour des cartes (repris en marges négatives, la mise
+                  en page ne bouge pas), pour que ni l'anneau du choisi ni les ombres ne soient coupés. */}
+              <div className="-mx-5 -mt-3 -mb-2 flex gap-3 overflow-x-auto px-5 py-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                 {place.opponents.players.filter((p) => !p.extraTime && !isHidden(p.name)).map((p) => {
                   const joueur = carte(p.name);
                   const choisi = mien === p.name;

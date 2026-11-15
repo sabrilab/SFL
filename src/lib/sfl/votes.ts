@@ -55,7 +55,7 @@
 // cours ; une saison close garde les élus écrits dans son archive le jour de
 // sa clôture (cloturerSaison).
 
-import type { Journee, JourneeMatch, MatchTeam } from "./engine";
+import { findPlayerMatch, type Journee, type JourneeMatch, type MatchTeam } from "./engine";
 import type { Saison } from "./saisie/types";
 import { jourMoisDuLibelle } from "./convocation-temps";
 import { titresTombes } from "./revelation";
@@ -271,6 +271,28 @@ export function journeeAvecVote(j: Journee): boolean {
 export function feuilleRemplie(saison: Pick<Saison, "entries">, j: number, match: JourneeMatch): boolean {
   const avecResultat = (nom: string) => saison.entries.some((e) => e.j === j && e.team === nom && !!e.result);
   return avecResultat(match.teamA.name) && avecResultat(match.teamB.name);
+}
+
+/**
+ * Où en est, pour un joueur, une journée dont le vote est ouvert
+ * (vote-du-jour.tsx : le vote dans les trois onglets) :
+ *   · `a-moi` : il la joue et la feuille de son match est remplie : il a ses
+ *     deux voix à donner ;
+ *   · `aux-autres` : il ne la joue pas, et un match au moins a sa feuille : on
+ *     y vote, sans lui ;
+ *   · `en-attente` : personne n'y vote encore de là où il regarde (la feuille
+ *     de son match, ou toutes s'il ne joue pas, pas encore remplie) : le bloc
+ *     est grisé, ou n'a rien à proposer.
+ * Un joueur venu en extra time compléter un autre match suit le sien
+ * (findPlayerMatch).
+ */
+export type EtatDuVote = "a-moi" | "aux-autres" | "en-attente";
+
+export function etatDuVote(saison: Pick<Saison, "entries">, journee: Journee, moi: string): EtatDuVote {
+  const remplie = (m: JourneeMatch) => feuilleRemplie(saison, journee.j, m);
+  const place = findPlayerMatch(journee, moi);
+  if (place) return remplie(place.match) ? "a-moi" : "en-attente";
+  return (journee.matches ?? []).some(remplie) ? "aux-autres" : "en-attente";
 }
 
 /* ------------------------------ Les élus -------------------------------- */

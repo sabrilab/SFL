@@ -19,6 +19,11 @@
 // suspens · à rattraper » (et son motif) à la place de la feuille, des votes
 // et des divisions.
 //
+// Le vote du jour (Ilyes, 15/11/2026 ; vote-du-jour.tsx) : tant que j'ai une
+// voix à donner (la feuille de mon match remplie, le vote pas encore fermé),
+// son étiquette sous le compte des matchs, en haut à gauche ; la toucher
+// ouvre le vote dans une feuille. Le bas de l'écran reste aux matchs.
+//
 // La discussion d'un match (22/10) : sur le plan, une bulle de messages au
 // coin de son sticker, rouge avec ce que je n'ai pas lu (Sabri : « comme une
 // notification dans la bulle du match ») ; la carte du match porte le même
@@ -1552,7 +1557,10 @@ export default function MapPage() {
             Leaflet (z-index 400 et plus). */}
         <div className="pointer-events-none absolute inset-x-0 top-0 z-[500] h-44 bg-gradient-to-b from-[rgba(8,9,11,0.42)] to-transparent" />
 
-        {/* En haut à gauche : la commune en lettrage, le compte en étiquette */}
+        {/* En haut à gauche : la commune en lettrage, le compte en étiquette et, tant que j'ai une
+            voix à donner, le vote du jour (Ilyes, 15/11 ; vote-du-jour.tsx) : dans la place que le
+            plan garde au lettrage, il ne passe ni sur le stade choisi ni sur les matchs du bas.
+            Jamais pour un joueur Bola. */}
         <div className="pointer-events-none absolute left-5 z-[510] flex max-w-[calc(100%-8.5rem)] flex-col items-start" style={{ top: `calc(${haut} + 8px)` }}>
           <span
             key={commune}
@@ -1568,6 +1576,7 @@ export default function MapPage() {
           >
             {compte}
           </span>
+          {!sansSfl && me && <VoteDuJourMap me={me} />}
         </div>
 
         {/* En haut à droite : la loupe (la Recherche, montée de la barre
@@ -1675,9 +1684,6 @@ export default function MapPage() {
             molette, le pincement et le glisser de la souris au plan, sur
             ordinateur (map/gestes-ordinateur.ts). */}
         <div data-traverse className="absolute inset-x-0 z-[510] flex flex-col items-center gap-3" style={{ bottom: bas }}>
-          {/* Le vote du jour, tant qu'il est ouvert et que j'y vote : son étiquette, qui ouvre le vote
-              dans une feuille (Ilyes, 15/11 ; vote-du-jour.tsx). Jamais pour un joueur Bola. */}
-          {!sansSfl && me && <VoteDuJourMap me={me} />}
           <InvitationsEquipe invitations={invitationsEquipe} moi={moi} />
           <Invitations invitations={invitations} onOuvrir={(p) => choisirSticker(`m${p.id}`)} />
           <div data-traverse className="flex w-full items-center justify-between gap-2 px-4">
