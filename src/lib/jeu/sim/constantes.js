@@ -93,11 +93,27 @@ export const JEU = {
   passeV0: [6, 12],                 // v0 = 6 + 12 p
   frappeV0: [14, 16],               // v0 = 14 + 16 p
   finesseV0: [12, 8],
+  exterieurV0: [13, 11],            // (bola-app#26) la frappe de l'extérieur du pied : un peu moins forte, l'effet inverse
   jauge: 0.9,                       // s : la jauge de puissance monte de 0 à 1
   aide: { pouce: 1, manette: 0.5, ia: 0 },
   coneAide: { pouce: (45 * Math.PI) / 180, manette: (30 * Math.PI) / 180 },
   duree: 150,                       // s : un match
   engagement: 1.1, intro: 1.6, butPause: 3.2,
+  // (bola-app#26, lot 2) les fautes légères, avec l'avantage : RÈGLE BOLA À FAIRE VALIDER PAR SABRI (jusqu'ici, aucune
+  // faute sifflée, décision de #23). false = plus aucune faute (le jeu redevient celui de #23 : la chute suffit).
+  fautes: true,
+  avantage: 2.5,                    // s : l'équipe fautée garde (ou reprend) la balle dans ce délai : l'avantage joue
+  coupFranc: { pause: 1.2, distance: 3, garde: 2.5 }, // s de pause balle posée ; m des adversaires ; s au plus pour les tenir à distance
+};
+
+// ── les duels (bola-app#26, lot 2) ──
+export const DUELS = {
+  // le tirage de maillot : un défenseur collé derrière le porteur (moins de 0,75 m entre les centres) qui le tient
+  tirage: { portee: 0.78, frein: 0.15, desPorteur: 2.0, desTireur: 1.8, faute: 0.8, repos: 1.5 }, // (des : par seconde, contre le retour de 1,5/s)
+  // la protection : le porteur qui protège recule dans le défenseur collé dans son dos (N), et le déséquilibre un peu
+  dos: { force: 420, des: 2.2 },     // (des : par seconde)
+  // le tacle debout contré : la balle sous le pied du porteur (moins de 0,42 m), les deux pieds la touchent ensemble
+  contre: { pied: 0.42, part: 0.5 },
 };
 
 export const ROLES = ['G', 'D', 'L', 'R', 'A'];

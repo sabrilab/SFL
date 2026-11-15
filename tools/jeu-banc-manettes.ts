@@ -253,9 +253,10 @@ function deuxManettes(graine: number) {
   demarrer(m, { intro: false });
   for (let i = 0; i < 18000; i++) { pas(m); m.evts.length = 0; }
   // (la référence de tools/jeu-banc.ts --graine=7 ; re-bénie par bola-app#26, lot 1 : vrai tacle glissé, chutes et
-  // relevés, contrôles anticipés, plongeons bas, IA qui glisse moins souvent — d3f4e37b avant ; les manettes ne la
-  // changent pas)
-  const REF = '7c88787c';
+  // relevés, contrôles anticipés, plongeons bas, IA qui glisse moins souvent — d3f4e37b avant ; re-bénie par le lot 2 :
+  // duels (tirage, poussée de dos, tacle contré), fautes et avantage, effet au pied, contrôle raté, centres et reprises,
+  // appels, une-deux, pressing coordonné, gardien sur l'angle — 7c88787c avant ; les manettes ne la changent pas)
+  const REF = '7919334a';
   verifier('IA contre IA inchangée (graine 7)', empreinte(m) === REF, `${empreinte(m)} (attendu ${REF}, celle du banc physique)`);
 }
 

@@ -6,8 +6,15 @@
 // graine + mêmes entrées = même match, au bit près (empreinte).
 //
 // Les règles de Bola (un five en salle) : la balle ne sort jamais, elle rebondit sur les panneaux et les filets ; pas
-// de touche, pas de corner, pas de hors-jeu ; après un but, l'équipe qui l'a pris engage au rond central. Aucune
-// faute sifflée (proposé à Sabri : la chute suffit). Les phases : attente, intro, engagement, jeu, but, fin.
+// de touche, pas de corner, pas de hors-jeu ; après un but, l'équipe qui l'a pris engage au rond central. Les phases :
+// attente, intro, engagement, jeu, but, fin.
+//
+// (bola-app#26, lot 2) Les fautes légères, avec l'avantage (JEU.fautes : RÈGLE À FAIRE VALIDER PAR SABRI) : une faute
+// notée (contacts.js) laisse jouer ; si l'équipe fautée garde ou reprend la balle dans les 2,5 s, l'avantage joue
+// (événement « avantage ») ; si l'équipe fautive la prend, ou si rien n'est venu, coup franc au point de la faute
+// (pasArret : la balle posée, hors des surfaces, les adversaires reculent à 3 m, le joueur fauté, ou le plus proche
+// debout, vient la jouer ; puis les adversaires restent à 3 m jusqu'à ce qu'elle soit jouée, 2,5 s au plus). La phase
+// reste « jeu » (l'horloge tourne, comme en salle).
 //
 // Ce que les humains (pouce ou manettes, entrees/) ajoutent à l'intention d'un joueur : presse (aller au porteur),
 // renfort (un coéquipier de l'IA presse aussi), sortie (le gardien sort), changer (prendre un autre joueur, au plus
@@ -19,14 +26,14 @@
 // contacts entre corps → balle (conduite, contrôle, intégration, corps qui la bloquent, gardiens, but) → horloge.
 // Pendant le but et la fin, les corps se démêlent aussi. Une intention NaN ou infinie est remise à zéro à l'entrée. Le monde publie la liste des événements du pas (ev) pour le rendu, le son et
 // les vibrations ; la simulation n'en dépend pas.
-import { PAS, JEU, ROLES, ENGAGEMENT, BX, BZ, LB, butDe, sens, BALLON } from './constantes.js';
+import { PAS, JEU, ROLES, ENGAGEMENT, BX, BZ, LB, butDe, sens, BALLON, TERRAIN } from './constantes.js';
 import { creerHasard } from './hasard.js';
 import { creerCorps, pasCorps, libre, lancerGeste, clamp, impactDe, duree } from './corps.js';
-import { creerBalle, pasBalle, antiBlocage } from './ballon.js';
+import { creerBalle, pasBalle, antiBlocage, poserBalle } from './ballon.js';
 import { pasConduite, pasControle, demanderFrappe, pasDemande, pasFrappe, porteur, pasAnticipation } from './gestes.js';
 import { pasCorpsACorps, demanderTacle, pasTacle, desequilibrer, demeler, balleCorps } from './contacts.js';
 import { pasGardien, pasCorpsGardien, contactGardien, tenirBalle } from './gardien.js';
-import { pasIA, intentionVide, conduire } from './ia.js';
+import { pasIA, intentionVide, conduire, aller, contourner } from './ia.js';
 import { acos, atan2, cos, hypot, sin } from './maths.js';
 import { exigerMesures, CLIPS } from './clips.js';
 
@@ -56,7 +63,12 @@ export function creerMonde({ graine = 1, duree = JEU.duree, humains = [true, fal
     sortie: [false, false],   // l'humain demande la sortie de son gardien (Y / △ maintenu en défense)
     rng: creerHasard(graine),
     evts: [], journal,
-    stats: { passes: 0, tirs: 0, tacles: 0, vols: 0, arrets: 0, buts: 0, epaules: 0, plongeons: 0, chutes: 0, antiBlocages: 0, demandes: 0, impacts: [] },
+    stats: { passes: 0, tirs: 0, tacles: 0, vols: 0, arrets: 0, buts: 0, epaules: 0, plongeons: 0, chutes: 0, antiBlocages: 0, demandes: 0, impacts: [],
+      // (bola-app#26, lot 2)
+      fautes: 0, avantages: 0, coupsFrancs: 0, tirages: 0, contresTacle: 0, uneDeux: 0, aeriens: 0, appels: 0 },
+    avantage: null,           // une faute notée : l'arbitre regarde l'avantage (pasAvantage)
+    arret: null,              // un coup franc : la balle posée, les adversaires à 3 m (pasArret)
+    passes: [],               // les deux dernières passes { de, a, t } (une-deux)
     _p0: { x: 0, y: 0, z: 0 },
     _phases: new Float64Array(joueurs.length),
   };
@@ -85,6 +97,7 @@ export function engagement(m, e) {
     m.controle[eq] = eq === e ? porteurE.i : m.joueurs.find((j) => j.e === eq && j.role === 'A').i;
   }
   m.buteur = null;
+  m.avantage = null; m.arret = null; m.ecart = null; m.passes.length = 0;
 }
 
 /** Démarre le match (après l'écran d'attente) ; sans intro : le coup d'envoi tout de suite. */
@@ -174,6 +187,7 @@ function copierIntention(j, src) {
   it.allure = clamp(fini(src.allure), 0, 1); it.sprint = clamp(fini(src.sprint), 0, 1);
   it.recupere = false;
   it.regard = src.regard ?? null; it.contenir = !!src.contenir; it.protege = !!src.protege; it.charge = !!src.charge; it.vaBalle = true;
+  it.tire = !!src.tire;
   it.action = src.action ?? null;
 }
 
@@ -183,7 +197,7 @@ function agir(m, j) {
   if (!a) return;
   j.int.action = null;
   const p = porteur(m);
-  if (a.type === 'tacle') { if (!p || p.e !== j.e) demanderTacle(m, j, !!a.glisse); return; }
+  if (a.type === 'tacle') { if ((!p || p.e !== j.e) && m.ecart?.e !== j.e) demanderTacle(m, j, !!a.glisse); return; }
   if (a.type === 'roulette') { roulette(m, j, a.dx ?? 1, a.dz ?? 0); return; }
   if (a.type === 'crochet') { crochet(m, j, a.dx ?? 1, a.dz ?? 0); return; }
   if (a.type === 'semelle') { semelle(m, j); return; }
@@ -415,6 +429,136 @@ function melee(m) {
   }
 }
 
+// ── les fautes, l'avantage, le coup franc (bola-app#26, lot 2) ──
+/**
+ * L'arbitre regarde l'avantage d'une faute notée (m.avantage) : l'équipe fautive prend la balle (passé 0,25 s) →
+ * coup franc ; au bout de 2,5 s (JEU.avantage), l'équipe fautée a la balle (ou l'a touchée en dernier, ou a frappé) →
+ * l'avantage a joué ; sinon coup franc.
+ */
+function pasAvantage(m) {
+  const A = m.avantage;
+  if (!A) return;
+  const b = m.balle, p = porteur(m), age = m.t - A.t0;
+  const eqDe = (i) => (i != null ? m.joueurs[i].e : -1);
+  const fautive = 1 - A.e;
+  const aEux = (p && p.e === fautive) || eqDe(b.garde) === fautive;
+  const aNous = (p && p.e === A.e) || eqDe(b.garde) === A.e || b.tir?.e === A.e;
+  if (aEux && age > 0.25) { coupFranc(m, A); return; }
+  if (b.tir?.e === A.e || age >= JEU.avantage) {
+    if (aNous || (b.possesseur == null && eqDe(b.dernier) === A.e)) { m.avantage = null; m.stats.avantages++; m.ev('avantage', { e: A.e, x: A.x, z: A.z }); }
+    else coupFranc(m, A);
+  }
+}
+
+/** Le point d'un coup franc : sur le terrain, à 1,5 m des panneaux de côté et des lignes de but (de la place pour reculer), hors des deux surfaces (pas de penalty en Bola). */
+function pointCoupFranc(x, z) {
+  x = clamp(x, -BX + 1.5, BX - 1.5); z = clamp(z, -LB + 1.5, LB - 1.5);
+  for (const s of [-1, 1]) {
+    const zb = s * LB, rx = x, rz = z - zb, d = hypot(rx, rz), lim = TERRAIN.surface + 0.6;
+    if (d < lim) { const L = d || 1; x = (rx / L) * lim; z = zb + (rz / L) * lim; if (Math.abs(z) > LB - 1.5) z = Math.sign(z) * (LB - 1.5); }
+  }
+  return { x, z };
+}
+
+/** Siffle un coup franc pour l'équipe A.e au point de la faute. */
+function coupFranc(m, A) {
+  m.avantage = null;
+  const b = m.balle, pt = pointCoupFranc(A.x, A.z);
+  // le joueur fauté s'il est debout, sinon le coéquipier debout le plus proche du point
+  const debout = (j) => !j.absent && !j.gardien && j.mode !== 'sol' && j.mode !== 'releve';
+  let tireur = debout(m.joueurs[A.victime]) ? m.joueurs[A.victime] : null;
+  if (!tireur) { let bd = Infinity; for (const j of m.joueurs) if (j.e === A.e && debout(j)) { const d = hypot(j.p.x - pt.x, j.p.z - pt.z); if (d < bd) { bd = d; tireur = j; } } }
+  if (!tireur) tireur = m.joueurs[A.victime];
+  for (const j of m.joueurs) { j.demande = null; if (j.tireCible != null) { j.tireCible = null; j.tireT = 0; } }
+  poserBalle(b, pt.x, pt.z);
+  b.garde = null; b.tir = null; b.recepteur = null; b.possesseur = tireur.i; b.dernier = tireur.i; b.dernierT = m.t;
+  m.arret = { t: JEU.coupFranc.pause, age: 0, x: pt.x, z: pt.z, e: A.e, tireur: tireur.i };
+  m.stats.coupsFrancs++;
+  m.ev('coupFranc', { e: A.e, j: tireur.i, x: pt.x, z: pt.z });
+}
+
+/**
+ * Pendant le coup franc : la balle reste posée ; le tireur vient derrière elle, les adversaires reculent à 3 m, les
+ * coéquipiers se placent (IA), les gardiens restent dans leur but. Fin : la pause passée, le tireur à la balle et les adversaires à 3 m (4,5 s au
+ * plus) ; ensuite les adversaires restent à 3 m (tenirEcart) tant qu'elle n'est pas jouée.
+ */
+function pasArret(m) {
+  const A = m.arret, b = m.balle, dist = JEU.coupFranc.distance;
+  A.t -= PAS; A.age += PAS;
+  poserBalle(b, A.x, A.z);
+  b.possesseur = A.tireur; b.dernier = A.tireur; b.dernierT = m.t;
+  const T = m.joueurs[A.tireur];
+  const zb = butDe(1 - A.e), ux = -A.x, uz = zb - A.z, L = hypot(ux, uz) || 1;
+  for (const j of m.joueurs) {
+    if (j.absent) continue;
+    const it = intentionVide(j.int);
+    it.regard = b.p;
+    if (j.gardien) { pasGardien(m, j); continue; }
+    if (j === T) { aller(j, it, A.x - (ux / L) * 0.5, A.z - (uz / L) * 0.5, 4); continue; }
+    const d = hypot(j.p.x - A.x, j.p.z - A.z);
+    if (j.e !== A.e) { if (d < dist + 0.3) { const q = pointRecul(m, j, A.x, A.z, dist + 0.6); aller(j, it, q.x, q.z, 5); contourner(m, j, it); } continue; }
+    pasIA(m, j);
+    j.int.action = null;
+  }
+  for (const j of m.joueurs) {
+    if (j.absent) continue;
+    if (j.gardien && pasCorpsGardien(j, PAS)) { borner(j); continue; }
+    pasCorps(j, PAS, false);
+  }
+  pasCorpsACorps(m, PAS);
+  for (const j of m.joueurs) if (!j.absent) borner(j);
+  m.reste -= PAS;
+  // (prêt : le tireur à la balle, et les adversaires debout à 3 m, à 0,3 m près)
+  const loin = m.joueurs.every((o) => o.absent || o.gardien || o.e === A.e || o.mode === 'sol' || o.mode === 'releve' || hypot(o.p.x - A.x, o.p.z - A.z) >= dist - 0.3);
+  const pret = hypot(T.p.x - A.x, T.p.z - A.z) < 1.0 && T.mode === 'loco' && loin;
+  if ((A.t <= 0 && pret) || A.age > 4.5) {
+    m.arret = null;
+    m.ecart = { e: 1 - A.e, x: A.x, z: A.z, tireur: A.tireur, fin: m.t + JEU.coupFranc.garde };
+    T.decision = 0.05;
+    m.ev('reprise', { e: A.e, j: A.tireur });
+  }
+}
+
+/**
+ * Où reculer pour être à dist de la balle (bx, bz) : dans l'axe balle → joueur, ou, si un panneau est derrière lui ou
+ * qu'un autre corps barre le chemin, en tournant autour de la balle (par pas de 30°) jusqu'à un point libre.
+ */
+function pointRecul(m, j, bx, bz, dist) {
+  let ux = j.p.x - bx, uz = j.p.z - bz; const L = hypot(ux, uz);
+  if (L < 1e-6) { ux = -Math.sign(bx || 1); uz = 0; } else { ux /= L; uz /= L; }
+  let repli = null;
+  for (let k = 0; k < 12; k++) {
+    const a = (k % 2 ? 1 : -1) * Math.ceil(k / 2) * (Math.PI / 6), c = cos(a), sn = sin(a);
+    const dx = ux * c + uz * sn, dz = -ux * sn + uz * c;
+    const x = bx + dx * dist, z = bz + dz * dist;
+    if (!(Math.abs(x) < BX - 0.6 && Math.abs(z) < BZ - 0.6)) continue;
+    repli ??= { x, z };
+    // (le chemin du joueur à ce point : aucun autre corps à moins de 0,7 m)
+    const ex = x - j.p.x, ez = z - j.p.z, E = ex * ex + ez * ez || 1;
+    let libreC = true;
+    for (const o of m.joueurs) {
+      if (o === j || o.absent) continue;
+      const u = clamp(((o.p.x - j.p.x) * ex + (o.p.z - j.p.z) * ez) / E, 0, 1);
+      if (hypot(o.p.x - j.p.x - ex * u, o.p.z - j.p.z - ez * u) < 0.7) { libreC = false; break; }
+    }
+    if (libreC) return { x, z };
+  }
+  return repli ?? { x: bx + ux * dist, z: bz + uz * dist };
+}
+
+/** Après le coup franc : les adversaires restent à 3 m de la balle tant qu'elle n'est pas jouée (2,5 s au plus). */
+function tenirEcart(m) {
+  const E = m.ecart, b = m.balle;
+  if (m.t > E.fin || b.dernier !== E.tireur || hypot(b.p.x - E.x, b.p.z - E.z) > 0.8 || hypot(b.v.x, b.v.z) > 1.5) { m.ecart = null; return; }
+  const dist = JEU.coupFranc.distance;
+  for (const j of m.joueurs) {
+    if (j.absent || j.gardien || j.e !== E.e) continue;
+    const d = hypot(j.p.x - b.p.x, j.p.z - b.p.z);
+    j.int.action = null; j.int.tire = false; j.int.charge = false;
+    if (d < dist + 0.2) { const it = j.int, q = pointRecul(m, j, b.p.x, b.p.z, dist + 0.5); aller(j, it, q.x, q.z, 4); contourner(m, j, it); it.regard = b.p; it.vaBalle = false; }
+  }
+}
+
 function borner(j) {
   const lim = 0.35;
   if (j.p.x > BX - lim) { j.p.x = BX - lim; if (j.v.x > 0) j.v.x = 0; }
@@ -470,6 +614,8 @@ export function pas(m, entrees = null) {
     m.renfort[e] = !!src?.renfort; m.sortie[e] = !!src?.sortie;
     if (src?.changer) changerJoueur(m, e, src.changer === true ? null : src.changer);
   }
+  // (bola-app#26, lot 2) un coup franc : la balle posée, chacun se place, puis le jeu reprend
+  if (m.arret) { pasArret(m); return; }
   majControle(m);
   for (const j of m.joueurs) {
     const e = j.e;
@@ -483,6 +629,7 @@ export function pas(m, entrees = null) {
       j.aide = m.aides[e];
     } else { pasIA(m, j); j.aide = 0; }
   }
+  if (m.ecart) tenirEcart(m);
   for (const j of m.joueurs) if (!j.absent) { agir(m, j); pasDemande(m, j); pasAnticipation(m, j); }
   demiTour(m);
   const p = porteur(m);
@@ -531,6 +678,7 @@ export function pas(m, entrees = null) {
     melee(m);
     if (marque >= 0) but(m, marque);
   }
+  if (m.phase === 'jeu') pasAvantage(m);
 
   m.reste -= PAS;
   if (m.reste <= 0 && m.phase === 'jeu' && !b.tir) { m.reste = 0; fin(m); }
@@ -547,6 +695,7 @@ function but(m, e) {
   m.buteur = tireur.i; m.butEquipe = e;
   m.phase = 'but'; m.phaseT = JEU.butPause;
   b.tir = null; b.recepteur = null; b.possesseur = null;
+  m.avantage = null; m.ecart = null;
   m.ev('but', { e, j: tireur.i });
 }
 

@@ -21,6 +21,8 @@
 //   · (bola-app#26) Dans l'axe : parade couchée (k_block), arrêt face (k_catch_std), saut (k_high) ; balle basse loin
 //     de lui : le plongeon bas sur le côté (k_low_l / k_low_r) concourt avec le plongeon haut ; trop tard : battu
 //     (k_miss). Relance roulée (k_roll) pour un partenaire à moins de 8 m.
+//   · (bola-app#26, lot 2) Placement sur l'angle (surAngle) : sur la bissectrice balle-poteaux ; sortie face à un
+//     porteur seul à moins de 9 m (jusqu'à 3,2 m de la ligne).
 //   · Après : relance à la main (k_throw, avec son root motion) ou au pied (k_kick) au bout de 0,9 à 3 s ; sortie sur
 //     une balle libre de sa surface s'il y arrive le premier.
 import { PAS, BALLON, BUT_DL, BUT_H, TERRAIN, butDe, LB } from './constantes.js';
@@ -65,7 +67,7 @@ const dedansDe = (e) => -Math.sign(butDe(e)); // vers le terrain
 
 /** L'intention du gardien, et ses décisions (appelé avant la locomotion). */
 export function pasGardien(m, k) {
-  const b = m.balle, zb = butDe(k.e), dedans = dedansDe(k.e);
+  const b = m.balle, zb = butDe(k.e);
   const it = k.int;
   it.dx = 0; it.dz = 0; it.allure = 0; it.sprint = 0; it.contenir = true; it.regard = b.p; it.protege = false; it.charge = false; it.vaBalle = false; it.action = null;
   k.lecture ??= null;
@@ -119,9 +121,22 @@ export function pasGardien(m, k) {
   // la balle libre dans sa surface, s'il y arrive le premier : il sort
   const dBut = hypot(b.p.x, b.p.z - zb);
   const libreB = b.possesseur == null || (m.joueurs[b.possesseur] && hypot(m.joueurs[b.possesseur].p.x - b.p.x, m.joueurs[b.possesseur].p.z - b.p.z) > 1.6);
-  let cx = clamp(b.p.x * 0.28, -1.1, 1.1);
-  const prof = clamp(0.7 + (1 - clamp(hypot(b.p.x, b.p.z - zb) / 15, 0, 1)) * 0.9, 0.7, 1.6);
-  let cz = zb + dedans * prof;
+  // (bola-app#26, lot 2) sur l'angle : sur la bissectrice de l'angle balle-poteaux, à une profondeur qui grandit
+  // quand la balle approche ; face à un porteur seul (aucun coéquipier entre lui et le but) à moins de 9 m, il sort
+  // fermer l'angle (jusqu'à 3,2 m de sa ligne, jamais à moins de 1,5 m du porteur)
+  let prof = clamp(0.7 + (1 - clamp(hypot(b.p.x, b.p.z - zb) / 15, 0, 1)) * 0.9, 0.7, 1.6);
+  const pa = b.possesseur != null ? m.joueurs[b.possesseur] : null;
+  if (pa && pa.e !== k.e && dBut < 9 && b.p.y < 0.6) {
+    let seul = true;
+    for (const o of m.joueurs) {
+      if (o.absent || o.e !== k.e || o.gardien || o.mode === 'sol') continue;
+      // un coéquipier entre le porteur et le but (plus près du but, dans le couloir)
+      if (hypot(o.p.x, o.p.z - zb) < dBut - 0.5 && Math.abs(o.p.x - b.p.x * (hypot(o.p.x, o.p.z - zb) / dBut)) < 1.6) seul = false;
+    }
+    if (seul) prof = clamp(Math.max(prof, 1.6 + (9 - dBut) * 0.35), 0.7, Math.min(3.2, dBut - 1.5));
+  }
+  const { x: cxA, z: czA } = surAngle(b.p.x, b.p.z, zb, prof);
+  let cx = cxA, cz = czA;
   let vise = false;
   if (libreB && dBut < TERRAIN.surface - 0.3 && hypot(b.v.x, b.v.z) < 9 && b.p.y < 1.5) {
     const tk = hypot(k.p.x - b.p.x, k.p.z - b.p.z) / 5.4;
@@ -144,6 +159,21 @@ export function pasGardien(m, k) {
     const passeDuPartenaire = false;
     if (pres && vr < 7 && !passeDuPartenaire && !(b.dernier === k.i && m.t - b.dernierT < 0.6)) capter(m, k, 'k_scoop');
   }
+}
+
+/**
+ * Le point sur la bissectrice de l'angle balle-poteaux, à la profondeur prof de la ligne de but zb (vers le terrain).
+ * La balle derrière la ligne ou presque sur elle : le poteau le plus proche, devant la ligne.
+ */
+export function surAngle(bx, bz, zb, prof) {
+  const dedans = -Math.sign(zb), zk = zb + dedans * prof;
+  const u1x = -BUT_DL - bx, u1z = zb - bz, u2x = BUT_DL - bx, u2z = zb - bz;
+  const l1 = hypot(u1x, u1z) || 1, l2 = hypot(u2x, u2z) || 1;
+  const vx = u1x / l1 + u2x / l2, vz = u1z / l1 + u2z / l2;
+  // (la bissectrice doit aller vers le but : sinon, la balle est sur la ligne ou derrière)
+  if ((bz - zk) * dedans < 0.3 || vz * -dedans < 0.15) return { x: clamp(bx, -BUT_DL + 0.25, BUT_DL - 0.25), z: zk };
+  const t = (zk - bz) / vz;
+  return { x: clamp(bx + vx * t, -BUT_DL + 0.2, BUT_DL - 0.2), z: zk };
 }
 
 /** La fin d'un plongeon : debout à côté de sa racine, la racine le rejoint (les pieds de la dernière image). */

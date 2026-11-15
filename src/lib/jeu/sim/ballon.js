@@ -45,6 +45,16 @@ export function sortirBalle(b, cx, cy, cz, nx, ny, nz, d) {
   b.p.x = cx + nx * d; b.p.y = Math.max(R, cy + ny * d); b.p.z = cz + nz * d;
 }
 
+/**
+ * (bola-app#26, lot 2) La balle posée par l'arbitre pour un coup franc (monde.js) : au sol, immobile, sans effet.
+ * C'est l'autre pose permise, avec l'engagement.
+ */
+export function poserBalle(b, x, z) {
+  b.p.x = x; b.p.y = R; b.p.z = z;
+  b.v.x = 0; b.v.y = 0; b.v.z = 0; b.w.x = 0; b.w.y = 0; b.w.z = 0;
+  b.sol = true; b.coinT = 0;
+}
+
 export function copierBalle(b, o = creerBalle()) {
   o.p.x = b.p.x; o.p.y = b.p.y; o.p.z = b.p.z;
   o.v.x = b.v.x; o.v.y = b.v.y; o.v.z = b.v.z;

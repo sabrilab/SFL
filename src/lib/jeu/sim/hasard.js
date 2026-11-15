@@ -57,5 +57,9 @@ export function creerHasard(graine) {
     gardiens: creerFlux(graine, 'gardiens'),
     contacts: creerFlux(graine, 'contacts'),
     fetes: creerFlux(graine, 'fetes'),
+    // (bola-app#26, lot 2) les duels (tirage, issue des tacles, fautes) et les décisions collectives de l'IA (appels,
+    // une-deux, pressing) : des flux à part, pour ne pas décaler les tirages des autres
+    duels: creerFlux(graine, 'duels'),
+    collectif: creerFlux(graine, 'collectif'),
   };
 }

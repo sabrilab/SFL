@@ -22,6 +22,7 @@ import * as Gst from '../src/lib/jeu/sim/gestes.js';
 import * as Gar from '../src/lib/jeu/sim/gardien.js';
 import * as Ia from '../src/lib/jeu/sim/ia.js';
 import * as Clp from '../src/lib/jeu/sim/clips.js';
+import * as Ctc from '../src/lib/jeu/sim/contacts.js';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Any = any;
@@ -264,7 +265,13 @@ let penOu = '';
 let nan = 0, blocages = 0, dehorsCorps = 0, penMax = 0, antiBlocages = 0, effleurees = 0;
 const detailsBlocage: string[] = [];
 const totaux: Record<string, number> = {};
+// (bola-app#26, lot 2) les statistiques du jeu : passes réussies, arrêts, fautes, tacles réussis, une-deux, reprises
+// aériennes, et le gardien sur la bissectrice de l'angle balle-poteaux
+const SM: Record<string, number> = { passes: 0, passesOk: 0, arrets: 0, fautes: 0, vols: 0, uneDeux: 0, aeriens: 0, avantages: 0, coupsFrancs: 0, tirages: 0, appels: 0, contresTacle: 0 };
+let bisN = 0, bisSomme = 0, fautesOuvertes = 0, ecartMin = Infinity;
+const { surAngle }: Any = Gar;
 for (let g = 1; g <= N; g++) {
+  let passeEq = -1;
   let immobile = 0, memePorteur = 0, dernierPorteur = -1;
   const coince = new Float64Array(10), locoDepuis = new Float64Array(10);
   const m = matchIA(g, 150, (m: Any) => {
@@ -293,8 +300,31 @@ for (let g = 1; g <= N; g++) {
         if (pen > penMax) { penMax = pen; penOu = `g${g} ${a}(${A.mode}${A.g ? ' ' + A.g.nom : ''})-${c}(${B.mode}${B.g ? ' ' + B.g.nom : ''}) à ${m.t.toFixed(1)} s`; }
       }
     }
-    for (const e of m.evts) { totaux[e.type] = (totaux[e.type] ?? 0) + 1; if (e.type === 'frappe' || e.type === 'passe') if (e.effleure) effleurees++; }
+    for (const e of m.evts) {
+      totaux[e.type] = (totaux[e.type] ?? 0) + 1; if (e.type === 'frappe' || e.type === 'passe') if (e.effleure) effleurees++;
+      // une passe est réussie si le prochain joueur (ou gardien) à prendre la balle est de la même équipe
+      if (e.type === 'passe') { if (passeEq >= 0) SM.passes++; passeEq = m.joueurs[e.j].e; }
+      else if ((e.type === 'controle' || e.type === 'capte') && passeEq >= 0) { SM.passes++; if (m.joueurs[e.j].e === passeEq) SM.passesOk++; passeEq = -1; }
+      else if (e.type === 'tacleBalle' || e.type === 'frappe' || e.type === 'but' || e.type === 'engagement' || e.type === 'coupFranc') { if (passeEq >= 0) SM.passes++; passeEq = -1; }
+      // pendant un coup franc et jusqu'à ce qu'elle soit jouée : aucun adversaire à moins de 3 m (à 0,4 m près : ils reculent)
+    }
+    // (à la reprise d'un coup franc : les adversaires debout à 3 m de la balle, à 0,6 m près ; sauf un joueur coincé
+    // contre un panneau, qui ne peut pas reculer plus)
+    if (m.evts.some((e: Any) => e.type === 'reprise')) for (const j of m.joueurs) if (!j.absent && !j.gardien && j.e === m.ecart?.e && j.mode !== 'sol' && j.mode !== 'releve' && Math.abs(j.p.x) < BX - 0.6 && Math.abs(j.p.z) < BZ - 0.6) ecartMin = Math.min(ecartMin, Math.hypot(j.p.x - m.balle.p.x, j.p.z - m.balle.p.z));
+    // le gardien sur l'angle : la balle à moins de 12 m de son but, au sol, pas de tir ni de plongeon, gardien en place
+    if (m.phase === 'jeu' && !m.arret) for (const k of m.joueurs) {
+      const pb = m.balle.possesseur != null ? m.joueurs[m.balle.possesseur] : null;
+      if (!k.gardien || k.g || m.balle.tir || m.balle.garde != null || m.balle.p.y > 0.5 || !pb || pb.e === k.e) continue;
+      const zb = -Cst.sens(k.e) * LB, dB = Math.hypot(m.balle.p.x, m.balle.p.z - zb);
+      if (dB > 12 || dB < 3 || Math.abs(m.balle.p.z) > LB - 0.5 || Math.hypot(m.balle.v.x, m.balle.v.z) > 3) continue;
+      // la distance du gardien à la bissectrice (la droite de la balle à son point sur l'angle)
+      const q = surAngle(m.balle.p.x, m.balle.p.z, zb, Math.abs(k.p.z - zb));
+      const ux = q.x - m.balle.p.x, uz = q.z - m.balle.p.z, L = Math.hypot(ux, uz) || 1;
+      bisSomme += Math.abs((k.p.x - m.balle.p.x) * uz - (k.p.z - m.balle.p.z) * ux) / L; bisN++;
+    }
   });
+  for (const k of Object.keys(SM)) if (k !== 'passes' && k !== 'passesOk') SM[k] += m.stats[k] ?? 0;
+  if (m.avantage) fautesOuvertes++;
   buts.push(m.score[0] + m.score[1]);
   impacts.push(...m.stats.impacts);
   antiBlocages += m.stats.antiBlocages;
@@ -306,6 +336,13 @@ for (let g = 1; g <= N; g++) {
     `NaN ${nan}, blocages ${blocages}${detailsBlocage.length ? ' (' + detailsBlocage.slice(0, 4).join(', ') + ')' : ''}, corps hors du terrain ${dehorsCorps}, buts par match ${f2(mb)} (de ${Math.min(...buts)} à ${Math.max(...buts)}, ${(sansBut * 100).toFixed(0)} % sans but), relances de coin ${antiBlocages}`);
   const per = (k: string) => f2((totaux[k] ?? 0) / N);
   console.log(`      par match : passes ${per('passe')}, frappes ${per('frappe')}, tacles balle ${per('tacleBalle')}, tacles jambes ${per('tacleJambes')}, épaules ${per('epaule')}, chutes ${per('chute')}, plongeons ${per('plongeon')}, parades ${per('parade')}, captés ${per('capte')}, poteaux ${per('poteau')}`);
+  {
+    const pm = (k: string) => SM[k] / N, pr = SM.passesOk / (SM.passes || 1), bis = bisSomme / (bisN || 1);
+    // (les fautes notées sont toutes réglées : avantage ou coup franc, sauf celles qu'un but ou la fin a coupées)
+    const reglees = SM.avantages + SM.coupsFrancs;
+    verifier('Statistiques de match (lot 2)', pm('arrets') >= 0.8 && pm('arrets') <= 8 && pm('fautes') >= 0.5 && pm('fautes') <= 5 && pm('vols') >= 1.5 && pm('vols') <= 12 && pm('uneDeux') >= 1 && pr >= 0.55 && pr <= 0.92 && pm('aeriens') >= 0.3 && reglees >= SM.fautes - fautesOuvertes - N && reglees <= SM.fautes && bis <= 0.4 && ecartMin >= 2.4 && pm('appels') > 5,
+      `par match : arrêts ${f2(pm('arrets'))}, fautes ${f2(pm('fautes'))} (avantage ${f2(pm('avantages'))}, coup franc ${f2(pm('coupsFrancs'))} ; tirages ${f2(pm('tirages'))}), tacles réussis ${f2(pm('vols'))} (contrés ${f2(pm('contresTacle'))}), une-deux ${f2(pm('uneDeux'))}, reprises aériennes ${f2(pm('aeriens'))}, appels ${f2(pm('appels'))} ; passes réussies ${(pr * 100).toFixed(0)} % (${SM.passes}) ; gardien à ${(bis * 100).toFixed(0)} cm de la bissectrice en moyenne (${bisN} pas) ; adversaires au coup franc à ${f2(ecartMin)} m au moins`);
+  }
   verifier('Contacts', penMax <= 0.05 + 1e-6, `pénétration maximale après un pas ${(penMax * 100).toFixed(1)} cm (${penOu})`);
   const propres = impacts.filter((x) => x <= 0.3).length / (impacts.length || 1);
   verifier('Frappes au contact du pied', propres > 0.7 && effleurees === impacts.filter((x) => x > 0.3 && x <= 0.6).length, `${impacts.length} impacts, pied-balle médian ${f2(med(impacts))} m, ${(propres * 100).toFixed(0)} % à moins de 0,30 m ; au-delà : effleurées (${effleurees}) ou manquées, toutes journalisées`);
@@ -658,6 +695,344 @@ function tacle(graine: number, deFace: boolean) {
   essai('passement', { type: 'passement', dx: 1, dz: 0 }, (m) => poserJ(m, -3, 1.9), (m, d) => d.plante >= 0.3 && !!m.joueurs[4].figure);
   essai('petit pont', { type: 'petitPont' }, (m) => { poserJ(m, -2, 1.1); m.joueurs[6].phase = 0.25; m.joueurs[6].v.z = 2; m.joueurs[6].int = { ...m.joueurs[6].int }; }, (m, d) => d.passe === true && m.balle.p.z < m.joueurs[6].p.z);
   verifier('Gestes techniques', ok, Object.entries(res).map(([k, v]) => `${k} ${v}`).join(' ; '));
+}
+
+// ─────────────────────────── duels, ballon, IA collective (bola-app#26, lot 2) ───────────────────────────
+const { JEU }: Any = Cst;
+/** Un monde de scène : humains des deux côtés (les joueurs tenus par controleFixe), joueurs choisis présents. */
+function scene(graine: number, presents: number[], fixe: [number | null, number | null], humains: [boolean, boolean] = [true, true]) {
+  const m: Any = creerMonde({ graine, humains, aides: [0, 0], presents });
+  demarrer(m, { intro: false });
+  m.controleFixe = fixe;
+  return m;
+}
+const poser = (j: Any, x: number, z: number, cap: number, vx = 0, vz = 0) => { j.p.x = x; j.p.z = z; j.cap = cap; j.v.x = vx; j.v.z = vz; j.mode = 'loco'; j.g = null; };
+const balleA = (m: Any, x: number, z: number, vx = 0, vz = 0, pos: number | null = null) => { const b = m.balle; b.p.x = x; b.p.y = R; b.p.z = z; b.v.x = vx; b.v.y = 0; b.v.z = vz; rouler(b); b.possesseur = pos; b.dernier = pos; b.dernierT = m.t; b.garde = null; b.tir = null; b.recepteur = null; };
+{
+  // le tirage de maillot : un défenseur collé dans le dos du porteur qui le tient ; le porteur perd 15 % d'allure (à
+  // 10 % près), les deux perdent de l'équilibre, et tenu plus de 0,8 s c'est une faute (pas sans JEU.fautes)
+  const essai = (tire: boolean, fautes = true) => {
+    const avant = JEU.fautes; JEU.fautes = fautes;
+    const m = scene(31, [4, 6], [4, 6]);
+    const p = m.joueurs[4], d = m.joueurs[6];
+    poser(p, 0, 4, Math.PI, 0, -4.2); poser(d, 0.05, 4.62, Math.PI, 0, -4.2);
+    balleA(m, 0, 3.4, 0, -5, 4);
+    let vit = 0, n = 0, dP = 0, dD = 0, faute = '', tirage = 0;
+    for (let i = 0; i < 150; i++) {
+      pas(m, [{ dx: 0, dz: -1, allure: 1, sprint: 0 }, { dx: (p.p.x - d.p.x) * 2, dz: -1, allure: 1, sprint: 0.3, tire }]);
+      for (const e of m.evts) { if (e.type === 'faute') faute = e.genre; if (e.type === 'tirage') tirage++; }
+      m.evts.length = 0;
+      if (i > 30 && i < 90) { vit += Math.hypot(p.v.x, p.v.z); n++; }
+      dP = Math.max(dP, p.d); dD = Math.max(dD, d.d);
+    }
+    JEU.fautes = avant;
+    return { v: vit / n, dP, dD, faute, tirage };
+  };
+  const libre = essai(false), tenu = essai(true), sansFautes = essai(true, false);
+  const baisse = 1 - tenu.v / libre.v;
+  verifier('Tirage de maillot', baisse >= 0.08 && baisse <= 0.3 && tenu.dP > 0.02 && tenu.dD > 0.02 && tenu.faute === 'tirage' && libre.faute === '' && sansFautes.faute === '' && tenu.tirage > 0,
+    `porteur tenu : ${f2(tenu.v)} m/s contre ${f2(libre.v)} libre (−${(baisse * 100).toFixed(0)} %) ; déséquilibre porteur ${f2(tenu.dP)}, tireur ${f2(tenu.dD)} ; faute « ${tenu.faute || 'aucune'} » (sans tirage : « ${libre.faute || 'aucune'} », règle coupée : « ${sansFautes.faute || 'aucune'} »)`);
+}
+{
+  // la protection : le porteur arrêté, dos au défenseur qui pousse dans son dos ; en protégeant, il garde la balle
+  // 2 s et repousse le défenseur (poussée de dos) ; sans protéger, le défenseur passe
+  const essai = (protege: boolean) => {
+    const m = scene(32, [4, 6], [4, 6]);
+    const p = m.joueurs[4], d = m.joueurs[6];
+    poser(p, 0, 4, Math.PI); poser(d, 0, 4.75, Math.PI);
+    balleA(m, 0, 3.5, 0, 0, 4);
+    let garde = 0, dMin = 9, dos = 0, dD = 0;
+    for (let i = 0; i < 240; i++) {
+      const tx = m.balle.p.x - d.p.x, tz = m.balle.p.z - d.p.z, L = Math.hypot(tx, tz) || 1;
+      pas(m, [{ dx: 0, dz: 0, allure: 0, protege, regard: d.p }, { dx: tx / L, dz: tz / L, allure: 1, sprint: 0.2, charge: true }]);
+      for (const e of m.evts) if (e.type === 'dos') dos++;
+      m.evts.length = 0;
+      if (porteur(m) === p) garde += PAS;
+      dMin = Math.min(dMin, Math.hypot(d.p.x - p.p.x, d.p.z - p.p.z)); dD = Math.max(dD, d.d);
+    }
+    return { garde, dMin, dos, dD, recul: Math.hypot(p.p.x, p.p.z - 4) };
+  };
+  const pr = essai(true), sans = essai(false);
+  verifier('Protection et poussée de dos', pr.garde >= 1.9 && pr.dos > 0 && sans.dos === 0 && pr.dD > sans.dD + 0.03 && pr.recul <= sans.recul + 0.05,
+    `en protégeant : balle gardée ${f2(pr.garde)} s sur 2 s, ${pr.dos} poussée(s) de dos, défenseur déséquilibré ${f2(pr.dD)} (sans protéger : ${f2(sans.dD)}), porteur repoussé de ${f2(pr.recul)} m (sans protéger : ${f2(sans.recul)} m)`);
+}
+{
+  // le tacle debout et ses issues : balle prise, balle contrée (les deux pieds dessus), ou jambes ; chacune arrive
+  let prise = 0, contree = 0, jambes = 0, n = 0;
+  for (let g = 1; g <= 120; g++) {
+    const m = scene(600 + g, [4, 6], [4, 6]);
+    const p = m.joueurs[4], t = m.joueurs[6];
+    const off = ((g % 7) - 3) * 0.12, prox = 0.22 + (g % 5) * 0.08;
+    poser(p, 0, 4, Math.PI, 0, -2); poser(t, off, 4 - prox - 0.85, 0);
+    // (une fois sur trois, la balle protégée derrière le porteur : le tacle de face ne trouve que ses jambes)
+    if (g % 3 === 0) { poser(t, off, 4 - 0.75, 0); balleA(m, 0, 4 + 0.4, 0, -2, 4); } else balleA(m, 0, 4 - prox, 0, -2, 4);
+    let lance = false;
+    for (let i = 0; i < 150; i++) {
+      const act = !lance && i === 2 ? { type: 'tacle', glisse: false } : null; if (act) lance = true;
+      pas(m, [{ dx: 0, dz: -1, allure: 0.4 }, { dx: 0, dz: 1, allure: 0.3, action: act }]);
+      for (const e of m.evts) { if (e.type === 'tacleBalle' && e.debout) prise++; if (e.type === 'tacleContre') contree++; if (e.type === 'tacleJambes' && e.debout) jambes++; }
+      m.evts.length = 0;
+    }
+    n++;
+  }
+  verifier('Tacle debout : issues', prise > 10 && contree > 5 && jambes > 5,
+    `${n} tacles debout : balle prise ${prise}, contrée ${contree} (la balle gicle, les deux déséquilibrés), jambes ${jambes}`);
+}
+{
+  // faute et avantage. (a) La faute notée, le porteur fauté garde la balle (il continue) : au bout de 2,5 s l'avantage a
+  // joué, pas de coup franc. (b) La faute notée, l'équipe fautive prend la balle : coup franc au point de la faute, hors
+  // des surfaces, adversaires à 3 m (à 0,4 m près) à la reprise, balle jouée d'abord par l'équipe fautée. (c) Le tacle
+  // glissé par derrière sur un porteur : faute notée. (d) JEU.fautes = false : aucune faute.
+  const { faute }: Any = Ctc;
+  const base = (g: number, pres: number[], humains: [boolean, boolean] = [true, true]) => {
+    const m = scene(700 + g, pres, [humains[0] ? 4 : null, 8], humains);
+    const p = m.joueurs[4], o = m.joueurs[6];
+    poser(p, (g % 5) - 2, 4 - g * 0.8, Math.PI, 0, -3); balleA(m, p.p.x, p.p.z - 0.45, 0, -3.3, 4);
+    poser(o, p.p.x + 0.3, p.p.z + 0.8, Math.PI);
+    poser(m.joueurs[8], p.p.x + 3, p.p.z - 4, 0);
+    return m;
+  };
+  let av = 0, nA = 0, cf = 0, cfBons = 0, nC = 0, ecartMin = 9, horsOk = 0, sansRegle = 0;
+  const mauvaisCF: string[] = [];
+  for (let g = 0; g < 10; g++) {
+    // (a)
+    {
+      // (le fautif, le n° 8 tenu, reste planté : personne ne reprend la balle au porteur)
+      const m = base(g, [4, 8]);
+      const note = faute(m, m.joueurs[8], m.joueurs[4], 'debout');
+      let a = false, c = false;
+      for (let i = 0; i < 400; i++) { pas(m, [{ dx: 0.3, dz: -1, allure: 0.7 }, { dx: 0, dz: 0, allure: 0 }]); for (const e of m.evts) { if (e.type === 'avantage') a = true; if (e.type === 'coupFranc') c = true; } m.evts.length = 0; }
+      if (note) { nA++; if (a && !c) av++; }
+    }
+    // (b)
+    {
+      // (l'équipe fautée est jouée par l'IA : son tireur joue le coup franc)
+      const m = base(g, [4, 6, 8, 2, 7], [false, true]);
+      const pt = { x: m.joueurs[4].p.x, z: m.joueurs[4].p.z };
+      const note = faute(m, m.joueurs[6], m.joueurs[4], 'derriere');
+      // l'équipe fautive prend la balle : le n° 8 (humain des Blancs) la reçoit dans les pieds
+      const o8 = m.joueurs[8]; poser(o8, pt.x + 1, pt.z - 1.2, 0); balleA(m, o8.p.x, o8.p.z + 0.4, 0, 0, 8);
+      let ev: Any = null, reprise = false, ecart = 9, premier: number | null = null;
+      for (let i = 0; i < 900; i++) {
+        pas(m, [null, { dx: 0, dz: 0, allure: 0 }]);
+        for (const e of m.evts) {
+          if (e.type === 'coupFranc' && !ev) ev = e;
+          if (e.type === 'reprise' && !reprise) { reprise = true; for (const o of m.joueurs) if (!o.absent && !o.gardien && o.e !== e.e && o.mode !== 'sol' && o.mode !== 'releve') ecart = Math.min(ecart, Math.hypot(o.p.x - m.balle.p.x, o.p.z - m.balle.p.z)); }
+          if (reprise && premier == null && (e.type === 'passe' || e.type === 'frappe' || e.type === 'controle' || e.type === 'tacleBalle' || e.type === 'touche')) premier = m.joueurs[e.j].e;
+        }
+        m.evts.length = 0;
+      }
+      if (note) {
+        nC++;
+        if (ev) {
+          cf++;
+          const hors = [-1, 1].every((s2) => Math.hypot(ev.x, ev.z - s2 * LB) >= Cst.TERRAIN.surface + 0.5);
+          if (hors) horsOk++;
+          ecartMin = Math.min(ecartMin, ecart);
+          if (reprise && ecart >= 2.6 && (premier == null || premier === 0) && hors && Math.hypot(ev.x - pt.x, ev.z - pt.z) < 6.6 + 0.01) cfBons++;
+          else mauvaisCF.push(`g${g} : reprise ${reprise}, adversaires à ${f2(ecart)} m, d'abord ${premier}, hors ${hors}`);
+        }
+      }
+    }
+    // (d)
+    { const avant = JEU.fautes; JEU.fautes = false; const m = base(g, [4, 6, 8]); if (faute(m, m.joueurs[6], m.joueurs[4], 'debout')) sansRegle++; JEU.fautes = avant; }
+  }
+  // (c) : le tacle glissé par derrière (le banc des tacles) note une faute
+  let cN = 0, cF = 0;
+  for (let g = 1; g <= 10; g++) {
+    const m = scene(800 + g, [4, 6], [4, 6]);
+    const p = m.joueurs[4], t = m.joueurs[6], b = m.balle;
+    poser(p, 0, 6, Math.PI, 0, -4); balleA(m, 0, 6 - 0.6 - (g % 4) * 0.1, 0, -4.6, 4);
+    poser(t, 0.25 * ((g % 3) - 1), 8.8, Math.PI, 0, -5.5);
+    let lance = false, f = false, jambes = false;
+    for (let i = 0; i < 300; i++) {
+      const dx = b.p.x - t.p.x, dz = b.p.z - t.p.z, d = Math.hypot(dx, dz) || 1;
+      const act = !lance && d < 2.0 ? { type: 'tacle', glisse: true } : null; if (act) lance = true;
+      pas(m, [{ dx: 0, dz: -1, allure: 0.85 }, { dx: dx / d, dz: dz / d, allure: 1, sprint: 0.4, action: act }]);
+      for (const e of m.evts) { if (e.type === 'faute') f = true; if (e.type === 'tacleJambes' && !e.balleAvant) jambes = true; }
+      m.evts.length = 0;
+    }
+    if (jambes) { cN++; if (f) cF++; }
+  }
+  verifier('Fautes et avantage', nA >= 8 && av >= 0.7 * nA && nC >= 8 && cf === nC && cfBons === cf && horsOk === cf && cN >= 6 && cF === cN && sansRegle === 0,
+    `porteur fauté qui garde la balle : ${av}/${nA} avantages joués ; l'équipe fautive la prend : ${cf}/${nC} coups francs (${cfBons} bien joués : hors des surfaces, adversaires à ${f2(ecartMin)} m au moins à la reprise, balle jouée d'abord par l'équipe fautée${mauvaisCF.length ? ' ; ' + mauvaisCF.join(' ; ') : ''}) ; tacle glissé par derrière dans les jambes : ${cF}/${cN} fautes ; règle coupée (JEU.fautes = false) : ${sansRegle} faute(s)`);
+}
+{
+  // l'effet : la finesse (intérieur) du pied droit enroule vers la gauche de la course, celle du gauche vers la droite ;
+  // l'extérieur fait l'inverse ; la courbe (écart de la balle à la droite de départ, à 15 m) dépasse 1 m et la balle
+  // finit sur la cible (la visée est corrigée par l'intégrateur)
+  const courbe = (type: string, gauche: boolean) => {
+    // (sans gardien : on mesure la balle jusqu'à la ligne)
+    const m = scene(41, [4], [4, null], [true, false]);
+    const j = m.joueurs[4];
+    poser(j, 0, 3.6, Math.PI);
+    // (la balle du côté du pied voulu : à gauche du joueur qui regarde −z, c'est −x)
+    balleA(m, gauche ? -0.16 : 0.16, 3.0, 0, 0, 4);
+    for (let i = 0; i < 20; i++) pas(m, [{ dx: 0, dz: 0, allure: 0 }, null]);
+    demanderFrappe(m, j, { type, p: 0.6, x: 0, y: 1.0 });
+    let p0: Any = null, v0: Any = null, ecart = 0, pied = -1, xFin = NaN;
+    for (let i = 0; i < 300; i++) {
+      pas(m, [{ dx: 0, dz: 0, allure: 0 }, null]);
+      for (const e of m.evts) if (e.type === 'elan') pied = e.pied;
+      if (!p0 && m.evts.some((e: Any) => e.type === 'frappe')) { p0 = { ...m.balle.p }; v0 = { ...m.balle.v }; }
+      m.evts.length = 0;
+      if (p0) {
+        const L = Math.hypot(v0.x, v0.z), along = ((m.balle.p.x - p0.x) * v0.x + (m.balle.p.z - p0.z) * v0.z) / L;
+        // > 0 : à gauche de la course (gauche de (fx, fz) = (fz, −fx))
+        const lat = ((m.balle.p.x - p0.x) * (v0.z / L) - (m.balle.p.z - p0.z) * (v0.x / L));
+        if (along <= 15) ecart = lat;
+        if (m.balle.p.z <= -LB && Number.isNaN(xFin)) xFin = m.balle.p.x;
+        if (along > 21) break;
+      }
+    }
+    return { ecart, pied, xFin };
+  };
+  const fD = courbe('finesse', false), fG = courbe('finesse', true), eD = courbe('exterieur', false), eG = courbe('exterieur', true);
+  const ok = fD.pied === 1 && fG.pied === 0 && fD.ecart > 1.0 && fG.ecart < -1.0 && eD.ecart < -0.7 && eG.ecart > 0.7 && [fD, fG, eD, eG].every((c) => Math.abs(c.xFin) < 1.0);
+  verifier('Effet : brossée et extérieur', ok,
+    `écart à 15 m (> 0 : vers la gauche) : finesse pied droit ${f2(fD.ecart)} m, pied gauche ${f2(fG.ecart)} m ; extérieur pied droit ${f2(eD.ecart)} m, pied gauche ${f2(eG.ecart)} m ; balle à la ligne à x = ${[fD, fG, eD, eG].map((c) => f2(c.xFin)).join(' / ')} (cible 0)`);
+}
+{
+  // les rebonds avec effet : sur le gazon, le lifté repart plus vite que la balle sans effet, le rétro moins vite ; sur
+  // un panneau, l'effet de côté dévie la balle du côté de sa rotation
+  const sol = (wx: number) => { const b: Any = creerBalle(); b.p.y = 0.6; b.v.z = 8; b.v.y = -3; b.w.x = wx; let vz = 0; for (let i = 0; i < 120; i++) { const vy = b.v.y; pasBalle(b, null); if (vy < 0 && b.v.y > 0) { vz = b.v.z; break; } } return vz; };
+  const lift = sol(60), plat = sol(0), retro = sol(-60);
+  // (le rétro garde sa rotation inverse après le rebond : il glisse plus longtemps et s'arrête plus court)
+  const roule = (wx: number) => { const b: Any = creerBalle(); b.p.y = 0.6; b.v.z = 8; b.v.y = -3; b.w.x = wx; for (let i = 0; i < 2400 && Math.hypot(b.v.x, b.v.z) > 0.05; i++) pasBalle(b, null); return b.p.z; };
+  const dLift = roule(60), dPlat = roule(0), dRetro = roule(-60);
+  const panneau = (wy: number) => { const b: Any = creerBalle(); b.p.x = 8.5; b.p.y = 0.5; b.v.x = 12; b.w.y = wy; for (let i = 0; i < 60; i++) { b.v.y += G * PAS; const vx = b.v.x; pasBalle(b, null); if (vx > 0 && b.v.x < 0) break; } return b.v.z; };
+  const pP = panneau(40), pN = panneau(-40), p0 = panneau(0);
+  verifier('Rebonds avec effet', lift > plat + 0.3 && retro <= plat + 0.1 && dLift > dPlat + 0.5 && dRetro < dPlat - 0.3 && pP > 0.3 && pN < -0.3 && Math.abs(p0) < 1e-6,
+    `gazon, vitesse après le rebond : lifté ${f2(lift)}, sans effet ${f2(plat)}, rétro ${f2(retro)} m/s (glissement de Coulomb : le rétro ne freine pas plus au premier rebond) ; arrêt à ${f2(dLift)} / ${f2(dPlat)} / ${f2(dRetro)} m ; panneau, vitesse de côté après le choc : ω +40 → ${f2(pP)}, −40 → ${f2(pN)}, 0 → ${f2(p0)} m/s`);
+}
+{
+  // les balles aériennes : un centre du côté sur un attaquant au point de penalty, l'IA le reprend de la tête ou de
+  // volée (geste aérien, impact à la hauteur de la balle) ; et le contrôle raté part vraiment (40 à 70 % de la vitesse)
+  let air = 0, n = 0;
+  const noms = new Set<string>(), portees: number[] = [];
+  for (let k = 0; k < 20; k++) {
+    // (le journal donne la distance de la surface — tête ou pied — à la balle, à l'impact)
+    const m: Any = creerMonde({ graine: 50 + k, humains: [false, false], aides: [0, 0], presents: [1, 4, 5], journal: (t: string, ...v: Any[]) => { if (t === 'impact' && /^(head|header|volley|shoot2|bicycle)/.test(v[2])) portees.push(v[1]); } });
+    demarrer(m, { intro: false });
+    const j = m.joueurs[1], r = m.joueurs[4], g = m.joueurs[5];
+    poser(j, -6.5 + (k % 3) * 0.5, -9.5, Math.PI / 2); poser(r, 0.3 * ((k % 5) - 2), -9.5 - (k % 4) * 0.6, Math.PI); poser(g, 0, -14.2, 0);
+    balleA(m, j.p.x + 0.45, j.p.z, 0, 0, 1);
+    for (let i = 0; i < 6; i++) pas(m);
+    demanderFrappe(m, j, { type: 'centre', p: 0.9, cible: 4 });
+    for (let i = 0; i < 300; i++) { pas(m); for (const e of m.evts) if (e.type === 'elan' && e.j === 4 && e.aerien) { air++; noms.add(e.nom); } m.evts.length = 0; }
+    n++;
+  }
+  const ratios: number[] = [];
+  for (let k = 0; k < 30; k++) {
+    const m = scene(900 + k, [3, 5, 8], [3, null], [true, false]);
+    const j = m.joueurs[3];
+    poser(j, 1, 2, Math.PI / 2);
+    poser(m.joueurs[8], -8, 2.5, -Math.PI / 2);
+    const v = 18 + (k % 5);
+    balleA(m, -6.4, 2.0, v, 0, null); m.balle.dernier = 8; m.balle.recepteur = 3;
+    for (let i = 0; i < 120; i++) {
+      pas(m, [{ dx: 0, dz: -1, allure: 0.05 }, null]);
+      for (const e of m.evts) if (e.type === 'controle' && e.j === 3 && e.rate) ratios.push(Math.hypot(m.balle.v.x - j.v.x, m.balle.v.z - j.v.z) / e.vin);
+      m.evts.length = 0;
+    }
+  }
+  const rOk = ratios.length >= 10 && ratios.every((x) => x >= 0.35 && x <= 0.75);
+  const pm = med(portees);
+  verifier('Balles aériennes et contrôle raté', air >= 15 && rOk && portees.length >= 15 && pm <= 0.3,
+    `centres repris en l'air : ${air}/${n} (${[...noms].sort().join(', ')}), surface à ${f2(pm)} m de la balle à l'impact (médiane), ${f2(Math.max(...portees))} m au plus ; contrôles ratés : ${ratios.length}, la balle repart avec ${ratios.length ? f2(Math.min(...ratios)) : '-'} à ${ratios.length ? f2(Math.max(...ratios)) : '-'} de sa vitesse`);
+}
+{
+  // l'IA collective. (1) Appel de balle : un coéquipier marqué de près s'échappe vers l'espace (≥ 2,5 m de tout
+  // adversaire, couloir libre) en 1,5 s. (2) Une-deux : le passeur reparti dans l'espace reçoit la remise en une touche.
+  // (3) Pressing coordonné : chasseur sur le porteur, un défenseur sur la ligne de passe la plus dangereuse, le
+  // couvreur entre la balle et le but ; porteur dos au but : un second presseur. (4) Le gardien sur l'angle, et sa
+  // sortie face à un porteur seul.
+  const res: string[] = [];
+  let ok = true;
+  // (1)
+  {
+    let bons = 0;
+    for (let g = 0; g < 8; g++) {
+      const m = scene(60 + g, [2, 4, 8, 5, 0], [4, 8], [true, true]);
+      const p = m.joueurs[4], c = m.joueurs[2], o = m.joueurs[8];
+      poser(p, 0, 3, Math.PI); balleA(m, 0, 2.6, 0, 0, 4);
+      poser(c, -4.4, -1.6 + g * 0.2, Math.PI); poser(o, -4.0, -1.9 + g * 0.2, 0);
+      for (let i = 0; i < 180; i++) pas(m, [{ dx: 0, dz: 0, allure: 0 }, { dx: 0, dz: 0, allure: 0 }]);
+      const dO = Math.min(...m.joueurs.filter((x: Any) => x.e === 1 && !x.absent).map((x: Any) => Math.hypot(x.p.x - c.p.x, x.p.z - c.p.z)));
+      let lane = true;
+      for (const x of m.joueurs) if (x.e === 1 && !x.absent && !x.gardien) { const ex = c.p.x - p.p.x, ez = c.p.z - p.p.z, E = ex * ex + ez * ez; const u = Math.max(0, Math.min(1, ((x.p.x - p.p.x) * ex + (x.p.z - p.p.z) * ez) / E)); if (Math.hypot(x.p.x - p.p.x - ex * u, x.p.z - p.p.z - ez * u) < 1.1) lane = false; }
+      if (dO >= 2.5 && lane) bons++;
+    }
+    res.push(`appels ${bons}/8`); ok &&= bons >= 6;
+  }
+  // (2)
+  {
+    let bons = 0;
+    for (let g = 0; g < 10; g++) {
+      // (le passeur et le mur sont de l'IA ; le défenseur, tenu, reste planté devant le passeur)
+      const m: Any = creerMonde({ graine: 80 + g, humains: [false, true], aides: [0, 0], presents: [2, 4, 8, 5] });
+      demarrer(m, { intro: false }); m.controleFixe = [null, 8];
+      const a = m.joueurs[2], b2 = m.joueurs[4], o = m.joueurs[8];
+      poser(a, -2, 2, Math.PI); balleA(m, -2, 1.55, 0, 0, 2);
+      poser(b2, 1.2, -1 - (g % 3) * 0.3, Math.PI * 0.8); poser(o, -2.0, 0.6 - (g % 2) * 0.2, 0);
+      for (let i = 0; i < 3; i++) pas(m, [null, { dx: 0, dz: 0, allure: 0 }]);
+      a.uneDeux = { t: m.t, cible: 4, x: -3.4, z: -3.5 };
+      demanderFrappe(m, a, { type: 'passe', p: 0.25, cible: 4 });
+      let un = false;
+      for (let i = 0; i < 480 && !un; i++) { pas(m, [null, { dx: 0, dz: 0, allure: 0 }]); for (const e of m.evts) if (e.type === 'uneDeux' && e.j === 2) un = true; m.evts.length = 0; }
+      if (un) bons++;
+    }
+    res.push(`une-deux ${bons}/10`); ok &&= bons >= 4;
+  }
+  // (3)
+  {
+    let chasse = 0, ligne = 0, couvre = 0, double = 0;
+    for (let g = 0; g < 8; g++) {
+      for (const dos of [false, true]) {
+        // (un seul receveur dangereux, le n° 8 : la ligne à couper ne change pas en cours de route)
+        const m = scene(120 + g, [1, 2, 3, 4, 8, 9, 0], [null, 9], [false, true]);
+        const p = m.joueurs[9];
+        // les Blancs attaquent vers +z ; le porteur au milieu, deux receveurs ; les Noirs (IA) défendent leur but en +z
+        poser(p, 0.5, -1 + g * 0.3, dos ? Math.PI : 0); balleA(m, 0.5, -1 + g * 0.3 + (dos ? -0.4 : 0.4), 0, 0, 9);
+        poser(m.joueurs[8], 4.5, 2.5, 0);
+        poser(m.joueurs[1], 0, 9, Math.PI); poser(m.joueurs[2], -2, 3.5, Math.PI); poser(m.joueurs[3], 2.5, 4.5, Math.PI); poser(m.joueurs[4], 0, 3, Math.PI);
+        for (let i = 0; i < 300; i++) { pas(m, [null, { dx: 0, dz: 0, allure: 0, protege: false }]); m.balle.dernierT = m.t; }
+        const Rr = m._roles?.[0];
+        if (!Rr) continue;
+        const J = (i: number | null) => (i != null ? m.joueurs[i] : null);
+        const c = J(Rr.chasseur), l = J(Rr.ligne), v = J(Rr.couvreur), d2 = J(Rr.double);
+        if (c && Math.hypot(c.p.x - p.p.x, c.p.z - p.p.z) < 1.6) chasse++;
+        if (!dos) {
+          const q = J(Rr.cible);
+          if (l && q) { const ex = q.p.x - p.p.x, ez = q.p.z - p.p.z, E = ex * ex + ez * ez; const u = Math.max(0, Math.min(1, ((l.p.x - p.p.x) * ex + (l.p.z - p.p.z) * ez) / E)); if (Math.hypot(l.p.x - p.p.x - ex * u, l.p.z - p.p.z - ez * u) < 1.3) ligne++; }
+          if (v && Rr.cov && Math.hypot(v.p.x - Rr.cov.x, v.p.z - Rr.cov.z) < 1.3 && v.p.z > p.p.z) couvre++;
+        } else if (d2 && Math.hypot(d2.p.x - p.p.x, d2.p.z - p.p.z) < 1.8) double++;
+      }
+    }
+    res.push(`pressing : chasseur au porteur ${chasse}/16, ligne coupée ${ligne}/8, couverture ${couvre}/8, second presseur (dos au but) ${double}/8`);
+    ok &&= chasse >= 13 && ligne >= 6 && couvre >= 6 && double >= 6;
+  }
+  // (4)
+  {
+    let pire = 0, sortie = 0, nSortie = 0;
+    const places = [[-7, 8], [-4, 10], [0, 11], [3, 7], [6.5, 9], [8, 5], [0, 6.5], [-2.5, 7]];
+    for (const [x, dz] of places) for (const seul of [false, true]) {
+      const m = scene(150, seul ? [4, 5] : [4, 5, 6], [4, null], [true, false]);
+      const p = m.joueurs[4], k = m.joueurs[5];
+      poser(p, x, -LB + dz + 0.45, Math.PI); balleA(m, x, -LB + dz, 0, 0, 4);
+      if (!seul) poser(m.joueurs[6], x * 0.5, -LB + dz * 0.5, 0);
+      for (let i = 0; i < 300; i++) { pas(m, [{ dx: 0, dz: 0, allure: 0 }, null]); m.balle.dernierT = m.t; }
+      const q = surAngle(m.balle.p.x, m.balle.p.z, -LB, Math.abs(k.p.z + LB));
+      const ux = q.x - m.balle.p.x, uz = q.z - m.balle.p.z, L = Math.hypot(ux, uz) || 1;
+      const dist = Math.abs((k.p.x - m.balle.p.x) * uz - (k.p.z - m.balle.p.z) * ux) / L;
+      pire = Math.max(pire, dist);
+      if (seul && Math.hypot(x, dz) < 8 && k.p.z + LB >= 1.9) sortie++;
+      if (seul && Math.hypot(x, dz) < 8) nSortie++;
+    }
+    res.push(`gardien à ${(pire * 100).toFixed(0)} cm au plus de la bissectrice, sorti face au porteur seul ${sortie}/${nSortie}`);
+    ok &&= pire <= 0.25 && nSortie >= 3 && sortie === nSortie;
+  }
+  verifier('IA collective', ok, res.join(' ; '));
 }
 
 // ─────────────────────────── les mesures des clips (.pak) ───────────────────────────

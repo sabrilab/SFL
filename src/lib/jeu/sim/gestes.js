@@ -18,13 +18,24 @@
 //     à moins de 0,30 m d'elle (sinon frappe effleurée ou manquée, journalisée). Puissance = jauge (0..1) ; erreur à
 //     graine σ = 0,6° + 5° p² + 4° pression + 3° v/7,4 + 4° angle/90° ; l'aide (pouce, manette) corrige la
 //     direction d'une passe, jamais sa force.
+//   · (bola-app#26, lot 2) l'effet suit le pied : l'intérieur du pied droit (finesse) enroule vers la gauche de la
+//     course (ω_y > 0), celui du gauche vers la droite ; l'extérieur (exterieur) fait l'inverse ; la visée de ces
+//     frappes est corrigée par l'intégrateur (traînée, Magnus) pour que la courbe finisse sur la cible. Un contrôle
+//     raté (q < 0,35) part vraiment : la balle repart de la surface avec 40 à 70 % de sa vitesse, dans la réflexion,
+//     et le contrôleur lancé trébuche sous 0,15. Un joueur qui a demandé une frappe ne contrôle pas la balle aérienne
+//     qui arrive : il la reprend de volée ou de la tête. Les deux dernières passes sont gardées (m.passes) : la
+//     remise du receveur au passeur, reprise par lui, est un une-deux (m.stats.uneDeux).
 import { PAS, G, BALLON, JEU, CORPS, BUT_DL, BUT_H, butDe, sens, LB, BX, BZ } from './constantes.js';
-import { piedA, teteA, piedLoco, racineA, versMonde, lancerGeste, impactDe, libre, clamp, enrouler, duree } from './corps.js';
+import { piedA, teteA, piedLoco, racineA, versMonde, lancerGeste, impactDe, libre, clamp, enrouler, duree, trebucher } from './corps.js';
 import { predire } from './ballon.js';
 import { CLIPS, FPS_CLIPS } from './clips.js';
 import { acos, atan2, cos, hypot, sin } from './maths.js';
 
 const R = BALLON.R;
+/** (bola-app#26, lot 2) les gestes qui visent le but : frappe, finesse (intérieur brossé), extérieur, piqué */
+export const estFrappe = (type) => type === 'frappe' || type === 'finesse' || type === 'lobFrappe' || type === 'exterieur';
+// (les gestes aériens : la volée et la tête, pour les statistiques)
+const AERIENS = /^(head_std|header2|volley|bicycle|shoot2)/;
 // la frappe en course : vitesse moyenne de son root motion au rythme 1 (strike_run, 2,97 hanches en 1,3 s)
 const DEG = Math.PI / 180;
 const t1 = { x: 0, y: 0, z: 0 }, t2 = { x: 0, y: 0, z: 0 }, f0 = { x: 0, y: 0, z: 0 }, f1 = { x: 0, y: 0, z: 0 };
@@ -176,6 +187,10 @@ export function pasControle(m, j, contact = false) {
   if (b.dernier != null && m.joueurs[b.dernier].e !== j.e && m.t - b.dernierT < 0.25) return false;
   if (pos && pos !== j && pos.e === j.e && hypot(pos.p.x - b.p.x, pos.p.z - b.p.z) < 1.2) return false;
   if (b.p.y > 2.0) return false;
+  // (bola-app#26, lot 2) il a demandé une reprise : la balle aérienne se frappe, elle ne se contrôle pas
+  if (j.demande && b.p.y > 0.35 && !contact) return false;
+  // (après un coup franc, les adversaires ne la touchent pas tant qu'elle n'est pas jouée)
+  if (m.ecart?.e === j.e) return false;
   // la portée se mesure depuis la surface qui touche : le pied prévu le plus proche, la cuisse (0,15 m devant le
   // corps), le buste ou la tête (l'axe du corps)
   let dh;
@@ -220,9 +235,26 @@ export function pasControle(m, j, contact = false) {
     oz = q * (uz * vs) + (1 - q) * rfz + j.v.z * (1 - q);
     oy = (1 - q) * rfy;
   }
+  let rate = false;
+  if (q < 0.35 && vin > 4) {
+    // (bola-app#26, lot 2) le contrôle raté part vraiment : la balle repart de la surface, dans la réflexion de sa
+    // vitesse relative (bruitée), avec 40 % (q = 0,35) à 70 % (q = 0) de cette vitesse
+    const part = 0.4 + 0.3 * (0.35 - q) / 0.35;
+    let rx = -vrx, rz = -vrz;
+    const rl = hypot(rx, rz) || 1;
+    const dev = rng.normal() * 0.45;
+    const c = cos(dev), sn = sin(dev);
+    const dx = (rx / rl) * c + (rz / rl) * sn, dz = -(rx / rl) * sn + (rz / rl) * c;
+    const sv = part * vin;
+    ox = j.v.x + dx * sv; oz = j.v.z + dz * sv; oy = surface === 'pied' ? 0.3 + rng.u() * 0.8 : Math.abs(vry) * 0.3 + 0.5;
+    rate = true;
+  }
   b.v.x = ox; b.v.y = oy; b.v.z = oz;
   if (b.p.y < R + 0.02 && oy <= 0) rouler(b); else { b.w.x *= 0.3; b.w.y *= 0.3; b.w.z *= 0.3; }
-  const possede = q >= 0.35 || hypot(ox - j.v.x, oz - j.v.z) < 3;
+  const possede = !rate && (q >= 0.35 || hypot(ox - j.v.x, oz - j.v.z) < 3);
+  j.controleQ = q; j.controleT = m.t;
+  // (lancé, raté de très peu : il trébuche sur la balle qui part)
+  if (rate && q < 0.15 && sj > 5) { trebucher(j); m.ev('trebuche', { j: j.i }); }
   const etaitTir = b.tir;
   toucher(m, j, { possede });
   if (!possede) b.possesseur = null;
@@ -231,11 +263,23 @@ export function pasControle(m, j, contact = false) {
   // l'animation (bola-app#26) : chaque surface a son geste, au pied qui touche (côté de la balle) ; un amorti déjà
   // lancé par l'anticipation (pasAnticipation) continue, calé pour que son contact tombe maintenant
   let clip = null;
+  // (lot 2) un amorti anticipé qui ne va plus : la balle arrive de l'autre côté, ou le joueur a été poussé et court
+  // (plus de 1,6 m/s) : il est repris par le geste juste
+  if (j.g?.type === 'amorti') {
+    const ga = (b.p.x - j.p.x) * cos(j.cap) - (b.p.z - j.p.z) * sin(j.cap) > 0;
+    const pa = CLIPS[j.g.nom]?.piedImpact?.pied;
+    if (sj > 1.6 || (pa && (pa === 'g') !== ga && Math.abs((b.p.x - j.p.x) * cos(j.cap) - (b.p.z - j.p.z) * sin(j.cap)) > 0.05)) { j.g = null; j.mode = 'loco'; }
+  }
   if (j.g?.type !== 'amorti') {
     const c = clipControle(j, b, surface, sj, vin, possede);
     if (c) { clip = c.nom; lancerGeste(j, c.nom, { depuis: Math.max(0, c.impact - 0.06) / duree(c.nom), taux: c.taux, fin: Math.min(duree(c.nom), c.impact + c.apres), type: 'controle', donnees: { surface } }); }
   } else { clip = j.g.nom; j.g.type = 'controle'; j.g.donnees = { ...j.g.donnees, surface }; }
-  m.ev('controle', { j: j.i, q, vin, surface, possede, tir: !!etaitTir, clip, sj, gauche: (b.p.x - j.p.x) * cos(j.cap) - (b.p.z - j.p.z) * sin(j.cap) > 0 });
+  m.ev('controle', { j: j.i, q, vin, surface, possede, rate, tir: !!etaitTir, clip, sj, gauche: (b.p.x - j.p.x) * cos(j.cap) - (b.p.z - j.p.z) * sin(j.cap) > 0 });
+  // (le une-deux : la passe de j à X, puis la remise de X à j, reprise par j dans les 4,5 s)
+  const [p1, p2] = m.passes;
+  if (possede && p1 && p2 && !p2.compte && p1.de === j.i && p2.de === p1.a && p2.a === j.i && m.t - p1.t < 4.5) {
+    p2.compte = true; m.stats.uneDeux++; m.ev('uneDeux', { j: j.i, o: p1.a });
+  }
   return true;
 }
 
@@ -283,7 +327,7 @@ export function clipControle(j, b, surface, sj, vin, possede = true) {
  */
 export function pasAnticipation(m, j) {
   const b = m.balle;
-  if (b.recepteur !== j.i || !libre(j) || b.garde != null || j.gardien) return;
+  if (b.recepteur !== j.i || !libre(j) || b.garde != null || j.gardien || j.demande) return;
   const sj = hypot(j.v.x, j.v.z);
   if (sj > 1.6 || m.t < (j.anticipeT ?? 0)) return;
   j.anticipeT = m.t + 0.05;
@@ -313,14 +357,16 @@ export function choisirPartenaire(m, j, dx, dz, cone = Math.PI) {
     const ox = o.p.x - j.p.x, oz = o.p.z - j.p.z, d = hypot(ox, oz) || 1;
     const al = (ox * dx + oz * dz) / (d * L);
     if (acos(clamp(al, -1, 1)) > cone) continue;
-    let gene = 0;
+    let gene = 0, libreO = 9;
     for (const a of m.joueurs) {
       if (a.absent || a.e === j.e) continue;
       const t = clamp(((a.p.x - j.p.x) * ox + (a.p.z - j.p.z) * oz) / (d * d), 0, 1);
       const px = j.p.x + ox * t - a.p.x, pz = j.p.z + oz * t - a.p.z;
-      if (hypot(px, pz) < 1.3) gene += 0.6;
+      if (hypot(px, pz) < 1.3) gene += 0.8;
+      if (!a.gardien) libreO = Math.min(libreO, hypot(a.p.x - o.p.x, a.p.z - o.p.z));
     }
-    const s = al * 1.4 - d * 0.03 - gene + (oz * sens(j.e) > 0 ? 0.25 : 0);
+    // (lot 2) un receveur démarqué vaut mieux (jusqu'à +0,4 à 3 m de tout adversaire)
+    const s = al * 1.4 - d * 0.03 - gene + (oz * sens(j.e) > 0 ? 0.25 : 0) + 0.4 * Math.min(libreO, 3) / 3;
     if (s > score) { score = s; best = o; }
   }
   return best;
@@ -337,7 +383,8 @@ export function demanderFrappe(m, j, spec) {
   if (!libre(j) || b.garde != null) return false;
   const d = hypot(b.p.x - j.p.x, b.p.z - j.p.z);
   // (bola-app#26 : une balle aérienne se reprend de volée ou de la tête, jusqu'à 2,2 m)
-  if (d > 3.5 || b.p.y > 2.2) return false;
+  // (lot 2 : une balle en l'air qui arrive se demande de plus loin, 6 m : le temps de régler la reprise)
+  if (d > (b.p.y > 0.5 && b.garde == null ? 6 : 3.5) || b.p.y > 2.6) return false;
   if (j.demande && !j.aide) return true; // l'IA ne relance pas une demande en cours
   j.demande = { spec, t0: j.demande?.t0 ?? m.t };
   return true;
@@ -363,7 +410,7 @@ const hauteurDans = (b, T) => Math.max(R, b.p.y + b.v.y * T - 0.5 * G * T * T);
  *     à la hauteur de la balle, pour les gestes aériens.
  */
 function clipFrappe(j, b, spec) {
-  const frappe = spec.type === 'frappe' || spec.type === 'finesse' || spec.type === 'lobFrappe';
+  const frappe = estFrappe(spec.type);
   const s = hypot(j.v.x, j.v.z);
   const fx = sin(j.cap), fz = cos(j.cap);
   const cote = (b.p.x - j.p.x) * fz - (b.p.z - j.p.z) * fx; // > 0 : à gauche
@@ -416,6 +463,8 @@ export function pasDemande(m, j) {
   const p = porteur(m);
   if (!libre(j) || b.garde != null || (p && p.e !== j.e && p !== j) || m.t - dm.t0 > 1.0) { j.demande = null; return; }
   const cible = viser(m, j, dm.spec, true);
+  // (lot 2) une balle en l'air : la reprise se cale sur l'instant où elle passe à sa portée (prédiction complète)
+  if (b.p.y > 0.45 || b.v.y > 1.5) { if (reprendre(m, j, dm, cible) !== null) return; }
   const c = clipFrappe(j, b, dm.spec);
   const T = c.impact / c.taux;
   const bx = b.p.x + b.v.x * T, bz = b.p.z + b.v.z * T;
@@ -445,7 +494,9 @@ export function pasDemande(m, j) {
       type: 'frappe', finApresImpact: 0.25, impact: c.impact, donnees: { spec: dm.spec, pied: c.pied },
     });
     // (pour le banc : le geste choisi, le pied qui frappe et le côté de la balle à l'élan)
-    m.ev('elan', { j: j.i, nom: c.nom, pied: c.pied, cote: c.cote, y: b.p.y });
+    const aerien = AERIENS.test(c.nom) && b.p.y > 0.3;
+    if (aerien) m.stats.aeriens++;
+    m.ev('elan', { j: j.i, nom: c.nom, pied: c.pied, cote: c.cote, y: b.p.y, aerien, geste: dm.spec.type });
     return;
   }
   // aller au point de frappe
@@ -454,6 +505,85 @@ export function pasDemande(m, j) {
   it.dx = dx / L; it.dz = dz / L;
   it.allure = Math.max(it.allure, clamp(L / 1.5, 0.3, 1));
   if (L > 1.2) it.sprint = Math.max(it.sprint, 0.6);
+}
+
+/**
+ * La reprise d'une balle aérienne (bola-app#26, lot 2) : la trajectoire prédite (traînée, effet, rebonds) donne
+ * l'instant tc et le point où elle passe au plus près du joueur (dans 1 s) ; le geste est choisi par la hauteur de ce
+ * point (tête au-dessus de 1,25 m, ciseau de 0,65 à 1,8 m, jambe tendue sous 0,7 m, retourné dos au but), son image de
+ * contact à cette hauteur, et son rythme pour que le contact tombe à tc (0,8 à 2,2 fois la capture) ; le joueur va au
+ * point de rencontre en attendant. Renvoie null si la balle ne passe pas à sa portée (le cas général reprend la
+ * main), sinon vrai.
+ */
+function reprendre(m, j, dm, cible) {
+  const b = m.balle;
+  if (m.t >= (dm.predT ?? -9)) {
+    dm.predT = m.t + 0.04;
+    // le point de passage le plus proche du joueur (sa course comprise), hauteur jouable
+    let best = null;
+    predire(b, (q, t) => {
+      const px = j.p.x + j.v.x * Math.min(t, 0.4), pz = j.p.z + j.v.z * Math.min(t, 0.4);
+      const d = hypot(q.p.x - px, q.p.z - pz);
+      if (q.p.y > 0.25 && q.p.y < 2.3 && (!best || d < best.d)) best = { d, t, x: q.p.x, y: q.p.y, z: q.p.z };
+      return false;
+    }, 1.0);
+    dm.pred = best && best.d < 1.6 ? best : null;
+  }
+  const P = dm.pred;
+  if (!P) return null;
+  const tc = P.t - (m.t - (dm.predT - 0.04));
+  if (tc <= 0.05) return null;
+  const fx = sin(j.cap), fz = cos(j.cap);
+  const cote = (P.x - j.p.x) * fz - (P.z - j.p.z) * fx;
+  const hv = hypot(j.v.x, j.v.z) > 0.3 ? atan2(j.v.x, j.v.z) : j.cap;
+  const ecart = Math.abs(enrouler(atan2(cible.x - P.x, cible.z - P.z) - hv));
+  const choix = [];
+  // (la tête debout jusqu'à 1,65 m ; au-dessus, la tête en extension, sautée)
+  if (P.y > 1.25 && ecart < 1.9) choix.push(P.y < 1.65 ? 'head_std' : 'header2');
+  if (P.y > 0.7 && P.y < 1.25 && ecart > 1.9 && CLIPS.bicycle) choix.push('bicycle');
+  if (P.y > 0.65 && P.y < 1.8) choix.push('volley');
+  if (P.y < 0.75) choix.push('shoot2');
+  let g = null;
+  for (const n0 of choix) {
+    const tete = /^head/.test(n0);
+    const n = !tete && n0 !== 'bicycle' && n0 !== 'volley' && cote > 0.08 && CLIPS[n0 + '_l'] ? n0 + '_l' : n0;
+    const c = CLIPS[n];
+    if (!c || (tete && !c.tete)) continue;
+    const pied = tete ? 'tete' : CLIPS_PIED(n);
+    for (let i = 3; i < (c.n * 2) / 3; i++) {
+      const t = i / FPS_CLIPS, taux = t / tc;
+      if (taux < 0.8 || taux > 2.2) continue;
+      // (la tête doit être à la balle à 0,2 m près : sinon c'est la poitrine ou les mains qui la prennent)
+      const err = Math.abs(surfaceA(n, t, pied, t1).y - P.y) * (tete ? 1.75 : 1);
+      if (!g || err < g.err) g = { nom: n, impact: t, taux, pied, err };
+    }
+  }
+  // le point de rencontre : là où le corps doit être pour que la surface touche la balle
+  const hc = atan2(cible.x - P.x, cible.z - P.z);
+  const it = j.int;
+  if (g && g.err < 0.35) {
+    surfaceA(g.nom, g.impact, g.pied, t1);
+    versMonde(hc, t1.x, t1.z, t2);
+    const sx = P.x - sin(hc) * (R + 0.04) - t2.x, sz = P.z - cos(hc) * (R + 0.04) - t2.z;
+    const ex = j.p.x + j.v.x * tc, ez = j.p.z + j.v.z * tc;
+    // (pasFrappe rattrape jusqu'à 1,2 m/s pendant l'élan)
+    if (hypot(sx - ex, sz - ez) < 0.2 + 1.1 * tc) {
+      j.demande = null;
+      j.cap = hc;
+      lancerGeste(j, g.nom, { taux: g.taux, rm: false, type: 'frappe', finApresImpact: 0.25, impact: g.impact, donnees: { spec: dm.spec, pied: g.pied } });
+      const aerien = AERIENS.test(g.nom);
+      if (aerien) m.stats.aeriens++;
+      m.ev('elan', { j: j.i, nom: g.nom, pied: g.pied, cote, y: P.y, aerien, geste: dm.spec.type });
+      return true;
+    }
+    const dx = sx - j.p.x, dz = sz - j.p.z, L = hypot(dx, dz) || 1;
+    it.dx = dx / L; it.dz = dz / L; it.allure = Math.max(it.allure, clamp(L / 1.2, 0.3, 1)); if (L > 1) it.sprint = Math.max(it.sprint, 0.7);
+    return true;
+  }
+  // pas encore de geste qui tombe juste : il va sous la balle
+  const dx = P.x - j.p.x, dz = P.z - j.p.z, L = hypot(dx, dz) || 1;
+  if (L > 0.3) { it.dx = dx / L; it.dz = dz / L; it.allure = Math.max(it.allure, clamp(L / 1.2, 0.3, 1)); }
+  return true;
 }
 
 /** le pied qui frappe dans ce clip (0 = gauche, 1 = droit), mesuré par tools/jeu-clips.mjs */
@@ -507,15 +637,15 @@ export function pasFrappe(m, j, dt) {
   m.stats.impacts.push(portee);
   if (portee > 0.6) { m.ev('rate', { j: j.i, portee }); return; }
   const effleure = portee > JEU.porteeFrappe;
-  lancer(m, j, spec, cible, effleure);
-  m.ev(spec.type === 'frappe' || spec.type === 'finesse' || spec.type === 'lobFrappe' ? 'frappe' : 'passe', { j: j.i, p: spec.p, portee, effleure });
+  lancer(m, j, spec, cible, effleure, g.donnees.pied, g.nom);
+  m.ev(estFrappe(spec.type) ? 'frappe' : 'passe', { j: j.i, p: spec.p, portee, effleure });
 }
 
 /** Le point visé (x, y, z) d'une demande : le partenaire et sa course, ou le but. */
 function viser(m, j, spec, provisoire) {
   const b = m.balle;
   const out = spec._cible ?? (spec._cible = { x: 0, y: 0, z: 0, t: 0 });
-  if (spec.type === 'frappe' || spec.type === 'finesse' || spec.type === 'lobFrappe') {
+  if (estFrappe(spec.type)) {
     const zb = butDe(1 - j.e);
     out.x = spec.x ?? 0; out.z = zb; out.y = spec.y ?? 0.8;
     return out;
@@ -528,7 +658,7 @@ function viser(m, j, spec, provisoire) {
   }
   if (!o) { out.x = b.p.x + (spec.dx ?? 0) * 10; out.z = b.p.z + (spec.dz ?? sens(j.e)) * 10; out.y = 0; return out; }
   const d0 = hypot(o.p.x - b.p.x, o.p.z - b.p.z);
-  const v0 = spec.type === 'lob' ? 14 : JEU.passeV0[0] + JEU.passeV0[1] * spec.p;
+  const v0 = spec.type === 'lob' ? 14 : spec.type === 'centre' ? 13 : JEU.passeV0[0] + JEU.passeV0[1] * spec.p;
   const t = clamp(d0 / Math.max(5, v0 * 0.85), 0.2, 2);
   out.x = o.p.x + o.v.x * t; out.z = o.p.z + o.v.z * t;
   if (spec.type === 'profondeur') { const fwd = 4 + 6 * spec.p; out.z += sens(o.e) * fwd * 0.8; out.x += (o.v.x / (hypot(o.v.x, o.v.z) || 1)) * fwd * 0.2; }
@@ -538,7 +668,7 @@ function viser(m, j, spec, provisoire) {
 }
 
 /** Le départ de la balle. */
-function lancer(m, j, spec, cible, effleure) {
+function lancer(m, j, spec, cible, effleure, pied = 1, nom = '') {
   const b = m.balle, rng = m.rng.frappes;
   const p = clamp(spec.p ?? 0.5, 0, 1);
   const s = hypot(j.v.x, j.v.z);
@@ -548,11 +678,27 @@ function lancer(m, j, spec, cible, effleure) {
   const angleCorps = Math.abs(enrouler(h - j.cap));
   const aide = j.aide ?? 0;
   let vx, vy, vz, w = null;
-  const frappe = spec.type === 'frappe' || spec.type === 'finesse' || spec.type === 'lobFrappe';
+  const frappe = estFrappe(spec.type);
   if (!frappe) {
     let sig = (1 + 3 * p * p + 3 * pr + 2 * (s / CORPS.vSprint)) * DEG * (1 - 0.5 * aide);
     h += rng.normal() * sig;
-    if (spec.type === 'lob') {
+    if (spec.type === 'centre') {
+      // (bola-app#26, lot 2) le centre : plus tendu qu'un lob (24 à 34°), il arrive à hauteur de tête (1,5 m) sur le
+      // receveur, pour une reprise de volée ou de la tête ; v0 cherché sur l'intégrateur (traînée, léger rétro-effet)
+      const th = clamp(24 + dist * 0.6, 24, 34) * DEG;
+      const w0 = { x: -cos(h) * 10, y: 0, z: sin(h) * 10 };
+      let a = 6, c = 24;
+      for (let k = 0; k < 12; k++) {
+        const v0 = (a + c) / 2;
+        const q = essai(b, sin(h) * v0 * cos(th), v0 * sin(th), cos(h) * v0 * cos(th), w0);
+        const r = predire(q, (x) => hypot(x.p.x - b.p.x, x.p.z - b.p.z) >= dist || (x.v.y < 0 && x.p.y < 0.3), 2.5);
+        const ok = r && hypot(r.p.x - b.p.x, r.p.z - b.p.z) >= dist - 0.05;
+        if (!ok || r.p.y < 1.5) a = v0; else c = v0;
+      }
+      const v0 = (a + c) / 2;
+      vx = sin(h) * v0 * cos(th); vz = cos(h) * v0 * cos(th); vy = v0 * sin(th);
+      w = w0;
+    } else if (spec.type === 'lob') {
       // un vrai lob : 42 à 55° selon la distance (65° au plus), un sommet d'au moins 2,5 m, et 2,3 m au-dessus de
       // l'adversaire le plus proche sur la ligne (à moins de 5 m)
       let th = clamp(42 + 13 * (dist / 25), 42, 55) * DEG;
@@ -585,34 +731,44 @@ function lancer(m, j, spec, cible, effleure) {
       vx = sin(h) * v0; vz = cos(h) * v0; vy = 0;
     }
   } else {
-    const finesse = spec.type === 'finesse';
-    const v0 = finesse ? JEU.finesseV0[0] + JEU.finesseV0[1] * p : JEU.frappeV0[0] + JEU.frappeV0[1] * p;
-    let cx = cible.x;
+    const finesse = spec.type === 'finesse', ext = spec.type === 'exterieur', brosse = finesse || ext;
+    // (lot 2) une tête part bien moins fort qu'une frappe du pied (8 à 15 m/s), une volée un peu moins, et moins juste
+    const tete = /^head/.test(nom), volee = /^(volley|bicycle|shoot2)/.test(nom) && b.p.y > 0.3;
+    let v0 = finesse ? JEU.finesseV0[0] + JEU.finesseV0[1] * p : ext ? JEU.exterieurV0[0] + JEU.exterieurV0[1] * p : JEU.frappeV0[0] + JEU.frappeV0[1] * p;
+    if (tete) v0 = 8 + 7 * p; else if (volee) v0 *= 0.85;
+    const cx = cible.x;
     let wy = 0;
-    if (finesse) {
-      const ext = Math.sign(cx || 1) * (1 + 0.5 * p);
-      cx += ext;
-      const vzs = Math.sign(cible.z - b.p.z);
-      wy = -Math.sign(ext) * vzs * (45 + 25 * p);
+    if (brosse) {
+      // (bola-app#26, lot 2) l'effet suit le pied : l'intérieur du droit (ou l'extérieur du gauche) enroule vers la
+      // gauche de la course (ω_y > 0 : Magnus ω × v vers la gauche), l'intérieur du gauche (ou l'extérieur du droit)
+      // vers la droite ; la visée est ensuite corrigée pour que la courbe finisse sur la cible
+      const sc = (finesse ? 1 : -1) * (pied === 0 ? -1 : 1);
+      wy = sc * (finesse ? 45 + 25 * p : 34 + 18 * p);
     }
     const yv = spec.type === 'lobFrappe' ? 2.2 : (spec.y ?? clamp(0.25 + ((1.6 - 0.25) * (p - 0.3)) / 0.6, 0.15, 2.6) + (p > 0.95 ? (p - 0.95) * 30 : 0));
     let sig = (0.6 + 5 * p * p + 4 * pr + 3 * (s / CORPS.vSprint) + 4 * (Math.min(angleCorps, Math.PI / 2) / (Math.PI / 2))) * DEG;
-    if (finesse) sig *= 0.5;
+    if (finesse) sig *= 0.5; else if (ext) sig *= 0.8;
+    if (tete) sig += 3 * DEG; else if (volee) sig += 4 * DEG;
     sig *= 1 - 0.3 * aide;
-    h = atan2(cx - b.p.x, cible.z - b.p.z) + rng.normal() * sig;
+    const bruitH = rng.normal() * sig;
+    h = atan2(cx - b.p.x, cible.z - b.p.z);
     const dh = hypot(cx - b.p.x, cible.z - b.p.z);
-    // la hauteur à la ligne : un premier jet sous gravité, puis deux corrections par l'intégrateur (traînée, effet)
+    // la hauteur à la ligne : un premier jet sous gravité, puis deux corrections par l'intégrateur (traînée, effet) ;
+    // (une frappe brossée : la direction aussi, trois fois, pour que la courbe finisse sur la cible)
     let t = dh / (v0 * 0.92);
     let vyv = (yv - b.p.y + 0.5 * G * t * t) / t;
     if (spec.type === 'lobFrappe') { vyv = Math.min(9, vyv + 4); }
-    w = { x: -cos(h) * 8, y: wy, z: sin(h) * 8 };
-    for (let k = 0; k < 2 && spec.type !== 'lobFrappe'; k++) {
+    const nk = spec.type === 'lobFrappe' ? 0 : brosse ? 3 : 2;
+    for (let k = 0; k < nk; k++) {
       const vh = Math.sqrt(Math.max(1, v0 * v0 - vyv * vyv));
-      const q = essai(b, sin(h) * vh, vyv, cos(h) * vh, w);
+      const q = essai(b, sin(h) * vh, vyv, cos(h) * vh, { x: -cos(h) * 8, y: wy, z: sin(h) * 8 });
       const r = predire(q, (x) => (x.p.z - cible.z) * Math.sign(cible.z - b.p.z) >= 0, 2);
       if (!r) break;
       vyv += ((yv - r.p.y) / Math.max(0.2, r.t)) * 0.9;
+      if (brosse && Math.abs(cos(h)) > 0.3) h = enrouler(h - (r.p.x - cx) / (cos(h) * dh));
     }
+    h += bruitH;
+    w = { x: -cos(h) * 8, y: wy, z: sin(h) * 8 };
     vyv += rng.normal() * sig * v0 * 0.4;
     const vh = Math.sqrt(Math.max(1, v0 * v0 - vyv * vyv));
     vx = sin(h) * vh; vz = cos(h) * vh; vy = vyv;
@@ -628,6 +784,8 @@ function lancer(m, j, spec, cible, effleure) {
   if (w) { b.w.x = w.x; b.w.y = w.y; b.w.z = w.z; } else rouler(b);
   b.dernier = j.i; b.dernierT = m.t; b.possesseur = null;
   b.recepteur = !frappe && spec.cible != null ? spec.cible : null;
+  // (les deux dernières passes, pour le une-deux)
+  if (!frappe && spec.cible != null) { m.passes.push({ de: j.i, a: spec.cible, t: m.t }); if (m.passes.length > 2) m.passes.shift(); }
   b.tir = frappe ? { e: j.e, t0: m.t, j: j.i } : null;
   j.recup = 0.3;
   m.stats[frappe ? 'tirs' : 'passes']++;

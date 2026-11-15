@@ -20,8 +20,15 @@
 //   · le ballon contre les corps (balleCorps) : personne n'est traversé. Jambes et buste en capsules, corps couché ou qui
 //     se relève ; la balle en ressort (e = 0,3, frottement 0,5), une frappe contrée n'est plus un tir ; un joueur debout
 //     et libre qui la prend dans les jambes la contrôle (moins bien).
-// Aucune faute n'est sifflée (décision proposée à Sabri : la chute suffit comme punition).
-import { CORPS as C, BALLON, BALLE_CORPS as BC, BX, BZ } from './constantes.js';
+//   · (bola-app#26, lot 2) tirage de maillot : un défenseur collé dans le dos du porteur le tient (intention « tire »,
+//     ou l'IA qui revient par derrière) : le porteur perd 15 % d'allure, les deux perdent de l'équilibre ; tenu plus de
+//     0,8 s, c'est une faute. Protection : le porteur qui protège recule dans le défenseur collé dans son dos (poussée de
+//     dos, 420 N) et le déséquilibre. Tacle debout : balle prise, balle contrée (les deux pieds dessus : elle gicle),
+//     ou jambes. Fautes légères (JEU.fautes, règle à faire valider par Sabri) : des jambes touchées avant la balle sur
+//     le porteur (tacle glissé, tacle debout qui le fait trébucher ou tomber) ou un tirage trop long ; l'arbitre laisse
+//     l'avantage (monde.js, pasAvantage) : si l'équipe fautée garde ou reprend la balle dans les 2,5 s, le jeu continue,
+//     sinon coup franc au point de la faute.
+import { CORPS as C, BALLON, BALLE_CORPS as BC, BX, BZ, JEU, DUELS } from './constantes.js';
 import { lancerGeste, tomber, trebucher, genreChute, piedA, hancheA, duree, versMonde, clamp, enrouler, libre } from './corps.js';
 import { rouler, pasControle } from './gestes.js';
 import { sortirBalle } from './ballon.js';
@@ -40,6 +47,24 @@ export function desequilibrer(m, j, dd, pousse = null, genre = null) {
   if (pousse && dd > 0.08) { j.chocT = m.t; j.chocX = pousse.x; j.chocZ = pousse.z; j.chocF = Math.min(1, dd); }
   if (j.d >= C.chute) { const gc = genre ?? (pousse ? genreChute(j, pousse.x, pousse.z) : 'avant'); tomber(j, gc); m.ev('chute', { j: j.i, genre: gc }); }
   else if (j.d >= C.trebuche && j.mode === 'loco') { trebucher(j); m.ev('trebuche', { j: j.i }); }
+}
+
+/**
+ * Une faute légère (bola-app#26, lot 2) de auteur sur victime : seulement si l'équipe de la victime avait la balle (le
+ * porteur, ou une balle libre qu'elle a touchée en dernier à moins de 2 m de lui). L'arbitre regarde l'avantage
+ * (monde.js) : la faute est notée avec son point, et le jeu continue. Renvoie vrai si la faute est notée.
+ */
+export function faute(m, auteur, victime, genre) {
+  if (!JEU.fautes || auteur.e === victime.e || victime.gardien) return false;
+  const b = m.balle;
+  const aLaBalle = b.possesseur === victime.i
+    || (b.possesseur == null && b.garde == null && b.dernier != null && m.joueurs[b.dernier].e === victime.e && hypot(b.p.x - victime.p.x, b.p.z - victime.p.z) < 2);
+  if (!aLaBalle) return false;
+  if (m.avantage || m.arret) return false; // (une faute à la fois : la suivante attend que celle-ci soit réglée)
+  m.avantage = { e: victime.e, auteur: auteur.i, victime: victime.i, x: victime.p.x, z: victime.p.z, t0: m.t, genre };
+  m.stats.fautes++;
+  m.ev('faute', { j: auteur.i, o: victime.i, genre, x: victime.p.x, z: victime.p.z });
+  return true;
 }
 
 /** Le joueur est-il contre un panneau dans la direction (dx, dz) ? */
@@ -87,17 +112,67 @@ export function demeler(m) {
     nx /= d; nz /= d;
     // (au plus 4 cm par passe : deux corps emmêlés, un joueur qui se relève sur un autre, se démêlent en glissant, pas
     // d'un saut)
-    const ia = 1 / A.m, ib = 1 / B.m, corr = Math.min(0.04, 0.95 * (rr - d));
+    // (lot 2 : un relevé emmêlé se démêle doucement, 2 cm par passe : il ne chasse pas l'autre dans un troisième)
+    const ia = 1 / A.m, ib = 1 / B.m, corr = Math.min((A.leve ?? 0) > 0 || (B.leve ?? 0) > 0 ? 0.02 : 0.04, 0.95 * (rr - d));
     const murA = contreMur(A, -nx, -nz), murB = contreMur(B, nx, nz);
-    const pa = murA ? 0 : murB ? 1 : ia / (ia + ib), pb = murB ? 0 : murA ? 1 : ib / (ia + ib);
+    const [pa, pb] = parts(A, B, murA, murB, ia, ib);
     ecarter(A, B, nx, nz, corr, pa, pb);
   }
+}
+
+/**
+ * Qui recule, entre A et B (parts de la correction) : pas celui qui est contre un panneau ; (lot 2) celui qui vient de se
+ * relever (j.leve, 0,5 s) se dégage seul, sans pousser l'autre dans un troisième (un relevé emmêlé dans un coin) ;
+ * sinon au prorata inverse des masses.
+ */
+function parts(A, B, murA, murB, ia, ib) {
+  if (murA) return [0, 1];
+  if (murB) return [1, 0];
+  const la = (A.leve ?? 0) > 0, lb = (B.leve ?? 0) > 0;
+  if (la && !lb) return [1, 0];
+  if (lb && !la) return [0, 1];
+  return [ia / (ia + ib), ib / (ia + ib)];
 }
 
 /** Corps contre corps, pour toutes les paires (45 au plus). */
 export function pasCorpsACorps(m, dt) {
   pasPaires(m, dt);
+  tirages(m, dt);
   demeler(m);
+}
+
+/**
+ * Le tirage de maillot (bola-app#26, lot 2) : le défenseur collé dans le dos du porteur (centres à moins de 0,78 m, il
+ * est derrière lui), qui le veut (intention « tire », l'IA qui revient par derrière), le tient : le porteur perd 15 %
+ * d'allure (corps.js, tireF), les deux perdent de l'équilibre ; tenu plus de 0,8 s : faute (si elle est sifflée), et le
+ * défenseur lâche. Pour le rendu : j.tireCible (le défenseur tend le bras vers lui), j.tirePar (le porteur tiré).
+ */
+function tirages(m, dt) {
+  const b = m.balle, T = DUELS.tirage;
+  const p = b.possesseur != null ? m.joueurs[b.possesseur] : null;
+  for (const o of m.joueurs) {
+    if (o.absent || o.gardien) continue;
+    const tient = p && o.e !== p.e && o.int?.tire && o.mode === 'loco' && p.mode !== 'sol' && p.mode !== 'releve' && m.t >= (o.tireRepos ?? -9);
+    let ok = false;
+    if (tient) {
+      const rx = o.p.x - p.p.x, rz = o.p.z - p.p.z, d = hypot(rx, rz);
+      // derrière lui : du côté opposé à sa course (ou à son cap s'il est arrêté)
+      const s = hypot(p.v.x, p.v.z);
+      const fx = s > 0.8 ? p.v.x / s : sin(p.cap), fz = s > 0.8 ? p.v.z / s : cos(p.cap);
+      ok = d < T.portee && d > 1e-6 && (rx * fx + rz * fz) < -0.35 * d;
+    }
+    if (!ok) { if (o.tireCible != null) { o.tireCible = null; o.tireT = 0; } continue; }
+    if (o.tireCible !== p.i) { o.tireCible = p.i; o.tireT = 0; m.ev('tirage', { j: o.i, o: p.i }); m.stats.tirages++; }
+    o.tireT += dt;
+    p.tireF = 0.12; p.tirePar = o.i; o.tireF = 0.12;
+    // (au plus 0,6 de déséquilibre par le tirage : il gêne, il ne fait pas tomber)
+    if (p.d < 0.6) desequilibrer(m, p, T.desPorteur * dt);
+    if (o.d < 0.6) desequilibrer(m, o, T.desTireur * dt);
+    if (o.tireT > T.faute) {
+      faute(m, o, p, 'tirage');
+      o.tireCible = null; o.tireT = 0; o.tireRepos = m.t + T.repos;
+    }
+  }
 }
 
 function pasPaires(m, dt) {
@@ -112,12 +187,13 @@ function pasPaires(m, dt) {
     if (d >= rr + 0.15 || d < 1e-6) continue;
     nx /= d; nz /= d;
     epaule(m, A, B, nx, nz, d, dt);
+    dos(m, A, B, nx, nz, d, dt);
     if (d >= rr + 0.01) continue;
     const ia = 1 / A.m, ib = 1 / B.m;
-    const pen = rr - d, corr = Math.max(0, Math.min(0.06, 0.95 * pen));
+    const pen = rr - d, corr = Math.max(0, Math.min((A.leve ?? 0) > 0 || (B.leve ?? 0) > 0 ? 0.02 : 0.06, 0.95 * pen));
     // (un corps collé à un panneau ne recule pas : l'autre prend toute la correction)
     const murA = contreMur(A, -nx, -nz), murB = contreMur(B, nx, nz);
-    const pa = murA ? 0 : murB ? 1 : ia / (ia + ib), pb = murB ? 0 : murA ? 1 : ib / (ia + ib);
+    const [pa, pb] = parts(A, B, murA, murB, ia, ib);
     ecarter(A, B, nx, nz, corr, pa, pb);
     // (le prochain pas d'un geste à root motion ne poussera plus dans l'autre corps)
     if (pen > 0) { A.bloque = A.bloque ?? { x: 0, z: 0 }; A.bloque.x = nx; A.bloque.z = nz; B.bloque = B.bloque ?? { x: 0, z: 0 }; B.bloque.x = -nx; B.bloque.z = -nz; A.bloqueT = B.bloqueT = 1; }
@@ -144,6 +220,27 @@ function pasPaires(m, dt) {
     if (dva > 1.4) desequilibrer(m, A, (f * (dva - 1.4)) / (2 * C.impDes), { x: -nx, z: -nz });
     if (dvb > 1.4) desequilibrer(m, B, (f * (dvb - 1.4)) / (2 * C.impDes), { x: nx, z: nz });
     if (jn * Math.max(ia, ib) > 1.2) m.ev('choc', { a: A.i, b: B.i, force: jn });
+  }
+}
+
+/**
+ * La poussée de dos (bola-app#26, lot 2) : le porteur qui protège la balle (dos à l'adversaire) recule dans le
+ * défenseur collé derrière lui : le défenseur est repoussé (420 N) et perd un peu d'équilibre ; le porteur, lui, tient.
+ */
+function dos(m, A, B, nx, nz, d, dt) {
+  if (A.e === B.e || A.gardien || B.gardien || d > 2 * C.rayon + 0.06) return;
+  for (const [P, D, s] of [[A, B, 1], [B, A, -1]]) {
+    if (!P.int?.protege || m.balle.possesseur !== P.i || D.mode === 'sol' || D.mode === 'releve') continue;
+    // le défenseur est dans le dos du porteur (son cap regarde à l'opposé)
+    const ux = s * nx, uz = s * nz; // du porteur vers le défenseur
+    if (ux * sin(P.cap) + uz * cos(P.cap) > -0.4) continue;
+    // (le défenseur contre un panneau ne recule plus : la poussée l'écraserait dans le coin)
+    if (contreMur(D, ux, uz)) continue;
+    const F = DUELS.dos.force;
+    D.v.x += (F / D.m) * ux * dt; D.v.z += (F / D.m) * uz * dt;
+    if (D.d < 0.5) desequilibrer(m, D, DUELS.dos.des * dt);
+    if (m.t - (P.dosT ?? -9) > 0.8) { P.dosT = m.t; m.ev('dos', { j: P.i, o: D.i }); }
+    P.appuiX = ux; P.appuiZ = uz; P.appuiF = 0.6; P.appuiT = m.t;
   }
 }
 
@@ -286,6 +383,8 @@ export function pasTacle(m, j) {
           const balleAvant = g.donnees.balle && g.donnees.balle < m.t;
           // par derrière (le porteur file dans le sens de la glissade) : croc-en-jambe ; sinon balayé
           const memeSens = o.v.x * sin(j.cap) + o.v.z * cos(j.cap) > 1.5;
+          // (la faute : les jambes avant la balle ; elle se note avant la chute, quand le porteur a encore la balle)
+          if (!balleAvant) faute(m, j, o, memeSens ? 'derriere' : 'glisse');
           desequilibrer(m, o, balleAvant ? 0.6 : 1.2, { x: sin(j.cap), z: cos(j.cap) }, memeSens ? 'croc' : 'balaye');
           m.ev('tacleJambes', { j: j.i, o: o.i, balleAvant: !!balleAvant, h: hancheA(g.nom, g.t) });
         }
@@ -298,7 +397,20 @@ export function pasTacle(m, j) {
     const al = d > 0 ? (rx * fx + rz * fz) / d : 1;
     const p = b.possesseur != null ? m.joueurs[b.possesseur] : null;
     const dp = p && p.e !== j.e ? hypot(p.p.x - j.p.x, p.p.z - j.p.z) : 99;
-    if (b.garde == null && b.p.y < 0.6 && d < 0.9 + BALLON.R && al > 0.64 && d < dp - 0.05) {
+    // (bola-app#26, lot 2) la balle sous le pied du porteur : les deux pieds la touchent ensemble, elle gicle (contrée)
+    const dbp = p && p.e !== j.e ? hypot(b.p.x - p.p.x, b.p.z - p.p.z) : 99;
+    if (b.garde == null && b.p.y < 0.6 && d < 0.9 + BALLON.R && al > 0.64 && d < dp - 0.05 && dbp < DUELS.contre.pied && m.rng.duels.u() < DUELS.contre.part) {
+      const r = m.rng.duels;
+      const h = atan2(fx, fz) + (r.u() < 0.5 ? -1 : 1) * (0.9 + r.u() * 1.2);
+      const sv = 2.5 + r.u() * 2.5;
+      b.v.x = sin(h) * sv; b.v.z = cos(h) * sv; b.v.y = 0.4 + r.u() * 1.4;
+      b.w.x = (r.u() - 0.5) * 30; b.w.y = (r.u() - 0.5) * 20; b.w.z = (r.u() - 0.5) * 30;
+      b.dernier = j.i; b.dernierT = m.t; b.possesseur = null; b.recepteur = null; b.tir = null;
+      desequilibrer(m, p, 0.25, { x: fx, z: fz });
+      desequilibrer(m, j, 0.15, { x: -fx, z: -fz });
+      m.ev('tacleContre', { j: j.i, o: p.i });
+      m.stats.contresTacle++;
+    } else if (b.garde == null && b.p.y < 0.6 && d < 0.9 + BALLON.R && al > 0.64 && d < dp - 0.05) {
       const h = atan2(fx, fz) + (m.rng.contacts.u() - 0.5) * 1.2;
       const sv = 3 + m.rng.contacts.u() * 2;
       b.v.x = sin(h) * sv + j.v.x * 0.3; b.v.z = cos(h) * sv + j.v.z * 0.3; b.v.y = 0.2;
@@ -307,7 +419,15 @@ export function pasTacle(m, j) {
       m.ev('tacleBalle', { j: j.i, debout: true });
       m.stats.vols++;
     } else if (p && dp < 0.95) {
-      desequilibrer(m, p, 0.7, { x: fx, z: fz });
+      // (les jambes sans la balle ; la faute se note avant le choc, balle encore à lui. Un contact jambe contre jambe qui le fait trébucher : l'arbitre siffle une fois sur deux par derrière ou de
+      // côté, une fois sur sept de face ; toujours s'il tombe)
+      const pv = hypot(p.v.x, p.v.z), pfx = pv > 0.8 ? p.v.x / pv : sin(p.cap), pfz = pv > 0.8 ? p.v.z / pv : cos(p.cap);
+      const deFace = ((j.p.x - p.p.x) * pfx + (j.p.z - p.p.z) * pfz) > 0.3 * dp;
+      // (le choc des jambes : 0,4 à 0,85 de déséquilibre)
+      const dd = 0.4 + 0.45 * m.rng.duels.u();
+      const u = m.rng.duels.u();
+      if (p.d + dd >= C.chute || (p.d + dd >= C.trebuche && u < (deFace ? 0.15 : 0.5))) faute(m, j, p, 'debout');
+      desequilibrer(m, p, dd, { x: fx, z: fz });
       m.ev('tacleJambes', { j: j.i, o: p.i, debout: true });
     } else {
       j.plante = 0.45;

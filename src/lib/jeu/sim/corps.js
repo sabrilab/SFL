@@ -18,7 +18,7 @@
 //     y cale les clips de course ; piedLoco donne, à cette phase, où est chaque pied (la touche de balle et le
 //     contrôle se mesurent depuis lui).
 // Pas fixe (constantes.js, PAS), aucune allocation par pas, rien de three.
-import { CORPS as C } from './constantes.js';
+import { CORPS as C, DUELS } from './constantes.js';
 import { CLIPS, FPS_CLIPS } from './clips.js';
 import { atan2, cos, exp, hypot, sin } from './maths.js';
 
@@ -249,6 +249,8 @@ function vitesseVoulue(j, it, balle) {
   if (it.contenir) v = Math.min(v, C.vChasse);
   if (it.protege) v = Math.min(v, C.vProtege);
   if (j.plante > 0) v = Math.min(v, 0.6);
+  // (bola-app#26, lot 2) tenu par le maillot (ou en train de tenir) : 15 % d'allure en moins
+  if (j.tireF > 0) v *= 1 - DUELS.tirage.frein;
   return v * (1 - 0.5 * clamp(j.d, 0, 1));
 }
 
@@ -263,6 +265,8 @@ export function pasCorps(j, dt, balle) {
   j.plante = Math.max(0, j.plante - dt);
   j.intouchable = Math.max(0, j.intouchable - dt);
   j.crochetT = Math.max(0, (j.crochetT ?? 0) - dt);
+  if (j.tireF > 0) { j.tireF = Math.max(0, j.tireF - dt); if (j.tireF === 0) j.tirePar = null; }
+  if (j.leve > 0) j.leve = Math.max(0, j.leve - dt); // (lot 2) vient de se relever : il se dégage seul des autres
   j.d = Math.max(0, j.d - C.retourDes * dt);
 
   if (j.mode === 'geste' || j.mode === 'sol' || j.mode === 'releve' || j.mode === 'pivot') pasGeste(j, dt);
@@ -413,7 +417,7 @@ function pasGeste(j, dt) {
   if (j.mode === 'releve') {
     j.v.x = 0; j.v.z = 0;
     if (g.t >= (g.donnees?.debout ?? 0.9) * duree(g.nom)) j.recup = Math.min(j.recup, 0.05);
-    if (g.t >= g.fin - 1e-6) { j.g = null; j.mode = 'loco'; }
+    if (g.t >= g.fin - 1e-6) { j.g = null; j.mode = 'loco'; j.leve = 0.5; }
     return;
   }
   if (fini) {
