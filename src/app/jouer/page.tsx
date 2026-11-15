@@ -20,7 +20,8 @@
 // l'écran Manettes (./manettes.tsx) : qui joue les Noirs, qui joue les Blancs (une manette, Noirs contre l'IA ; deux,
 // Noirs contre Blancs). A / ✕ ou Menu sur une manette, avant le match, l'ouvre aussi ; Menu / Options ou « Jouer » le
 // lance. Une manette branchée ou débranchée en plein match ne l'arrête pas : l'IA reprend son équipe. Menu / Options
-// met en pause (deux barres au milieu, sans texte).
+// met en pause (deux barres au milieu, sans texte ; Échap ou P au clavier ; un toucher sur le voile reprend). Sur
+// l'écran d'attente, une manette branchée apparaît tout de suite en petit au-dessus de « Jouer ».
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
@@ -30,7 +31,7 @@ import { useMyPlayer } from "@/components/sfl/player-provider";
 import { isAdmin } from "@/lib/sfl/admin";
 import { photoPerso, rafraichirPhotos } from "@/lib/sfl/photos";
 import { cn } from "@/lib/utils";
-import { EcranManettes, type MagasinManettes } from "./manettes";
+import { EcranManettes, ManettesVues, type MagasinManettes } from "./manettes";
 
 type Etat = {
   phase: "attente" | "intro" | "engagement" | "jeu" | "but" | "fin";
@@ -46,6 +47,7 @@ type Match = {
   demarrer: () => void;
   detruire: () => void;
   salon: (ouvert: boolean) => void;
+  reprendre: () => void;
   manettes: MagasinManettes & { reconnues: () => number };
 };
 
@@ -179,7 +181,14 @@ export default function JouerPage() {
 
       {/* la pause (Menu / Options) : deux barres, sans texte */}
       {etat?.pause && (
-        <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/45">
+        <div
+          className="absolute inset-0 flex items-center justify-center bg-black/45"
+          onPointerDown={(e) => {
+            // le voile se touche : au doigt ou à la souris, le match reprend (sans manette, rien d'autre ne le pourrait)
+            e.stopPropagation();
+            match.current?.reprendre();
+          }}
+        >
           <div className="flex gap-3">
             <span className="h-14 w-4 rounded-sm bg-white" />
             <span className="h-14 w-4 rounded-sm bg-white" />
@@ -205,6 +214,7 @@ export default function JouerPage() {
               <span className={cn(etat.blancs < etat.noirs && "text-white/40")}>{etat.blancs}</span>
             </div>
           )}
+          {magasin && pret && !erreur && <ManettesVues magasin={magasin} />}
           {erreur ? (
             <p className="text-center text-[15px] text-white/70">{erreur}</p>
           ) : (

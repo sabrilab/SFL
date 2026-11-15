@@ -10,9 +10,11 @@
 //
 // Les manettes (bola-app#23, entrees/manettes.js et entrees/commande.js) : lues une fois par image, avant les pas.
 // Une manette rangée chez les Noirs ou les Blancs joue cette équipe ; une équipe sans manette est jouée par l'IA, sauf
-// les Noirs que joue le pouce (toujours sans manette ; avec des manettes, seulement s'il a servi). Le partage est relu
+// les Noirs que joue le pouce (toujours sans manette ; avec des manettes, seulement sur un vrai geste de jeu, et
+// rendus à l'IA après 2 s sans geste). Le partage est relu
 // à chaque image : une manette débranchée rend son équipe à l'IA au pas suivant, sans pause. Les gardiens restent à
-// l'IA. Menu / Options met le match en pause. Les vibrations suivent les événements de la simulation (frappe, tacle,
+// l'IA. Menu / Options (ou Échap, P au clavier) met le match en pause ; un toucher sur le voile la lève, et elle se lève
+// d'elle-même si plus aucune manette d'équipe n'est branchée. Les vibrations suivent les événements de la simulation (frappe, tacle,
 // chute, épaule, poteau, but). Sous le joueur de chaque humain, un anneau : blanc pour les Noirs, noir cerclé de blanc
 // pour les Blancs ; la jauge de puissance s'y remplit pendant qu'on charge une passe ou une frappe.
 //
@@ -21,7 +23,8 @@
 //
 // La caméra est celle de la télé (Sabri 03/11 : « vision sur le côté, même vue caméra que dans FIFA ») : en hauteur
 // dans la tribune, le long du terrain ; les Noirs attaquent vers la droite de l'écran. Elle suit la balle par un
-// filtre doux, sans secousse.
+// filtre doux, sans secousse ; une frappe fait reculer le cadre pour tenir la balle et le but visé (et 0,6 s après la
+// ligne) ; au téléphone, le panneau proche reste au-dessus de la zone du pouce quand la balle s'en approche.
 //
 // Ce que fait chaque geste du pouce (on joue toujours les Noirs) ; il produit la même intention qu'une manette :
 //   glisser          courir dans cette direction ; loin du point de départ, sprinter (analogique de 85 à 100 % du rayon).
@@ -47,7 +50,7 @@ import { creerPouce } from './pouce.js';
 import { creerAnimateur } from './rendu/animateur.js';
 import { creerMonde, demarrer as demarrerMonde, empreinte } from './sim/monde.js';
 import { creerBoucle, avancer, avancerPas, joueurInterpole, balleInterpolee } from './sim/boucle.js';
-import { PAS, BALLON } from './sim/constantes.js';
+import { PAS, BALLON, JEU, butDe } from './sim/constantes.js';
 import { allongeBras } from './sim/gardien.js';
 import { porteur } from './sim/gestes.js';
 import { SCENARIOS } from './sim/scenarios.js';
@@ -217,8 +220,12 @@ export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, 
   const manettes = creerManettes({ versJeu: ecranVersJeu });
   manettes.surSalon = () => surSalon();
   manettes.surDemarrer = () => surDemarrer();
-  let pause = false;
-  manettes.surPause = () => { if (m().phase === 'jeu' || m().phase === 'engagement') { pause = !pause; etat.pause = pause; signaler(); } };
+  let pause = false, pauseManette = false;
+  const poserPause = (v, parManette = false) => { if (v === pause) return; if (v && !(m().phase === 'jeu' || m().phase === 'engagement')) return; pause = v; pauseManette = v && parManette; etat.pause = pause; signaler(); };
+  manettes.surPause = () => poserPause(!pause, true);
+  // au clavier : Échap ou P met en pause et reprend (sans manette, rien d'autre ne le pourrait)
+  const clavierPause = (e) => { if (e.repeat) return; if (e.key === 'Escape' || e.key === 'p' || e.key === 'P') poserPause(!pause); };
+  addEventListener('keydown', clavierPause);
   let avecManettes = false; // le match a commencé avec au moins une manette dans une équipe
 
   // ── la simulation ──
@@ -233,7 +240,7 @@ export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, 
   const MOI = 4; // l'attaquant des Noirs
   const signaler = () => surEtat({ ...etat });
   let ralenti = 1, ralentiFin = 0;
-  const cam = { pos: new THREE.Vector3(0, 8.5, 12), regard: new THREE.Vector3(0, 0, 0), foyer: new THREE.Vector3(), buteur: null };
+  const cam = { pos: new THREE.Vector3(0, 8.5, 12), regard: new THREE.Vector3(0, 0, 0), foyer: new THREE.Vector3(), buteur: null, recul: 0 };
   const tmp = new THREE.Vector3(), tmp2 = new THREE.Vector3(), w = new THREE.Vector3();
   const qBalle = new THREE.Quaternion(), axeB = new THREE.Vector3();
   const bInterp = { x: 0, y: R, z: 0 };
@@ -245,6 +252,7 @@ export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, 
   let actionPouce = null;
   function lireEntree() {
     const st = pouce.stick, amp = Math.min(1, Math.hypot(st.x, st.y));
+    if (amp > 0.3) pouce.vu = performance.now();
     const g = ecranVersJeu(st.x / (amp || 1), st.y / (amp || 1));
     entree.dx = amp > 0.05 ? g.x : 0; entree.dz = amp > 0.05 ? g.z : 0;
     entree.allure = amp > 0.05 ? Math.min(1, amp / 0.85) : 0;
@@ -256,8 +264,12 @@ export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, 
   }
   let changerPouce = null;
   const entrees = [null, null];
-  /** Qui joue quoi : une manette par équipe, sinon le pouce pour les Noirs, sinon l'IA. */
-  const pouceJoue = () => !avecManettes || pouce.utilise;
+  /**
+   * Qui joue quoi : une manette par équipe, sinon le pouce pour les Noirs, sinon l'IA. Dans un match lancé avec des
+   * manettes, le pouce ne prend les Noirs que sur un vrai geste de jeu (pas un clic pour rendre le focus), et les
+   * rend à l'IA après 2 s sans geste : jamais un Noir planté jusqu'à la fin.
+   */
+  const pouceJoue = () => !avecManettes || (pouce.utilise && performance.now() - pouce.vu < 2000);
   function lireEntrees() {
     if (scene) return scene.entrees(m());
     if (banc.auto || m().phase !== 'jeu') { entrees[0] = null; entrees[1] = null; return entrees; }
@@ -379,6 +391,8 @@ export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, 
         vx: j.v.x, vz: j.v.z, cap: I.cap, phase: j.phase, balle: p === j,
         geste: g && (j.mode === 'geste' || j.mode === 'sol' || j.mode === 'releve' || j.mode === 'pivot') ? { nom: g.nom, t: g.t } : null,
         saut, aLong: j.aLong, aLat: j.aLat, d: j.d, regard: M.balle.p, pos: I, allonge: j.gardien ? allongeBras(j) : 0,
+        appui: j.appuiT != null && M.t - j.appuiT < 0.35 ? (v.appui ??= { x: 0, z: 0, f: 0, age: 0 }, Object.assign(v.appui, { x: j.appuiX, z: j.appuiZ, f: j.appuiF, age: M.t - j.appuiT })) : null,
+        touche: j.toucheT != null && M.t - j.toucheT < 0.12 ? (v.touche ??= { age: 0, b: bInterp }, (v.touche.age = M.t - j.toucheT), v.touche) : null,
       }, dt);
     }
     balleInterpolee(bc, bInterp);
@@ -415,7 +429,8 @@ export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, 
       return;
     }
     const ph = M.phase;
-    const face = ph === 'intro' || ph === 'fin' || ph === 'attente' || (ph === 'but' && M.phaseT > 0.6);
+    // (après la ligne, la caméra de la télé reste 0,6 s sur le but avant le plan de la célébration)
+    const face = ph === 'intro' || ph === 'fin' || ph === 'attente' || (ph === 'but' && M.phaseT > 0.6 && M.phaseT < JEU.butPause - 0.6);
     let voulu, regard;
     if (face) {
       const i = ph === 'but' && cam.buteur != null ? cam.buteur : MOI;
@@ -427,13 +442,40 @@ export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, 
     } else {
       // le plan de la télé : en hauteur dans la tribune, le long du terrain, qui suit la balle en travelling
       const b = M.balle;
-      cam.foyer.lerp(tmp2.set(bInterp.x + b.v.x * 0.2, 0, bInterp.z + b.v.z * 0.35), 1 - Math.exp(-dt * 2.6));
       const large = cw > ch;
-      const fx = clamp(cam.foyer.x, -6, 6), fz = clamp(cam.foyer.z, -(large ? 6 : 11), large ? 6 : 11);
+      // une frappe vers un but (et les 0,6 s après la ligne) : le cadre tient la balle ET le but visé
+      const zBut = b.tir ? butDe(1 - b.tir.e) : ph === 'but' && M.butEquipe != null ? butDe(1 - M.butEquipe) : null;
+      const vise = zBut != null ? bInterp.z * 0.4 + zBut * 0.6 : bInterp.z + b.v.z * 0.35;
+      cam.foyer.lerp(tmp2.set(bInterp.x + b.v.x * 0.2, 0, vise), 1 - Math.exp(-dt * (zBut != null ? 6 : 2.6)));
+      const lim = large ? (zBut != null ? 8 : 6) : zBut != null ? 13.5 : 11;
+      const fx = clamp(cam.foyer.x, -6, 6), fz = clamp(cam.foyer.z, -lim, lim);
       voulu = tmp.set(large ? 21 : 15.5, large ? 12.5 : 11, fz);
-      regard = tmp2.set(fx * 0.3 + (large ? -1 : 0.6), 0, fz);
+      let rx = fx * 0.3 + (large ? -1 : 0.6);
+      if (!large) {
+        // au téléphone, le panneau proche (x = +10) reste au-dessus de 72 % de la hauteur de l'écran (au-dessus du
+        // pouce) quand la balle s'en approche : le foyer glisse vers lui, au même filtre (aucune secousse)
+        const H = voulu.y, f = (camera.fov * Math.PI) / 360;
+        const ap = Math.atan2(H, voulu.x - 10), a0 = ap - Math.atan(0.44 * Math.tan(f));
+        const rxMin = voulu.x - H / Math.tan(a0);
+        const w = THREE.MathUtils.smoothstep(cam.foyer.x, 2, 7.5);
+        rx = Math.max(rx, rx + (rxMin - rx) * w);
+      }
+      regard = tmp2.set(rx, 0, fz);
+      // et le recul : ce qu'il faut pour tenir la balle et le but dans la largeur du cadre
+      cam.recul += ((zBut != null ? 1 : 0) - cam.recul) * (1 - Math.exp(-dt * 2.5));
+      if (cam.recul > 1e-3 && zBut != null) {
+        const D = Math.hypot(voulu.x - regard.x, voulu.y - regard.y);
+        const demi = D * Math.tan(Math.atan(Math.tan((camera.fov * Math.PI) / 360) * camera.aspect));
+        const besoin = Math.abs(bInterp.z - zBut) / 2 + 1.6;
+        const k = 1 + (clamp(besoin / Math.max(1, demi), 1, 1.7) - 1) * cam.recul;
+        voulu.x = regard.x + (voulu.x - regard.x) * k; voulu.y = regard.y + (voulu.y - regard.y) * k;
+      } else if (cam.recul > 1e-3) {
+        const k = 1 + 0.25 * cam.recul;
+        voulu.x = regard.x + (voulu.x - regard.x) * k; voulu.y = regard.y + (voulu.y - regard.y) * k;
+      }
     }
-    const k = 1 - Math.exp(-dt * (face ? 2.2 : 3));
+    // (une frappe : le cadre rejoint le but plus vite, au même filtre du premier ordre, sans dépassement)
+    const k = 1 - Math.exp(-dt * (face ? 2.2 : cam.recul > 0.05 ? 5 : 3));
     cam.pos.lerp(voulu, k);
     cam.regard.lerp(regard, Math.min(1, k * 1.15));
     versMonde(cam.pos, camera.position);
@@ -465,6 +507,8 @@ export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, 
     // les manettes : une lecture par image, avant les pas ; puis qui joue quelle équipe
     manettes.lire(ms / 1000, m());
     majHumains();
+    // plus aucune manette d'équipe branchée (batterie, câble) : la pause qu'elle avait mise se lève d'elle-même
+    if (pause && pauseManette && manettes.rangees() === 0) poserPause(false);
     if (pause) { evenements(); majEtat(); rendre(0); return; }
     if (ralentiFin > 0) { ralentiFin -= dtReel; if (ralentiFin <= 0) ralenti = 1; }
     let dtJeu = dtReel * ralenti;
@@ -531,6 +575,8 @@ export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, 
     },
     /** L'écran Manettes ouvert (salon) ou fermé (repos) ; abonner / instantane pour l'écran (manettes.tsx). */
     salon(ouvert) { manettes.mode(ouvert ? 'salon' : 'repos'); },
+    /** Lever la pause (le voile de pause est touchable : au doigt, à la souris) */
+    reprendre() { poserPause(false); },
     manettes: { abonner: manettes.abonner, instantane: manettes.instantane, reconnues: manettes.reconnues },
     // banc d'essai (?banc) : l'état, la graine, des pas exacts, l'empreinte, les scénarios de capture
     _test: {
@@ -567,6 +613,7 @@ export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, 
     },
     detruire() {
       cancelAnimationFrame(raf);
+      removeEventListener('keydown', clavierPause);
       ro.disconnect();
       pouce.detruire();
       manettes.detruire();

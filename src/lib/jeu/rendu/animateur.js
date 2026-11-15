@@ -1,25 +1,29 @@
 // L'animation des joueurs calée sur la simulation (bola-app#23) : le corps suit ce que la simulation a décidé, au lieu
 // de l'inverse. Rien ici ne change une position de jeu.
 //
-//   · Locomotion : un mélange de clips synchronisé sur la vitesse réelle. Tous les cycles (idle, jog, run, drib, back,
+//   · Locomotion : un mélange de clips synchronisé sur la vitesse réelle. Tous les cycles (idle, jog, run, sprint au-delà
+//     de 6 m/s, drib, back,
 //     strafe_l, strafe_r ; pour le gardien k_idle, k_side_l, k_side_r) sont posés au temps que donne la phase de foulée
 //     de la simulation (φ, corps.js), calée pour chaque clip sur l'appui de son pied gauche : le pied d'appui ne saute
 //     jamais d'un clip à l'autre, et la cadence suit la vitesse sans borne. Poids : idle ↔ jog ↔ run selon la vitesse
 //     (drib balle au pied, sous 4,4 m/s) et avant / arrière / côtés selon l'angle entre le cap et la course.
 //   · Gestes : le clip est posé au temps que la simulation lui donne (impact affiché = impact simulé) ; fondu 0,08 s à
 //     l'entrée, 0,25 s à la sortie, sans fondu quand la racine a sauté (fin de plongeon).
-//   · Procédural, filtré (ressorts amortis, aucun bruit) : buste penché à l'accélération (Spine, Spine1), roulis dans
-//     les virages et au déséquilibre (tout le corps, autour des pieds), tête et cou vers la balle (60° au plus).
-//     « Réduire les animations » divise ces amplitudes par deux.
+//   · Procédural, filtré (ressorts amortis, aucun bruit) : buste penché à l'accélération et plus bas en sprint, en
+//     arrière au freinage (Spine, Spine1), roulis dans les virages, au déséquilibre et vers l'adversaire dans un duel
+//     d'épaule (tout le corps, autour des pieds), tête et cou vers la balle (60° au plus). « Réduire les animations »
+//     divise ces amplitudes par deux. Le gardien est remonté quand ses orteils passeraient sous le gazon.
 //   · Pieds verrouillés : pendant un appui (table des appuis de sim/clips.js), le pied est tenu à sa place au sol par
-//     une IK à deux os (cuisse, tibia ; le genou reste dans son plan), correction plafonnée à 8 cm et relâchée en 60 ms.
+//     une IK à deux os (cuisse, tibia ; le genou reste dans son plan), correction plafonnée à 8 cm et relâchée en 60 ms ;
+//     presque à l'arrêt, les deux pieds tiennent leur place (25 cm) et ne sont reposés que par un vrai pas. Pendant une
+//     touche de balle, le pied le plus proche va au contact (IK, 30 cm au plus).
 //     Les bras du gardien s'allongent vers la balle de la même façon (allongeBras, ± 0,4 m).
 // Les bras de course viennent des clips, sans retouche (le retour « un bras devant, un derrière » visait une course
 // raide : rien de procédural n'y touche).
 import * as THREE from 'three';
 import { CLIPS } from '../sim/clips.js';
 
-const LOCO = ['idle', 'jog', 'run', 'drib', 'back', 'strafe_l', 'strafe_r'];
+const LOCO = ['idle', 'jog', 'run', 'sprint', 'drib', 'back', 'strafe_l', 'strafe_r'];
 const LOCO_G = ['k_idle', 'k_side_l', 'k_side_r'];
 const clamp = THREE.MathUtils.clamp;
 const DEG = Math.PI / 180;
@@ -90,7 +94,8 @@ function ik2(haut, milieu, bout, cible0) {
 /**
  * L'animateur d'un joueur. perso : creerPersonnage (personnage.js) ; gardien : bool ; reduit : mouvement réduit.
  * maj(e, dt) avec e = { vx, vz (m/s, repère du jeu), cap, phase, balle, geste: { nom, t } | null, saut, aLong, aLat,
- * d, regard: { x, z } | null (jeu), pos: { x, z } (jeu), allonge (m) } ; versMonde(jeu → monde three) pour la tête.
+ * d, regard: { x, z } | null (jeu), pos: { x, z } (jeu), allonge (m), appui: { x, z, f, age } | null (épaule),
+ * touche: { age, b: { x, y, z } } | null (balle touchée) } ; versMonde(jeu → monde three) pour la tête et la balle.
  */
 export function creerAnimateur(perso, { gardien = false, reduit = false, versMonde3 } = {}) {
   const { actions, mixer, os, corps, racine } = perso;
@@ -108,7 +113,7 @@ export function creerAnimateur(perso, { gardien = false, reduit = false, versMon
     { haut: os.leftarm, milieu: os.leftforearm, bout: os.lefthand },
     { haut: os.rightarm, milieu: os.rightforearm, bout: os.righthand },
   ];
-  const lateral = new THREE.Vector3(), haut = new THREE.Vector3(0, 1, 0), avant = new THREE.Vector3(), cible = new THREE.Vector3();
+  const lateral = new THREE.Vector3(), haut = new THREE.Vector3(0, 1, 0), avant = new THREE.Vector3(), cible = new THREE.Vector3(), bal = new THREE.Vector3();
 
   function poserLoco(e, total) {
     const s = Math.hypot(e.vx, e.vz);
@@ -128,13 +133,16 @@ export function creerAnimateur(perso, { gardien = false, reduit = false, versMon
       const q = fw * fw + bk * bk + lf * lf + rt * rt || 1;
       const marche = clamp(s / 1.4, 0, 1); // sous 1,4 m/s, le cycle se mêle au repos (pas de clip de marche)
       // l'avant : idle ↔ jog ↔ run (ou la conduite)
-      let jog = 0, run = 0, drib = 0;
+      let jog = 0, run = 0, drib = 0, sprint = 0;
       if (e.balle && s < 4.4) drib = 1;
       else if (s < 2.85) jog = 1;
       else if (s < 5.39) { run = (s - 2.85) / (5.39 - 2.85); jog = 1 - run; }
       else run = 1;
       if (e.balle && s >= 3.8 && s < 4.4) { const u = (s - 3.8) / 0.6; drib = 1 - u; run = u; }
+      // au-delà de 6 m/s, la course de sprint (buste plus bas, bras plus amples) prend le relais de la course
+      if (run > 0 && s > 6 && actions.sprint) { sprint = run * clamp((s - 6) / 0.8, 0, 1); run -= sprint; }
       w.jog = (fw * fw / q) * jog * marche; w.run = (fw * fw / q) * run * marche; w.drib = (fw * fw / q) * drib * marche;
+      if ('sprint' in w) w.sprint = (fw * fw / q) * sprint * marche;
       w.back = (bk * bk / q) * marche; w.strafe_l = (lf * lf / q) * marche; w.strafe_r = (rt * rt / q) * marche;
       w.idle = 1 - marche;
     }
@@ -178,12 +186,28 @@ export function creerAnimateur(perso, { gardien = false, reduit = false, versMon
     const { dom, s } = poserLoco(e, total);
     mixer.update(0);
 
-    // le buste et le roulis (corps entier, autour des pieds), filtrés
-    const tangage = ressort(etat, 'tg', clamp(0.028 * (e.aLong ?? 0), -8 * DEG, 14 * DEG) * amp * (1 - poidsG), dt, 10);
-    // (une poussée d'épaule est une accélération latérale : elle se voit dans le même roulis)
-    const roulis = ressort(etat, 'rl', clamp(-0.6 * Math.atan((e.aLat ?? 0) / 9.81), -16 * DEG, 16 * DEG) * amp * (1 - poidsG), dt, 9);
+    // le buste et le roulis (corps entier, autour des pieds), filtrés : penché à l'accélération, en arrière au
+    // freinage (10° au plus), plus bas en sprint (9° de plus au-delà de 6 m/s)
+    const penSprint = gardien ? 0 : clamp((s - 6) / 1.2, 0, 1) * 9 * DEG;
+    const tangage = ressort(etat, 'tg', (clamp(0.03 * (e.aLong ?? 0), -10 * DEG, 14 * DEG) + penSprint) * amp * (1 - poidsG), dt, 10);
+    // l'épaule contre épaule : le corps s'appuie vers l'adversaire (13° au plus), selon la poussée, et se relâche en
+    // 0,35 s ; le perdant, déséquilibré, roule aussi par l'accélération latérale
+    let appui = 0;
+    const A = e.appui;
+    if (A && A.age < 0.35) {
+      const gx = Math.cos(e.cap), gz = -Math.sin(e.cap); // la gauche du joueur (repère du jeu)
+      appui = -(A.x * gx + A.z * gz) * 13 * DEG * clamp(A.f, 0, 1) * (1 - A.age / 0.35);
+    }
+    const roulis = ressort(etat, 'rl', (clamp(-0.6 * Math.atan((e.aLat ?? 0) / 9.81), -16 * DEG, 16 * DEG) + appui) * amp * (1 - poidsG), dt, 9);
     corps.rotation.z = roulis;
     corps.rotation.x = 0;
+    // le gardien : ses captures enfoncent les orteils dans le gazon (jusqu'à 11 cm) ; le corps remonte d'autant
+    if (gardien && os.lefttoebase && os.righttoebase) {
+      corps.position.y = 0; racine.updateMatrixWorld(true);
+      os.lefttoebase.getWorldPosition(va); os.righttoebase.getWorldPosition(vb);
+      const bas = Math.min(va.y, vb.y) - racine.position.y;
+      corps.position.y = ressort(etat, 'pied', clamp(0.012 - bas, 0, 0.12), dt, 16);
+    }
     racine.updateMatrixWorld(true);
     // l'axe latéral du joueur, dans le monde three
     avant.set(Math.sin(e.cap), 0, Math.cos(e.cap));
@@ -203,21 +227,47 @@ export function creerAnimateur(perso, { gardien = false, reduit = false, versMon
     if (os.head) tournerMonde(os.head, haut, lacet * 0.5);
     racine.updateMatrixWorld(true);
 
-    // les pieds verrouillés pendant l'appui
+    // les pieds verrouillés pendant l'appui ; presque à l'arrêt (sous 0,5 m/s), les deux pieds tiennent leur place
+    // (jusqu'à 25 cm de correction) et un pied n'est reposé que quand il s'en écarte de plus de 25 cm : plus de pieds
+    // qui patinent sur place
+    const lent = !gesteAction && s < 0.5 && !gardien;
     for (let p = 0; p < 2; p++) {
       const P = pieds[p];
       if (!P.haut || !P.milieu || !P.bout) continue;
-      const appui = !gesteAction && dom && s > 0.3 && enAppui(dom.nom, dom.u, p);
+      const appui = lent || (!gesteAction && dom && s > 0.3 && enAppui(dom.nom, dom.u, p));
       P.bout.getWorldPosition(cible);
+      if (appui && P.lock && lent && Math.hypot(P.lock.x - cible.x, P.lock.z - cible.z) > 0.25) P.lock = null;
       if (appui && !P.lock) P.lock = P.verrou.copy(cible);
       if (!appui && P.lock) { P.lock = null; }
       P.mix = appui ? 1 : Math.max(0, P.mix - dt / 0.06);
       if (P.lock) P.cible.set(P.lock.x, cible.y, P.lock.z);
       if (P.mix > 0) {
         const off = vt.copy(P.cible).sub(cible);
-        const L = off.length();
-        if (L > 0.08) off.multiplyScalar(0.08 / L);
+        const L = off.length(), plafond = lent ? 0.25 : 0.08;
+        if (L > plafond) off.multiplyScalar(plafond / L);
         if (L > 0.002) ik2(P.haut, P.milieu, P.bout, cible.add(off.multiplyScalar(P.mix)));
+      }
+    }
+    // le pied qui touche la balle : pendant les 0,12 s d'une touche (conduite, contrôle, amorti), le pied le plus proche
+    // va au contact de la balle (30 cm de correction au plus), puis la suit ; le pied qui frappe, lui, vient du clip
+    const T = e.touche;
+    if (T && T.age >= 0 && T.age < 0.12 && versMonde3 && (!gesteAction || geste === 'receive')) {
+      const bw = versMonde3(T.b, bal);
+      let best = null, bd = 0.6;
+      for (const P of pieds) {
+        if (!P.bout || P.lock) continue;
+        P.bout.getWorldPosition(cible);
+        const d = Math.hypot(cible.x - bw.x, cible.z - bw.z);
+        if (d < bd) { bd = d; best = P; }
+      }
+      if (best) {
+        best.bout.getWorldPosition(cible);
+        const dx = bw.x - cible.x, dz = bw.z - cible.z, L = Math.hypot(dx, dz) || 1;
+        // au contact : le pied derrière la balle, pas dedans
+        vt.set(bw.x - (dx / L) * 0.12, Math.max(cible.y, Math.min(bw.y - 0.02, cible.y + 0.15)), bw.z - (dz / L) * 0.12).sub(cible);
+        const k = 1 - T.age / 0.12, Lc = vt.length();
+        if (Lc > 0.3) vt.multiplyScalar(0.3 / Lc);
+        if (Lc > 0.005) ik2(best.haut, best.milieu, best.bout, cible.add(vt.multiplyScalar(k)));
       }
     }
     // les bras du gardien vers la balle

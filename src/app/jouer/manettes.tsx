@@ -4,7 +4,9 @@
 //
 // Deux colonnes, NOIRS à gauche et BLANCS à droite, chacune avec sa pastille ; au milieu, les manettes branchées qui
 // ne jouent pas (leur équipe est à l'IA). Chaque manette a l'icône de sa marque (Xbox, PlayStation, ou générique ;
-// barrée si elle n'est pas reconnue), pleine quand elle a rejoint une équipe. En bas, la seule phrase d'aide du jeu :
+// barrée si elle n'est pas reconnue), pleine quand elle a rejoint une équipe, et son numéro dessous (deux manettes de
+// la même marque se distinguent). Sur l'écran d'attente, les manettes vues apparaissent en petit au-dessus de « Jouer »
+// (ManettesVues), sans texte. En bas, la seule phrase d'aide du jeu :
 // « [A] / [✕] pour rejoindre », avec les boutons des marques présentes. Tout se fait à la manette (A / ✕ rejoindre,
 // stick ou croix pour changer de côté, B / ○ revenir au milieu, Menu / Options lancer) ; « Jouer » au doigt lance
 // aussi. Deux manettes du même côté : refusé, l'icône a un petit choc. Noir et blanc, Inter ; avec « Réduire les
@@ -15,7 +17,7 @@
 import { useSyncExternalStore } from "react";
 import { cn } from "@/lib/utils";
 
-export type PadVu = { cle: string; marque: "xbox" | "playstation" | "generique"; reconnue: boolean; equipe: 0 | 1 | null; choc: number };
+export type PadVu = { cle: string; marque: "xbox" | "playstation" | "generique"; reconnue: boolean; equipe: 0 | 1 | null; choc: number; numero: number };
 export type Instantane = { version: number; mode: string; pads: PadVu[] };
 export type MagasinManettes = { abonner: (f: () => void) => () => void; instantane: () => Instantane };
 
@@ -35,16 +37,20 @@ export function BoutonBas({ marque, className }: { marque: PadVu["marque"]; clas
   );
 }
 
-/** La silhouette d'une manette, à la forme de sa marque (dessin à nous, sans logo). */
-function IconeManette({ marque, reconnue, pleine }: { marque: PadVu["marque"]; reconnue: boolean; pleine: boolean }) {
+/**
+ * La silhouette d'une manette, à la forme de sa marque (dessin à nous, sans logo). Ce qui les distingue se lit à 390 px :
+ * Xbox, un corps rond, les sticks décalés (le gauche en haut, le droit en bas) et la croix en bas à gauche ;
+ * PlayStation, de longues poignées, les deux sticks côte à côte en bas et un grand pavé tactile plein au milieu.
+ */
+export function IconeManette({ marque, reconnue, pleine, petite = false }: { marque: PadVu["marque"]; reconnue: boolean; pleine: boolean; petite?: boolean }) {
   const fond = pleine ? "#fff" : "none";
   const trait = pleine ? "#050505" : "#fff";
   const ps = marque === "playstation";
   return (
-    <svg viewBox="0 0 80 52" className="h-[46px] w-[70px]" aria-hidden>
+    <svg viewBox="0 0 80 52" className={petite ? "h-[24px] w-[37px]" : "h-[46px] w-[70px]"} aria-hidden>
       {ps ? (
         <path
-          d="M22 6 H58 C66 6 70 10 72 18 L77 38 C79 46 72 50 66 45 L58 37 H22 L14 45 C8 50 1 46 3 38 L8 18 C10 10 14 6 22 6 Z"
+          d="M20 5 H60 C67 5 71 9 73 16 L78 40 C80 49 72 52 66 46 L58 37 H22 L14 46 C8 52 0 49 2 40 L7 16 C9 9 13 5 20 5 Z"
           fill={fond}
           stroke="#fff"
           strokeWidth="2"
@@ -52,7 +58,7 @@ function IconeManette({ marque, reconnue, pleine }: { marque: PadVu["marque"]; r
         />
       ) : (
         <path
-          d="M24 7 C30 5 50 5 56 7 C66 9 71 14 74 24 C77 34 78 44 70 46 C64 47 60 40 55 36 H25 C20 40 16 47 10 46 C2 44 3 34 6 24 C9 14 14 9 24 7 Z"
+          d="M23 8 C30 5 50 5 57 8 C67 11 72 16 75 26 C77 35 77 43 69 44 C63 45 60 40 55 37 H25 C20 40 17 45 11 44 C3 43 3 35 5 26 C8 16 13 11 23 8 Z"
           fill={fond}
           stroke="#fff"
           strokeWidth="2"
@@ -61,28 +67,53 @@ function IconeManette({ marque, reconnue, pleine }: { marque: PadVu["marque"]; r
       )}
       {ps ? (
         <g stroke={trait} strokeWidth="1.6" fill="none">
-          <rect x="31" y="10" width="18" height="10" rx="2" />
-          <path d="M17 14 V22 M13 18 H21" strokeLinecap="round" />
-          <circle cx="63" cy="14.5" r="1.9" />
-          <circle cx="63" cy="22" r="1.9" />
-          <circle cx="59.2" cy="18.2" r="1.9" />
-          <circle cx="66.8" cy="18.2" r="1.9" />
-          <circle cx="31" cy="29" r="4.2" />
-          <circle cx="49" cy="29" r="4.2" />
+          <rect x="29" y="9" width="22" height="12" rx="2.5" fill={trait} fillOpacity={pleine ? 0.9 : 0.85} />
+          <path d="M16 12 V21 M11.5 16.5 H20.5" strokeLinecap="round" strokeWidth="2.2" />
+          <circle cx="64" cy="12.5" r="2" />
+          <circle cx="64" cy="21" r="2" />
+          <circle cx="59.8" cy="16.8" r="2" />
+          <circle cx="68.2" cy="16.8" r="2" />
+          <circle cx="31" cy="30" r="4.4" />
+          <circle cx="49" cy="30" r="4.4" />
         </g>
       ) : (
         <g stroke={trait} strokeWidth="1.6" fill="none">
-          <circle cx="21" cy="18" r="4.6" />
-          <path d="M31 27 V35 M27 31 H35" strokeLinecap="round" />
-          <circle cx="59" cy="13.5" r="1.9" />
-          <circle cx="59" cy="22.5" r="1.9" />
-          <circle cx="54.5" cy="18" r="1.9" />
-          <circle cx="63.5" cy="18" r="1.9" />
-          <circle cx="48" cy="30" r="4.2" />
+          <circle cx="21" cy="19" r="5" />
+          <path d="M30 26 V35 M25.5 30.5 H34.5" strokeLinecap="round" strokeWidth="2.2" />
+          <circle cx="59" cy="13" r="2" />
+          <circle cx="59" cy="22.4" r="2" />
+          <circle cx="54.3" cy="17.7" r="2" />
+          <circle cx="63.7" cy="17.7" r="2" />
+          <circle cx="49" cy="30.5" r="4.6" />
         </g>
       )}
       {!reconnue && <path d="M8 48 L72 4" stroke="#fff" strokeWidth="2.4" strokeLinecap="round" />}
     </svg>
+  );
+}
+
+/** Le numéro de la manette (son index dans le navigateur), pour distinguer deux manettes de la même marque. */
+function Numero({ n }: { n: number }) {
+  return <span className="mt-1 block text-center text-[12px] font-bold tabular-nums text-white/70">{n}</span>;
+}
+
+/**
+ * Sur l'écran d'attente : les manettes vues (reconnues), en petit, au-dessus de « Jouer ». Brancher une manette se voit
+ * tout de suite ; aucun texte.
+ */
+export function ManettesVues({ magasin }: { magasin: MagasinManettes }) {
+  const inst = useSyncExternalStore(magasin.abonner, magasin.instantane, magasin.instantane);
+  const pads = inst.pads.filter((p) => p.reconnue);
+  if (!pads.length) return null;
+  return (
+    <div className="flex items-end gap-3" aria-hidden>
+      {pads.map((p) => (
+        <div key={p.cle} className="flex flex-col items-center">
+          <IconeManette marque={p.marque} reconnue pleine={false} petite />
+          <Numero n={p.numero} />
+        </div>
+      ))}
+    </div>
   );
 }
 
@@ -127,6 +158,7 @@ export function EcranManettes({ magasin, reduit, onJouer }: { magasin: MagasinMa
             >
               <div key={p.choc} className={cn(p.choc > 0 && (reduit ? "jeu-choc-r" : "jeu-choc"), !p.reconnue && "opacity-50")}>
                 <IconeManette marque={p.marque} reconnue={p.reconnue} pleine={p.equipe != null} />
+                <Numero n={p.numero} />
               </div>
             </div>
           );

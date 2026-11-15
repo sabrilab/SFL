@@ -5,8 +5,9 @@
 //   · touché bref sans bouger : le dribble (surTouche).
 // À la souris, c'est pareil (cliquer-glisser) ; au clavier, flèches pour courir, Maj pour sprinter, Espace pour frapper
 // (maintenu = plus fort), D pour la passe, S la lobée, F la profondeur, Q pour changer de joueur, E le tacle glissé
-// (surClavier). « utilise » passe à vrai au premier toucher ou à la première touche : quand des manettes jouent, le
-// pouce ne prend les Noirs que s'il a servi.
+// (surClavier). « utilise » passe à vrai au premier vrai geste de jeu (stick poussé au-delà de 30 %, frappe, touche,
+// une touche de jeu), pas à un simple toucher ni à Maj ; « vu » garde l'instant du dernier geste : quand des manettes
+// jouent, le pouce ne prend les Noirs que s'il sert (match.js les rend à l'IA après 2 s sans geste).
 
 const ZONE = 0.55; // le pouce se pose sous cette fraction de la hauteur
 const RAYON = 58; // px : le stick plein
@@ -38,7 +39,9 @@ export function creerPouce(el) {
     surClavier: null,
     actif: false,
     utilise: false,
+    vu: -1e9,
   };
+  const servir = () => { p.utilise = true; p.vu = performance.now(); };
   let id = null, ox = 0, oy = 0, debut = 0, bouge = 0;
   const trace = []; // derniers points { x, y, t }
 
@@ -53,7 +56,6 @@ export function creerPouce(el) {
     trace.length = 0;
     trace.push({ x: e.clientX, y: e.clientY, t: debut });
     p.actif = true;
-    p.utilise = true;
     anneau.style.left = point.style.left = ox + 'px';
     anneau.style.top = point.style.top = oy + 'px';
     anneau.style.opacity = point.style.opacity = '1';
@@ -69,6 +71,7 @@ export function creerPouce(el) {
     // le stick suit le doigt s'il dépasse le rayon (l'anneau glisse avec lui)
     if (L > RAYON) { ox += (dx / L) * (L - RAYON); oy += (dy / L) * (L - RAYON); dx = x - ox; dy = y - oy; }
     p.stick.x = dx / RAYON; p.stick.y = -dy / RAYON;
+    if (Math.hypot(p.stick.x, p.stick.y) > 0.3) servir();
     anneau.style.left = ox + 'px'; anneau.style.top = oy + 'px';
     point.style.left = x + 'px'; point.style.top = y + 'px';
     const t = performance.now();
@@ -88,10 +91,11 @@ export function creerPouce(el) {
     const vx = (z.x - a.x) / dt, vy = (z.y - a.y) / dt;
     const v = Math.hypot(vx, vy);
     if (v > VIF && t - z.t < 80) {
+      servir();
       p.surLancer?.(vx, -vy, Math.min(1, (v - VIF) / (VIF_MAX - VIF)));
       return;
     }
-    if (t - debut < 260 && bouge < 14) p.surTouche?.();
+    if (t - debut < 260 && bouge < 14) { servir(); p.surTouche?.(); }
   }
   el.addEventListener('pointerdown', poser);
   el.addEventListener('pointermove', glisser);
@@ -112,7 +116,8 @@ export function creerPouce(el) {
   const bas = (e) => {
     if (e.repeat) return;
     if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' '].includes(e.key)) e.preventDefault();
-    if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' ', 'Shift', 'd', 'D', 's', 'S', 'f', 'F', 'q', 'Q', 'e', 'E'].includes(e.key)) p.utilise = true;
+    // (Maj seule ne compte pas : c'est la touche qu'on presse pour autre chose)
+    if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' ', 'd', 'D', 's', 'S', 'f', 'F', 'q', 'Q', 'e', 'E'].includes(e.key)) servir();
     if (e.key === ' ') { espace = performance.now(); return; }
     if (e.key === 'd' || e.key === 'D') { p.surTouche?.(); return; }
     const k = { s: 'lob', f: 'profondeur', q: 'changer', e: 'tacle' }[e.key.toLowerCase()];
@@ -129,6 +134,8 @@ export function creerPouce(el) {
     }
     touches.delete(e.key); majClavier();
   };
+  // (des flèches tenues : le pouce sert tant qu'on court)
+  p.servir = servir;
   addEventListener('keydown', bas);
   addEventListener('keyup', haut);
 
