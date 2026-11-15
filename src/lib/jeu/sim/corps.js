@@ -139,7 +139,6 @@ export function creerCorps(i, e, role) {
     plante: 0,             // planté (après un tacle raté, une roulette subie) : s
     intouchable: 0,
     crochetT: 0, crochetH: 0, // un crochet en cours (monde.js) : le virage très court sur les appuis, vers crochetH
-    crochetR: null,        // le dernier crochet, pour le rendu seulement (clip crochet_g / crochet_d) : { t0, cote }
     regard: null,          // vers où regarde la tête (x, z), pour le rendu
     figure: null,          // un geste technique joué en couche par le rendu (passement, talon, sombrero) : { type, t0, duree, cote }
     int: null,             // l'intention du pas

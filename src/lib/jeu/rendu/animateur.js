@@ -17,7 +17,7 @@
 //     clip additif du haut du corps, du côté d'où vient la poussée, au poids du déséquilibre) ; les gestes techniques
 //     sans clip (passement : le pied fait le tour de la balle par-dessus ; talonnade ; sombrero en course) en IK du
 //     pied sur une courbe (gestes absents d'aeriea, la bibliothèque Mixamo) ; le contrôle de la poitrine, la roulette
-//     des deux côtés, le crochet semelle et la feinte de frappe en course sont des clips d'aeriea (paquet player2).
+//     des deux côtés et la feinte de frappe en course sont des clips d'aeriea (paquet player2).
 //     « Réduire les animations » divise ces amplitudes par deux.
 //   · Pieds verrouillés : pendant un appui (table des appuis de sim/clips.js, des cycles et des gestes sur place), le
 //     pied est tenu à sa place au sol par une IK à deux os (cuisse, tibia ; le genou reste dans son plan), correction

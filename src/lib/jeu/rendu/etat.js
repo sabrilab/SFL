@@ -3,7 +3,6 @@
 // mesure exactement ce que la page montre. Sans three ; aucune allocation par image (l'objet e et ses sous-objets
 // sont gardés dans cache).
 import { allongeBras } from '../sim/gardien.js';
-import { CROCHET } from './graphe.js';
 
 const GESTES = new Set(['geste', 'sol', 'releve', 'pivot']);
 
@@ -12,7 +11,7 @@ const GESTES = new Set(['geste', 'sol', 'releve', 'pivot']);
  * balle : la balle interpolée { x, y, z } ; cache : un objet propre au joueur.
  */
 export function etatAnim(M, j, I, porteur, balle, cache) {
-  const e = (cache.e ??= { geste: null, appui: null, touche: null, choc: null, figure: null, crochet: null });
+  const e = (cache.e ??= { geste: null, appui: null, touche: null, choc: null, figure: null });
   const g = j.g;
   e.vx = j.v.x; e.vz = j.v.z; e.cap = I.cap; e.phase = j.phase; e.balle = porteur === j; e.mode = j.mode;
   e.aLong = j.aLong; e.aLat = j.aLat; e.d = j.d; e.regard = M.balle.p; e.pos = I; e.boule = balle;
@@ -29,9 +28,6 @@ export function etatAnim(M, j, I, porteur, balle, cache) {
   // (bola-app#26, lot 2) le tirage de maillot : le dos du porteur que le défenseur tient (repère du jeu)
   const tc = j.tireCible != null ? M.joueurs[j.tireCible] : null;
   e.tire = tc ? Object.assign((cache.tire ??= {}), { x: tc.p.x, y: 1.15, z: tc.p.z }) : null;
-  // (aeriea) le crochet semelle : joué par le graphe pendant CROCHET.duree après le crochet de la simulation
-  const CR = j.crochetR;
-  e.crochet = CR && M.t - CR.t0 < CROCHET.duree ? Object.assign((cache.crochet ??= {}), { age: M.t - CR.t0, cote: CR.cote }) : null;
   const F = j.figure;
   e.figure = F && M.t - F.t0 < F.duree ? Object.assign((cache.figure ??= {}), { type: F.type, age: M.t - F.t0, duree: F.duree, cote: F.cote, double: !!F.double }) : null;
   return e;

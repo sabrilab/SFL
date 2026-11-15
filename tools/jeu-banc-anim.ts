@@ -6,8 +6,8 @@
 //
 // Contrôles (code de sortie 1 si l'un manque) ; les seuils sont ceux mesurés à la construction, un peu au-dessus :
 //   · chaque état du graphe, chaque clip ajouté au lot 1 (ATTENDUS) et chaque couche procédurale (passement,
-//     talonnade, sombrero) est atteint (et les clips d'aeriea branchés sur les gestes : roulette des deux côtés, crochet
-//     semelle, poitrine, feinte de frappe en course), en matchs IA et dans des scènes jouées (gestes, tacle, chutes, gardien) ;
+//     talonnade, sombrero) est atteint (et les clips d'aeriea branchés sur les gestes : roulette des deux côtés,
+//     poitrine, feinte de frappe en course), en matchs IA et dans des scènes jouées (gestes, tacle, chutes, gardien) ;
 //   · pieds tenus : vitesse au sol d'un pied verrouillé, médiane ≤ 3 cm/s, 90e centile ≤ 31 cm/s (correctifs #26 : 30
 //     avant ; 26,9 à 30,1 mesurés selon les matchs que joue l'IA, le seuil tombait au hasard du contenu) (les cycles de
 //     course n'ont pas la foulée de la simulation à toutes les vitesses : la correction est plafonnée à 22 cm) ;
@@ -104,8 +104,8 @@ const ATTENDUS_ETATS = ['loco', 'depart', 'arret', 'demitour', 'geste', 'chute',
 // (« a|b » : l'un ou l'autre côté suffit)
 const ATTENDUS_CLIPS = ['slide', 'getup_dos', 'getup_ventre', 'trap', 'trap_l', 'stall|stall_l', 'knee|knee_l', 'head_std', 'stagger', 'fall_side', 'fall_back', 'fall_sweep', 'fall_trip',
   'start', 'stop', 'turn180_std|turn180_std_l', 'feint_r', 'feint_l', 'kickup|kickup_l', 'k_catch_std', 'k_high', 'k_low_l|k_low_r', 'k_roll', 'c_thumbs', 'shoot2|shoot2_l', 'volley|header2|head_std',
-  // (gestes trouvés dans aeriea) la roulette des deux côtés, le crochet semelle des deux côtés, la poitrine, la feinte de frappe en course
-  'roulette', 'roulette_l', 'crochet_g', 'crochet_d', 'chest', 'strike_run|strike_run_l'];
+  // (gestes trouvés dans aeriea) la roulette des deux côtés, la poitrine, la feinte de frappe en course
+  'roulette', 'roulette_l', 'chest', 'strike_run|strike_run_l'];
 const vus = new Set<string>(), clipsVus = new Set<string>(), figuresVues = new Set<string>();
 const glisse: number[] = [];       // vitesse au sol d'un pied tenu (m/s)
 const glisseParEtat: Record<string, number[]> = {};
