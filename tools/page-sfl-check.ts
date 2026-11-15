@@ -78,6 +78,12 @@
 //       des cartes d'ACCORDS (imagesMur, déterministe) et comparé au pixel
 //       près (empreinte) aux fichiers servis, et sa liste de joueurs est
 //       exactement celle du mur (nomsDuMur) ; aucun fichier orphelin.
+//       Les variantes d, d2, d3 (14/11, à comparer) sont des FIGURANTS
+//       GÉNÉRÉS (Higgsfield, projet Bola) : chacune nomme son PNG et son
+//       empreinte, exactement ceux que l'outil accepte (FIGURANTS), sans
+//       source ni joueur ; leurs fichiers existent, sous le même plafond de
+//       poids ; d a son voile derrière le contenu sur ordinateur ; la page
+//       reste sur a.
 // Ce qu'il ne tient pas : le rendu (les captures), ce qu'une chaîne
 // construite à l'exécution pourrait écrire dans la page, et SURTOUT L'ACCORD
 // LUI-MÊME. Ce banc ne contrôle que l'instantané avec lui-même : un joueur
@@ -124,7 +130,7 @@ import { sigleSfl } from "./sigle-sfl";
 import { APERCU_LIEN, composer, empreinte, sigleSerre } from "./sigle-sfl-exports";
 import { COUVERTURES } from "../src/lib/sfl/couvertures";
 import { VARIANTES_COUVERTURE, type ImageCouverture } from "../src/lib/sfl/page-sfl-couverture";
-import { POIDS_ORDINATEUR, POIDS_TELEPHONE, cartesPermises, imagesMur, nomsDuMur } from "./page-sfl-couverture";
+import { FIGURANTS, POIDS_ORDINATEUR, POIDS_TELEPHONE, cartesPermises, imagesMur, nomsDuMur } from "./page-sfl-couverture";
 import { empechement, fautesInstantane, nomsDeSaison, podiumSansTrou, slug, type Lecture, type LigneJoueur } from "./page-sfl-instantane";
 
 const RACINE = join(__dirname, "..");
@@ -810,6 +816,11 @@ function fautesCouverture(source: string, haut: string): string[] {
     }
   }
   v(/var\(--background\) calc\(100% - 440px\)\)`,$/m.test(cv) && /var\(--background\) max\(80%, calc\(100% - 120px\)\)\)`,$/m.test(cv), "12 · le voile du téléphone n'est plus plein en bas (le haut ne se fond plus dans la page)");
+  v(
+    /^\{cle === "d" && <div className="absolute inset-0 hidden min-\[960px\]:block" style=\{\{ background: VOILE_EQUIPE \}\} \/>\}$/m.test(cv.split("\n").map((l) => l.trim()).join("\n")) &&
+      /^const VOILE_EQUIPE = `radial-gradient\([^`]*\$\{fond\((9\d)\)\} 0%[^`]*`;$/m.test(cv),
+    "12 · l'équipe (d) n'a plus son voile plein derrière le contenu sur ordinateur"
+  );
   v(/\{cle === "b" && <div className="absolute inset-0 min-\[960px\]:hidden" style=\{\{ background: VOILE_MUR\.telephone \}\} \/>\}/.test(cv) && /\{cle === "b" && <div className="absolute inset-0 hidden min-\[960px\]:block" style=\{\{ background: VOILE_MUR\.ordinateur \}\} \/>\}/.test(cv), "12 · le mur des cartes n'a plus son voile derrière le contenu");
   // Le haut : la boîte qui porte la couverture, sa hauteur venue de la fenêtre, isolée (sinon l'image en -z-10 passe sous le fond du cadre).
   v(
@@ -844,6 +855,9 @@ const mutantsCouverture: [string, () => [string, string]][] = [
   ],
   ["mur sans son voile", () => [muter(couverture, "style={{ background: VOILE_MUR.telephone }}", "style={{}}"), page]],
   ["variante par défaut changée", () => [muter(couverture, 'export const COUVERTURE_SFL: CleCouverture = "a";', 'export const COUVERTURE_SFL: CleCouverture = "b";'), page]],
+  ["variante par défaut passée à d", () => [muter(couverture, 'export const COUVERTURE_SFL: CleCouverture = "a";', 'export const COUVERTURE_SFL: CleCouverture = "d";'), page]],
+  ["l'équipe sans son voile", () => [muter(couverture, "style={{ background: VOILE_EQUIPE }}", "style={{}}"), page]],
+  ["voile de l'équipe éclairci", () => [muter(couverture, "${fond(92)} 0%, ${fond(84)} 55%", "${fond(40)} 0%, ${fond(30)} 55%"), page]],
 ];
 if (fautesDuHaut.length === 0) for (const [quoi, m] of mutantsCouverture) assert.ok(fautesCouverture(...m()).length > 0, `12 · le contrôle de la couverture laisse passer : ${quoi}`);
 
@@ -851,9 +865,17 @@ const sourcesValidees = new Set(COUVERTURES.map((c) => `/actus/couvertures/${c.i
 const permises = new Set(cartesPermises().map((c) => c.nom));
 const servisCouverture = new Set<string>();
 for (const [cle, v] of Object.entries(VARIANTES_COUVERTURE)) {
-  verifier(v.source === null ? cle === "b" : sourcesValidees.has(v.source), `12 · la variante ${cle} vient d'une image hors du moodboard des Actus (${v.source})`);
+  const figurant = (FIGURANTS as Record<string, { fichier: string; sha256: string }>)[cle];
+  verifier(
+    v.source === null ? cle === "b" || figurant !== undefined : sourcesValidees.has(v.source) && figurant === undefined,
+    `12 · la variante ${cle} vient d'une image hors du moodboard des Actus, du mur ou des figurants (${v.source})`
+  );
+  verifier(
+    figurant === undefined ? v.figurants === null : v.figurants !== null && v.figurants.fichier === figurant.fichier && v.figurants.sha256 === figurant.sha256 && v.source === null,
+    `12 · la variante ${cle} : ses figurants ne sont pas ceux que l'outil accepte (FIGURANTS)`
+  );
   verifier(v.cartes.every((n) => (ACCORDS as readonly string[]).includes(n) && permises.has(n)), `12 · le mur de la variante ${cle} montre un joueur hors d'ACCORDS`);
-  verifier(v.source === null ? pareil([...v.cartes], nomsDuMur()) : v.cartes.length === 0, `12 · la variante ${cle} : la liste des joueurs n'est pas celle du mur (${v.cartes.join(", ")}), ou une photo en a`);
+  verifier(cle === "b" ? pareil([...v.cartes], nomsDuMur()) : v.cartes.length === 0, `12 · la variante ${cle} : la liste des joueurs n'est pas celle du mur (${v.cartes.join(", ")}), ou une photo en a`);
   verifier(v.telephone.length === 2 && v.telephone[0].largeur < v.telephone[1].largeur, `12 · la variante ${cle} n'a plus ses deux largeurs de téléphone`);
   const toutes: [ImageCouverture, number][] = [...v.telephone.map((i): [ImageCouverture, number] => [i, POIDS_TELEPHONE]), [v.ordinateur, POIDS_ORDINATEUR]];
   for (const [i, max] of toutes) {
@@ -869,6 +891,8 @@ for (const [cle, v] of Object.entries(VARIANTES_COUVERTURE)) {
     verifier(pareil(tailleWebp(b), [i.largeur, i.hauteur]), `12 · ${i.src} ne fait pas ${i.largeur} × ${i.hauteur} (WebP)`);
   }
 }
+// Les trois figurants à comparer sont là (d recommandée, d2, d3), et seulement eux.
+verifier(pareil(Object.keys(FIGURANTS).sort(), ["d", "d2", "d3"]) && Object.keys(FIGURANTS).every((c) => c in VARIANTES_COUVERTURE), "12 · les variantes de figurants d, d2, d3 manquent");
 for (const f of readdirSync(join(RACINE, "public/sfl/couverture"))) verifier(servisCouverture.has(`/sfl/couverture/${f}`), `12 · public/sfl/couverture/${f} n'est cité par aucune variante (orphelin)`);
 // Les pixels du mur : l'outil est déterministe ; le banc recompose le mur à partir des cartes d'ACCORDS
 // (imagesMur) et compare chaque empreinte à celle du fichier servi. Une autre image mise à la place, même

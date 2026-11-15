@@ -12,10 +12,16 @@
 // terrain), deux photos du moodboard des Actus, en production depuis le
 // 24/10 ; b « Les cartes », le mur des vraies cartes de l'instantané (les
 // joueurs qui ont dit oui à leur carte hors de l'app). Aucun visage dans les
-// photos ; aucun joueur sans accord sur le mur.
+// photos ; aucun joueur sans accord sur le mur. À comparer aussi (14/11) :
+// d « L'équipe » (cinq Noirs face à cinq Blancs, la recommandée des trois),
+// d2 « Le face-à-face », d3 « Le pied sur le ballon » : des FIGURANTS
+// GÉNÉRÉS (Higgsfield, fournis par le projet Bola), aucun joueur de la SFL,
+// aucun visage réel. Leur portrait garde toute la largeur de la photo ; sur
+// ordinateur, d2 et d3 sont recomposés, les joueurs sur les côtés ; d garde
+// ses dix joueurs, sous un voile plein derrière le contenu (VOILE_EQUIPE).
 //
 // La variante de la page est COUVERTURE_SFL (la recommandée). En dev et sur
-// un aperçu Vercel seulement (ESSAI), ?couverture=a|b|c en choisit une autre,
+// un aperçu Vercel seulement (ESSAI), ?couverture=a|b|c|d|d2|d3 en choisit une autre,
 // pour la comparer (lue après l'hydratation : le HTML servi porte toujours
 // COUVERTURE_SFL, l'autre image vient juste après ; la production ne lit
 // jamais l'adresse, et lireAdresse est le seul endroit qui la lit).
@@ -77,6 +83,8 @@ const VOILE_MUR = {
   telephone: `linear-gradient(to bottom, ${fond(30)} 0%, ${fond(30)} calc(100% - 660px), ${fond(88)} calc(100% - 500px))`,
   ordinateur: `radial-gradient(ellipse 54% 74% at 50% 64%, ${fond(94)} 0%, ${fond(88)} 55%, ${fond(35)} 100%)`,
 };
+/** L'équipe (d) sur ordinateur : dix joueurs au centre, un voile plein derrière le contenu (aucun visage sous le texte). */
+const VOILE_EQUIPE = `radial-gradient(ellipse 50% 70% at 50% 60%, ${fond(92)} 0%, ${fond(84)} 55%, ${fond(0)} 100%)`;
 
 export function Couverture() {
   const cle = useSyncExternalStore(rien, lireAdresse, () => COUVERTURE_SFL);
@@ -109,6 +117,7 @@ export function Couverture() {
       {/* Le mur des cartes est plus chargé qu'une photo : un voile de plus, plein derrière le contenu. */}
       {cle === "b" && <div className="absolute inset-0 min-[960px]:hidden" style={{ background: VOILE_MUR.telephone }} />}
       {cle === "b" && <div className="absolute inset-0 hidden min-[960px]:block" style={{ background: VOILE_MUR.ordinateur }} />}
+      {cle === "d" && <div className="absolute inset-0 hidden min-[960px]:block" style={{ background: VOILE_EQUIPE }} />}
       {/* Le voile : téléphone et tablette, puis ordinateur ; clair, puis sombre. */}
       <div className="absolute inset-0 min-[960px]:hidden dark:hidden" style={{ background: VOILE.clair }} />
       <div className="absolute inset-0 hidden dark:block min-[960px]:dark:hidden" style={{ background: VOILE.sombre }} />
