@@ -20,7 +20,7 @@
 // ordinateur, d2 et d3 sont recomposés, les joueurs sur les côtés ; d garde
 // ses dix joueurs, sous un voile plein derrière le contenu (VOILE_EQUIPE).
 //
-// La variante de la page est COUVERTURE_SFL (la recommandée). En dev et sur
+// La variante de la page est COUVERTURE_SFL (d, choisie le 15/11). En dev et sur
 // un aperçu Vercel seulement (ESSAI), ?couverture=a|b|c|d|d2|d3 en choisit une autre,
 // pour la comparer (lue après l'hydratation : le HTML servi porte toujours
 // COUVERTURE_SFL, l'autre image vient juste après ; la production ne lit
@@ -46,8 +46,8 @@
 import { useSyncExternalStore } from "react";
 import { VARIANTES_COUVERTURE, type CleCouverture } from "@/lib/sfl/page-sfl-couverture";
 
-/** La variante de la page : a « La cage », recommandée. */
-export const COUVERTURE_SFL: CleCouverture = "a";
+/** La variante de la page : d « L'équipe », choisie le 15/11 (figurants générés, aucun joueur de la SFL). */
+export const COUVERTURE_SFL: CleCouverture = "d";
 /** L'adresse choisit la variante : en dev et sur un aperçu Vercel, jamais en production. */
 const ESSAI = process.env.NODE_ENV !== "production" || process.env.NEXT_PUBLIC_BOLA_ENV === "preview";
 

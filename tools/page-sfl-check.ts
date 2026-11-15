@@ -773,7 +773,7 @@ function fautesCouverture(source: string, haut: string): string[] {
   };
   const cv = nettoyer(source);
   const pg = nettoyer(haut);
-  v(/^export const COUVERTURE_SFL: CleCouverture = "a";$/m.test(cv), "12 · la variante de la page n'est plus a « La cage » (la recommandée)");
+  v(/^export const COUVERTURE_SFL: CleCouverture = "d";$/m.test(cv), "12 · la variante de la page n'est plus d « L'équipe » (choisie le 15/11)");
   // L'adresse n'est lue que par lireAdresse, dont la première ligne rend la variante de la page hors essai ;
   // l'essai, c'est le dev ou un aperçu Vercel, jamais la production.
   v(/^const ESSAI = process\.env\.NODE_ENV !== "production" \|\| process\.env\.NEXT_PUBLIC_BOLA_ENV === "preview";$/m.test(cv), "12 · l'essai par l'adresse n'est plus limité au dev et aux aperçus");
@@ -857,8 +857,8 @@ const mutantsCouverture: [string, () => [string, string]][] = [
     () => [couverture, muter(page, '<div className="relative isolate flex min-h-[calc(100svh-env(safe-area-inset-top))] flex-col justify-end">', '{/* min-h-[calc(100svh-env(safe-area-inset-top))] */}<div className="relative isolate flex flex-col justify-end">')],
   ],
   ["mur sans son voile", () => [muter(couverture, "style={{ background: VOILE_MUR.telephone }}", "style={{}}"), page]],
-  ["variante par défaut changée", () => [muter(couverture, 'export const COUVERTURE_SFL: CleCouverture = "a";', 'export const COUVERTURE_SFL: CleCouverture = "b";'), page]],
-  ["variante par défaut passée à d", () => [muter(couverture, 'export const COUVERTURE_SFL: CleCouverture = "a";', 'export const COUVERTURE_SFL: CleCouverture = "d";'), page]],
+  ["variante par défaut changée", () => [muter(couverture, 'export const COUVERTURE_SFL: CleCouverture = "d";', 'export const COUVERTURE_SFL: CleCouverture = "b";'), page]],
+  ["variante par défaut revenue à a", () => [muter(couverture, 'export const COUVERTURE_SFL: CleCouverture = "d";', 'export const COUVERTURE_SFL: CleCouverture = "a";'), page]],
   ["l'équipe sans son voile", () => [muter(couverture, "style={{ background: VOILE_EQUIPE }}", "style={{}}"), page]],
   ["voile de l'équipe éclairci", () => [muter(couverture, "${fond(92)} 0%, ${fond(84)} 55%", "${fond(40)} 0%, ${fond(30)} 55%"), page]],
 ];
