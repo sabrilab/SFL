@@ -9,7 +9,7 @@ import { SEED_ENTRIES, SEED_JOURNEES, SEED_ROSTER } from "./seed";
 import { appliquerMvpAuto } from "./mvp";
 import { sansVitrine } from "../compte-vitrine";
 import { bloquantsEcriture, nouveauxEcarts, type Ecart } from "./integrite";
-import { tenirFinDesMatchs } from "../revelation";
+import { tenirFinDesMatchs, tenirMainSurLeVote } from "../revelation";
 import { maintenant } from "../horloge";
 import type { Saison } from "./types";
 
@@ -182,7 +182,10 @@ export const saisieStore: SaisieStoreSur = {
     // la base la garde ou la corrige, et publier_saison rend la sienne
     // (sync.ts). Une vue figée (input.figee) est refusée plus bas
     // (integrite.ts, I10).
-    const saison = tenirFinDesMatchs(appliquerMvpAuto(sansVitrine(input)), maintenant());
+    // La main de l'admin sur le vote (15/11/2026, tenirMainSurLeVote) ne
+    // bouge plus une fois la journée comptée.
+    const t = maintenant();
+    const saison = tenirMainSurLeVote(localStorageStore.load(), tenirFinDesMatchs(appliquerMvpAuto(sansVitrine(input)), t), t);
     // Une feuille saine (30/10, après les matchs 5 et 6 de la J3) : un doublon,
     // un membre qui ne joue pas, une deuxième journée pour un dimanche ou un
     // brouillon effacé par une saison filtrée ne s'écrivent pas.

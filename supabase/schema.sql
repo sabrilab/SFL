@@ -3566,6 +3566,52 @@ as $$
 $$;
 revoke execute on function public.revelation_de(date, timestamptz) from public, anon, authenticated;
 
+-- La main de l'admin sur le vote (15/11/2026 ; revelation.ts, finDuVote et
+-- revelation ; JourneeMeta.votesOuvertsLe et votesFermesLe). Un geste ne vaut
+-- que s'il date du jour de la journée (une journée déplacée repart de la
+-- règle) ; la fermeture l'emporte sur l'ouverture :
+--   · votesFermesLe : le vote a fermé à cet instant ;
+--   · votesOuvertsLe : le vote tient jusqu'à minuit ;
+--   · sinon la règle : minuit tant que la fin des matchs est inconnue
+--     (`p_fin` null), puis fin_du_vote_de.
+-- La révélation suit d'une heure, minuit au plus tard (`p_fin` connu).
+create or replace function public.fin_du_vote_meta(p_meta jsonb, p_jour date, p_fin timestamptz)
+returns timestamptz
+language plpgsql
+stable
+set search_path = ''
+as $$
+declare
+  minuit timestamptz := (p_jour + 1)::timestamp at time zone 'Europe/Paris';
+  ferme  timestamptz := public.instant_sur(p_meta ->> 'votesFermesLe');
+  ouvert timestamptz := public.instant_sur(p_meta ->> 'votesOuvertsLe');
+begin
+  if ferme is not null and (ferme at time zone 'Europe/Paris')::date = p_jour then
+    return least(minuit, ferme);
+  end if;
+  if ouvert is not null and (ouvert at time zone 'Europe/Paris')::date = p_jour then
+    return minuit;
+  end if;
+  if p_fin is null then
+    return minuit;                                                    -- pas finie : la butée
+  end if;
+  return public.fin_du_vote_de(p_jour, p_fin);
+end;
+$$;
+revoke execute on function public.fin_du_vote_meta(jsonb, date, timestamptz) from public, anon, authenticated;
+
+create or replace function public.revelation_meta(p_meta jsonb, p_jour date, p_fin timestamptz)
+returns timestamptz
+language plpgsql
+stable
+set search_path = ''
+as $$
+begin
+  return least(((p_jour + 1)::timestamp at time zone 'Europe/Paris'), public.fin_du_vote_meta(p_meta, p_jour, p_fin) + interval '1 hour');
+end;
+$$;
+revoke execute on function public.revelation_meta(jsonb, date, timestamptz) from public, anon, authenticated;
+
 -- Le miroir de journeeTerminee (src/lib/sfl/saisie/engine.ts) : un résultat,
 -- un but ou une passe saisi, et chaque équipe présente avec son résultat.
 create or replace function public.journee_terminee(p_data jsonb, p_j int)
@@ -3600,7 +3646,8 @@ revoke execute on function public.journee_terminee(jsonb, int) from public, anon
 
 -- La fin du vote d'une journée de la saison en cours : minuit jusqu'à la J4 ;
 -- dès la J5, min(minuit, max(18 h, fin des matchs + 1 h)), et minuit tant que
--- la fin des matchs est inconnue. null : pas de journée publiée et datée, ou
+-- la fin des matchs est inconnue ; la main de l'admin passe avant
+-- (fin_du_vote_meta). null : pas de journée publiée et datée, ou
 -- une journée en suspens (12/11/2026 : pas de vote, ni vote_ouvert, ni
 -- politique de votes_figures). `p_ref` fixe l'année du libellé (« 8 nov. ») ;
 -- fin_du_vote prend now().
@@ -3638,10 +3685,9 @@ begin
     return minuit;
   end if;
   fin := public.instant_sur(meta ->> 'finDesMatchs');
-  if fin is null then
-    return minuit;                                                    -- pas finie : la butée
-  end if;
-  return public.fin_du_vote_de(jour, fin);
+  -- La main de l'admin d'abord, puis la règle (minuit tant que la journée
+  -- n'est pas finie).
+  return public.fin_du_vote_meta(meta, jour, fin);
 end;
 $$;
 revoke execute on function public.fin_du_vote_a(int, int, timestamptz) from public, anon, authenticated;
@@ -3724,6 +3770,8 @@ revoke all on public.fins_des_matchs from public, anon, authenticated;
 -- quelle : ni posé, ni retiré, et fins_des_matchs n'est pas touchée. À sa
 -- reprise, la règle ci-dessus reprend (à une autre date : saison_reprise
 -- efface l'ancienne ligne).
+-- La révélation se lit avec la main de l'admin sur le vote (revelation_meta,
+-- 15/11/2026), et cette main ne bouge plus une fois la journée révélée.
 -- Joue pour publier_saison (l'admin : insert … on conflict, donc deux fois ;
 -- le premier passage pose, le second relit) comme pour sceller_feuille (un
 -- joueur scelle la feuille de son match).
@@ -3745,6 +3793,7 @@ declare
   tampon     timestamptz;
   propose    timestamptz;
   ecrit      text;
+  ancien     jsonb;
   change     boolean := false;
   aujourdhui date := (now() at time zone 'Europe/Paris')::date;
 begin
@@ -3762,8 +3811,34 @@ begin
       garde_jour := null;
       garde_fin := null;
       select f.jour, f.fin into garde_jour, garde_fin from public.fins_des_matchs f where f.saison = numero and f.j = nj;
+      -- La main de l'admin sur le vote (votesOuvertsLe, votesFermesLe) ne
+      -- bouge plus une fois la journée révélée (15/11/2026) : une publication
+      -- partie en retard d'un appareil (« Garder les votes ouverts » touché
+      -- avant la révélation, envoyé après) ne décompte pas une journée déjà
+      -- comptée ; les gestes d'avant sont remis. Dans son propre bloc : un
+      -- défaut ici ne bloque jamais une publication.
+      if tg_op = 'UPDATE' and garde_fin is not null and garde_jour is not distinct from jour then
+        begin
+          ancien := null;
+          select o into ancien
+            from jsonb_array_elements(case when jsonb_typeof(old.data -> 'journees') = 'array' then old.data -> 'journees' else '[]'::jsonb end) o
+           where o ->> 'j' = nj::text
+           limit 1;
+          if ancien is not null
+             and now() >= public.revelation_meta(ancien, jour, garde_fin)
+             and ((m -> 'votesOuvertsLe') is distinct from (ancien -> 'votesOuvertsLe')
+               or (m -> 'votesFermesLe') is distinct from (ancien -> 'votesFermesLe')) then
+            m := (m - 'votesOuvertsLe' - 'votesFermesLe')
+                 || jsonb_strip_nulls(jsonb_build_object('votesOuvertsLe', ancien -> 'votesOuvertsLe', 'votesFermesLe', ancien -> 'votesFermesLe'));
+            js := jsonb_set(js, array[i::text], m);
+            change := true;
+          end if;
+        exception when others then
+          null;
+        end;
+      end if;
       if garde_fin is not null and garde_jour is not distinct from jour then
-        if now() < public.revelation_de(jour, garde_fin) and not public.journee_terminee(new.data, nj) then
+        if now() < public.revelation_meta(m, jour, garde_fin) and not public.journee_terminee(new.data, nj) then
           delete from public.fins_des_matchs f where f.saison = numero and f.j = nj;   -- rouverte avant la révélation
         else
           tampon := garde_fin;
@@ -3772,7 +3847,7 @@ begin
           -- (sceller_feuille le dit par sfl.feuille_scellee). Une feuille scellée
           -- trop tôt (0-0 au coup d'envoi) ne fixe plus la fin du vote.
           if coalesce(current_setting('sfl.feuille_scellee', true), '') = nj::text
-             and now() > garde_fin and now() < public.revelation_de(jour, garde_fin) then
+             and now() > garde_fin and now() < public.revelation_meta(m, jour, garde_fin) then
             update public.fins_des_matchs f set fin = now(), pose_le = now() where f.saison = numero and f.j = nj;
             tampon := now();
           end if;

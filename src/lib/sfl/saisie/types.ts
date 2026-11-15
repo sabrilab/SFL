@@ -107,6 +107,20 @@ export interface JourneeMeta {
    * la révélation des journées du nouveau régime (dès la J5 de la saison 1).
    */
   finDesMatchs?: string;
+  /**
+   * La main de l'admin sur le vote (15/11/2026, revelation.ts) : l'instant
+   * (ISO) où il a choisi de garder le vote ouvert jusqu'à minuit, au lieu
+   * de la fermeture d'office une heure après le dernier match. Ne vaut que
+   * le jour de la journée (une journée déplacée repart de la règle).
+   */
+  votesOuvertsLe?: string;
+  /**
+   * L'instant (ISO) où l'admin a fermé le vote à la main : la révélation
+   * tombe une heure après, minuit au plus tard. Ne vaut que le jour de la
+   * journée. Un seul des deux champs à la fois (garderLeVoteOuvert,
+   * fermerLeVote) ; si les deux y sont, la fermeture l'emporte.
+   */
+  votesFermesLe?: string;
 }
 
 /**
