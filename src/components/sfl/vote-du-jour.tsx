@@ -31,21 +31,28 @@ import { useMaintenant } from "@/hooks/use-missions";
 import { useVotes } from "@/hooks/use-votes";
 import { findPlayerMatch, type Journee } from "@/lib/sfl/engine";
 import { libelleFinDuVote, voteOuvertA } from "@/lib/sfl/revelation";
-import { CATEGORIES_VOTE, journeeAvecVote, monVote } from "@/lib/sfl/votes";
+import { CATEGORIES_VOTE, feuilleRemplie, journeeAvecVote, monVote } from "@/lib/sfl/votes";
 import { cn } from "@/lib/utils";
 
 const ENCRE = "#0A0B0D";
 const BLANC = "#F4F5F2";
 
-/** Les journées dont le vote est ouvert ; `pourMoi` : seulement celles où ce joueur a joué. */
+/**
+ * Les journées dont le vote est ouvert ; `pourMoi` : seulement celles où ce
+ * joueur peut voter, la feuille de son match remplie (feuilleRemplie) : avant,
+ * rien à faire, donc rien sur la Map ni sur Ma carte.
+ */
 function useVotesOuverts(pourMoi?: string): Journee[] {
   const isClient = useIsClient();
   const { journeesDirect: journees, saisonLue } = useSeason();
   const maintenant = useMaintenant();
   if (!isClient) return [];
-  return journees.filter(
-    (j) => journeeAvecVote(j) && voteOuvertA(saisonLue, j.j, maintenant) && (pourMoi === undefined || !!findPlayerMatch(j, pourMoi)),
-  );
+  return journees.filter((j) => {
+    if (!journeeAvecVote(j) || !voteOuvertA(saisonLue, j.j, maintenant)) return false;
+    if (pourMoi === undefined) return true;
+    const place = findPlayerMatch(j, pourMoi);
+    return !!place && feuilleRemplie(saisonLue, j.j, place.match);
+  });
 }
 
 function Titre({ j, className }: { j: number; className?: string }) {
