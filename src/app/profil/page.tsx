@@ -89,6 +89,7 @@ import { BoutonStats } from "@/components/layout/bouton-stats";
 import { BoutonTheme } from "@/components/layout/bouton-theme";
 import { BoutonDeconnexion } from "@/components/sfl/auth/bouton-deconnexion";
 import { MesCartons } from "@/components/sfl/cartons/mes-cartons";
+import { VoteDuJour } from "@/components/sfl/vote-du-jour";
 
 /* ------------------------------ Petits blocs ------------------------------ */
 
@@ -172,6 +173,10 @@ function ProfilJoueurPage() {
           </Link>
         </div>
       </div>
+      {/* Le vote du jour, tant qu'il est ouvert et que j'y vote : sous le titre,
+          avant ma carte (Ilyes, 15/11 ; vote-du-jour.tsx). Au-dessus du cadre
+          de la 3D, dont les bords vides passent dessous. */}
+      {!bola && <VoteDuJour me={player.name} pourMoi className="relative z-10 mb-[var(--fib-21)]" />}
       {/* Deux colonnes dès qu'il y a la place, dans le rapport 1 : φ
           (grille-or, globals.css) : moi à gauche, ma saison et le reste à
           droite. */}

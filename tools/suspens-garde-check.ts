@@ -57,7 +57,7 @@ const EXCEPTIONS_DIRECT: Record<string, string> = {
   "components/sfl/cartons/mes-cartons.tsx": "D3 : les cartons restent",
   "components/sfl/invitation-carte.tsx": "D3 : les cartons restent",
   "app/api/ligue/annoncer/route.ts": "lit revelationAttendue, qui saute les journées en suspens",
-  "components/sfl/actus/fil.tsx": "le vote du jour passe par voteOuvertA (fermé : finDuVote nul)",
+  "components/sfl/vote-du-jour.tsx": "le vote du jour passe par voteOuvertA (fermé : finDuVote nul)",
   "components/sfl/vote-figures.tsx": "voteOuvertA (fermé : finDuVote nul)",
   "components/sfl/admin/resultats-votes.tsx": "lit etatRevelation, qui rend « a-rattraper »",
   "components/sfl/direct/direct-du-match.tsx": "lit droitDePrendre, qui rend « suspens »",
