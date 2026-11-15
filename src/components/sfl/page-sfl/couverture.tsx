@@ -83,8 +83,15 @@ const VOILE_MUR = {
   telephone: `linear-gradient(to bottom, ${fond(30)} 0%, ${fond(30)} calc(100% - 660px), ${fond(88)} calc(100% - 500px))`,
   ordinateur: `radial-gradient(ellipse 54% 74% at 50% 64%, ${fond(94)} 0%, ${fond(88)} 55%, ${fond(35)} 100%)`,
 };
-/** L'équipe (d) sur ordinateur : dix joueurs au centre, un voile plein derrière le contenu (aucun visage sous le texte). */
-const VOILE_EQUIPE = `radial-gradient(ellipse 50% 70% at 50% 60%, ${fond(92)} 0%, ${fond(84)} 55%, ${fond(0)} 100%)`;
+/** L'équipe (d) sur ordinateur : dix joueurs au centre, un voile plein derrière le contenu (aucun visage sous le texte) ; depuis que la bande garde leurs têtes (15/11), il monte jusqu'à l'étiquette. */
+const VOILE_EQUIPE = `radial-gradient(ellipse 50% 78% at 50% 52%, ${fond(92)} 0%, ${fond(84)} 55%, ${fond(0)} 100%)`;
+/**
+ * Les figurants (d, d2, d3) en sombre, sur téléphone : des visages et un ballon juste au-dessus du contenu.
+ * Contrôle visuel du 15/11 : en 375 × 667, le sigle et « Lille. » passaient sur les genoux et les visages du
+ * second rang, et le panneau « BOLA SFL » de d3 se lisait à côté de « SUNDAY FIVE LEAGUE ». Compté depuis le
+ * bas comme le voile (l'étiquette est à ~460 px du bas) : rien au-dessus, presque plein dès l'étiquette.
+ */
+const VOILE_FIGURANTS_SOMBRE = `linear-gradient(to bottom, ${fond(0)} 0%, ${fond(0)} calc(100% - 600px), ${fond(92)} calc(100% - 480px))`;
 
 export function Couverture() {
   const cle = useSyncExternalStore(rien, lireAdresse, () => COUVERTURE_SFL);
@@ -118,6 +125,7 @@ export function Couverture() {
       {cle === "b" && <div className="absolute inset-0 min-[960px]:hidden" style={{ background: VOILE_MUR.telephone }} />}
       {cle === "b" && <div className="absolute inset-0 hidden min-[960px]:block" style={{ background: VOILE_MUR.ordinateur }} />}
       {cle === "d" && <div className="absolute inset-0 hidden min-[960px]:block" style={{ background: VOILE_EQUIPE }} />}
+      {v.figurants && <div className="absolute inset-0 hidden dark:block min-[960px]:dark:hidden" style={{ background: VOILE_FIGURANTS_SOMBRE }} />}
       {/* Le voile : téléphone et tablette, puis ordinateur ; clair, puis sombre. */}
       <div className="absolute inset-0 min-[960px]:hidden dark:hidden" style={{ background: VOILE.clair }} />
       <div className="absolute inset-0 hidden dark:block min-[960px]:dark:hidden" style={{ background: VOILE.sombre }} />

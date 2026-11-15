@@ -115,12 +115,14 @@ const VARIANTES: Variante[] = [
   { cle: "a", nom: "La cage", photo: "cage-2", cadre: { x: 0.6, haut: 0, yBande: 0.36 } },
   { cle: "b", nom: "Les cartes", cartes: true },
   { cle: "c", nom: "Les ombres", photo: "ombres-1", cadre: { x: 0.5, haut: 0.05, yBande: 0.3 } },
-  { cle: "d", nom: "L'équipe", figurants: true, cadre: { haut: 0.08 }, bande: { yBande: 0.42 } },
+  // Contrôle visuel du 15/11 : à haut 0,08, le ballon de d tombait sous « SUNDAY FIVE LEAGUE » (390 × 844) ; à
+  // yBande 0,42, la bande de l'ordinateur coupait la tête des six joueurs debout. d2 : son ballon touchait l'étiquette.
+  { cle: "d", nom: "L'équipe", figurants: true, cadre: { haut: 0.12 }, bande: { yBande: 0.38 } },
   {
     cle: "d2",
     nom: "Le face-à-face",
     figurants: true,
-    cadre: { haut: 0.1 },
+    cadre: { haut: 0.12 },
     bande: { lignes: [0.02, 0.72], morceaux: [{ de: 0, a: 0.47, gauche: 0 }, { de: 0.5, a: 1, gauche: 0.775 }] },
   },
   { cle: "d3", nom: "Le pied sur le ballon", figurants: true, cadre: { haut: 0.02, fondu: { debut: 0.53, fin: 0.63, force: 0.88 } }, bande: { lignes: [0, 0.8], morceaux: [{ de: 0.05, a: 1, gauche: 0.69 }] } },
