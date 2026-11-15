@@ -23,7 +23,9 @@
 //     revenir sur ce qu'on connaît déjà) : le rail des journées, collé en
 //     haut ; le jour du match, la feuille en direct ; puis, du dimanche soir
 //     au mercredi, le dernier dimanche joué d'abord (sa couverture, ses
-//     vidéos, son terrain, le vote du soir, ton dimanche, ton Flair, ses
+//     vidéos, son trash talk (trash-talk.tsx : une phrase mise en visuel
+//     « tweet » ou « une », 12/11), son terrain, le vote du soir, ton
+//     dimanche, ton Flair, ses
 //     rubriques), et la semaine qui se prépare ensuite ; du jeudi au matin
 //     du match, la semaine d'abord. La semaine : la convocation (la météo de
 //     ton match, meteo-match.tsx ; qui vient, Je viens / Je passe ; ta
@@ -119,6 +121,9 @@ import { ContratALaUne } from "./contrat-a-la-une";
 import { RubriqueFlair } from "@/components/sfl/flair/mon-flair";
 import { journeeDeLaVideo, useVideos, VideosDuFil } from "./video";
 import type { Video } from "@/lib/sfl/videos";
+import { BlocTrashTalk, useTrashTalks } from "./trash-talk";
+import { journeeDuTrashTalk, matchDuJoueur } from "@/lib/sfl/trash-talk";
+import { feuilleDeConvocation, feuilleDeJournee } from "@/lib/sfl/feuille";
 import { VueClassements, VueMatchs } from "./vues";
 import { ChoixEpoque, useEpoques, type ChoixDEpoque, type Epoque, type Vue } from "./epoques";
 import { CarteSaison, categoriesLegendes, Compteurs, LeMur } from "./wall-of-fame";
@@ -142,6 +147,7 @@ function Dimanche({
   scenes,
   ouvrir,
   videos = [],
+  trashTalk,
   avant,
   depliee = false,
 }: {
@@ -151,6 +157,8 @@ function Dimanche({
   ouvrir: () => void;
   /** Les vidéos de ce dimanche (Sabri, 26/10 : « la vidéo […] de la journée 3 dans le feed de la journée 3 »). */
   videos?: Video[];
+  /** Le trash talk de ce dimanche (trash-talk.tsx), sous ses vidéos. */
+  trashTalk?: React.ReactNode;
   /** Ce qui ouvre ses rubriques : ton dimanche, pour le dernier joué. */
   avant?: React.ReactNode;
   /** Déplié depuis sa ligne (JourneeDAvant) : la ligne porte l'ancre et tient lieu de couverture. */
@@ -168,6 +176,7 @@ function Dimanche({
     >
       {!depliee && <CouvertureDimanche j={j} journee={journee} c={chapitre} />}
       {videos.length > 0 && <VideosDuFil videos={videos} className="md:col-span-full md:mx-auto md:w-full md:max-w-[560px]" />}
+      {trashTalk}
       {journee && (
         <div ref={terrain} className={cn("px-5 md:px-0", terrainCollant && "md:sticky md:top-[var(--fib-21)]")}>
           <CarteJournee journee={journee} onOuvrir={ouvrir} />
@@ -1013,6 +1022,22 @@ function EpoqueEnCours({ epoques, vue, onVue, classement, exploit }: PropsEpoque
   const recapDabord = ecart != null && ecart <= 0 && ecart >= -3;
   // Le dimanche de la convocation en suspens (saisie/suspens.ts) : « J5 · à rattraper ».
   const prochainEnSuspens = aVenir && estEnSuspens(saison.journees.find((m) => m.j === prochain));
+  // Le trash talk (trash-talk.tsx) : un bloc par journée ; on n'écrit que sur celle du moment,
+  // la dernière jouée du dimanche soir au mercredi, sinon celle qui vient.
+  const tt = useTrashTalks();
+  const jDuMoment = journeeDuTrashTalk({
+    derniere: une ? { j: une.j, iso: isoDernier } : null,
+    prochaine: aVenir ? { j: prochain, suspens: !!prochainEnSuspens } : null,
+    aujourdhui,
+  });
+  const blocTrashTalk = (j: number, terrains: () => { a: { joueurs: string[] }; b: { joueurs: string[] } }[]) => (
+    <BlocTrashTalk
+      tt={tt}
+      j={j}
+      ecrire={j === jDuMoment ? { match: matchDuJoueur(terrains(), me) } : null}
+      className="md:col-span-full md:mx-auto md:w-full md:max-w-[560px]"
+    />
+  );
   const etapeSemaine: Etape = {
     id: aVenir ? `j${prochain}` : "semaine",
     label: aVenir ? `J${prochain}` : "Semaine",
@@ -1036,6 +1061,7 @@ function EpoqueEnCours({ epoques, vue, onVue, classement, exploit }: PropsEpoque
       journee={une.journee}
       scenes={une.scenes}
       videos={videosDe.get(une.j)}
+      trashTalk={blocTrashTalk(une.j, () => feuilleDeJournee(une.journee))}
       avant={
         <>
           {/* Le soir du match, le vote est dans son dimanche, juste après la feuille. */}
@@ -1064,6 +1090,7 @@ function EpoqueEnCours({ epoques, vue, onVue, classement, exploit }: PropsEpoque
         className={cn("contents md:flex md:flex-col md:gap-[var(--fib-21)]", semaineCollante && "md:sticky md:top-[var(--fib-21)]")}
       >
         {aVenir && <Convocation p={presence} />}
+        {aVenir && blocTrashTalk(prochain, () => (presence.equipesVisibles ? feuilleDeConvocation(presence.teams) : []))}
         {!recapDabord && <VoteDuJour me={me} />}
         <VideosDuFil videos={videosDe.get(null) ?? []} />
       </div>
@@ -1125,6 +1152,7 @@ function EpoqueEnCours({ epoques, vue, onVue, classement, exploit }: PropsEpoque
                   ouverte={deplie(d.j)}
                   basculer={() => basculer(d.j)}
                   videos={videosDe.get(d.j)}
+                  trashTalk={blocTrashTalk(d.j, () => feuilleDeJournee(d.journee))}
                   ouvrir={() => router.push(`/ligue/journee?j=${d.j}`)}
                 />
               ))}
@@ -1148,12 +1176,14 @@ function JourneeDAvant({
   ouverte,
   basculer,
   videos,
+  trashTalk,
   ouvrir,
 }: {
   d: { j: number; journee?: Journee; scenes: Actu[] };
   ouverte: boolean;
   basculer: () => void;
   videos?: Video[];
+  trashTalk?: React.ReactNode;
   ouvrir: () => void;
 }) {
   const matchs = d.journee?.matches ?? [];
@@ -1187,6 +1217,7 @@ function JourneeDAvant({
             journee={d.journee}
             scenes={d.scenes}
             videos={videos}
+            trashTalk={trashTalk}
             depliee
             avant={<RubriqueFlair j={d.j} />}
             ouvrir={ouvrir}

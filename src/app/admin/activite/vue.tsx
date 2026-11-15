@@ -264,6 +264,8 @@ function Conseils({ liste, masques }: { liste: Conclusion[]; masques: boolean })
 /** Les blocs qui lisent leurs propres tables (./page.tsx), rangés chacun dans son étape. */
 export interface BlocsActivite {
   videos: (public_: PublicId, admins: ReadonlySet<string>) => React.ReactNode;
+  /** Le trash talk des Actus : les posts signalés ou masqués, et de quoi les masquer, remettre ou retirer (./trash-talk.tsx). */
+  trashTalk: () => React.ReactNode;
   agent: (public_: PublicId, admins: ReadonlySet<string>) => React.ReactNode;
   parrainage: () => React.ReactNode;
   revenu: (depuis: number, actifs: number, garde: (id: string) => boolean) => React.ReactNode;
@@ -961,6 +963,7 @@ export function ActiviteVue({
           </Section>
 
           {blocs?.videos(public_, vu.ensembleAdmins)}
+          {blocs?.trashTalk()}
           {blocs?.agent(public_, vu.ensembleAdmins)}
 
           <Chapitre id="revenu" rang={4} titre="Revenu" question="Qu'est-ce que Bola gagne ?" />
