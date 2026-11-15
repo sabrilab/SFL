@@ -451,5 +451,3 @@ export function TonDimanche({ j, date }: { j: number; date: string }) {
     />
   );
 }
-
-/* ---------------------------------- Le fil ---------------------------------- */

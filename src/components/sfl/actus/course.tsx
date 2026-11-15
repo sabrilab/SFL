@@ -20,10 +20,12 @@
 //     L'onglet est dans l'adresse (?vue=classements, ?vue=matchs ;
 //     page-actus.tsx), et l'en-tête ne bouge pas d'un onglet à l'autre ;
 //   · le fil (Sabri, 31/10 : « plus je scrolle, plus je découvre », pas
-//     revenir sur ce qu'on connaît déjà) : le rail des journées, collé en
-//     haut ; le jour du match, la feuille en direct ; puis, du dimanche soir
+//     revenir sur ce qu'on connaît déjà) : le vote du jour dès qu'on y vote,
+//     avant tout le reste (Ilyes, 15/11 ; vote-du-jour.tsx) ; le rail des
+//     journées, collé en haut ; le jour du match, la feuille en direct (et,
+//     dessous, le vote qui attend sa feuille, grisé) ; puis, du dimanche soir
 //     au mercredi, le dernier dimanche joué d'abord (sa couverture, ses
-//     vidéos, son terrain, le vote du soir, ton dimanche, ton Flair, ses
+//     vidéos, son terrain, ton dimanche, ton Flair, ses
 //     rubriques), et la semaine qui se prépare ensuite ; du jeudi au matin
 //     du match, la semaine d'abord. La semaine : la convocation (la météo de
 //     ton match, meteo-match.tsx ; qui vient, Je viens / Je passe ; ta
@@ -63,7 +65,7 @@
 // Sur tablette et ordinateur (dès 768 px ; Sabri, 23/10 : « rends-le
 // responsive pour le desktop […] et réadapte toutes les dispositions »), le
 // fil devient une grille, deux colonnes puis trois dès 1280 px (.actus-gabarit,
-// actus.css). À gauche, ce qui se joue : le direct, le vote, la convocation et
+// actus.css). En tête, le vote et le direct ; puis, à gauche, la convocation et
 // la vidéo ; à droite, le contrat à la une et tes rubriques. Puis chaque dimanche : son
 // terrain à gauche, qui reste à l'écran pendant qu'on parcourt ses rubriques
 // à droite. Les onglets restent à gauche ; la course garde sa rangée, avec
@@ -1049,7 +1051,7 @@ function EpoqueEnCours({ epoques, vue, onVue, classement, exploit }: PropsEpoque
     />
   );
   // Le dimanche qui se prépare. Sur téléphone, un seul fil : la convocation et sa météo (tant
-  // que son dimanche n'est pas joué), le vote, la vidéo sans dimanche, le contrat à la une
+  // que son dimanche n'est pas joué), la vidéo sans dimanche, le contrat à la une
   // (vendredi et samedi, s'il y en a un), puis ce qui se joue. Sur grand écran, deux colonnes :
   // à gauche ce qui se joue, à droite le contrat à la une et les enjeux.
   const laSemaine = (
@@ -1084,18 +1086,22 @@ function EpoqueEnCours({ epoques, vue, onVue, classement, exploit }: PropsEpoque
         {vue === "classements" && <Ticker moi={me} />}
       </EnTete>
       {vue === "classements" ? (
-        <VueClassements vote={<VoteDuJour me={me} />} classement={classement} />
+        // Dans la colonne de la vue, déjà en retrait : l'encart sans marges, au bord de ses voisins.
+        <VueClassements vote={<VoteDuJour me={me} className="" />} classement={classement} />
       ) : vue === "matchs" ? (
         <VueMatchs />
       ) : (
         <>
-          {/* Le vote ouvert, juste sous la rangée de la Pépite d'Or, avant tout le reste
+          {/* Le vote où l'on vote déjà, juste sous la rangée de la Pépite d'Or, avant tout le reste
               (Ilyes, 15/11 : « bien visibles, qu'on les trouve partout » ; vote-du-jour.tsx). */}
-          <VoteDuJour me={me} />
+          <VoteDuJour me={me} lesquels="ouverts" />
           <RailJournees etapes={etapes} deplier={deplier} />
           {/* Le jour du match, la feuille qui se remplit, avant tout le reste. */}
           {/* Son lien mène à la feuille en direct (la Map), pas au récap, qui attend la révélation. */}
           <EnDirect ouvrir={() => router.push("/map")} sauf={recapDabord ? une?.j : undefined} />
+          {/* Tant que personne n'y vote (la feuille de mon match pas encore remplie), le vote
+              attend ici, grisé : la feuille en direct passe d'abord. */}
+          <VoteDuJour me={me} lesquels="en-attente" />
           {enSuspens.map((j) => {
             const meta = saison.journees.find((m) => m.j === j);
             return meta ? (
