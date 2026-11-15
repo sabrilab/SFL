@@ -28,16 +28,20 @@ export function creerEtatClavier() {
  * joueur tenu (I J K L relatives à lui) ; versEcran(gx, gz) → { sx, sy } : le repère du jeu vers l'écran (l'inverse de
  * versJeu de la commande). Sans cap, I J K L sont le haut, la gauche, le bas et la droite de l'écran.
  */
+// (correctifs #26 : tables parcourues sans allocation par image)
+let LBOUTON = null, LAXES = null, LDROIT = null;
+const v = [0, 0, 0, 0];
 export function etatDepuisTouches(tenues, t, etat, cap = null, versEcran = null) {
+  LBOUTON ??= Object.entries(BOUTON); LAXES ??= Object.entries(AXES); LDROIT ??= Object.entries(DROIT);
   etat.b.fill(0);
-  for (const [k, i] of Object.entries(BOUTON)) if (tenues.has(k)) etat.b[i] = 1;
-  const v = [0, 0, 0, 0];
-  for (const [k, [a, s]] of Object.entries(AXES)) if (tenues.has(k)) v[a] += s;
+  for (let n = 0; n < LBOUTON.length; n++) if (tenues.has(LBOUTON[n][0])) etat.b[LBOUTON[n][1]] = 1;
+  v[0] = 0; v[1] = 0; v[2] = 0; v[3] = 0;
+  for (let n = 0; n < LAXES.length; n++) { const [k, [a, s]] = LAXES[n]; if (tenues.has(k)) v[a] += s; }
   // le stick gauche : une diagonale reste à pleine allure (unitaire)
   const Lg = Math.hypot(v[0], v[1]);
   etat.ax[0] = Lg ? v[0] / Lg : 0; etat.ax[1] = Lg ? v[1] / Lg : 0;
   let av = 0, ga = 0;
-  for (const [k, [a, g]] of Object.entries(DROIT)) if (tenues.has(k)) { av += a; ga += g; }
+  for (let n = 0; n < LDROIT.length; n++) { const [k, [a, g]] = LDROIT[n]; if (tenues.has(k)) { av += a; ga += g; } }
   const Lr = Math.hypot(av, ga);
   if (Lr) {
     av /= Lr; ga /= Lr;

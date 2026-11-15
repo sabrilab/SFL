@@ -65,7 +65,7 @@ export const TOUCHES = [
   { id: 'choisir', partie: 'defense', action: 'Prendre celui de ce côté', xbox: 'RS', ps: 'RS', clavier: 'I J K L', pouce: '—', attendu: 'changer' },
   // ── le jeu ──
   { id: 'pause', partie: 'jeu', action: 'Pause', xbox: 'Menu', ps: 'Options', clavier: 'Échap', pouce: 'toucher le voile', attendu: null },
-  { id: 'touches', partie: 'jeu', action: 'Les touches', xbox: 'Vue', ps: 'Share', clavier: '—', pouce: '—', attendu: null },
+  { id: 'touches', partie: 'jeu', action: 'Les touches (écran Manettes)', xbox: 'Vue', ps: 'Share', clavier: '—', pouce: '—', attendu: null },
 ];
 
 export const PARTIES = [

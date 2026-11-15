@@ -70,7 +70,7 @@ import { SCENARIOS } from './sim/scenarios.js';
 import { chargerMesuresUrl } from './sim/clips.js';
 import { changerHumains } from './sim/monde.js';
 import { creerManettes, EFFETS } from './entrees/manettes.js';
-import { creerCommande, lireManette, intentionDe, oublier } from './entrees/commande.js';
+import { creerCommande, lireManette, intentionDe, oublier, enAttaque } from './entrees/commande.js';
 import { creerClavier, creerEtatClavier, etatDepuisTouches } from './entrees/clavier.js';
 import { creerLecteur, oublierLecteur, lireGesteStick } from './entrees/geste-stick.js';
 import { creerCameraTele, majCameraTele, poserFoyer, duelPresDuBut } from './rendu/camera.js';
@@ -312,7 +312,9 @@ export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, 
   function lireClavier(t) {
     if (m().phase !== 'jeu' || manettes.equipes()[0] || !clavier.utilise || pause) { if (cmdClavier.vu) oublier(cmdClavier); return; }
     const jc = m().controle[0] != null ? m().joueurs[m().controle[0]] : null;
-    etatDepuisTouches(clavier.tenues, t, etatClavier, jc?.cap ?? null, jeuVersEcran);
+    // (correctifs #26 : I J K L relatives au joueur pour les gestes, en attaque ; en défense, relatives à l'écran comme
+    // le stick droit d'une manette : I prend le coéquipier du haut de l'écran)
+    etatDepuisTouches(clavier.tenues, t, etatClavier, enAttaque(m(), 0) ? (jc?.cap ?? null) : null, jeuVersEcran);
     lireManette(cmdClavier, etatClavier, t, m(), 0, ecranVersJeu);
   }
   function lireEntrees() {
@@ -739,7 +741,7 @@ export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, 
       cancelAnimationFrame(raf);
       removeEventListener('keydown', clavierPause);
       removeEventListener('keydown', clavierRalenti);
-      son.detruire(); ombres.liberer(); marques.liberer();
+      son.detruire(); ombres.liberer(); marques.liberer(); filet?.liberer();
       ro.disconnect();
       pouce.detruire();
       clavier.detruire();
@@ -747,6 +749,8 @@ export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, 
       for (const v of vus) v.perso.liberer();
       pl.composer.dispose?.();
       renderer.dispose();
+      // (correctifs #26 : le contexte WebGL rend sa mémoire tout de suite, sans attendre le ramasse-miettes)
+      renderer.forceContextLoss();
       renderer.domElement.remove();
     },
   };

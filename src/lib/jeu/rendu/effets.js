@@ -50,7 +50,8 @@ export function formeOmbres(h, pg, pd, tete, out) {
   out[0] = h.x + ux * decal; out[1] = h.z + uz * decal; out[2] = large * (1 - haut * 0.3); out[3] = long * (1 - haut * 0.3); out[4] = axe;
   out[5] = 0.78 * (1 - haut * 0.6);
   let i = 6;
-  for (const p of [pg, pd]) {
+  for (let q = 0; q < 2; q++) {
+    const p = q ? pd : pg;
     const lev = clamp((p.y - 0.06) / 0.3, 0, 1);
     out[i] = p.x + p.ax * 0.05; out[i + 1] = p.z + p.az * 0.05; out[i + 2] = 0.2; out[i + 3] = 0.36; out[i + 4] = Math.atan2(p.ax, p.az);
     out[i + 5] = 0.9 * (1 - lev) * (1 - sol * 0.7);
@@ -112,7 +113,8 @@ export function creerOmbres(parent, n) {
         if (majMatrices) v.perso.racine.updateMatrixWorld(true);
         versJeu(w.setFromMatrixPosition(os.hips.matrixWorld), h);
         versJeu(w.setFromMatrixPosition((os.head ?? os.neck ?? os.hips).matrixWorld), tete);
-        for (const [pied, orteil, P] of [[os.leftfoot, os.lefttoebase, pg], [os.rightfoot, os.righttoebase, pd]]) {
+        for (let q = 0; q < 2; q++) {
+          const pied = q ? os.rightfoot : os.leftfoot, orteil = q ? os.righttoebase : os.lefttoebase, P = q ? pd : pg;
           if (!pied) { P.y = 9; continue; }
           versJeu(w.setFromMatrixPosition(pied.matrixWorld), P);
           if (orteil) { versJeu(w2.setFromMatrixPosition(orteil.matrixWorld), bout); const dx = bout.x - P.x, dz = bout.z - P.z, l = Math.hypot(dx, dz) || 1; P.ax = dx / l; P.az = dz / l; P.y = Math.min(P.y, bout.y); }
@@ -141,12 +143,14 @@ export const MARQUES = { largeur: 20, longueur: 32, px: 256, py: 160, vie: 20, g
  */
 export function traceGlisse(etat, h, t) {
   const bas = h.y < MARQUES.glisse;
+  // (correctifs #26 : le point d'avant est mis à jour sur place, sans nouvel objet par image)
   const prec = etat.h;
-  etat.h = { x: h.x, z: h.z, t };
-  if (!bas || !prec || t - prec.t > 0.2) return null;
-  const d = Math.hypot(h.x - prec.x, h.z - prec.z), v = d / Math.max(1e-3, t - prec.t);
+  const px = prec?.x, pz = prec?.z, pt = prec?.t;
+  if (prec) { prec.x = h.x; prec.z = h.z; prec.t = t; } else etat.h = { x: h.x, z: h.z, t };
+  if (!bas || !prec || t - pt > 0.2) return null;
+  const d = Math.hypot(h.x - px, h.z - pz), v = d / Math.max(1e-3, t - pt);
   if (d < 0.015 || v < 0.8 || d > 1.5) return null;
-  return { x0: prec.x, z0: prec.z, x1: h.x, z1: h.z, force: clamp((v - 0.8) / 4, 0.25, 1) };
+  return { x0: px, z0: pz, x1: h.x, z1: h.z, force: clamp((v - 0.8) / 4, 0.25, 1) };
 }
 
 export function creerMarques(parent) {
@@ -237,8 +241,11 @@ export function decouper(geo, n) {
 export function creerFilet(scene, versMonde) {
   const o = scene.getObjectByName('st_filets_buts');
   if (!o || !o.isMesh) return null;
-  o.geometry = decouper(o.geometry, 3);
-  const mat = o.material.clone();
+  // (correctifs #26 : l'ancienne géométrie et l'ancien matériau sont rendus au GPU, et liberer() rend les nouveaux)
+  const geo0 = o.geometry, mat0 = o.material;
+  o.geometry = decouper(geo0, 3);
+  geo0.dispose();
+  const mat = mat0.clone();
   // les mailles du filet sont fines : en test alpha (0,3), les mipmaps les faisaient disparaître dès quelques mètres (le
   // filet du but ne se voyait presque pas). En transparence, le filet lointain devient un voile léger, le proche ses
   // mailles ; il ne cache rien (pas d'écriture de profondeur)
@@ -260,6 +267,7 @@ export function creerFilet(scene, versMonde) {
   };
   mat.customProgramCacheKey = () => 'bola-jeu-filet-v3';
   o.material = mat;
+  mat0.dispose();
   o.frustumCulled = false;
   const inv = new THREE.Matrix4(), w = new THREE.Vector3(), d = new THREE.Vector3(), nm = new THREE.Matrix3();
   // les derniers chocs, datés en temps de jeu : le filet se rejoue aussi dans le ralenti du but (temps(t) relu)
@@ -287,5 +295,6 @@ export function creerFilet(scene, versMonde) {
       for (; n < 2; n++) impacts[n].w = -1;
     },
     vider() { histoire.length = 0; },
+    liberer() { o.geometry.dispose(); mat.dispose(); histoire.length = 0; },
   };
 }

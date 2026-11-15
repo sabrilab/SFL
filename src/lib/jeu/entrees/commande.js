@@ -85,6 +85,22 @@ export function oublier(cmd) {
  * Lit l'état d'une manette pour l'équipe e, dans le monde M, à l'heure t (s).
  * versJeu(sx, sy) : l'écran (sx vers la droite, sy vers le haut) → le repère du jeu { x, z }, selon la caméra.
  */
+/** L'équipe e attaque-t-elle (elle a la balle, ou son joueur tenu est à moins de 3,5 m d'une balle libre) ? */
+export function enAttaque(M, e) {
+  const p = porteur(M), bl = M.balle;
+  const j = M.controle[e] != null ? M.joueurs[M.controle[e]] : null;
+  return p ? p.e === e : !!(j && Math.hypot(bl.p.x - j.p.x, bl.p.z - j.p.z) < 3.5 && bl.garde == null);
+}
+
+/** (correctifs #26) Le joueur j est-il collé dans le dos du porteur p (à moins de 0,95 m, derrière sa course) ? */
+function dansLeDos(j, p) {
+  if (!j || !p || p.e === j.e) return false;
+  const rx = j.p.x - p.p.x, rz = j.p.z - p.p.z, d = Math.hypot(rx, rz);
+  const s = Math.hypot(p.v.x, p.v.z);
+  const fx = s > 0.8 ? p.v.x / s : Math.sin(p.cap), fz = s > 0.8 ? p.v.z / s : Math.cos(p.cap);
+  return d < 0.95 && d > 1e-6 && rx * fx + rz * fz < -0.35 * d;
+}
+
 export function lireManette(cmd, etat, t, M, e, versJeu) {
   const b = etat.b, ax = etat.ax, prec = cmd.prec;
   // à la première lecture, rien n'est un appui (un bouton tenu en arrivant ne déclenche rien)
@@ -112,7 +128,7 @@ export function lireManette(cmd, etat, t, M, e, versJeu) {
   const dirStick = st.amp > 0.3 ? versJeu(sx, sy) : null;
 
   const p = porteur(M);
-  const attaque = p ? p.e === e : !!(j && Math.hypot(bl.p.x - j.p.x, bl.p.z - j.p.z) < 3.5 && bl.garde == null);
+  const attaque = enAttaque(M, e);
   const lt = gachette(b[B.LT] ?? 0) > 0.3;
   const sortir = (a) => { cmd.attente = a; cmd.dernier = a; };
 
@@ -180,7 +196,9 @@ export function lireManette(cmd, etat, t, M, e, versJeu) {
     it.sortie = tenu(B.Y);
     it.renfort = tenu(B.RB);
     if (bas(B.X)) sortir({ type: 'tacle', glisse: true });
-    else if (bas(B.B)) sortir({ type: 'tacle', glisse: false });
+    // (correctifs #26 : collé dans le dos du porteur, B ne tacle pas : tenu, c'est le tirage de maillot ; avant, le
+    // premier appui partait toujours en tacle debout et le tirage n'arrivait jamais à la manette)
+    else if (bas(B.B) && !dansLeDos(j, p)) sortir({ type: 'tacle', glisse: false });
     if (bas(B.LB)) cmd.changer = true;
   }
 

@@ -143,13 +143,14 @@ export function creerAnimateur(perso, { gardien = false, reduit = false, versMon
   let phaseG = 0;
   const foulee = (n) => Math.max(0.3, (CLIPS[n]?.vitesse ?? 1) * (CLIPS[n]?.dur ?? 0.5));
   const calageG = (n) => CLIPS[n]?.appuis?.[0]?.[0]?.[0] ?? 0;
+  // (correctifs #26 : objets gardés d'une image à l'autre, aucune allocation par image)
+  const w = {}, domT = { nom: '', u: 0, w: 0 }, retourLoco = { dom: null, s: 0 };
   function poserLoco(e, total, wLoco, dt = 0) {
     const s = Math.hypot(e.vx, e.vz);
     if (gardien) phaseG = (phaseG + (dt * s) / foulee('k_side_l')) % 1;
     // vitesse dans le repère du joueur (x = sa gauche, z = devant)
     const c = Math.cos(e.cap), sn = Math.sin(e.cap);
     const lx = e.vx * c - e.vz * sn, lz = e.vx * sn + e.vz * c;
-    const w = {};
     for (const n of noms) w[n] = 0;
     if (gardien) {
       const cote = s > 0.3 ? clamp(Math.abs(lx) / s, 0, 1) : 0;
@@ -184,9 +185,10 @@ export function creerAnimateur(perso, { gardien = false, reduit = false, versMon
       const u = n === 'idle' || n === 'k_idle' ? ((total % dur) / dur) : gardien ? (phaseG + calageG(n)) % 1 : partCycle(n, e.phase);
       a.time = u * dur;
       a.setEffectiveWeight(w[n] * wLoco);
-      if (w[n] > dw && cl?.appuis && n !== 'idle' && n !== 'k_idle') { dw = w[n]; d = { nom: n, u, w: w[n] }; }
+      if (w[n] > dw && cl?.appuis && n !== 'idle' && n !== 'k_idle') { dw = w[n]; domT.nom = n; domT.u = u; domT.w = w[n]; d = domT; }
     }
-    return { dom: d, s };
+    retourLoco.dom = d; retourLoco.s = s;
+    return retourLoco;
   }
 
   /** Les couches : l'active va vers 1, les autres vers 0 à la vitesse de leur fondu ; leur somme ne dépasse pas 1. */
@@ -239,7 +241,7 @@ export function creerAnimateur(perso, { gardien = false, reduit = false, versMon
     let reste = 0; for (const c of couches) if (c !== active) reste += c.poids;
     const k = reste > 1 - wa ? (1 - wa) / reste : 1;
     for (const c of couches) { const p = c === active ? c.poids : c.poids * k; c.a.setEffectiveWeight(p); W += p; }
-    diag.couches = couches.length; diag.enFondu = couches.some((c) => c.poids > 0.02 && c.poids < 0.98); diag.noms = couches.map((c) => `${c.nom}:${c.poids.toFixed(2)}@${c.t.toFixed(2)}`);
+    diag.couches = couches.length; diag.enFondu = couches.some((c) => c.poids > 0.02 && c.poids < 0.98); if (diag.avecNoms) diag.noms = couches.map((c) => `${c.nom}:${c.poids.toFixed(2)}@${c.t.toFixed(2)}`);
     if (diag.sortie) { diag.sortie.reste -= dt; }
     return Math.min(1, W);
   }

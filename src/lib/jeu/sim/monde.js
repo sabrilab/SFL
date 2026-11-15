@@ -585,7 +585,23 @@ function pointCoupFranc(x, z) {
 /** Siffle un coup franc pour l'équipe A.e au point de la faute. */
 function coupFranc(m, A) {
   m.avantage = null;
-  const b = m.balle, pt = pointCoupFranc(A.x, A.z);
+  const b = m.balle;
+  let pt = pointCoupFranc(A.x, A.z);
+  // (correctifs #26) pas sous un corps au sol : la balle était posée sur le bassin du joueur fauté, encore couché ;
+  // elle va à côté de lui (à 0,7 m de son corps, couché le long de son cap sur 0,8 m de part et d'autre des hanches)
+  for (let passe = 0; passe < 3; passe++) {
+    let bouge = false;
+    for (const j of m.joueurs) {
+      if (j.absent || (j.mode !== 'sol' && j.mode !== 'releve')) continue;
+      const ux = sin(j.cap), uz = cos(j.cap);
+      const u = clamp((pt.x - j.p.x) * ux + (pt.z - j.p.z) * uz, -0.8, 0.8);
+      const qx = j.p.x + ux * u, qz = j.p.z + uz * u, dx = pt.x - qx, dz = pt.z - qz, d = hypot(dx, dz);
+      if (d >= 0.7) continue;
+      const nx = d > 1e-3 ? dx / d : uz, nz = d > 1e-3 ? dz / d : -ux;
+      pt = pointCoupFranc(qx + nx * 0.75, qz + nz * 0.75); bouge = true;
+    }
+    if (!bouge) break;
+  }
   // le joueur fauté s'il est debout, sinon le coéquipier debout le plus proche du point
   const debout = (j) => !j.absent && !j.gardien && j.mode !== 'sol' && j.mode !== 'releve';
   let tireur = debout(m.joueurs[A.victime]) ? m.joueurs[A.victime] : null;
@@ -755,7 +771,8 @@ export function pas(m, entrees = null) {
         // le coéquipier le plus proche vient applaudir (pouce levé)
         let q = null, dq = 9;
         for (const o of m.joueurs) if (o.e === j.e && o !== j && !o.gardien && !o.absent) { const d = hypot(o.p.x - j.p.x, o.p.z - j.p.z); if (d < dq) { dq = d; q = o; } }
-        if (q) lancerGeste(q, 'c_thumbs', { type: 'fete', fin: 1e9, depuis: 0.05 });
+        // (correctifs #26 : seulement s'il est debout et libre ; au sol, il se retrouvait debout d'un coup)
+        if (q && q.mode === 'loco') lancerGeste(q, 'c_thumbs', { type: 'fete', fin: 1e9, depuis: 0.05 });
       }
       if (m.phaseT <= 0) {
         if (m.reste <= 0) fin(m);

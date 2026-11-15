@@ -171,9 +171,10 @@ export default function JouerPage() {
         )}
       </div>
 
-      {/* le mot du résultat, au milieu */}
+      {/* le mot du résultat, en haut (correctifs #26 : au milieu, à 64 %, il couvrait le buteur qui célèbre au plan
+          rapproché) */}
       {etat?.message && (
-        <div className="pointer-events-none absolute inset-x-0 top-[64%] text-center">
+        <div className="pointer-events-none absolute inset-x-0 top-[17%] text-center">
           <span
             key={`${etat.noirs}-${etat.blancs}`}
             className={cn("jeu-mot inline-block text-[84px] leading-none tracking-tight", CLASSE_SCORE)}

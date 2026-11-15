@@ -266,7 +266,7 @@ function deuxManettes(graine: number) {
   // relevés, contrôles anticipés, plongeons bas, IA qui glisse moins souvent — d3f4e37b avant ; re-bénie par le lot 2 :
   // duels (tirage, poussée de dos, tacle contré), fautes et avantage, effet au pied, contrôle raté, centres et reprises,
   // appels, une-deux, pressing coordonné, gardien sur l'angle — 7c88787c avant ; les manettes ne la changent pas)
-  const REF = '43ecc41a'; // (correctifs #26 : l'IA sort des coins, le ciseau et le tacle glissé corrigés ; 7919334a avant)
+  const REF = '98ccc5d7'; // (correctifs #26 : l'IA sort des coins, ciseau et tacle glissé corrigés, pouce levé seulement debout, coup franc à côté du joueur au sol ; 7919334a avant)
   verifier('IA contre IA inchangée (graine 7)', empreinte(m) === REF, `${empreinte(m)} (attendu ${REF}, celle du banc physique)`);
 }
 
@@ -366,13 +366,16 @@ const TOUCHE: Record<string, string> = { A: 'd', B: 's', X: ' ', Y: 'f', LB: 'q'
 const tenir = (n: number, im: Image = {}): Image[] => Array.from({ length: n }, () => im);
 /** Les touches tenues qui font cette image au clavier (I J K L relatives au joueur de cap « cap »). */
 const versEcran = (gx: number, gz: number) => ({ sx: -gz, sy: -gx });
-function touchesDe(im: Image, cap: number) {
+function touchesDe(im: Image, cap: number | null) {
   const s = new Set<string>();
   for (const b of im.b ?? []) s.add(TOUCHE[b]);
   const [lx, ly] = im.ls ?? [0, 0], [rx, ry] = im.rs ?? [0, 0];
   if (lx > 0.3) s.add('arrowright'); if (lx < -0.3) s.add('arrowleft'); if (ly > 0.3) s.add('arrowup'); if (ly < -0.3) s.add('arrowdown');
-  if (rx || ry) {
-    const g = versJeu(rx, ry), fx = Math.sin(cap), fz = Math.cos(cap);
+  if ((rx || ry) && cap == null) {
+    // (en défense : le haut, la gauche, le bas, la droite de l'écran)
+    if (ry > 0.3) s.add('i'); if (ry < -0.3) s.add('k'); if (rx < -0.3) s.add('j'); if (rx > 0.3) s.add('l');
+  } else if (rx || ry) {
+    const g = versJeu(rx, ry), fx = Math.sin(cap as number), fz = Math.cos(cap as number);
     const av = fx * g.x + fz * g.z, ga = fz * g.x - fx * g.z;
     if (av > 0.3) s.add('i'); if (av < -0.3) s.add('k'); if (ga > 0.3) s.add('j'); if (ga < -0.3) s.add('l');
   }
@@ -421,7 +424,8 @@ function jouerSuite(S: Situation, suite: Image[], appareil: 'pad' | 'clavier', a
       e.ax[0] = im.ls?.[0] ?? 0; e.ax[1] = -(im.ls?.[1] ?? 0); e.ax[2] = im.rs?.[0] ?? 0; e.ax[3] = -(im.rs?.[1] ?? 0);
       lireManette(c, e, t, m, 0, versJeu);
     } else {
-      const cap = m.joueurs[m.controle[0] ?? 4].cap;
+      // (comme match.js : relatives au joueur en attaque, à l'écran en défense)
+      const cap = (Cmd as Any).enAttaque(m, 0) ? m.joueurs[m.controle[0] ?? 4].cap : null;
       etatDepuisTouches(touchesDe(im, cap), t, ec, cap, versEcran);
       lireManette(c, ec, t, m, 0, versJeu);
     }
@@ -582,6 +586,29 @@ ESSAIS.changerA.suite = appuyer(['LB'], 3);
     if (fr || !ff) rates.push(`A ${d} image(s) après : frappe ${fr}, feinte ${ff}`);
   }
   verifier('feinte de frappe après le relâché de X', rates.length === 0, rates.length ? rates.join(' ; ') : 'A 1, 3, 8, 12 images après le relâché : feinte, aucune frappe');
+}
+
+// ── (correctifs #26) B tenu dans le dos d'un porteur qui court : le tirage de maillot, pas un tacle debout ──
+{
+  const essai = (derriere: boolean) => {
+    const m = monde({ defense: true });
+    const p = m.joueurs[9], j = m.joueurs[4], b = m.balle;
+    // le porteur court vers +z ; le n° 10 Noir colle derrière lui (ou devant lui, face à face)
+    p.p.x = 0; p.p.z = 1; p.cap = 0; p.v.x = 0; p.v.z = 3;
+    b.p.x = 0; b.p.z = 1.45; b.v.x = 0; b.v.z = 3; b.possesseur = 9;
+    j.p.x = 0; j.p.z = derriere ? 0.4 : 2.0; j.cap = derriere ? 0 : Math.PI; j.v.x = 0; j.v.z = derriere ? 3 : 0;
+    const c = creerCommande(), e = pad(); let t = 0; const evts: string[] = [], gestes: string[] = [];
+    for (let i = 0; i < 40; i++) {
+      e.b.fill(0); e.b[K.B] = i > 0 ? 1 : 0; e.ax[0] = 0; e.ax[1] = derriere ? 1 : 0; e.ax[2] = 0; e.ax[3] = 0;
+      lireManette(c, e, t, m, 0, versJeu);
+      for (let k = 0; k < 2; k++) { pas(m, [intentionDe(c), { dx: 0, dz: 1, allure: 0.85, sprint: 0 }]); for (const ev of m.evts) evts.push(ev.type); m.evts.length = 0; const g = j.g?.type; if (g && gestes[gestes.length - 1] !== g) gestes.push(g); }
+      t += 1 / 60;
+    }
+    return { tirage: evts.includes('tirage'), tacle: gestes.includes('tacleDebout') };
+  };
+  const dos = essai(true), face = essai(false);
+  verifier('B tenu dans le dos : tirage, de face : tacle debout', dos.tirage && !dos.tacle && face.tacle,
+    `dans le dos : tirage ${dos.tirage}, tacle debout ${dos.tacle} ; de face : tacle debout ${face.tacle}`);
 }
 
 // ── aucun geste en défense ──

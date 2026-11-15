@@ -23,12 +23,15 @@ const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
 const smooth = (x, a, b) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
 
 /** Un ressort critique sur une valeur (x, v) vers la cible c, de pulsation w, pas dt : exact, stable, sans dépassement. */
+const VITESSE = { x: 'xv', y: 'yv', z: 'zv' };
+const AXES = ['x', 'y', 'z'];
 export function ressortCritique(r, k, c, w, dt) {
-  const x = r[k], v = r[k + 'v'] ?? 0;
+  const kv = VITESSE[k] ?? k + 'v';
+  const x = r[k], v = r[kv] ?? 0;
   const e = Math.exp(-w * dt), d = x - c;
   const j = (v + w * d) * dt;
   r[k] = c + (d + j) * e;
-  r[k + 'v'] = (v - w * j) * e;
+  r[kv] = (v - w * j) * e;
 }
 
 export const CAMERA_TELE = {
@@ -118,7 +121,7 @@ export function majCameraTele(c, E, dt, P = CAMERA_TELE) {
   // la place et le regard de la caméra : des ressorts critiques aussi (une frappe : le cadre rejoint le but plus vite) ;
   // la vitesse du cadre ne casse jamais, même quand la cible change d'un coup (frappe, but, célébration)
   const w = face ? P.wFace : c.recul > 0.05 ? P.wCadreTir : P.wCadre;
-  for (const k of ['x', 'y', 'z']) { ressortCritique(c.pos, k, voulu[k], w, dt); ressortCritique(c.regard, k, regard[k], w * 1.15, dt); }
+  for (const k of AXES) { ressortCritique(c.pos, k, voulu[k], w, dt); ressortCritique(c.regard, k, regard[k], w * 1.15, dt); }
   return c;
 }
 

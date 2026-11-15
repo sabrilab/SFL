@@ -277,6 +277,7 @@ const totaux: Record<string, number> = {};
 const SM: Record<string, number> = { passes: 0, passesOk: 0, arrets: 0, fautes: 0, vols: 0, uneDeux: 0, aeriens: 0, avantages: 0, coupsFrancs: 0, tirages: 0, appels: 0, contresTacle: 0 };
 let bisN = 0, bisSomme = 0, fautesOuvertes = 0, ecartMin = Infinity;
 const surPlaceMax = { d: 0, ou: '' };
+let cfPoses = 0, cfSous = 0;
 const { surAngle }: Any = Gar;
 for (let g = 1; g <= N; g++) {
   let passeEq = -1;
@@ -314,6 +315,8 @@ for (let g = 1; g <= N; g++) {
         if (pen > penMax) { penMax = pen; penOu = `g${g} ${a}(${A.mode}${A.g ? ' ' + A.g.nom : ''})-${c}(${B.mode}${B.g ? ' ' + B.g.nom : ''}) à ${m.t.toFixed(1)} s`; }
       }
     }
+    // (correctifs #26) la balle du coup franc n'est jamais posée sous un corps au sol
+    if (m.evts.some((e: Any) => e.type === 'coupFranc')) { cfPoses++; const bp = m.balle.p; for (const j of m.joueurs) if (!j.absent && (j.mode === 'sol' || j.mode === 'releve')) { const ux = Math.sin(j.cap), uz = Math.cos(j.cap); const u = Math.max(-0.8, Math.min(0.8, (bp.x - j.p.x) * ux + (bp.z - j.p.z) * uz)); if (Math.hypot(bp.x - j.p.x - ux * u, bp.z - j.p.z - uz * u) < 0.45) cfSous++; } }
     for (const e of m.evts) {
       totaux[e.type] = (totaux[e.type] ?? 0) + 1; if (e.type === 'frappe' || e.type === 'passe') if (e.effleure) effleurees++;
       // une passe est réussie si le prochain joueur (ou gardien) à prendre la balle est de la même équipe
@@ -348,6 +351,7 @@ for (let g = 1; g <= N; g++) {
   const mb = moy(buts);
   verifier(`Matchs IA contre IA (${N} × 150 s)`, nan === 0 && blocages === 0 && dehorsCorps === 0 && mb >= 1.5 && mb <= 10 && sansBut <= 0.25,
     `NaN ${nan}, blocages ${blocages}${detailsBlocage.length ? ' (' + detailsBlocage.slice(0, 4).join(', ') + ')' : ''}, corps hors du terrain ${dehorsCorps}, buts par match ${f2(mb)} (de ${Math.min(...buts)} à ${Math.max(...buts)}, ${(sansBut * 100).toFixed(0)} % sans but), relances de coin ${antiBlocages}`);
+  verifier('Coup franc : balle à côté du joueur au sol', cfPoses > 10 && cfSous === 0, `${cfPoses} coups francs, ${cfSous} balle(s) posée(s) à moins de 0,45 m d'un corps au sol (31 sur 58 avant le correctif)`);
   verifier('Balle jamais coincée (correctifs #26)', surPlaceMax.d <= 15, `au plus ${surPlaceMax.d.toFixed(1)} s dans un rond de 2 m en jeu (${surPlaceMax.ou}) ; borne 15 s`);
   const per = (k: string) => f2((totaux[k] ?? 0) / N);
   console.log(`      par match : passes ${per('passe')}, frappes ${per('frappe')}, tacles balle ${per('tacleBalle')}, tacles jambes ${per('tacleJambes')}, épaules ${per('epaule')}, chutes ${per('chute')}, plongeons ${per('plongeon')}, parades ${per('parade')}, captés ${per('capte')}, poteaux ${per('poteau')}`);
@@ -1175,7 +1179,8 @@ const balleA = (m: Any, x: number, z: number, vx = 0, vz = 0, pos: number | null
       const lectures: Any[] = []; let cur: Any = null, buts = 0, filets = 0, butsAvecFilet = 0, tBut = -9;
       const sortie: Any = {};
       let images = 0;
-      while (m.pas < FIN && images < 400000) {
+      // (correctifs #26 : un but marqué juste avant FIN va au bout de sa phase « but », et de son ralenti)
+      while ((m.pas < FIN || m.phase === 'but' || (avecRalenti && simGelee(R))) && images < 400000) {
         images++;
         if (avecRalenti && R.etat === 'pret' && m.phase === 'but' && m.phaseT < 0.62) { if (lancerRalenti(R, T)) cur = { pas: m.pas, emp: empreinte(m), plans: [] as string[], ecran: dureeRalenti(R), duree: 0, pasPendant: 0 }; }
         if (avecRalenti && simGelee(R)) {
@@ -1244,7 +1249,7 @@ const balleA = (m: Any, x: number, z: number, vx = 0, vz = 0, pos: number | null
       for (const j of m.joueurs) {
         const h = j.g && (j.mode === 'geste' || j.mode === 'sol') ? hancheA(j.g.nom, j.g.t) : 0.95;
         const T = traceGlisse(etats[j.i], { x: j.p.x, y: h, z: j.p.z }, m.t);
-        if (T) { traces++; if (j.g?.nom === 'slide' || j.g?.nom === 'c_slide' || /fall|trip|volley|bicycle/.test(j.g?.nom ?? '')) glisses++; else { faux++; fauxNoms.add(`${j.mode}:${j.g?.nom ?? '-'}`); } }
+        if (T) { traces++; if (j.g?.nom === 'slide' || j.g?.nom === 'c_slide' || /fall|trip|volley|bicycle|k_block|k_low|k_high|k_dive/.test(j.g?.nom ?? '')) glisses++; else { faux++; fauxNoms.add(`${j.mode}:${j.g?.nom ?? '-'}`); } }
       }
     }
     const e2: Any = {}; let marche = 0; for (let i = 0; i < 60; i++) if (traceGlisse(e2, { x: 0, y: 0.95, z: i * 0.05 }, i / 60)) marche++;

@@ -1,8 +1,8 @@
 // Les clips Mixamo du jeu /jouer, des FBX de la bibliothèque de Sabri aux paquets brouillés (bola-app#26, lot 1).
 //
 // Adapté de sabrilab/bola-game (tools/anims/convert.mjs, lui-même repris d'Aeriea), sans aucune dépendance nouvelle :
-//   · les FBX sont lus en place, dans le clone local de sabrilab/mixamo-library (chemin : JEU_MIXAMO, sinon
-//     /home/user/mixamo-library/Mixamo Animations), par le FBXLoader de three déjà installé ; rien n'est copié ;
+//   · les FBX sont lus en place, dans le clone local de la bibliothèque Mixamo (dossier « Mixamo Animations », donné par
+//     la variable JEU_MIXAMO, obligatoire), par le FBXLoader de three déjà installé ; rien n'est copié ;
 //   · même cuisson que bola-game : squelette canonique sans préfixe « mixamorig », position des hanches normalisée
 //     (1 = hanche au repos), déplacement horizontal (root motion) sorti sur un nœud « Root » (sauf root: 'keep'), miroir gauche / droite,
 //     lacet retiré (unturn), rognage (from, to), impact par vitesse maximale d'un os, plus yaw et hitAt (manifeste) ;
@@ -30,7 +30,8 @@ const { FBXLoader } = await import('three/examples/jsm/loaders/FBXLoader.js');
 const { pak } = await import(path.join(racine, 'src/lib/jeu/pakcodec.js'));
 const { PACKS } = await import(path.join(ici, 'jeu-anims-manifest.mjs'));
 
-const SRC = process.env.JEU_MIXAMO || '/home/user/mixamo-library/Mixamo Animations';
+const SRC = process.env.JEU_MIXAMO;
+if (!SRC) { console.error('JEU_MIXAMO : le dossier « Mixamo Animations » de la bibliothèque (clone local)'); process.exit(1); }
 const OUT = path.join(racine, 'public/jeu/anims');
 const ONLY = process.argv[2];
 const FPS = 30;
