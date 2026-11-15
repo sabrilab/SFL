@@ -83,6 +83,29 @@ export function lireEnvironnement(): Environnement {
 }
 
 /**
+ * L'adresse à rouvrir hors de l'app hôte : la page affichée, avec la source
+ * d'arrivée du visiteur.
+ * - `href` est l'adresse de la barre, `chemin` la page que React affiche
+ *   (usePathname). Après une navigation interne, la page change avant
+ *   l'adresse : venu de /sfl par « Créer mon compte », le guide rouvrait /sfl
+ *   au lieu de l'inscription (12/11/2026). La suite de l'ancienne adresse
+ *   (`?…`) ne vaut pas pour la nouvelle page : elle est retirée.
+ * - `source` (site-visites.ts, sourceArrivee) part en `utm_source` : le
+ *   navigateur où l'on arrive est neuf, sans référent ; sans elle, Admin →
+ *   Acquisition comptait les arrivées d'Instagram, pas leurs comptes créés.
+ *   Une adresse qui porte déjà sa source la garde.
+ */
+export function adresseSortie(href: string, chemin: string | null | undefined, source: string | null): URL {
+  const url = new URL(href);
+  if (chemin && chemin !== url.pathname) {
+    url.pathname = chemin;
+    url.search = "";
+  }
+  if (source && !url.searchParams.has("utm_source")) url.searchParams.set("utm_source", source);
+  return url;
+}
+
+/**
  * Lien qui rouvre la page courante hors de l'app hôte.
  * - iPhone : le schéma `x-safari-https://` ouvre Safari (iOS 17 et plus) ;
  *   les apps qui l'ignorent laissent le bouton sans effet, d'où les étapes
