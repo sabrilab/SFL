@@ -318,7 +318,15 @@ const cle = (m: Map<string, unknown>) => JSON.stringify([...m].sort());
   const d1830 = direct(hiver("2026-11-08 18:30"));
   assert.equal(revelationAttendue(d1830, hiver("2026-11-08 18:30")), 5);
   assert.equal(revelationAttendue(direct(a19), a19), null);
-  assert.equal(cloturerSaison(d1830), d1830, "pas de clôture avant la révélation");
+  // cloturerSaison lit l'heure réelle : sans l'horloge fixée, ce banc échouait depuis le 8/11 à 19 h (la J5 du
+  // jeu d'essai est révélée pour de bon), et `npm run checks` avec lui (relecture du 15/11).
+  const vraieHeure = Date.now;
+  Date.now = () => hiver("2026-11-08 18:30").getTime();
+  try {
+    assert.equal(cloturerSaison(d1830), d1830, "pas de clôture avant la révélation");
+  } finally {
+    Date.now = vraieHeure;
+  }
 }
 
 /* ------------------------- 7 · La J4 : l'ancien régime ------------------------- */

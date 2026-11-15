@@ -534,6 +534,30 @@ export function avecMainsDeLaBase(s: Saison, mains: Record<string, MainSurLeVote
   return change ? { ...s, journees } : s;
 }
 
+/**
+ * Les mains que la base a réellement remises : celles de sa réponse qui
+ * diffèrent du document que CETTE publication a envoyé. Une réponse égale à
+ * l'envoi ne dit rien de neuf — et ne doit pas toucher l'appareil : un geste
+ * posé pendant qu'une publication plus ancienne était en vol (un but corrigé
+ * à 18 h 39 min 59 s, « Garder les votes ouverts » à 18 h 40) serait effacé
+ * par la réponse de la première, puis perdu pour toute la ligue à la
+ * publication suivante.
+ */
+export function mainsRemises(
+  envoyee: Pick<Saison, "journees">,
+  mains: Record<string, MainSurLeVote | null | undefined>
+): Record<string, MainSurLeVote | null> {
+  const remises: Record<string, MainSurLeVote | null> = {};
+  for (const m of envoyee.journees) {
+    const k = String(m.j);
+    if (!(k in mains)) continue;
+    const ouverts = mains[k]?.votesOuvertsLe || null;
+    const fermes = mains[k]?.votesFermesLe || null;
+    if ((m.votesOuvertsLe ?? null) !== ouverts || (m.votesFermesLe ?? null) !== fermes) remises[k] = mains[k] ?? null;
+  }
+  return remises;
+}
+
 /* ------------------------------ Les libellés ------------------------------ */
 
 /** « 18 h », « 18 h 40 », « minuit », à Paris. */
