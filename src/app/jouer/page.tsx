@@ -11,8 +11,17 @@
 //
 // Gestes, dans le bas de l'écran : glisser = courir (loin = sprint) ; toucher =
 // passe (ou tacle en défense) ; coup sec vers la droite = frappe ; coup sec
-// vers le haut ou le bas = roulette. La caméra est sur le côté, comme à la télé. Pas de texte d'aide : un pouce fantôme montre le geste tant
-// qu'on n'a pas touché l'écran.
+// vers le haut ou le bas = roulette ; sans la balle, coup sec vers le porteur = tacle glissé. Depuis bola-app#23, le
+// match est une simulation physique à pas fixe (lib/jeu/sim) : élan, contacts, ballon libre, gardiens qui lisent la
+// trajectoire ; ?banc&graine=N rejoue le même match. La caméra est sur le côté, comme à la télé. Pas de texte d'aide : un pouce fantôme montre le geste tant
+// qu'on n'a pas touché l'écran (pas quand on joue à la manette).
+//
+// Les manettes (bola-app#23) : s'il y en a une de visible (le navigateur ne la montre qu'après un appui), « Jouer » ouvre
+// l'écran Manettes (./manettes.tsx) : qui joue les Noirs, qui joue les Blancs (une manette, Noirs contre l'IA ; deux,
+// Noirs contre Blancs). A / ✕ ou Menu sur une manette, avant le match, l'ouvre aussi ; Menu / Options ou « Jouer » le
+// lance. Une manette branchée ou débranchée en plein match ne l'arrête pas : l'IA reprend son équipe. Menu / Options
+// met en pause (deux barres au milieu, sans texte ; Échap ou P au clavier ; un toucher sur le voile reprend). Sur
+// l'écran d'attente, une manette branchée apparaît tout de suite en petit au-dessus de « Jouer ».
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
@@ -22,6 +31,7 @@ import { useMyPlayer } from "@/components/sfl/player-provider";
 import { isAdmin } from "@/lib/sfl/admin";
 import { photoPerso, rafraichirPhotos } from "@/lib/sfl/photos";
 import { cn } from "@/lib/utils";
+import { EcranManettes, ManettesVues, type MagasinManettes } from "./manettes";
 
 type Etat = {
   phase: "attente" | "intro" | "engagement" | "jeu" | "but" | "fin";
@@ -30,8 +40,16 @@ type Etat = {
   reste: number;
   message: string | null;
   buteur: "moi" | "noirs" | "blancs" | null;
+  pause: boolean;
+  manettes: boolean;
 };
-type Match = { demarrer: () => void; detruire: () => void };
+type Match = {
+  demarrer: () => void;
+  detruire: () => void;
+  salon: (ouvert: boolean) => void;
+  reprendre: () => void;
+  manettes: MagasinManettes & { reconnues: () => number };
+};
 
 const chrono = (s: number) => {
   const t = Math.max(0, Math.ceil(s));
@@ -49,6 +67,25 @@ export default function JouerPage() {
   const [touche, setTouche] = useState(false);
   const boite = useRef<HTMLDivElement>(null);
   const match = useRef<Match | null>(null);
+  const [salon, setSalon] = useState(false);
+  const [reduit, setReduit] = useState(false);
+  // (les manettes appellent ces deux-là depuis la boucle du jeu : on passe par des références)
+  const ouvrirSalon = useRef<() => void>(() => {});
+  const lancer = useRef<() => void>(() => {});
+  const [magasin, setMagasin] = useState<MagasinManettes | null>(null);
+  const phaseVue = etat?.phase ?? "attente";
+  useEffect(() => {
+    ouvrirSalon.current = () => {
+      if (!match.current || (phaseVue !== "attente" && phaseVue !== "fin")) return;
+      match.current.salon(true);
+      setSalon(true);
+    };
+    lancer.current = () => {
+      if (!match.current) return;
+      setSalon(false);
+      match.current.demarrer();
+    };
+  }, [phaseVue]);
 
   useEffect(() => {
     if (!monte || !boite.current) return;
@@ -58,14 +95,23 @@ export default function JouerPage() {
         await rafraichirPhotos().catch(() => {});
         const photo = me ? photoPerso(me) : null;
         const reduit = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+        setReduit(reduit);
         const { creerMatch } = await import("@/lib/jeu/match.js");
         if (fini || !boite.current) return;
-        const m = (await creerMatch(boite.current, { photo, reduit, surEtat: (e: Etat) => setEtat(e), surProgres: (p: number) => setProgres(p) })) as Match;
+        const m = (await creerMatch(boite.current, {
+          photo,
+          reduit,
+          surEtat: (e: Etat) => setEtat(e),
+          surProgres: (p: number) => setProgres(p),
+          surSalon: () => ouvrirSalon.current(),
+          surDemarrer: () => lancer.current(),
+        })) as unknown as Match;
         if (fini) {
           m.detruire();
           return;
         }
         match.current = m;
+        setMagasin(m.manettes);
         // banc de captures (?banc) : le match piloté depuis la console
         if (new URLSearchParams(window.location.search).has("banc")) (window as unknown as { __bolaJeu: Match }).__bolaJeu = m;
         setPret(true);
@@ -127,14 +173,36 @@ export default function JouerPage() {
       )}
 
       {/* le pouce fantôme : le geste, tant qu'on n'a pas touché */}
-      {phase === "jeu" && !touche && (
+      {phase === "jeu" && !touche && !etat?.manettes && !etat?.pause && (
         <div className="pointer-events-none absolute bottom-[14%] left-[38%] -translate-x-1/2">
           <div className="jeu-fantome h-10 w-10 rounded-full bg-white/80 shadow-[0_2px_14px_rgba(0,0,0,.4)]" />
         </div>
       )}
 
+      {/* la pause (Menu / Options) : deux barres, sans texte */}
+      {etat?.pause && (
+        <div
+          className="absolute inset-0 flex items-center justify-center bg-black/45"
+          onPointerDown={(e) => {
+            // le voile se touche : au doigt ou à la souris, le match reprend (sans manette, rien d'autre ne le pourrait)
+            e.stopPropagation();
+            match.current?.reprendre();
+          }}
+        >
+          <div className="flex gap-3">
+            <span className="h-14 w-4 rounded-sm bg-white" />
+            <span className="h-14 w-4 rounded-sm bg-white" />
+          </div>
+        </div>
+      )}
+
+      {/* l'écran Manettes */}
+      {salon && magasin && (phase === "attente" || phase === "fin") && (
+        <EcranManettes magasin={magasin} reduit={reduit} onJouer={() => lancer.current()} />
+      )}
+
       {/* avant, et après */}
-      {(phase === "attente" || phase === "fin") && (
+      {!salon && (phase === "attente" || phase === "fin") && (
         <div
           className="absolute inset-x-0 bottom-0 flex flex-col items-center gap-4 px-6"
           style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 28px)" }}
@@ -146,6 +214,7 @@ export default function JouerPage() {
               <span className={cn(etat.blancs < etat.noirs && "text-white/40")}>{etat.blancs}</span>
             </div>
           )}
+          {magasin && pret && !erreur && <ManettesVues magasin={magasin} />}
           {erreur ? (
             <p className="text-center text-[15px] text-white/70">{erreur}</p>
           ) : (
@@ -153,7 +222,9 @@ export default function JouerPage() {
               disabled={!pret}
               onClick={(e) => {
                 e.stopPropagation();
-                match.current?.demarrer();
+                // une manette visible : d'abord l'écran Manettes
+                if (match.current && match.current.manettes.reconnues() > 0) ouvrirSalon.current();
+                else lancer.current();
               }}
               className="h-14 w-full max-w-[320px] rounded-full bg-white text-[17px] font-bold text-black transition-opacity disabled:opacity-40"
             >
