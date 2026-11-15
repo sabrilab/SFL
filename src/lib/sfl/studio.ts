@@ -6,9 +6,10 @@
 // seulement (components/sfl/studio-bola.tsx) : aucun achat, aucun porte-
 // monnaie touché, aucun appel à un service de génération.
 //
-// La seule source du studio : les douze templates et leurs prix, les ballons
-// de l'abonnement, les recharges. Les prix ne sont pas encore validés par
-// Sabri : ils se changent ICI, et seulement ici (tools/studio-check.ts).
+// La seule source du studio : les douze templates, leurs prix et leurs
+// vignettes, les ballons de l'abonnement, les recharges. Les prix ne sont pas
+// encore validés par Sabri : ils se changent ICI, et seulement ici
+// (tools/studio-check.ts).
 //
 //   · un ballon vaut un centime (lib/sfl/ballons.ts, BALLONS_PAR_EURO = 100) ;
 //   · Bola Plus donne BALLONS_PAR_MOIS (300) chaque mois, aux deux formules ;
@@ -27,19 +28,25 @@
 // n'ont pas été recopiés ici depuis le chiffrage ; l'écran ne les montre
 // jamais.
 //
-// La scène de chaque template : la vignette qui dit ce que le joueur reçoit,
-// composée par l'écran avec ce qui existe déjà (aucune image générée pour le
-// studio) : un visuel de public/bola-plus/ (le stade de piliers la nuit, le
-// portant des maillots, et depuis le carrousel du 14/11 les visuels de la
-// part SFL, où jouent des joueurs génériques : le duel filmé, les cadeaux sur
-// le socle, la cérémonie et ses confettis), recadré, et la vraie carte
-// anonyme « Toi » (BolaCard, DosCarte), ou le symbole Bola pour le ballon ;
-// la carte n'est jamais posée sur un joueur de l'image. L'écran teint le fond
-// dans le violet de Bola Plus. Une vidéo est un cadrage qui bouge lentement,
-// arrêté avec « Réduire les animations ».
+// La vignette de chaque template : une vraie image (retour de Sabri du
+// 15/11/2026 sur bola-app#22, « les vraies vignettes des 12 modèles »). Les
+// douze ont été générées hors de l'app, à sa demande : du noir et blanc, des
+// silhouettes sans visage dans le stade de colonnes de marbre, aucun joueur
+// réel, le tiers bas sombre. Elles sont dans public/bola-plus/studio/,
+// numérotées dans l'ordre du catalogue (« 01-ma-carte-en-vrai.webp »), en
+// 4:5 (980 × 1226, la taille de leur capture : une ligne de pixels de plus
+// que 4:5) ; à côté de chacune, sa copie plus légère pour le rail
+// (« 01-ma-carte-en-vrai-660.webp », 660 × 825 : le suffixe de largeur de
+// public/bola-plus/). Chaque template porte la sienne (Template.image).
+// L'écran les montre telles quelles : en 4:5, jamais recadrées en carré, ni
+// grossies, ni teintes (elles sont en noir et blanc par choix), ni animées ;
+// il écrit le nom du modèle et son prix en ballons sur leur tiers bas. Elles
+// remplacent les vignettes composées du 14/11 (un visuel de Bola Plus
+// recadré et teint en violet, la carte « Toi » posée dessus).
 // La carte « Ton studio » du carrousel Bola Plus montre trois de ces
-// templates en éventail (EVENTAIL_STUDIO) : la carte en vrai au milieu, qui
-// se lit en petit, et un sujet dans chaque vignette.
+// templates en éventail (EVENTAIL_STUDIO) : la carte en vrai au milieu, la
+// seule entière, avec son nom et son prix ; de chaque côté, une image dont
+// le sujet dépasse.
 //
 // Pur : ni React ni réseau.
 
@@ -49,38 +56,11 @@ import { montant } from "./bola-plus";
 /** Une image fixe, ou une vidéo de tant de secondes. */
 export type Rendu = { genre: "image" } | { genre: "video"; secondes: number };
 
-/** Les visuels de public/bola-plus/ sur lesquels une scène se compose. */
-export const FONDS = ["affiche", "maillots", "matchs-filmes", "cadeaux", "ceremonies"] as const;
-export type Fond = (typeof FONDS)[number];
-/** Un visuel de Bola Plus (Visuel.image, une chaîne) est-il un fond du studio ? */
-export const estFond = (image: string): image is Fond => (FONDS as readonly string[]).includes(image);
-
 /**
- * La mise en scène d'une vignette :
- *   · tenue : la carte, de près, penchée, comme tenue en main ;
- *   · une : la carte en couverture, le logo Bola en tête ;
- *   · affiche : la face et le dos, droits, en miroir, le ballon entre les deux
- *     (le « contre » de l'affiche) ;
- *   · provoc : la carte seule, de très près, penchée vers l'objectif ; le dos
- *     de l'adversaire coupé au bord du cadre, flou ;
- *   · sortie : la carte en grand, qui avance vers l'écran ;
- *   · trois : trois plans côte à côte, la carte au milieu ;
- *   · loin : la carte petite, au bout de l'allée de piliers ;
- *   · ballon : le symbole Bola (le ballon) au bout de sa course, la carte en bas ;
- *   · rang : cinq cartes en rang, la face au milieu ;
- *   · fond : le visuel seul.
+ * Les vignettes (public/bola-plus/studio/) : leur rapport hauteur sur largeur
+ * (4:5), la largeur du fichier d'origine et celle de sa copie légère.
  */
-export type Pose = "tenue" | "une" | "affiche" | "provoc" | "sortie" | "trois" | "loin" | "ballon" | "rang" | "fond";
-
-export interface Scene {
-  fond: Fond;
-  /** Le point du visuel gardé au centre, en % de sa largeur et de sa hauteur. */
-  x: number;
-  y: number;
-  /** Le grossissement du visuel (1 : plein cadre). */
-  zoom: number;
-  pose: Pose;
-}
+export const VIGNETTE = { rapport: 5 / 4, largeur: 980, legere: 660 } as const;
 
 export interface Template {
   id: string;
@@ -95,7 +75,8 @@ export interface Template {
   /** Le modèle de génération et son coût en crédits, pour la marge : jamais à l'écran. */
   modele: string | null;
   credits: number | null;
-  scene: Scene;
+  /** Sa vignette : son fichier dans public/bola-plus/studio/, sans l'extension (« 01-ma-carte-en-vrai »). */
+  image: string;
 }
 
 /** Les ballons de Bola Plus, chaque mois, aux deux formules. */
@@ -113,7 +94,7 @@ export const TEMPLATES: readonly Template[] = [
     prix: 49,
     modele: null,
     credits: null,
-    scene: { fond: "cadeaux", x: 50, y: 62, zoom: 1.35, pose: "tenue" },
+    image: "01-ma-carte-en-vrai",
   },
   {
     id: "maillot-a-ton-nom",
@@ -123,8 +104,7 @@ export const TEMPLATES: readonly Template[] = [
     prix: 49,
     modele: null,
     credits: null,
-    // Le maillot noir seul, de près (ni nom ni numéro : à générer, voir le compte rendu).
-    scene: { fond: "maillots", x: 32, y: 44, zoom: 2.2, pose: "fond" },
+    image: "02-maillot-a-ton-nom",
   },
   {
     id: "une-du-dimanche",
@@ -134,7 +114,7 @@ export const TEMPLATES: readonly Template[] = [
     prix: 79,
     modele: null,
     credits: null,
-    scene: { fond: "affiche", x: 50, y: 40, zoom: 1.15, pose: "une" },
+    image: "03-la-une-du-dimanche",
   },
   {
     id: "affiche-du-match",
@@ -144,7 +124,7 @@ export const TEMPLATES: readonly Template[] = [
     prix: 99,
     modele: null,
     credits: null,
-    scene: { fond: "affiche", x: 50, y: 58, zoom: 1.25, pose: "affiche" },
+    image: "04-l-affiche-du-match",
   },
   {
     id: "celebration",
@@ -154,7 +134,7 @@ export const TEMPLATES: readonly Template[] = [
     prix: 199,
     modele: null,
     credits: null,
-    scene: { fond: "ceremonies", x: 80, y: 8, zoom: 2.2, pose: "tenue" },
+    image: "05-la-celebration",
   },
   {
     id: "trash-talk",
@@ -164,7 +144,7 @@ export const TEMPLATES: readonly Template[] = [
     prix: 299,
     modele: null,
     credits: null,
-    scene: { fond: "affiche", x: 50, y: 62, zoom: 1.6, pose: "provoc" },
+    image: "06-trash-talk",
   },
   {
     id: "sorti-de-la-carte",
@@ -174,7 +154,7 @@ export const TEMPLATES: readonly Template[] = [
     prix: 299,
     modele: null,
     credits: null,
-    scene: { fond: "affiche", x: 50, y: 70, zoom: 1.3, pose: "sortie" },
+    image: "07-sorti-de-la-carte",
   },
   {
     id: "option-hd",
@@ -185,7 +165,7 @@ export const TEMPLATES: readonly Template[] = [
     prix: 399,
     modele: null,
     credits: null,
-    scene: { fond: "matchs-filmes", x: 54, y: 46, zoom: 1.4, pose: "fond" },
+    image: "08-option-hd",
   },
   {
     id: "ta-saison",
@@ -195,7 +175,7 @@ export const TEMPLATES: readonly Template[] = [
     prix: 499,
     modele: null,
     credits: null,
-    scene: { fond: "affiche", x: 50, y: 50, zoom: 1, pose: "trois" },
+    image: "09-ta-saison",
   },
   {
     id: "entree",
@@ -205,7 +185,7 @@ export const TEMPLATES: readonly Template[] = [
     prix: 599,
     modele: null,
     credits: null,
-    scene: { fond: "affiche", x: 50, y: 52, zoom: 1.05, pose: "loin" },
+    image: "10-l-entree",
   },
   {
     id: "but-de-ta-journee",
@@ -215,7 +195,7 @@ export const TEMPLATES: readonly Template[] = [
     prix: 599,
     modele: null,
     credits: null,
-    scene: { fond: "affiche", x: 50, y: 78, zoom: 1.5, pose: "ballon" },
+    image: "11-le-but-de-ta-journee",
   },
   {
     id: "convocation",
@@ -225,7 +205,7 @@ export const TEMPLATES: readonly Template[] = [
     prix: 599,
     modele: null,
     credits: null,
-    scene: { fond: "affiche", x: 50, y: 46, zoom: 1.1, pose: "rang" },
+    image: "12-convocation-d-equipe",
   },
 ];
 
@@ -248,6 +228,17 @@ export const prixDe = (t: Template) => `${t.supplement ? "+" : ""}${ballons(t.pr
 
 /** Le rendu d'un template : « Image », « 5 s », ou « +5 s » pour un supplément. */
 export const dureeDe = (t: Template) => (t.rendu.genre === "image" ? "Image" : `${t.supplement ? "+" : ""}${t.rendu.secondes} s`);
+
+/**
+ * L'adresse de la vignette d'un template : son fichier d'origine, ou sa copie
+ * légère (« …-660.webp »).
+ */
+export const fichierVignette = (t: Template, largeur: number = VIGNETTE.largeur) =>
+  `/bola-plus/studio/${t.image}${largeur === VIGNETTE.largeur ? "" : `-${largeur}`}.webp`;
+
+/** Le srcset d'une vignette : sa copie légère, puis l'original. */
+export const sourcesVignette = (t: Template) =>
+  `${fichierVignette(t, VIGNETTE.legere)} ${VIGNETTE.legere}w, ${fichierVignette(t)} ${VIGNETTE.largeur}w`;
 
 /** Un template par son id (le banc et la phrase des ballons inclus). */
 export function template(id: string): Template {
@@ -301,12 +292,15 @@ export const MENTION_STUDIO = BALLONS_FORMULE.mensuel;
 
 /**
  * Les trois templates de l'éventail de « Ton studio » : à gauche, au milieu,
- * à droite. Au milieu, « Ma carte en vrai » : la carte « Toi » entière, qui se
- * lit en petit ; à droite, Ta saison (le joueur au trophée). Le trash talk (carte
- * coupée, adversaire flou) et L'entrée (des colonnes, personne) ne se lisent
- * pas à cette taille (contrôle visuel du 14/11) : ils restent dans le rail.
+ * à droite. Au milieu, « Ma carte en vrai » : la seule vignette entière, elle
+ * porte son nom et son prix. Les deux autres, penchées, sont à demi cachées
+ * par elle : on y met une image dont le sujet est du côté qui dépasse. À
+ * gauche, Le but de ta journée (le ballon dans le filet, à gauche de
+ * l'image) ; à droite, Ta saison (le poing levé, à droite). Maillot à ton
+ * nom, dont le maillot est au centre de l'image, n'y montrait qu'une colonne
+ * (contrôle visuel du 15/11) : il reste dans le rail.
  */
-export const EVENTAIL_STUDIO = ["maillot-a-ton-nom", "carte-en-vrai", "ta-saison"] as const;
+export const EVENTAIL_STUDIO = ["but-de-ta-journee", "carte-en-vrai", "ta-saison"] as const;
 
 /** Une recharge de ballons : son prix en centimes entiers et ce qu'elle donne. */
 export interface RechargeStudio {

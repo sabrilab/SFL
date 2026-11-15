@@ -48,8 +48,9 @@
 //       (COMPOSANTS) avec ses ballons du mois sous le titre (PIEDS,
 //       MentionStudio) ; sous chaque formule de « Ton prix », ses ballons
 //       (BALLONS_FORMULE de lib/sfl/studio.ts), visibles, après la ligne du
-//       dessous. Le catalogue, le panneau et les recharges sont contrôlés par
-//       tools/studio-check.ts.
+//       dessous. Le catalogue, le panneau, les recharges et les vignettes
+//       (public/bola-plus/studio/, le seul dossier admis à côté des visuels)
+//       sont contrôlés par tools/studio-check.ts.
 //       Des mutants de la source sont rejoués : chaque garde doit les refuser.
 // Sans réseau : fetch est remplacé.
 //   npx tsx tools/bola-plus-check.ts
@@ -685,13 +686,15 @@ async function banc() {
   assert.ok(/^public\/bola-plus\/maillots-portes\*\.webp$/m.test(readFileSync(join(__dirname, "..", ".gitignore"), "utf8")), ".gitignore refuse les maillots portés");
   const depose = deposeJuste();
   if (depose) console.log(`bola-plus : ${DEPOSE} est déposé, « Tes maillots » le montre`);
+  // Le dossier studio/ : les vignettes de Bola Studio (douze images et leurs copies légères), contrôlées par tools/studio-check.ts.
+  const STUDIO = "studio";
   const dossier = readdirSync(join(PUBLIC, "bola-plus")).sort();
   assert.deepEqual(
     dossier,
-    [...IMAGES.flatMap((i) => LARGEURS.map((l) => `${i}-${l}.webp`)), ...(depose ? [DEPOSE.split("/").pop()!] : [])].sort(),
-    "public/bola-plus : les quinze visuels (et le visuel déposé), rien d'autre"
+    [...IMAGES.flatMap((i) => LARGEURS.map((l) => `${i}-${l}.webp`)), ...(depose ? [DEPOSE.split("/").pop()!] : []), STUDIO].sort(),
+    "public/bola-plus : les quinze visuels (et le visuel déposé), le dossier des vignettes de Bola Studio, rien d'autre"
   );
-  assert.ok(dossier.every((f) => statSync(join(PUBLIC, "bola-plus", f)).isFile()));
+  assert.ok(dossier.every((f) => (f === STUDIO ? statSync(join(PUBLIC, "bola-plus", f)).isDirectory() : statSync(join(PUBLIC, "bola-plus", f)).isFile())));
 
   // La source de l'écran.
   const style = src("components/sfl/bola-plus.css");

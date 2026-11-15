@@ -45,8 +45,9 @@
 // (1170 px, 4:5), qui montre de vrais joueurs : il ne va jamais dans ce dépôt,
 // qui est public (.gitignore le refuse) ; absent, la carte garde le portant.
 // Les visuels générés le disent dans leur texte de remplacement. Les
-// variables de la part Bola Plus (VARIABLES_PLUS) et la carte « Toi »
-// (CARTE_TOI) sont écrites ici une fois, pour la page et pour Bola Studio.
+// variables de la part Bola Plus (VARIABLES_PLUS) sont écrites ici une fois,
+// pour la page et pour Bola Studio ; la carte « Toi » (CARTE_TOI) aussi, pour
+// la page (les vignettes de Bola Studio sont des images depuis le 15/11).
 //
 // Pur : ni React ni réseau (tools/bola-plus-check.ts).
 
@@ -250,8 +251,8 @@ export const VARIABLES_PLUS = {
 
 /**
  * La carte « Toi » de la page : une carte anonyme qui a déjà joué (sans nom
- * ni photo), la même sur « Ta carte continue. » et dans les vignettes de
- * Bola Studio. La note se calcule (ovr, engine.ts), elle ne s'écrit pas.
+ * ni photo), celle de « Ta carte continue. ». La note se calcule (ovr,
+ * engine.ts), elle ne s'écrit pas.
  */
 export const CARTE_TOI = {
   name: "Toi",

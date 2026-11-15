@@ -2,11 +2,14 @@
    de la carte « Ton studio », le panneau (le rail des templates, les
    recharges), les vignettes. Couleurs de la part Bola Plus, lues dans les
    variables --bp-plus-* (PALETTE, posées par la page et sur le panneau) :
-   aucune teinte écrite ici. Les vignettes sont des îlots sombres ; leur fond
-   est teint en violet (fusion « color »), la carte « Toi » garde ses vraies
-   couleurs. Le rail s'accroche carte par carte (scroll-snap) ; une vignette
-   vidéo avance lentement son cadrage (st-cadrage) ; avec « Réduire les
-   animations », tout est fixe (fin du fichier). */
+   aucune teinte écrite ici. Une vignette est l'image de son modèle, en 4:5,
+   telle qu'elle a été faite : ni recadrée en carré, ni grossie, ni teinte
+   (du noir et blanc, par choix), ni animée ; sur son tiers bas, sombre dans
+   l'image, le nom du modèle et son prix, sur un voile noir. Les mots de la
+   légende se règlent sur la largeur de la vignette (cqw) : la même vignette
+   dans le rail, dans l'éventail et en grand dans la fiche. Le rail s'accroche
+   carte par carte (scroll-snap) ; avec « Réduire les animations », rien ne
+   s'enfonce sous le doigt (fin du fichier). */
 
 /* ── Le panneau : « Bola Studio », la phrase, le rail, les recharges. ── */
 .st-panneau {
@@ -28,15 +31,11 @@
     var(--bp-plus-papier);
   color: var(--bp-plus-fond);
 }
-.st-panneau__titre,
-.st-fiche__titre {
+.st-panneau__titre {
   font-size: 34px;
   color: var(--bp-plus-clair);
 }
-.st-fiche__titre {
-  font-size: 30px;
-}
-:root:not(.dark) :is(.st-panneau__titre, .st-fiche__titre) {
+:root:not(.dark) .st-panneau__titre {
   color: var(--bp-plus-encre);
 }
 .st-panneau__phrase {
@@ -73,7 +72,7 @@
   text-align: left;
   -webkit-tap-highlight-color: transparent;
 }
-.st-item__bouton:active .st-scene {
+.st-item__bouton:active .st-vignette {
   scale: 0.98;
 }
 .st-item__bouton:focus-visible {
@@ -82,155 +81,78 @@
   border-radius: 22px;
 }
 
-/* ── Une vignette : le visuel recadré, les cartes posées dessus. ── */
-.st-scene {
+/* ── Une vignette : l'image du modèle, en 4:5, et sa légende sur le tiers bas. ── */
+.st-vignette {
   position: relative;
+  display: block;
   aspect-ratio: 4 / 5;
   overflow: hidden;
   border-radius: 20px;
-  background: var(--bp-plus-fond);
+  background: #000;
   color: #fff;
   isolation: isolate;
+  container-type: inline-size;
+  text-align: left;
   transition: scale 0.2s ease;
 }
-.st-scene--grand {
+.st-vignette--grand {
   border-radius: 24px;
 }
-.st-scene--plein {
-  position: absolute;
-  inset: 0;
-  aspect-ratio: auto;
-  border-radius: 0;
-}
-.st-scene__fond {
+/* L'image remplit la boîte, qui a son rapport : rien n'est coupé (le fichier
+   d'origine a une ligne de pixels de plus que 4:5), rien n'est déformé. */
+.st-vignette__image {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
-  object-position: var(--x) var(--y);
-  transform-origin: var(--x) var(--y);
-  scale: var(--z);
   user-select: none;
   -webkit-user-drag: none;
 }
-/* Le fond teint dans le violet de Bola Plus (fusion « color », comme le
-   stade de l'ouverture) ; les cartes, posées au-dessus, gardent leurs couleurs. */
-.st-scene::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  pointer-events: none;
-  mix-blend-mode: color;
-  background: linear-gradient(
-    to bottom,
-    color-mix(in srgb, var(--bp-plus-vif) 80%, transparent),
-    color-mix(in srgb, var(--bp-plus-vif) 55%, transparent)
-  );
-}
-/* Un voile bas, pour que les cartes se détachent du gazon ; un liseré. */
-.st-scene::after {
+/* Un liseré, comme les cartes du carrousel. */
+.st-vignette::after {
   content: "";
   position: absolute;
   inset: 0;
   z-index: 2;
   border-radius: inherit;
   pointer-events: none;
-  background: linear-gradient(to top, rgb(0 0 0 / 0.38) 0%, transparent 34%);
   box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.09);
 }
-.st-scene__cartes {
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-}
-.st-trois {
-  z-index: 0;
-}
-.st-carte {
-  position: absolute;
-  display: block;
-  filter: drop-shadow(0 10px 14px rgb(0 0 0 / 0.55));
-}
-.st-carte__dessin {
-  position: absolute;
-  top: 0;
-  left: 0;
-  display: block;
-  transform-origin: 0 0;
-}
-
-/* « La Une » : le logo en tête, comme le titre d'un magazine. */
-.st-une__logo {
-  position: absolute;
-  top: 7%;
-  left: 50%;
-  width: 62%;
-  translate: -50% 0;
-  user-select: none;
-}
-/* Le ballon : le symbole Bola, en haut à droite, au bout de sa course. */
-.st-ballon {
-  position: absolute;
-  top: 14%;
-  right: 16%;
-  width: 17%;
-  filter: drop-shadow(0 6px 10px rgb(0 0 0 / 0.6));
-  user-select: none;
-}
-/* L'affiche : le ballon entre la face et le dos, à mi-hauteur des cartes (bottom posé par la scène). */
-.st-ballon--contre {
-  top: auto;
-  right: auto;
-  left: 50%;
-  width: 12%;
-  translate: -50% 50%;
-}
-/* La compo : cinq cartes en rang, la face au milieu. */
-.st-rang {
+/* La légende, sur le tiers bas : le nom sur sa ligne, le prix dessous, calés
+   à gauche (les mêmes lignes d'une vignette à l'autre dans le rail, et le
+   prix de la vignette qui dépasse du bord se lit déjà). Le voile noir ne
+   monte pas plus haut que ce tiers, déjà sombre dans l'image : il assure les
+   mots là où une colonne ou une ligne de craie y descend, sans teinter
+   l'image (mesuré sur les douze : sous les mots, le blanc garde un contraste
+   d'au moins 7 sur 95 % des points, 5 au pire). */
+.st-vignette__bas {
   position: absolute;
   right: 0;
-  bottom: 34%;
+  bottom: 0;
   left: 0;
+  z-index: 1;
   display: flex;
-  align-items: flex-end;
-  justify-content: center;
-  gap: 2px;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 2.4cqw;
+  min-height: 36%;
+  padding: 0 6.5cqw 6cqw;
+  background: linear-gradient(to top, rgb(0 0 0 / 0.82) 0%, rgb(0 0 0 / 0.62) 42%, rgb(0 0 0 / 0.28) 76%, transparent 100%);
 }
-.st-rang .st-carte {
-  filter: drop-shadow(0 6px 8px rgb(0 0 0 / 0.5));
+/* 20 px dans le rail (216 px de large), 34 px dans la fiche : le plus long
+   des douze noms tient sur une ligne, avec de l'air à droite. */
+.st-vignette__nom {
+  font-size: 9.2cqw;
+  color: #fff;
+  text-shadow: 0 1px 12px rgb(0 0 0 / 0.55);
 }
-/* « Ta saison » : trois plans. */
-.st-trois {
-  position: absolute;
-  inset: 0;
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 2px;
-  background: #000;
-}
-.st-trois > span {
-  position: relative;
-  overflow: hidden;
-}
-
-/* « Trash talk » : l'adversaire, coupé au bord du cadre. */
-.st-scene[data-pose="provoc"] .st-carte {
-  filter: drop-shadow(0 16px 20px rgb(0 0 0 / 0.6));
-}
-
-/* Une vidéo : le cadrage avance lentement, et revient. */
-.st-scene[data-video] .st-scene__fond {
-  animation: st-cadrage var(--duree, 8s) ease-in-out infinite alternate;
-}
-@keyframes st-cadrage {
-  from {
-    scale: var(--z);
-  }
-  to {
-    scale: calc(var(--z) * 1.12);
-  }
+.st-vignette__prix {
+  font-size: 8.3cqw;
+  line-height: 1;
+  white-space: nowrap;
+  color: #fff;
+  text-shadow: 0 1px 12px rgb(0 0 0 / 0.55);
 }
 
 /* ── « Ton studio » : l'éventail, un seul bouton qui ouvre le panneau. ── */
@@ -335,23 +257,23 @@
 }
 
 /* Écran court (375 × 667) : le panneau tient sans défiler, et la fiche d'un
-   template garde son titre, ce que tu reçois et son prix à l'écran ; la
-   vignette, toujours en 4/5, se borne à la hauteur qui reste. */
+   template garde ce que tu reçois et sa durée à l'écran : la vignette,
+   toujours en 4:5, se borne à la hauteur qui reste dans la feuille (92dvh,
+   FEUILLE_STUDIO) une fois ôtés le retour, les marges et les deux lignes du
+   dessous (222 px). */
 @media (max-height: 700px) {
   .st-panneau {
     padding-top: 22px;
   }
-  .st-scene--grand {
-    width: min(100%, 52svh * 0.8);
+  .st-vignette--grand {
+    width: min(100%, (92dvh - 222px) * 0.8);
     margin-inline: auto;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .st-scene,
-  .st-eventail__place,
-  .st-scene[data-video] .st-scene__fond {
-    animation: none;
+  .st-vignette,
+  .st-eventail__place {
     transition: none;
   }
 }
