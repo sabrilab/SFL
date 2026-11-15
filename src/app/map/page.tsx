@@ -49,6 +49,20 @@
 // puisse filtrer facilement ») : map/format-terrains.tsx, le même choix que
 // dans la feuille « Terrains ».
 //
+// La boutique (14/11/2026, Sabri : « comme ça s'affiche les matchs sur la
+// carte, on pourrait afficher ça aussi : une petite étiquette sur laquelle on
+// pourrait cliquer ») : l'étiquette « Boutique », papier blanc, bord et encre
+// noirs, de la famille des étiquettes des stickers, sous le compte en haut à
+// gauche. Elle est posée sur l'écran : ni le zoom ni « toi » ne la bougent, et
+// elle ne se prend pas pour un lieu. La pile du coin est mesurée (encoche
+// comprise) et le cadrage des matchs laisse libre la bande qu'elle occupe,
+// plus la hauteur d'un sticker (`margeHaut`, map/carte-map.tsx) : au
+// cadrage, aucun match ni terrain ne passe dessous. Un plan qu'on fait
+// glisser soi-même peut y passer, comme sous le lettrage. Elle ouvre
+// /boutique ; elle s'efface avec les matchs quand le viseur des contrats est
+// allumé, et ne prend ni le doigt ni le clavier tant que l'écran de
+// chargement ou l'accueil la couvrent.
+//
 // Les contrats en direct (23/10) : le bouton au viseur ne laisse sur la Map
 // que les cibles des contrats signés du dimanche, sous leur viseur, leur prime
 // à la place de la note (map/contrats-map.ts) ; les matchs et les terrains
@@ -75,6 +89,7 @@ import {
   Plus,
   Search,
   Settings2,
+  ShoppingBag,
   Star,
   Trash2,
   Users,
@@ -465,6 +480,9 @@ function etatDe(dedans: boolean, manque: number): { etat: EtatSticker; texte: st
   if (manque > 0) return { etat: { genre: "manque", n: manque }, texte: `Il manque ${manque}` };
   return { etat: { genre: "complet" }, texte: "Complet" };
 }
+
+/** La hauteur d'un repère du plan au-dessus de son point (le sticker d'un match : sa vignette de 71 px, sa pastille). */
+const HAUTEUR_REPERE = 80;
 
 export default function MapPage() {
   // La Map écrit la saison (terrains, horaires) : elle part du document stocké.
@@ -1508,6 +1526,26 @@ export default function MapPage() {
   const haut = "calc(env(safe-area-inset-top, 0px) + var(--sous-entete))";
   const bas = "calc(env(safe-area-inset-bottom, 0px) + 92px)";
 
+  // La bande du haut que le cadrage laisse libre : mesurée sous la pile du
+  // coin (lettrage, compte, boutique), encoche comprise, plus la hauteur d'un
+  // repère, qui se dessine au-dessus de son point. Ainsi, au cadrage, aucun
+  // match ni terrain ne passe sous l'étiquette « Boutique » ni ne perd son
+  // toucher à son profit (contrôle du 14/11 : la constante de 140 px ne
+  // comptait ni l'encoche ni la hauteur du sticker).
+  const [margeHaut, setMargeHaut] = useState(0);
+  const coin = useCallback((el: HTMLDivElement | null) => {
+    if (!el) return;
+    const mesurer = () => setMargeHaut(Math.round(el.offsetTop + el.offsetHeight) + HAUTEUR_REPERE);
+    mesurer();
+    const ro = new ResizeObserver(mesurer);
+    ro.observe(el);
+    window.addEventListener("resize", mesurer);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", mesurer);
+    };
+  }, []);
+
   return (
     <AmbianceDuPlan.Provider value={ambiance}>
       {/* ─── Le plan, tout l'écran ─── */}
@@ -1527,6 +1565,7 @@ export default function MapPage() {
             onBulle={ouvrirDiscussion}
             villes={enContrats || calques.joueurs ? villesVues : AUCUNE_VILLE}
             margeBas={replie || enContrats ? 150 : 380}
+            margeHaut={margeHaut}
             onVille={ouvrirVille}
             onJoueur={toucherJoueur}
             viser={viser}
@@ -1551,8 +1590,8 @@ export default function MapPage() {
             Leaflet (z-index 400 et plus). */}
         <div className="pointer-events-none absolute inset-x-0 top-0 z-[500] h-44 bg-gradient-to-b from-[rgba(8,9,11,0.42)] to-transparent" />
 
-        {/* En haut à gauche : la commune en lettrage, le compte en étiquette */}
-        <div className="pointer-events-none absolute left-5 z-[510] flex max-w-[calc(100%-8.5rem)] flex-col items-start" style={{ top: `calc(${haut} + 8px)` }}>
+        {/* En haut à gauche : la commune en lettrage, le compte en étiquette, puis la boutique */}
+        <div ref={coin} className="pointer-events-none absolute left-5 z-[510] flex max-w-[calc(100%-8.5rem)] flex-col items-start" style={{ top: `calc(${haut} + 8px)` }}>
           <span
             key={commune}
             className="lettrage lettrage-entre -rotate-[4deg]"
@@ -1567,6 +1606,29 @@ export default function MapPage() {
           >
             {compte}
           </span>
+          {/* La boutique (Sabri, 14/11/2026 : « une petite étiquette sur
+              laquelle on pourrait cliquer ») : la troisième étiquette du coin,
+              de la famille de celles des stickers, posée sur l'écran et non
+              sur le plan. La cible fait 44 px ; seule la capsule se voit. Le
+              bord à l'encre (la variante blanche de la famille,
+              `.stk__etiquette--inscrits`) la détache des tuiles claires. Pas
+              de préchargement : la Map est l'écran le plus ouvert. */}
+          {!enContrats && (
+            <Link
+              href="/boutique"
+              prefetch={false}
+              onClick={() => geste("boutique")}
+              className="map-etiquette compte-entre pointer-events-auto -mt-1 -ml-1 flex h-11 items-center rounded-md px-1"
+            >
+              <span
+                className="inline-flex h-[22px] -rotate-[3deg] items-center gap-1 rounded-[5.5px] border-2 px-[7px] text-[10.5px] leading-none font-black tracking-[-0.1px] uppercase italic shadow-[0_1.5px_2.5px_rgba(0,0,0,0.2)]"
+                style={{ background: BLANC, color: ENCRE, borderColor: ENCRE }}
+              >
+                <ShoppingBag className="size-3" strokeWidth={2.6} aria-hidden />
+                Boutique
+              </span>
+            </Link>
+          )}
         </div>
 
         {/* En haut à droite : la loupe (la Recherche, montée de la barre
