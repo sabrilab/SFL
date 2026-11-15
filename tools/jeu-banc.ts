@@ -567,7 +567,9 @@ function tacle(graine: number, deFace: boolean) {
         const A = m.joueurs[a], B = m.joueurs[c];
         const pen = 2 * CORPS.rayon - Math.hypot(A.p.x - B.p.x, A.p.z - B.p.z);
         const k = a * 10 + c;
-        duree[k] = pen > 0.08 && A.mode !== 'sol' && B.mode !== 'sol' ? duree[k] + PAS : 0;
+        // (un corps au sol ou qui se relève n'est qu'un obstacle bas, on l'enjambe : comme en jeu, il ne compte pas)
+        const bas = (j: Any) => j.mode === 'sol' || j.mode === 'releve';
+        duree[k] = pen > 0.08 && !bas(A) && !bas(B) ? duree[k] + PAS : 0;
         if (duree[k] > 1 && duree[k] - PAS <= 1) longs++;
       }
     });

@@ -14,7 +14,7 @@ import { cos, hypot, sin } from './maths.js';
 /** Remet une intention à zéro. */
 export function intentionVide(it = {}) {
   it.dx = 0; it.dz = 0; it.allure = 0; it.sprint = 0; it.regard = null;
-  it.contenir = false; it.protege = false; it.charge = false; it.vaBalle = false; it.action = null;
+  it.contenir = false; it.protege = false; it.charge = false; it.vaBalle = false; it.action = null; it.recupere = false;
   return it;
 }
 
@@ -178,8 +178,17 @@ export function conduire(m, j, it) {
   const b = m.balle;
   if (!(it.dx || it.dz)) return;
   const rx = b.p.x - j.p.x, rz = b.p.z - j.p.z, d = hypot(rx, rz);
-  if (d < 0.35 || d > 5) return;
-  const al = (rx * it.dx + rz * it.dz) / d;
+  if (d > 5) return;
+  // la balle est restée à côté de lui ou derrière (il l'a dépassée) : il ralentit et revient dessus, au lieu de
+  // l'abandonner en continuant tout droit
+  const al0 = d > 1e-6 ? (rx * it.dx + rz * it.dz) / d : 1;
+  if (d > 0.3 && d < 1.4 && al0 < 0.35 && b.p.y < 0.4 && hypot(b.v.x, b.v.z) < hypot(j.v.x, j.v.z) + 0.5) {
+    it.dx = rx / d; it.dz = rz / d; it.allure = Math.min(Math.max(it.allure, 0.4), 0.6); it.sprint = 0;
+    it.recupere = true; // (ce n'est pas un demi-tour demandé : monde.js ne le change pas en crochet)
+    return;
+  }
+  if (d < 0.35) return;
+  const al = al0;
   if (al < 0.35) return;
   // viser un peu derrière la balle, sur sa course
   const t = 0.12;

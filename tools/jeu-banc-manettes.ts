@@ -247,7 +247,7 @@ function deuxManettes(graine: number) {
   for (let i = 0; i < 18000; i++) { pas(m); m.evts.length = 0; }
   // (la référence de tools/jeu-banc.ts --graine=7 après les correctifs du contrôle : balle contre les corps, chutes,
   // demi-tour, gardien ; les manettes ne la changent pas)
-  verifier('IA contre IA inchangée (graine 7)', empreinte(m) === 'c43e6a9a', `${empreinte(m)} (attendu c43e6a9a, celle du banc physique)`);
+  verifier('IA contre IA inchangée (graine 7)', empreinte(m) === 'd3f4e37b', `${empreinte(m)} (attendu d3f4e37b, celle du banc physique)`);
 }
 
 // ── les correctifs du contrôle : gâchettes vues au repos, Xbox sous Linux, manette rebranchée sous un autre index ──

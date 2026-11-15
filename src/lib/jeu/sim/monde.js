@@ -169,6 +169,7 @@ function copierIntention(j, src) {
   const L = hypot(it.dx, it.dz);
   if (L > 1e-6 && Number.isFinite(L)) { it.dx /= L; it.dz /= L; } else { it.dx = 0; it.dz = 0; }
   it.allure = clamp(fini(src.allure), 0, 1); it.sprint = clamp(fini(src.sprint), 0, 1);
+  it.recupere = false;
   it.regard = src.regard ?? null; it.contenir = !!src.contenir; it.protege = !!src.protege; it.charge = !!src.charge; it.vaBalle = true;
   it.action = src.action ?? null;
 }
@@ -260,7 +261,7 @@ function demiTour(m) {
   if (!engage) p.demiTour = null;
   if (p.crochetT > 0 || b.p.y > 0.4) return;
   if (!engage) {
-    if (s < 2 || !(it.dx || it.dz) || it.allure < 0.3 || m.t - (p.toucheT ?? -9) < 0.2) return;
+    if (s < 2 || !(it.dx || it.dz) || it.allure < 0.3 || it.recupere || m.t - (p.toucheT ?? -9) < 0.2) return;
     const c = (it.dx * p.v.x + it.dz * p.v.z) / s;
     if (c > cos((120 * Math.PI) / 180) || d > 2.5) return;
     p.demiTour = { t: m.t, dx: it.dx, dz: it.dz };
