@@ -168,19 +168,22 @@ function bords(b, ev) {
           const ox = (p.x - sx * BUT_DL) * sx; // > 0 : dehors, de ce côté
           if (Math.abs(ox) < R && p.y < BUT_H) {
             p.x = sx * BUT_DL + Math.sign(ox || -1) * R * sx;
-            choc(b, Math.sign(ox || -1) * sx, 0, 0, B.filetBut, 0.3);
+            const vn = choc(b, Math.sign(ox || -1) * sx, 0, 0, B.filetBut, 0.3);
+            if (vn > 1) ev?.('filet', vn); // (bola-app#26, lot 4 : la vue seulement, le filet qui bouge et le son)
           }
         }
         if (Math.abs(p.x) < BUT_DL && Math.abs(p.y - BUT_H) < R) {
           const dessus = p.y > BUT_H;
           p.y = BUT_H + (dessus ? R : -R);
-          choc(b, 0, dessus ? 1 : -1, 0, B.filetBut, 0.3);
+          const vn = choc(b, 0, dessus ? 1 : -1, 0, B.filetBut, 0.3);
+          if (vn > 1) ev?.('filet', vn);
         }
       }
       if (dedans && dz > BUT_P - R && dz < BUT_P + R) {
         const derriere = dz > BUT_P;
         p.z = zl + s * (BUT_P + (derriere ? R : -R));
-        choc(b, 0, 0, derriere ? s : -s, B.filetBut, 0.3);
+        const vn = choc(b, 0, 0, derriere ? s : -s, B.filetBut, 0.3);
+        if (vn > 1) ev?.('filet', vn);
       }
     }
   }

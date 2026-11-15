@@ -687,6 +687,19 @@ function borner(j) {
   if (j.p.z < -BZ + lim) { j.p.z = -BZ + lim; if (j.v.z < 0) j.v.z = 0; }
 }
 
+/**
+ * (bola-app#26, lot 4) Chaque choc du ballon (sol, panneau, filet, poteau), avec sa place et sa vitesse : pour la vue
+ * seulement (le son, le filet qui bouge). Rien de la simulation n'en dépend : l'empreinte ne change pas. Au plus un
+ * événement de chaque genre tous les 30 ms (un ballon qui roule contre le filet n'en fait pas cent).
+ */
+function chocBalle(m, genre, f) {
+  const d = (m._chocs ??= {});
+  if (m.t - (d[genre] ?? -1) < 0.03) return;
+  d[genre] = m.t;
+  const b = m.balle;
+  m.ev('balleChoc', { genre, f, x: b.p.x, y: b.p.y, z: b.p.z, vx: b.v.x, vy: b.v.y, vz: b.v.z });
+}
+
 /** Un pas de simulation. entrees : [intention | null, intention | null] pour les humains des deux équipes. */
 export function pas(m, entrees = null) {
   m.t += PAS; m.pas++;
@@ -703,7 +716,7 @@ export function pas(m, entrees = null) {
     // (pendant le ralenti du but et la fin, les corps se démêlent aussi : personne ne se fond dans un autre)
     demeler(m);
     for (const j of m.joueurs) borner(j);
-    pasBalle(b, null);
+    pasBalle(b, (type, f) => chocBalle(m, type, f));
     balleCorps(m);
     if (m.phase === 'but') {
       const avant = m.phaseT;
@@ -791,7 +804,7 @@ export function pas(m, entrees = null) {
       break;
     }
     const p0 = m._p0; p0.x = b.p.x; p0.y = b.p.y; p0.z = b.p.z;
-    const marque = pasBalle(b, (type, f) => { if (type === 'poteau') m.ev('poteau', { force: f }); else if (type === 'panneau' && f > 6) m.ev('panneau', { force: f }); });
+    const marque = pasBalle(b, (type, f) => { if (type === 'poteau') m.ev('poteau', { force: f }); else if (type === 'panneau' && f > 6) m.ev('panneau', { force: f }); chocBalle(m, type, f); });
     // personne n'est traversé : jambes, buste, corps au sol (contacts.js)
     balleCorps(m);
     for (const k of m.joueurs) if (k.gardien && !k.absent && contactGardien(m, k, p0)) break;

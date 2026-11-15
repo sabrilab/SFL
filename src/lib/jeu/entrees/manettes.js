@@ -104,7 +104,7 @@ export function creerManettes({ versJeu = (sx, sy) => ({ x: -sy, z: -sx }) } = {
   let mode = 'repos';
   let version = 0, instant = null;
   const abonnes = new Set();
-  const api = { surSalon: null, surDemarrer: null, surPause: null, surTouches: null };
+  const api = { surSalon: null, surDemarrer: null, surPause: null, surTouches: null, surPasser: null };
 
   const changer = () => { version++; instant = null; for (const f of abonnes) f(); };
 
@@ -171,6 +171,8 @@ export function creerManettes({ versJeu = (sx, sy) => ({ x: -sy, z: -sx }) } = {
       if (mode === 'salon') salon(p, bas, gauche, droite);
       else if (mode === 'repos') { if (bas(K.A) || bas(K.MENU)) api.surSalon?.(); }
       else if (mode === 'match' && M) {
+        // (bola-app#26, lot 4) A / ✕ passe le ralenti du but (match.js ne l'écoute que pendant le ralenti)
+        if (bas(K.A)) api.surPasser?.();
         if (p.equipe != null) {
           lireManette(p.cmd, p.etat, t, M, p.equipe, versJeu);
           if (bas(K.MENU)) api.surPause?.();

@@ -31,6 +31,12 @@
 // match lancé avec des manettes, tant qu'une touche de jeu est tenue ou l'a été dans les 2 s. Le tableau des touches
 // est dans entrees/touches.js.
 //
+// (bola-app#26, lot 4) La vue : la caméra de la télé anticipe la balle par des ressorts critiques (rendu/camera.js) ;
+// le ralenti du but en trois plans relit un tampon des corps affichés sans jamais faire avancer la simulation
+// (rendu/ralenti.js ; deux bandes noires dans la page, un toucher, A / ✕, Entrée, Espace, D ou Échap le passe) ; ombres de
+// contact instanciées, herbe qui marque et filet qui bouge (rendu/effets.js) ; matières des joueurs (rendu/materiaux.js) ;
+// son synthétisé (rendu/son.js, M coupe le son) ; qualité adaptative en quatre paliers ; police du tableau dans police.js.
+//
 // Ce que fait chaque geste du pouce (on joue toujours les Noirs) ; il produit la même intention qu'une manette :
 //   glisser          courir dans cette direction ; loin du point de départ, sprinter (analogique de 85 à 100 % du rayon).
 //                    Balle au pied, tu la conduis par touches : elle n'est plus collée au pied.
@@ -67,6 +73,11 @@ import { creerManettes, EFFETS } from './entrees/manettes.js';
 import { creerCommande, lireManette, intentionDe, oublier } from './entrees/commande.js';
 import { creerClavier, creerEtatClavier, etatDepuisTouches } from './entrees/clavier.js';
 import { creerLecteur, oublierLecteur, lireGesteStick } from './entrees/geste-stick.js';
+import { creerCameraTele, majCameraTele, poserFoyer, duelPresDuBut } from './rendu/camera.js';
+import { creerTampon, enregistrer, lireTampon, creerRalenti, armerRalenti, suivreRalenti, lancerRalenti, simGelee, passerRalenti, avancerRalenti, cameraPlan, viderTampon } from './rendu/ralenti.js';
+import { creerOmbres, creerMarques, creerFilet } from './rendu/effets.js';
+import { creerSon, planSons, niveauFoule } from './rendu/son.js';
+import { POLICE_SCORE, POLICES } from './police.js';
 
 const R = BALLON.R;
 const PX = DIM.Tl / 2 - R;
@@ -88,15 +99,6 @@ function creerBallon() {
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
   return new THREE.Mesh(new THREE.SphereGeometry(R, 32, 20), new THREE.MeshStandardMaterial({ map: t, roughness: 0.45 }));
-}
-
-// l'ombre douce sous chaque joueur (les ombres du plateau sont calculées une fois, sans les joueurs)
-function texOmbre() {
-  const c = document.createElement('canvas'); c.width = c.height = 64;
-  const g = c.getContext('2d'); const gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
-  gr.addColorStop(0, 'rgba(0,0,0,0.62)'); gr.addColorStop(0.55, 'rgba(0,0,0,0.3)'); gr.addColorStop(1, 'rgba(0,0,0,0)');
-  g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
-  return new THREE.CanvasTexture(c);
 }
 
 
@@ -130,7 +132,9 @@ export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, 
   surProgres(0.4);
   if (pl.lyres && reduit) pl.lyres.visible = false;
   // le halo seulement sur les vraies sources (projecteurs, LED) : pas sur un col blanc ou le ballon sous les projecteurs
-  if (pl.bloom) pl.bloom.threshold = 2.4;
+  // (lot 4) un halo discret, serré, sur les projecteurs et les LED seulement
+  if (pl.bloom) { pl.bloom.threshold = 2.4; pl.bloom.strength = 0.32; pl.bloom.radius = 0.32; }
+  const expoBase = renderer.toneMappingExposure;
   const camera = pl.camera;
   // le grillage du côté de la caméra (le côté nord du plateau) masquerait le bas du terrain : on n'en garde que les
   // panneaux LED, comme la caméra de la télé qui filme par-dessus
@@ -143,10 +147,12 @@ export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, 
 
   // le tableau d'affichage sur les quatre faces du cube suspendu
   const ecran = document.createElement('canvas'); ecran.width = 1024; ecran.height = 576;
-  let policeEcran = 'system-ui, sans-serif';
+  // la police du tableau du cube : celle du score de la page (police.js, POLICE_SCORE ; décision 1 de bola-app#25)
+  let policeEcran = 'system-ui, sans-serif', graisseEcran = '';
+  const PE = POLICES[POLICE_SCORE];
   try {
-    const f = new FontFace('BolaAnton', 'url(/jeu/plateau/anton-latin.woff2)');
-    await f.load(); document.fonts.add(f); policeEcran = 'BolaAnton, system-ui, sans-serif';
+    if (PE.fichier) { const f = new FontFace(PE.famille, `url(${PE.fichier})`); await f.load(); document.fonts.add(f); policeEcran = `${PE.famille}, system-ui, sans-serif`; }
+    else { const v = getComputedStyle(document.body).getPropertyValue(PE.variable).trim(); if (v) policeEcran = `${v}, system-ui, sans-serif`; graisseEcran = `${PE.graisse} `; await document.fonts.load(`${graisseEcran}64px ${policeEcran}`).catch(() => {}); }
   } catch {}
   const facesCube = ['ecranN', 'ecranS', 'ecranE', 'ecranO'].map((k) => pl.emplacements[k]).filter(Boolean);
   for (const e of facesCube) e.poser(ecran);
@@ -158,10 +164,10 @@ export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, 
     g.fillStyle = '#050505'; g.fillRect(0, 0, 1024, 576);
     g.textAlign = 'center'; g.textBaseline = 'middle';
     g.fillStyle = '#f2f2f2';
-    g.font = `260px ${policeEcran}`;
+    g.font = `${graisseEcran}260px ${policeEcran}`;
     g.fillText(`${noirs}`, 300, 290); g.fillText(`${blancs}`, 724, 290);
     g.fillRect(482, 282, 60, 16);
-    g.font = `64px ${policeEcran}`;
+    g.font = `${graisseEcran}64px ${policeEcran}`;
     g.fillStyle = '#9a9a9a';
     g.fillText('NOIRS', 300, 96); g.fillText('BLANCS', 724, 96);
     g.fillStyle = '#f2f2f2';
@@ -171,9 +177,6 @@ export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, 
 
 
   // ── les joueurs (l'état de jeu est dans la simulation ; ici, leur corps à l'écran) ──
-  const tomber = texOmbre();
-  const matOmbre = new THREE.MeshBasicMaterial({ map: tomber, transparent: true, depthWrite: false, opacity: 1 });
-  const geoOmbre = new THREE.PlaneGeometry(1.1, 1.1).rotateX(-Math.PI / 2);
   const ROLES = ['G', 'D', 'L', 'R', 'A'];
   const specs = [];
   for (const e of [0, 1]) for (const role of ROLES) specs.push({ e, role });
@@ -188,20 +191,23 @@ export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, 
     });
     perso.racine.traverse((o) => { o.castShadow = false; });
     surProgres(0.4 + (++charges / specs.length) * 0.55);
-    const ombre = new THREE.Mesh(geoOmbre, matOmbre);
-    ombre.renderOrder = 2;
-    monde.add(perso.racine, ombre);
+    monde.add(perso.racine);
     const anim = creerAnimateur(perso, { gardien: role === 'G', reduit, versMonde3: (v, out) => versMondeDir(v, out) });
-    return { e, role, perso, ombre, anim, interp: { x: 0, z: 0, cap: 0 }, prec: { x: 0, z: 0 }, cache: {} };
+    return { e, role, perso, anim, interp: { x: 0, z: 0, cap: 0 }, prec: { x: 0, z: 0 }, cache: {} };
   }));
   // les ombres du décor, une fois pour toutes, avant que les joueurs ne bougent
   pl.majOmbres();
 
   const balle = creerBallon();
-  const ombreBalle = new THREE.Mesh(geoOmbre, matOmbre);
-  ombreBalle.scale.setScalar(0.35);
-  ombreBalle.renderOrder = 2;
-  monde.add(balle, ombreBalle);
+  monde.add(balle);
+  // (lot 4) les ombres de contact (un seul maillage instancié), l'herbe qui marque, le filet qui bouge, le son
+  const ombres = creerOmbres(monde, vus.length);
+  const marques = creerMarques(monde);
+  const filet = creerFilet(pl.scene, versMonde);
+  const son = creerSon({ reduit });
+  const sons = [];
+  // (leurs programmes liés au chargement, pas à la première image du match)
+  try { await renderer.compileAsync(pl.scene, camera); } catch { /* le premier rendu compilera */ }
 
   // l'anneau sous le joueur que tu joues
   const anneau = new THREE.Mesh(
@@ -256,13 +262,16 @@ export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, 
   let boucleSim = creerBoucle(monde0);
   const m = () => boucleSim.m;
   // banc d'essai : l'IA joue aussi les Noirs (auto), le rendu peut être coupé ; pas = secondes de simulation par image
-  const banc = { auto: false, rendu: true, pas: 0, stats: monde0.stats };
-  const etat = { phase: 'attente', noirs: 0, blancs: 0, reste: duree, message: null, buteur: null, pause: false, manettes: false };
+  // (ralenti : le ralenti du but aussi quand l'IA joue seule, pour le banc ; il ne l'est pas d'ordinaire)
+  const banc = { auto: false, rendu: true, pas: 0, stats: monde0.stats, ralenti: false };
+  const etat = { phase: 'attente', noirs: 0, blancs: 0, reste: duree, message: null, buteur: null, pause: false, manettes: false, ralenti: false };
   const MOI = 4; // l'attaquant des Noirs
   const signaler = () => surEtat({ ...etat });
   let ralenti = 1, ralentiFin = 0;
-  const cam = { pos: new THREE.Vector3(0, 8.5, 12), regard: new THREE.Vector3(0, 0, 0), foyer: new THREE.Vector3(), buteur: null, recul: 0 };
-  const tmp = new THREE.Vector3(), tmp2 = new THREE.Vector3(), w = new THREE.Vector3();
+  const cam = { pos: new THREE.Vector3(0, 8.5, 12), regard: new THREE.Vector3(0, 0, 0), buteur: null, recul: 0 };
+  const tele = creerCameraTele();
+  const entreeCam = { balle: { x: 0, y: 0, z: 0, vx: 0, vz: 0 }, celebre: null, zBut: null, large: false, fov: 60, aspect: 1, intro: true, duel: false };
+  const w = new THREE.Vector3();
   const qBalle = new THREE.Quaternion(), axeB = new THREE.Vector3();
   const bInterp = { x: 0, y: R, z: 0 };
   let derniereSeconde = -1;
@@ -384,12 +393,20 @@ export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, 
           etat.buteur = e.j === MOI ? 'moi' : e.e === 0 ? 'noirs' : 'blancs';
           cam.buteur = e.j;
           if (!reduit) { ralenti = 0.3; ralentiFin = 1.1; }
+          // (lot 4) le ralenti du but en plusieurs angles, joué quand la célébration a été vue (rendu/ralenti.js)
+          if (!banc.auto || banc.ralenti) { const B = M.joueurs[e.j]; armerRalenti(RL, M.t, { zBut: butDe(1 - e.e), xBut: M.balle.p.x, buteur: { x: B.p.x, z: B.p.z } }); }
           secouer(e.e, EFFETS.but(), [30, 40, 60]);
           break;
         case 'engagement': etat.message = null; etat.buteur = null; break;
+        case 'balleChoc':
+          // le filet se gonfle vers l'extérieur du but (du centre du but vers le choc), de la force du choc
+          if (e.genre === 'filet' && filet && Math.abs(e.z) > 14.5) { const s = Math.sign(e.z); const dx = e.x, dy = e.y - 1, dz = e.z - s * 15.45, l = Math.hypot(dx, dy, dz) || 1; filet.choc(e.t, e.x, e.y, e.z, dx / l, dy / l, dz / l, e.f); }
+          break;
         default: break;
       }
     }
+    // le son (rendu/son.js) : ce que la simulation vient de faire ; coupé au banc qui fait jouer l'IA seule
+    if (!banc.auto && M.evts.length) son.jouer(planSons(M.evts, M, sons));
     M.evts.length = 0;
   }
 
@@ -405,6 +422,7 @@ export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, 
 
   // ── le rendu d'un état (interpolé) ──
   const sautes = new Uint8Array(10);
+  const appuis = [];
   function poserTout(dt) {
     const M = m(), bc = boucleSim;
     const p = porteur(M);
@@ -416,9 +434,7 @@ export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, 
       sautes[i] = saut ? 1 : 0;
       v.perso.racine.position.set(I.x, 0, I.z);
       v.perso.racine.rotation.y = I.cap;
-      v.ombre.position.set(I.x, 0.04, I.z);
       v.perso.racine.visible = !j.absent;
-      v.ombre.visible = !j.absent;
       v.cache.saut = saut;
       v.anim.maj(etatAnim(M, j, I, p, bInterp, v.cache), dt);
     }
@@ -427,7 +443,16 @@ export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, 
     // la rotation affichée est celle de la simulation (ω), dans le repère du jeu (le parent du ballon)
     const wv = M.balle.w, wn = Math.hypot(wv.x, wv.y, wv.z);
     if (wn > 1e-4 && dt > 0) { axeB.set(wv.x / wn, wv.y / wn, wv.z / wn); qBalle.setFromAxisAngle(axeB, wn * dt * ralenti); balle.quaternion.premultiply(qBalle); }
-    ombreBalle.position.set(bInterp.x, 0.045, bInterp.z);
+    ombres.maj(vus, bInterp);
+    // l'herbe qui marque : les corps qui glissent, et les crampons d'un appui fort (un nouvel appui de la sim)
+    appuis.length = 0;
+    for (let i = 0; i < vus.length; i++) {
+      const j = M.joueurs[i], c = vus[i].cache;
+      if (j.appuiT != null && j.appuiT !== c.appuiVu) { c.appuiVu = j.appuiT; if ((j.appuiF ?? 0) > 0.6) { const P = ombres.pieds[i]; if (P) appuis.push({ x: P.x, z: P.z, ang: P.ang }); } }
+    }
+    if (dt > 0) marques.maj(M.t, ombres.bassins, appuis);
+    filet?.temps(M.t);
+    if (dt > 0) enregistrerImage(M);
     // l'anneau sous le joueur que tu joues
     const visibleJeu = !banc.auto && (M.phase === 'jeu' || M.phase === 'engagement');
     const c = M.controle[0], c1 = M.controle[1];
@@ -458,55 +483,108 @@ export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, 
     const ph = M.phase;
     // (après la ligne, la caméra de la télé reste 0,6 s sur le but avant le plan de la célébration)
     const face = ph === 'intro' || ph === 'fin' || ph === 'attente' || (ph === 'but' && M.phaseT > 0.6 && M.phaseT < JEU.butPause - 0.6);
-    let voulu, regard;
-    if (face) {
-      const i = ph === 'but' && cam.buteur != null ? cam.buteur : MOI;
-      const I = vus[i].interp;
-      const ang = I.cap + (ph === 'intro' || ph === 'attente' ? 0.35 : -0.5);
-      const d = ph === 'intro' || ph === 'attente' ? 3.4 : 4.6; // la célébration : en pied
-      voulu = tmp.set(I.x + Math.sin(ang) * d, 1.7, I.z + Math.cos(ang) * d);
-      regard = tmp2.set(I.x, 1.45, I.z);
-    } else {
-      // le plan de la télé : en hauteur dans la tribune, le long du terrain, qui suit la balle en travelling
-      const b = M.balle;
-      const large = cw > ch;
-      // une frappe vers un but (et les 0,6 s après la ligne) : le cadre tient la balle ET le but visé
-      const zBut = b.tir ? butDe(1 - b.tir.e) : ph === 'but' && M.butEquipe != null ? butDe(1 - M.butEquipe) : null;
-      const vise = zBut != null ? bInterp.z * 0.4 + zBut * 0.6 : bInterp.z + b.v.z * 0.35;
-      cam.foyer.lerp(tmp2.set(bInterp.x + b.v.x * 0.2, 0, vise), 1 - Math.exp(-dt * (zBut != null ? 6 : 2.6)));
-      const lim = large ? (zBut != null ? 8 : 6) : zBut != null ? 13.5 : 11;
-      const fx = clamp(cam.foyer.x, -6, 6), fz = clamp(cam.foyer.z, -lim, lim);
-      voulu = tmp.set(large ? 21 : 15.5, large ? 12.5 : 11, fz);
-      let rx = fx * 0.3 + (large ? -1 : 0.6);
-      if (!large) {
-        // au téléphone, le panneau proche (x = +10) reste au-dessus de 72 % de la hauteur de l'écran (au-dessus du
-        // pouce) quand la balle s'en approche : le foyer glisse vers lui, au même filtre (aucune secousse)
-        const H = voulu.y, f = (camera.fov * Math.PI) / 360;
-        const ap = Math.atan2(H, voulu.x - 10), a0 = ap - Math.atan(0.44 * Math.tan(f));
-        const rxMin = voulu.x - H / Math.tan(a0);
-        const w = THREE.MathUtils.smoothstep(cam.foyer.x, 2, 7.5);
-        rx = Math.max(rx, rx + (rxMin - rx) * w);
-      }
-      regard = tmp2.set(rx, 0, fz);
-      // et le recul : ce qu'il faut pour tenir la balle et le but dans la largeur du cadre
-      cam.recul += ((zBut != null ? 1 : 0) - cam.recul) * (1 - Math.exp(-dt * 2.5));
-      if (cam.recul > 1e-3 && zBut != null) {
-        const D = Math.hypot(voulu.x - regard.x, voulu.y - regard.y);
-        const demi = D * Math.tan(Math.atan(Math.tan((camera.fov * Math.PI) / 360) * camera.aspect));
-        const besoin = Math.abs(bInterp.z - zBut) / 2 + 1.6;
-        const k = 1 + (clamp(besoin / Math.max(1, demi), 1, 1.7) - 1) * cam.recul;
-        voulu.x = regard.x + (voulu.x - regard.x) * k; voulu.y = regard.y + (voulu.y - regard.y) * k;
-      } else if (cam.recul > 1e-3) {
-        const k = 1 + 0.25 * cam.recul;
-        voulu.x = regard.x + (voulu.x - regard.x) * k; voulu.y = regard.y + (voulu.y - regard.y) * k;
-      }
-    }
-    // (une frappe : le cadre rejoint le but plus vite, au même filtre du premier ordre, sans dépassement)
-    const k = 1 - Math.exp(-dt * (face ? 2.2 : cam.recul > 0.05 ? 5 : 3));
-    cam.pos.lerp(voulu, k);
-    cam.regard.lerp(regard, Math.min(1, k * 1.15));
+    // la caméra de la télé (rendu/camera.js : elle anticipe la balle, par un ressort critique ; aucun tremblement)
+    const b = M.balle;
+    const E = entreeCam;
+    E.large = cw > ch; E.fov = camera.fov; E.aspect = camera.aspect; E.intro = ph === 'intro' || ph === 'attente';
+    E.celebre = face ? vus[ph === 'but' && cam.buteur != null ? cam.buteur : MOI].interp : null;
+    E.balle.x = bInterp.x; E.balle.y = bInterp.y; E.balle.z = bInterp.z; E.balle.vx = b.v.x; E.balle.vz = b.v.z;
+    E.zBut = b.tir ? butDe(1 - b.tir.e) : ph === 'but' && M.butEquipe != null ? butDe(1 - M.butEquipe) : null;
+    E.duel = ph === 'jeu' && duelPresDuBut(M, porteur(M));
+    majCameraTele(tele, E, dt);
+    cam.pos.set(tele.pos.x, tele.pos.y, tele.pos.z); cam.regard.set(tele.regard.x, tele.regard.y, tele.regard.z);
+    cam.recul = tele.recul;
     versMonde(cam.pos, camera.position);
     camera.lookAt(versMonde(cam.regard, w));
+  }
+
+  // ── le ralenti du but (rendu/ralenti.js) : le tampon de ce que l'écran a montré, relu sans faire avancer la sim ──
+  // une image = pour chaque joueur : visible, x, z, cap, le corps (position, quaternion), chaque os (position,
+  // quaternion) ; puis le ballon (position, quaternion). 30 images par seconde de jeu, 4,6 s.
+  const osDe = vus.map((v) => { const l = []; v.perso.corps.traverse((o) => { if (o.isBone) l.push(o); }); return l; });
+  const genres = [];
+  const pousser = (g, n = 1) => { for (let i = 0; i < n; i++) genres.push(i === 0 ? g : 0); };
+  for (const l of osDe) { pousser(3); pousser(0, 2); pousser(2); pousser(0, 3); pousser(1, 4); for (let i = 0; i < l.length; i++) { pousser(0, 3); pousser(1, 4); } }
+  pousser(0, 3); pousser(1, 4);
+  const tampon = creerTampon(genres.length, Uint8Array.from(genres));
+  const RL = creerRalenti({ reduit });
+  const imageR = new Float32Array(genres.length), sauveR = new Float32Array(genres.length);
+  const sortieR = {}, camR = {};
+  let planR = null;
+  const ecrireQ = (D, o, q) => { D[o] = q.x; D[o + 1] = q.y; D[o + 2] = q.z; D[o + 3] = q.w; return o + 4; };
+  const ecrireV = (D, o, v) => { D[o] = v.x; D[o + 1] = v.y; D[o + 2] = v.z; return o + 3; };
+  function ecrireImage(D, o) {
+    for (let k = 0; k < vus.length; k++) {
+      const r = vus[k].perso.racine, c = vus[k].perso.corps;
+      D[o++] = r.visible ? 1 : 0; D[o++] = r.position.x; D[o++] = r.position.z; D[o++] = r.rotation.y;
+      o = ecrireV(D, o, c.position); o = ecrireQ(D, o, c.quaternion);
+      for (const b of osDe[k]) { o = ecrireV(D, o, b.position); o = ecrireQ(D, o, b.quaternion); }
+    }
+    o = ecrireV(D, o, balle.position); ecrireQ(D, o, balle.quaternion);
+  }
+  function poserImage(D) {
+    let o = 0;
+    for (let k = 0; k < vus.length; k++) {
+      const r = vus[k].perso.racine, c = vus[k].perso.corps;
+      r.visible = D[o++] > 0.5; r.position.set(D[o++], 0, D[o++]); r.rotation.y = D[o++];
+      c.position.set(D[o], D[o + 1], D[o + 2]); c.quaternion.set(D[o + 3], D[o + 4], D[o + 5], D[o + 6]); o += 7;
+      for (const b of osDe[k]) { b.position.set(D[o], D[o + 1], D[o + 2]); b.quaternion.set(D[o + 3], D[o + 4], D[o + 5], D[o + 6]); o += 7; }
+    }
+    balle.position.set(D[o], D[o + 1], D[o + 2]); balle.quaternion.set(D[o + 3], D[o + 4], D[o + 5], D[o + 6]);
+  }
+  /** après la pose d'une image du direct : dans le tampon (pas pendant la lecture, ni hors du jeu) */
+  function enregistrerImage(M) {
+    if (simGelee(RL)) return;
+    if (M.phase !== 'jeu' && M.phase !== 'but' && M.phase !== 'engagement') return;
+    enregistrer(tampon, M.t, ecrireImage);
+    suivreRalenti(RL, tampon, M.t);
+  }
+  function commencerRalenti() {
+    if (!lancerRalenti(RL, tampon)) return;
+    ecrireImage(sauveR, 0);
+    planR = null;
+    etat.ralenti = true; etat.message = null; signaler();
+    for (const o of [anneau, anneauB, ...jauges]) o.visible = false;
+  }
+  function finirRalenti() {
+    poserImage(sauveR);
+    renderer.toneMappingExposure = expoBase;
+    camera.fov = cw > ch ? 34 : 60; camera.updateProjectionMatrix();
+    etat.ralenti = false; signaler();
+  }
+  function lireRalenti(dtReel) {
+    const o = avancerRalenti(RL, tampon, dtReel, sortieR);
+    if (o.fini) { finirRalenti(); return; }
+    lireTampon(tampon, o.t, imageR);
+    poserImage(imageR);
+    const premier = o.plan !== planR; planR = o.plan;
+    cameraPlan(camR, o.plan, RL.info, balle.position, dtReel, premier);
+    const f = cw > ch ? camR.fov * 0.62 : camR.fov;
+    if (camera.fov !== f) { camera.fov = f; camera.updateProjectionMatrix(); }
+    versMonde(camR.pos, camera.position);
+    camera.lookAt(versMonde(camR.regard, w));
+    renderer.toneMappingExposure = expoBase * (1 - o.noir);
+    ombres.maj(vus, balle.position, true);
+    filet?.temps(o.t);
+    peindreEcran(`${etat.noirs}-${etat.blancs}-${horlogeTexte(etat.reste)}`, etat.noirs, etat.blancs, horlogeTexte(etat.reste));
+    if (banc.rendu) pl.rendre(performance.now() / 1000);
+  }
+  // passer le ralenti : un toucher (la page), A / ✕ (manettes.js), Entrée, Espace, D ou Échap
+  const clavierRalenti = (e) => { if (simGelee(RL) && !e.repeat && ['Enter', ' ', 'd', 'D', 'Escape'].includes(e.key)) passerRalenti(RL); };
+  addEventListener('keydown', clavierRalenti);
+  manettes.surPasser = () => passerRalenti(RL);
+
+  // ── la qualité adaptative : d'abord la définition (0,7 au plus bas), puis, si les images restent lentes, le halo,
+  // puis les fibres du gazon et les flashs, puis les sièges vides ; tout revient quand les images redeviennent rapides ──
+  const fibres = pl.scene.getObjectByName('gazon_fibres'), sieges = pl.scene.getObjectByName('sieges');
+  const couches0 = fibres?.count ?? 0;
+  let niveau = 0;
+  function poserNiveau(n) {
+    niveau = clamp(n, 0, 3);
+    if (pl.bloom) pl.bloom.enabled = niveau < 1;
+    if (fibres) fibres.count = niveau >= 2 ? Math.min(3, couches0) : couches0;
+    if (pl.flashs) pl.flashs.visible = niveau < 2;
+    if (sieges) sieges.visible = niveau < 3;
   }
 
   // ── la boucle ──
@@ -519,7 +597,9 @@ export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, 
     if (++compte < 45) return;
     let e = echelle;
     if (moyenne > 24 && e > 0.7) e = Math.max(0.7, e - 0.1);
-    else if (moyenne < 15 && e < 1) e = Math.min(1, e + 0.05);
+    else if (moyenne > 24 && niveau < 3) { poserNiveau(niveau + 1); compte = 0; return; }
+    else if (moyenne < 15 && niveau > 0 && compte >= 90) { poserNiveau(niveau - 1); compte = 0; return; }
+    else if (moyenne < 15 && niveau === 0 && e < 1) e = Math.min(1, e + 0.05);
     if (e !== echelle) { echelle = e; compte = 0; taille(); }
   }
 
@@ -538,6 +618,10 @@ export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, 
     // plus aucune manette d'équipe branchée (batterie, câble) : la pause qu'elle avait mise se lève d'elle-même
     if (pause && pauseManette && manettes.rangees() === 0) poserPause(false);
     if (pause) { evenements(); majEtat(); rendre(0); return; }
+    // le ralenti du but : quand la célébration a été vue, la simulation s'arrête et le tampon est relu
+    if (RL.etat === 'pret' && m().phase === 'but' && m().phaseT < 0.62 && (!scene || banc.ralenti) && !gele) commencerRalenti();
+    // (le banc qui fixe le pas des images, banc.pas, fixe aussi celui du ralenti : des captures au plan près)
+    if (simGelee(RL)) { son.foule(0.3); lireRalenti(banc.pas > 0 ? banc.pas : dtReel); return; }
     if (ralentiFin > 0) { ralentiFin -= dtReel; if (ralentiFin <= 0) ralenti = 1; }
     let dtJeu = dtReel * ralenti;
     if (!gele) {
@@ -547,6 +631,7 @@ export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, 
     evenements();
     majEtat();
     rendre(dtJeu);
+    son.foule(niveauFoule(m()));
   }
   function rendre(dtJeu) {
     poserTout(dtJeu);
@@ -567,12 +652,13 @@ export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, 
   ro.observe(conteneur);
   taille();
   poserTout(0);
-  cam.foyer.set(0, 0, 0);
+  poserFoyer(tele, 0, 0);
   {
     const I = vus[MOI].interp;
     const ang = I.cap + 0.35;
     cam.pos.set(I.x + Math.sin(ang) * 3.4, 1.75, I.z + Math.cos(ang) * 3.4);
     cam.regard.set(I.x, 1.45, I.z);
+    Object.assign(tele.pos, { x: cam.pos.x, y: cam.pos.y, z: cam.pos.z }); Object.assign(tele.regard, { x: cam.regard.x, y: cam.regard.y, z: cam.regard.z });
   }
   surProgres(1);
   raf = requestAnimationFrame(boucle);
@@ -585,6 +671,8 @@ export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, 
     boucleSim = creerBoucle(monde0);
     banc.stats = monde0.stats;
     ralenti = 1; ralentiFin = 0; cam.buteur = null; scene = null;
+    if (simGelee(RL)) finirRalenti();
+    RL.etat = 'direct'; viderTampon(tampon); marques.vider(); filet?.vider();
     return monde0;
   }
 
@@ -606,6 +694,8 @@ export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, 
     salon(ouvert) { manettes.mode(ouvert ? 'salon' : 'repos'); },
     /** Lever la pause (le voile de pause est touchable : au doigt, à la souris) */
     reprendre() { poserPause(false); },
+    /** Passer le ralenti du but (un toucher sur l'écran pendant le ralenti) */
+    passer() { passerRalenti(RL); },
     manettes: { abonner: manettes.abonner, instantane: manettes.instantane, reconnues: manettes.reconnues },
     // banc d'essai (?banc) : l'état, la graine, des pas exacts, l'empreinte, les scénarios de capture
     _test: {
@@ -625,6 +715,11 @@ export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, 
       avancer: (n = 1) => { avancerPas(boucleSim, n, lireEntrees); evenements(); majEtat(); rendre(n * PAS); return m().pas; },
       geler: (v = true) => { gele = v; },
       empreinte: () => empreinte(m()),
+      /** (lot 4) le ralenti du but, la qualité adaptative, les effets */
+      get ralenti() { const P = RL.liste?.[RL.plan]; return { etat: RL.etat, plan: RL.plan, nom: P?.nom ?? null, u: P ? RL.tPlan / P.ecran : 0, images: tampon.n, de: tampon.n ? tampon.t[tampon.debut] : null }; },
+      passer: () => passerRalenti(RL),
+      qualite: (n) => { if (n != null) poserNiveau(n); return { niveau, echelle }; },
+      ombres, marques, filet, son,
       /** un scénario de sim/scenarios.js : placements et intentions scriptées, rejouables au pas près */
       scenario: (nom, g) => {
         const S = SCENARIOS[nom];
@@ -634,7 +729,7 @@ export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, 
         scene = S.creer(M);
         majEtat(); signaler();
         // la caméra se pose tout de suite sur l'action (pas de travelling depuis l'ancienne place)
-        const b = M.balle; cam.foyer.set(b.p.x, 0, b.p.z);
+        const b = M.balle; poserFoyer(tele, b.p.x, b.p.z);
         return { pas: S.pas ?? 0 };
       },
       /** un plan fixe (repère du jeu) pour les captures ; camera(null) rend la caméra de la télé */
@@ -643,6 +738,8 @@ export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, 
     detruire() {
       cancelAnimationFrame(raf);
       removeEventListener('keydown', clavierPause);
+      removeEventListener('keydown', clavierRalenti);
+      son.detruire(); ombres.liberer(); marques.liberer();
       ro.disconnect();
       pouce.detruire();
       clavier.detruire();

@@ -35,6 +35,8 @@ import { photoPerso, rafraichirPhotos } from "@/lib/sfl/photos";
 import { cn } from "@/lib/utils";
 import { EcranManettes, ManettesVues, type MagasinManettes } from "./manettes";
 import { SchemaTouches, type Appareil } from "./touches";
+// la police du score et de « BUT » : un mot à changer dans lib/jeu/police.js pour passer à Inter 800 (décision 1 de #25)
+import { CLASSE_SCORE } from "@/lib/jeu/police.js";
 
 type Etat = {
   phase: "attente" | "intro" | "engagement" | "jeu" | "but" | "fin";
@@ -45,12 +47,14 @@ type Etat = {
   buteur: "moi" | "noirs" | "blancs" | null;
   pause: boolean;
   manettes: boolean;
+  ralenti: boolean;
 };
 type Match = {
   demarrer: () => void;
   detruire: () => void;
   salon: (ouvert: boolean) => void;
   reprendre: () => void;
+  passer: () => void;
   manettes: MagasinManettes & { reconnues: () => number };
 };
 
@@ -153,8 +157,8 @@ export default function JouerPage() {
         <div className={cn("pointer-events-auto transition-opacity", enJeu && "opacity-0")}>
           <BoutonRetour parent="/" titre="Map" />
         </div>
-        {etat && enJeu && (
-          <div className="absolute left-1/2 top-[calc(env(safe-area-inset-top)+10px)] flex -translate-x-1/2 items-center overflow-hidden rounded-full bg-black/55 font-[family-name:var(--font-anton)] leading-none backdrop-blur">
+        {etat && enJeu && !etat.ralenti && (
+          <div className={cn("absolute left-1/2 top-[calc(env(safe-area-inset-top)+10px)] flex -translate-x-1/2 items-center overflow-hidden rounded-full bg-black/55 leading-none backdrop-blur", CLASSE_SCORE)}>
             <span className="flex items-center gap-2 py-1.5 pl-3.5 pr-3 text-[22px] tabular-nums">
               <span className="h-2.5 w-2.5 rounded-full border border-white/70 bg-black" />
               {etat.noirs}
@@ -172,10 +176,24 @@ export default function JouerPage() {
         <div className="pointer-events-none absolute inset-x-0 top-[64%] text-center">
           <span
             key={`${etat.noirs}-${etat.blancs}`}
-            className="jeu-mot inline-block font-[family-name:var(--font-anton)] text-[84px] leading-none tracking-tight"
+            className={cn("jeu-mot inline-block text-[84px] leading-none tracking-tight", CLASSE_SCORE)}
           >
             {etat.message}
           </span>
+        </div>
+      )}
+
+      {/* le ralenti du but (bola-app#26, lot 4) : deux bandes noires, comme un replay de télé ; un toucher le passe */}
+      {etat?.ralenti && (
+        <div
+          className="absolute inset-0"
+          onPointerDown={(e) => {
+            e.stopPropagation();
+            match.current?.passer();
+          }}
+        >
+          <div className="jeu-bande absolute inset-x-0 top-0 h-[7%] bg-black" />
+          <div className="jeu-bande absolute inset-x-0 bottom-0 h-[7%] bg-black" />
         </div>
       )}
 
@@ -224,7 +242,7 @@ export default function JouerPage() {
           style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 28px)" }}
         >
           {phase === "fin" && etat && (
-            <div className="flex items-center gap-5 font-[family-name:var(--font-anton)] text-[88px] leading-none tabular-nums">
+            <div className={cn("flex items-center gap-5 text-[88px] leading-none tabular-nums", CLASSE_SCORE)}>
               <span className={cn(etat.noirs < etat.blancs && "text-white/40")}>{etat.noirs}</span>
               <span className="text-[40px] text-white/40">–</span>
               <span className={cn(etat.blancs < etat.noirs && "text-white/40")}>{etat.blancs}</span>
@@ -259,6 +277,8 @@ export default function JouerPage() {
         .jeu-mot { animation: jeu-mot .5s cubic-bezier(.2,.9,.3,1.2) both; text-shadow: 0 6px 30px rgba(0,0,0,.45); }
         @keyframes jeu-mot { from { transform: scale(.6); opacity: 0 } to { transform: none; opacity: 1 } }
         .jeu-fantome { animation: jeu-fantome 2.2s ease-in-out infinite; }
+        .jeu-bande { animation: jeu-bande .35s ease-out both; }
+        @keyframes jeu-bande { from { transform: scaleY(0) } to { transform: none } }
         @keyframes jeu-fantome {
           0% { transform: translate(0, 0); opacity: 0 }
           12% { opacity: .9 }
@@ -266,7 +286,7 @@ export default function JouerPage() {
           62% { transform: translate(110px, 0); opacity: 0 }
           100% { opacity: 0 }
         }
-        @media (prefers-reduced-motion: reduce) { .jeu-mot, .jeu-fantome { animation: none } }
+        @media (prefers-reduced-motion: reduce) { .jeu-mot, .jeu-fantome, .jeu-bande { animation: none } }
       `}</style>
     </div>
   );

@@ -23,6 +23,12 @@ import * as Gar from '../src/lib/jeu/sim/gardien.js';
 import * as Ia from '../src/lib/jeu/sim/ia.js';
 import * as Clp from '../src/lib/jeu/sim/clips.js';
 import * as Ctc from '../src/lib/jeu/sim/contacts.js';
+import * as Crp2 from '../src/lib/jeu/sim/corps.js';
+import * as Cam from '../src/lib/jeu/rendu/camera.js';
+import * as Ral from '../src/lib/jeu/rendu/ralenti.js';
+import * as Eff from '../src/lib/jeu/rendu/effets.js';
+import * as Son from '../src/lib/jeu/rendu/son.js';
+import * as Pol from '../src/lib/jeu/police.js';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Any = any;
@@ -1063,6 +1069,201 @@ const balleA = (m: Any, x: number, z: number, vx = 0, vz = 0, pos: number | null
   const manque = nouveaux.filter((k) => !CLIPS[k]);
   verifier('Mesures des clips en .pak', !enClair && refuse && abimeRefuse && perimes.length === 0 && clairs.length === 0 && manque.length === 0,
     `clips.js en clair : ${enClair ? 'OUI' : 'non'} ; monde sans mesures ${refuse ? 'refusé' : 'ACCEPTÉ'} ; .pak abîmé ${abimeRefuse ? 'refusé' : 'ACCEPTÉ'} ; empreinte ${MESURES.empreinte}, ${Object.keys(CLIPS).length} clips mesurés sur ${Object.keys(MESURES.sources).join(', ')}${perimes.length ? ' ; PÉRIMÉES pour ' + perimes.join(', ') : ' (à jour)'} ; FBX/GLB d'animation en clair dans public/ : ${clairs.length ? clairs.join(', ') : 'aucun'}${manque.length ? ' ; clips absents : ' + manque.join(', ') : ''}`);
+}
+
+// ─────────────────────────── la vue : caméra, ralenti, effets, son, police (bola-app#26, lot 4) ───────────────────────────
+{
+  const { creerCameraTele, majCameraTele, poserFoyer, duelPresDuBut, CAMERA_TELE }: Any = Cam;
+  const E0 = (o: Any = {}) => ({ phase: 'jeu', large: false, fov: 60, aspect: 390 / 844, intro: false, celebre: null, zBut: null, duel: false, balle: { x: 0, y: 0.11, z: 0, vx: 0, vz: 0 }, ...o });
+  const dt = 1 / 60;
+  // 1. elle anticipe : balle à vitesse constante, le foyer est devant elle de ≈ v × 0,45 s
+  {
+    const c: Any = creerCameraTele(); poserFoyer(c, 0, 8);
+    const E: Any = E0(); let z = 8;
+    for (let i = 0; i < 240; i++) { z -= 5 * dt; E.balle.z = z; E.balle.vz = -5; majCameraTele(c, E, dt); }
+    const avance = z - c.f.z; // > 0 : le foyer est plus loin vers -z que la balle
+    verifier('Caméra : anticipe la balle', Math.abs(avance - 5 * CAMERA_TELE.avance) < 0.3, `balle à 5 m/s : foyer ${f2(avance)} m devant la balle (attendu ${f2(5 * CAMERA_TELE.avance)} m) ; l'ancienne caméra était ${f2(-5 * 0.35 + 5 / 2.6)} m derrière`);
+  }
+  // 2. sans dépassement : la cible saute de 6 m, le foyer et le cadre y vont sans jamais la dépasser
+  {
+    const c: Any = creerCameraTele(); poserFoyer(c, 0, 0);
+    const E: Any = E0();
+    for (let i = 0; i < 60; i++) majCameraTele(c, E, dt);
+    E.balle.z = -6; let maxF = 0, maxR = 0;
+    for (let i = 0; i < 600; i++) { majCameraTele(c, E, dt); maxF = Math.max(maxF, -c.f.z); maxR = Math.max(maxR, -c.regard.z); }
+    verifier('Caméra : aucun dépassement', maxF <= 6 + 1e-3 && maxR <= 6 + 1e-3 && maxF > 5.95, `cible à 6 m : foyer au plus ${f2(maxF)} m, cadre au plus ${f2(maxR)} m`);
+  }
+  // 3. rien qui tremble : une balle dont la vitesse est bruitée (contacts, rebonds) — le cadre reste lisse ; comparé au
+  // filtre du premier ordre d'avant (bola-app#23 : foyer.lerp(balle + v × 0,35, 1 − e^(−2,6 dt)))
+  {
+    let sd = 99; const bruit = () => { sd = (Math.imul(sd, 1103515245) + 12345) >>> 0; return sd / 4294967296 - 0.5; };
+    const c: Any = creerCameraTele(); poserFoyer(c, 0, 0);
+    const E: Any = E0(); let z = 0, fAncien = 0;
+    const nouv: number[] = [], anc: number[] = [];
+    for (let i = 0; i < 900; i++) {
+      const vz = -3 * Math.sin(i / 120) + bruit() * 8; z += vz * dt;
+      E.balle.z = z; E.balle.vz = vz; majCameraTele(c, E, dt); nouv.push(c.f.z);
+      fAncien += (z + vz * 0.35 - fAncien) * (1 - Math.exp(-dt * 2.6)); anc.push(fAncien);
+    }
+    const sec = (t: number[]) => { let q = 0; for (let i = 2; i < t.length; i++) { const a = (t[i] - 2 * t[i - 1] + t[i - 2]) / (dt * dt); q += a * a; } return Math.sqrt(q / (t.length - 2)); };
+    const jn = sec(nouv), ja = sec(anc);
+    verifier('Caméra : rien qui tremble', jn < ja * 0.25, `accélération du foyer sous une vitesse bruitée (±4 m/s à chaque image) : ${f2(jn)} m/s² (rms) contre ${f2(ja)} avec le filtre d'avant`);
+  }
+  // 4. sur de vrais matchs IA contre IA (120 s, trois graines) : le cadre n'a jamais de cassure — ni de vitesse
+  // (accélération bornée), ni d'accélération (son saut d'une image à l'autre borné) ; hors des 1,5 s qui suivent un
+  // engagement. L'ancienne caméra (premier ordre, bola-app#23), mesurée de la même façon le 15/11 : accélération au
+  // plus 830 à 870 m/s², saut d'accélération 900 m/s² par image (lot4/cam-essai-ancien.ts du dossier du chantier).
+  {
+    let accMax = 0, saut = 0, duels = 0;
+    for (const g of [5, 7, 9]) {
+      const m: Any = creerMonde({ graine: g, humains: [false, false], aides: [0, 0] }); demarrer(m, { intro: false });
+      const bc: Any = creerBoucle(m); const c: Any = creerCameraTele(); poserFoyer(c, 0, 0);
+      const E: Any = E0(); const pos: number[][] = [];
+      for (let i = 0; i < 7200; i++) {
+        avancer(bc, dt, null, 1); m.evts.length = 0;
+        const b = m.balle;
+        E.balle.x = b.p.x; E.balle.y = b.p.y; E.balle.z = b.p.z; E.balle.vx = b.v.x; E.balle.vz = b.v.z;
+        E.zBut = b.tir ? Cst.butDe(1 - b.tir.e) : null; E.duel = m.phase === 'jeu' && duelPresDuBut(m, porteur(m)); if (E.duel) duels++;
+        majCameraTele(c, E, dt);
+        if (m.phase === 'jeu') pos.push([c.pos.z, c.regard.z, c.regard.x]); else pos.length = 0;
+        const n = pos.length;
+        if (n >= 90) for (const k of [0, 1, 2]) {
+          const a1 = (pos[n - 1][k] - 2 * pos[n - 2][k] + pos[n - 3][k]) / (dt * dt), a0 = (pos[n - 2][k] - 2 * pos[n - 3][k] + pos[n - 4][k]) / (dt * dt);
+          accMax = Math.max(accMax, Math.abs(a1)); saut = Math.max(saut, Math.abs(a1 - a0));
+        }
+      }
+    }
+    verifier('Caméra : des matchs sans cassure de cadre', accMax < 80 && saut < 20 && duels > 0, `accélération du cadre au plus ${f2(accMax)} m/s² (seuil 80 ; avant : 870), saut d'accélération au plus ${f2(saut)} m/s² par image (seuil 20 ; avant : 900) ; ${(duels / 60).toFixed(1)} s de duel près d'un but (cadre resserré)`);
+  }
+
+  // ── le ralenti : le tampon ──
+  const { creerTampon, enregistrer, lireTampon, creerRalenti, armerRalenti, suivreRalenti, lancerRalenti, simGelee, passerRalenti, avancerRalenti, dureeRalenti, RALENTI, PLANS_RALENTI, cameraPlan }: Any = Ral;
+  {
+    const T: Any = creerTampon(7, Uint8Array.from([0, 2, 1, 0, 0, 0, 3]));
+    const ecr = (t: number) => (D: Float32Array, o: number) => { const a = t * 0.8; D[o] = t * 2; D[o + 1] = t < 0.5 ? 3.1 : -3.1; D[o + 2] = 0; D[o + 3] = Math.sin(a / 2); D[o + 4] = 0; D[o + 5] = Math.cos(a / 2); D[o + 6] = t < 0.5 ? 0 : 1; };
+    for (let k = 0; k <= 30; k++) enregistrer(T, k / 30, ecr(k / 30));
+    const out = new Float32Array(7);
+    lireTampon(T, 0.5 + 1 / 60, out);
+    const lin = Math.abs(out[0] - (1 + 2 / 60)) < 1e-4;
+    lireTampon(T, 14.5 / 30, out); const angle = Math.abs(Math.abs(out[1]) - Math.PI) < 0.06; // 3,1 → −3,1 par π, pas par 0
+    const qn = Math.hypot(out[2], out[3], out[4], out[5]);
+    // l'anneau : 10 s à 60 images/s n'en gardent que 4,6 s à 30 images/s
+    const T2: Any = creerTampon(1, Uint8Array.from([0]));
+    let pris = 0; for (let i = 0; i <= 600; i++) if (enregistrer(T2, i / 60, (D: Float32Array, o: number) => { D[o] = i; })) pris++;
+    const garde = T2.t[(T2.debut + T2.n - 1) % T2.cap] - T2.t[T2.debut];
+    verifier('Ralenti : le tampon', lin && angle && Math.abs(qn - 1) < 1e-5 && pris === 301 && T2.n === T2.cap && Math.abs(garde - (T2.cap - 1) / 30) < 1e-6 && garde >= RALENTI.duree,
+      `interpolation linéaire ${lin ? 'juste' : 'FAUSSE'}, angle par le plus court chemin ${angle ? 'oui' : 'NON'} (${f2(out[1])}), quaternion unitaire (${qn.toFixed(6)}) ; 601 images proposées à 60/s : ${pris} prises, ${T2.n}/${T2.cap} gardées, ${f2(garde)} s`);
+  }
+  // ── le ralenti contre la vraie simulation : la sim ne bouge pas pendant la lecture ; le match qui suit est le même ──
+  {
+    const G = 9, FIN = 150 * 120;
+    const jouer2 = (avecRalenti: boolean) => jouer(avecRalenti, false, 7);
+    const jouer = (avecRalenti: boolean, reduit = false, graine = G) => {
+      const m: Any = creerMonde({ graine, humains: [false, false], aides: [0, 0] }); demarrer(m, { intro: false });
+      const bc: Any = creerBoucle(m);
+      const T: Any = creerTampon(2 * 10 + 3, Uint8Array.from(Array(23).fill(0)));
+      const R: Any = creerRalenti({ reduit });
+      const lectures: Any[] = []; let cur: Any = null, buts = 0, filets = 0, butsAvecFilet = 0, tBut = -9;
+      const sortie: Any = {};
+      let images = 0;
+      while (m.pas < FIN && images < 400000) {
+        images++;
+        if (avecRalenti && R.etat === 'pret' && m.phase === 'but' && m.phaseT < 0.62) { if (lancerRalenti(R, T)) cur = { pas: m.pas, emp: empreinte(m), plans: [] as string[], ecran: dureeRalenti(R), duree: 0, pasPendant: 0 }; }
+        if (avecRalenti && simGelee(R)) {
+          const p0 = m.pas; const o = avancerRalenti(R, T, dt, sortie);
+          if (!o.fini) { cur.duree += dt; if (cur.plans[cur.plans.length - 1] !== o.plan.nom) cur.plans.push(o.plan.nom); }
+          cur.pasPendant += m.pas - p0;
+          if (o.fini) { cur.empApres = empreinte(m); cur.pasApres = m.pas; lectures.push(cur); cur = null; }
+          continue;
+        }
+        avancer(bc, dt, null, 1);
+        for (const e of m.evts) {
+          if (e.type === 'but') { buts++; tBut = e.t; if (avecRalenti) armerRalenti(R, m.t, { zBut: Cst.butDe(1 - e.e), xBut: m.balle.p.x, buteur: { x: 0, z: 0 } }); }
+          if (e.type === 'balleChoc' && e.genre === 'filet') { filets++; if (e.t - tBut < 0.6 && e.t >= tBut) { butsAvecFilet++; tBut = -9; } }
+        }
+        m.evts.length = 0;
+        if (m.phase === 'jeu' || m.phase === 'but' || m.phase === 'engagement') enregistrer(T, m.t, (D: Float32Array, o: number) => { for (const j of m.joueurs) { D[o++] = j.p.x; D[o++] = j.p.z; } D[o++] = m.balle.p.x; D[o++] = m.balle.p.y; D[o++] = m.balle.p.z; });
+        if (avecRalenti) suivreRalenti(R, T, m.t);
+      }
+      return { m, lectures, buts, filets, butsAvecFilet, emp: empreinte(m), pas: m.pas };
+    };
+    const A = jouer(true), B = jouer(false), C = jouer(true, true);
+    // une seconde graine, plus riche en buts : mêmes exigences
+    const A2 = jouer2(true), B2 = jouer2(false);
+    const L = [...A.lectures, ...A2.lectures];
+    const plansOk = L.length > 0 && L.every((l: Any) => l.plans.join(',') === PLANS_RALENTI.map((p: Any) => p.nom).join(','));
+    const geles = L.every((l: Any) => l.pasPendant === 0 && l.empApres === l.emp && l.pasApres === l.pas);
+    const durees = L.map((l: Any) => l.duree);
+    verifier('Ralenti : la simulation n\'avance jamais pendant la lecture', L.length === A.buts + A2.buts && geles && A.emp === B.emp && A.pas === B.pas && A2.emp === B2.emp && A2.pas === B2.pas,
+      `graines ${G} et 7 : ${A.buts + A2.buts} buts, ${L.length} ralentis ; pas faits pendant les lectures : ${L.reduce((s: number, l: Any) => s + l.pasPendant, 0)} ; empreinte avant/après chaque lecture identique : ${geles ? 'oui' : 'NON'} ; fin des matchs avec ralentis ${A.emp}, ${A2.emp} = sans ${B.emp}, ${B2.emp}`);
+    verifier('Ralenti : trois plans, durée', plansOk && durees.every((d: number) => d > 6 && d < 13), `plans ${L[0]?.plans.join(' → ') ?? '—'} ; durées à l'écran ${durees.map((d: number) => d.toFixed(1)).join(', ')} s (6 à 13 s)`);
+    // mouvement réduit : jamais de ralenti, et passer arrête tout de suite
+    const R2: Any = creerRalenti({ reduit: false }), T3: Any = creerTampon(1, Uint8Array.from([0]));
+    for (let i = 0; i < 200; i++) enregistrer(T3, i / 30, (D: Float32Array, o: number) => { D[o] = i; });
+    armerRalenti(R2, 5, { zBut: 15, xBut: 0, buteur: { x: 0, z: 10 } }); suivreRalenti(R2, T3, 6); lancerRalenti(R2, T3);
+    const avant = simGelee(R2); passerRalenti(R2); const o = avancerRalenti(R2, T3, dt, {});
+    verifier('Ralenti : mouvement réduit, passer', C.lectures.length === 0 && C.buts > 0 && avant && o.fini && !simGelee(R2) && !T3.fige,
+      `mouvement réduit : ${C.lectures.length} ralenti pour ${C.buts} buts ; passer : lecture ${avant ? 'en cours' : 'ABSENTE'} → ${o.fini ? 'finie à l\'image suivante' : 'CONTINUE'}`);
+    verifier('Filet : chaque but secoue le filet', A.buts + A2.buts > 1 && A.butsAvecFilet + A2.butsAvecFilet >= Math.ceil((A.buts + A2.buts) * 0.7), `${A.butsAvecFilet + A2.butsAvecFilet}/${A.buts + A2.buts} buts suivis d'un choc dans le filet en moins de 0,6 s (${A.filets + A2.filets} chocs de filet dans les deux matchs)`);
+    // les caméras des plans : finies, au-dessus du gazon, et qui regardent vers la balle
+    let okCam = true;
+    for (const p of PLANS_RALENTI) { const c: Any = {}; for (let i = 0; i < 30; i++) cameraPlan(c, p, { zBut: -15, xBut: 0.5, buteur: { x: 2, z: -9 } }, { x: 0.5, y: 0.3, z: -13 + i * 0.01 }, dt, i === 0); const d = Math.hypot(c.pos.x - c.regard.x, c.pos.y - c.regard.y, c.pos.z - c.regard.z); if (!(c.pos.y > 0.3 && d > 1 && d < 15 && Number.isFinite(c.fov))) okCam = false; }
+    verifier('Ralenti : caméras des plans', okCam, 'derrière le but, au ras du gazon, du cube : au-dessus du gazon, entre 1 et 15 m de ce qu\'elles regardent');
+  }
+
+  // ── effets : le filet, les ombres, l'herbe ──
+  {
+    const { ondeFilet, FILET, formeOmbres, traceGlisse }: Any = Eff;
+    let maxD = 0, finD = 0, loinD = 0;
+    for (let a = 0; a <= FILET.vie; a += 0.005) { maxD = Math.max(maxD, Math.abs(ondeFilet(0, a, 40))); if (a > FILET.vie - 0.05) finD = Math.max(finD, Math.abs(ondeFilet(0, a, 40))); loinD = Math.max(loinD, Math.abs(ondeFilet(1.6, a, 40))); }
+    verifier('Filet : une onde bornée qui s\'éteint', maxD <= FILET.max + 1e-6 && maxD > FILET.max * 0.95 && finD < 0.001 && loinD < 0.01 && ondeFilet(0, 0, 40) === 0,
+      `au plus ${(maxD * 100).toFixed(1)} cm (borne ${FILET.max * 100}), ${(finD * 1000).toFixed(2)} mm à la fin (${FILET.vie} s), ${(loinD * 1000).toFixed(1)} mm à 1,6 m du choc`);
+    const o = new Float32Array(18);
+    const pied = (x: number, y: number) => ({ x, y, z: 0, ax: 0, az: 1 });
+    formeOmbres({ x: 0, y: 0.95, z: 0 }, pied(-0.1, 0.03), pied(0.1, 0.45), { x: 0, y: 1.7, z: 0 }, o);
+    const debout = o[5] > 0.4 && o[11] > 0.5 && o[17] < 0.05;
+    formeOmbres({ x: 0, y: 0.18, z: 0 }, pied(-0.1, 0.1), pied(0.1, 0.1), { x: 0, y: 0.2, z: 1.5 }, o);
+    const couche = o[3] > 1.9 && Math.abs(o[4]) < 0.05 && o[1] > 0.3;
+    verifier('Ombres de contact', debout && couche, `debout : tache ${f2(o[5])}, pied posé ${debout ? 'marqué' : 'NON'}, pied levé effacé ; couché : tache de ${f2(o[3])} m le long du corps (vers la tête), décalée de ${f2(o[1])} m`);
+    // l'herbe : un vrai tacle glissé de la simulation (hauteur de hanche mesurée sur le clip) laisse une trace ; un
+    // joueur debout ou qui marche n'en laisse pas
+    const { hancheA }: Any = Crp2;
+    const m: Any = creerMonde({ graine: 3, humains: [false, false], aides: [0, 0] }); demarrer(m, { intro: false });
+    let traces = 0, glisses = 0, faux = 0; const etats: Any[] = m.joueurs.map(() => ({}));
+    for (let i = 0; i < 120 * 150; i++) {
+      pas(m); m.evts.length = 0; if (i % 2) continue;
+      for (const j of m.joueurs) {
+        const h = j.g && (j.mode === 'geste' || j.mode === 'sol') ? hancheA(j.g.nom, j.g.t) : 0.95;
+        const T = traceGlisse(etats[j.i], { x: j.p.x, y: h, z: j.p.z }, m.t);
+        if (T) { traces++; if (j.g?.nom === 'slide' || j.g?.nom === 'c_slide' || /fall|trip/.test(j.g?.nom ?? '')) glisses++; else faux++; }
+      }
+    }
+    const e2: Any = {}; let marche = 0; for (let i = 0; i < 60; i++) if (traceGlisse(e2, { x: 0, y: 0.95, z: i * 0.05 }, i / 60)) marche++;
+    const e3: Any = {}; let lent = 0; for (let i = 0; i < 60; i++) if (traceGlisse(e3, { x: 0, y: 0.2, z: i * 0.01 }, i / 60)) lent++;
+    verifier('Herbe qui marque', traces > 0 && faux === 0 && marche === 0 && lent === 0, `${traces} traits peints sur un match IA (${glisses} de glissades et chutes, ${faux} ailleurs) ; joueur debout qui court : ${marche} ; corps au sol presque immobile : ${lent}`);
+  }
+
+  // ── le son (le plan, sans navigateur) et la police ──
+  {
+    const { planSons, niveauFoule }: Any = Son;
+    const m: Any = creerMonde({ graine: 7, humains: [false, false], aides: [0, 0] }); demarrer(m, { intro: false });
+    const cpt: Record<string, number> = {}; let frappes = 0, buts = 0, borne = true, fins = 0;
+    while (m.phase !== 'fin' && m.pas < 200 * 120) {
+      pas(m);
+      for (const e of m.evts) { if (e.type === 'frappe') frappes++; if (e.type === 'but') buts++; }
+      for (const x of planSons(m.evts, m)) { cpt[x.s] = (cpt[x.s] ?? 0) + 1; if (!(x.g >= 0 && x.g <= 1) || !(Math.abs(x.pan) <= 0.6)) borne = false; if (x.s === 'sifflet' && x.n === 3) fins++; }
+      m.evts.length = 0;
+    }
+    const pres = niveauFoule({ balle: { p: { z: 14 }, tir: null } }), loin = niveauFoule({ balle: { p: { z: 0 }, tir: null } }), tir = niveauFoule({ balle: { p: { z: 10 }, tir: { e: 0 } } });
+    verifier('Son : chaque événement a son son', cpt.frappe === frappes && (cpt.clameur ?? 0) === buts && fins === 1 && (cpt.rebond ?? 0) > 0 && (cpt.panneau ?? 0) > 0 && (cpt.filet ?? 0) > 0 && borne && pres > loin && tir > pres,
+      `${Object.entries(cpt).map(([k, v]) => `${k} ${v}`).join(', ')} ; ${frappes} frappes, ${buts} buts → clameurs ; sifflet de fin ${fins} ; volumes dans [0, 1] : ${borne ? 'oui' : 'NON'} ; rumeur loin ${f2(loin)} < près d'un but ${f2(pres)} < frappe ${f2(tir)}`);
+    const page = fs.readFileSync(path.join(RACINE, 'src/app/jouer/page.tsx'), 'utf8');
+    const match = fs.readFileSync(path.join(RACINE, 'src/lib/jeu/match.js'), 'utf8');
+    const { POLICE_SCORE, POLICES, CLASSE_SCORE }: Any = Pol;
+    const restes = (page.match(/var\(--font-anton\)/g) ?? []).length;
+    verifier('Police du score en un seul endroit', POLICE_SCORE === 'anton' && CLASSE_SCORE === POLICES.anton.classe && (page.match(/CLASSE_SCORE\)/g) ?? []).length === 3 && restes === 0 && /POLICES\[POLICE_SCORE\]/.test(match) && !!POLICES.inter,
+      `police.js : « ${POLICE_SCORE} » (Inter 800 prête : « inter ») ; page.tsx : 3 usages de CLASSE_SCORE, ${restes} font-anton en dur ; le cube lit POLICES[POLICE_SCORE]`);
+  }
 }
 
 // ─────────────────────────── reproductible ───────────────────────────

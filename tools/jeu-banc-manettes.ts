@@ -592,5 +592,27 @@ ESSAIS.changerA.suite = appuyer(['LB'], 3);
   if (arg) fs.writeFileSync(arg.slice(10), `# Les touches du jeu Bola (bola-app#26, lot 3)\n\nTiré de src/lib/jeu/entrees/touches.js par tools/jeu-banc-manettes.ts (chaque ligne avec une action est vérifiée sur la simulation).\n\n${md}`);
   verifier('tableau en Markdown', md.split('\n').filter((x: string) => x.startsWith('| ') && !x.startsWith('| Action')).length === TOUCHES.length, `${TOUCHES.length} lignes${arg ? ` → ${arg.slice(10)}` : ''}`);
 }
+// ══ bola-app#26, lot 4 : passer le ralenti du but, couper le son ══
+{
+  // A / ✕ passe le ralenti : en match seulement (pas dans le salon, où A range la manette), une fois par appui
+  const pads: Any[] = [];
+  const btn2 = (on: number[]) => Array.from({ length: 17 }, (_, i) => ({ pressed: on.includes(i), value: on.includes(i) ? 1 : 0 }));
+  const g = (on: number[] = []) => ({ index: 0, id: 'Xbox Wireless Controller (STANDARD GAMEPAD Vendor: 045e Product: 0b13)', connected: true, mapping: 'standard', buttons: btn2(on), axes: [0, 0, 0, 0] });
+  Object.defineProperty(globalThis, 'navigator', { value: { getGamepads: () => pads }, configurable: true, writable: true });
+  const M = Man.creerManettes({ versJeu });
+  let passes = 0; (M as Any).surPasser = () => { passes++; };
+  const m2: Any = creerMonde({ graine: 3, humains: [true, false], aides: [0.5, 0] }); demarrer(m2, { intro: false });
+  M.mode('salon'); pads[0] = g(); M.lire(0, null); pads[0] = g([0]); M.lire(0.02, null); pads[0] = g(); M.lire(0.04, null);
+  const salon = passes;
+  M.mode('match');
+  let t = 1; const appui = () => { pads[0] = g([0]); M.lire(t, m2); t += 0.02; pads[0] = g([0]); M.lire(t, m2); t += 0.02; pads[0] = g(); M.lire(t, m2); t += 0.02; };
+  appui(); appui();
+  const tenu = passes;
+  M.detruire();
+  // le clavier : M coupe le son (rendu/son.js) et ne sert à aucune touche de jeu ; Entrée passe le ralenti, sans être une touche de jeu
+  const { TOUCHES_JEU }: Any = Clv;
+  const libre = !TOUCHES_JEU.has('m') && !TOUCHES_JEU.has('enter');
+  verifier('ralenti passé à la manette, son coupé au clavier', salon === 0 && tenu === 2 && libre, `A dans le salon : ${salon} ; deux appuis de A en match (tenus 2 images) : ${tenu} ; M et Entrée libres dans le tableau du clavier : ${libre ? 'oui' : 'NON'}`);
+}
 console.log(echecs ? `\n${echecs} contrôle(s) en échec` : '\nTout est vert.');
 process.exit(echecs ? 1 : 0);
