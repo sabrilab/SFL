@@ -26,6 +26,11 @@
 // filtre doux, sans secousse ; une frappe fait reculer le cadre pour tenir la balle et le but visé (et 0,6 s après la
 // ligne) ; au téléphone, le panneau proche reste au-dessus de la zone du pouce quand la balle s'en approche.
 //
+// Le clavier (bola-app#26, lot 3, entrees/clavier.js) est une manette faite de touches, lue par la même commande que
+// les manettes, pour les Noirs : il les prend quand c'est lui qui a servi en dernier (avant le pouce), et, dans un
+// match lancé avec des manettes, tant qu'une touche de jeu est tenue ou l'a été dans les 2 s. Le tableau des touches
+// est dans entrees/touches.js.
+//
 // Ce que fait chaque geste du pouce (on joue toujours les Noirs) ; il produit la même intention qu'une manette :
 //   glisser          courir dans cette direction ; loin du point de départ, sprinter (analogique de 85 à 100 % du rayon).
 //                    Balle au pied, tu la conduis par touches : elle n'est plus collée au pied.
@@ -33,6 +38,8 @@
 //                    sans la balle, près du porteur adverse : le tacle debout
 //   coup sec vers la droite avec la balle : la frappe, vers le côté du but que montre le geste, aussi forte que le geste est vif
 //   coup sec vers le haut ou le bas avec la balle : la roulette, de ce côté ; sans la balle, vers le porteur : le tacle glissé
+//   second doigt     (lot 3) le stick droit des gestes techniques, comme à la manette (entrees/geste-stick.js) ;
+//                    touché sans bouger : la semelle
 // Comme à la manette, tu joues le porteur ; en défense, la main passe au Noir le plus près de la balle. Celui que tu
 // joues porte un anneau blanc au pied.
 //
@@ -57,6 +64,9 @@ import { SCENARIOS } from './sim/scenarios.js';
 import { chargerMesuresUrl } from './sim/clips.js';
 import { changerHumains } from './sim/monde.js';
 import { creerManettes, EFFETS } from './entrees/manettes.js';
+import { creerCommande, lireManette, intentionDe, oublier } from './entrees/commande.js';
+import { creerClavier, creerEtatClavier, etatDepuisTouches } from './entrees/clavier.js';
+import { creerLecteur, oublierLecteur, lireGesteStick } from './entrees/geste-stick.js';
 
 const R = BALLON.R;
 const PX = DIM.Tl / 2 - R;
@@ -93,13 +103,13 @@ function texOmbre() {
 /**
  * Lance le jeu dans conteneur. Renvoie { demarrer(), detruire(), _test }.
  * @param {HTMLElement} conteneur
- * @param {{ photo?: string | null, surEtat?: (etat: any) => void, reduit?: boolean, duree?: number, surProgres?: (p: number) => void, surSalon?: () => void, surDemarrer?: () => void }} [options]
+ * @param {{ photo?: string | null, surEtat?: (etat: any) => void, reduit?: boolean, duree?: number, surProgres?: (p: number) => void, surSalon?: () => void, surDemarrer?: () => void, surTouches?: (marque: string) => void }} [options]
  *   photo : ta photo du studio ; surEtat : le tableau (HUD) ; reduit : « Réduire les animations » ; duree : en secondes ;
  *   surSalon : une manette demande l'écran Manettes (A / ✕ ou Menu avant le match) ; surDemarrer : Menu / Options
  *   dans l'écran Manettes.
  */
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, reduit = false, duree = 150, surProgres = () => {}, surSalon = () => {}, surDemarrer = () => {} } = {}) {
+export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, reduit = false, duree = 150, surProgres = () => {}, surSalon = () => {}, surDemarrer = () => {}, surTouches = () => {} } = {}) {
   const pr = Math.min(window.devicePixelRatio || 1, 1.5);
   let echelle = 1; // la définition adaptative
   const dims = () => {
@@ -222,9 +232,15 @@ export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, 
   const pouce = creerPouce(renderer.domElement);
   // l'écran vu de la tribune : la droite de l'écran = vers le but attaqué par les Noirs (-z), le haut = vers -x
   const ecranVersJeu = (sx, sy) => ({ x: -sy, z: -sx });
+  const jeuVersEcran = (gx, gz) => ({ sx: -gz, sy: -gx });
   const manettes = creerManettes({ versJeu: ecranVersJeu });
+  // le clavier : une manette de touches, pour les Noirs ; le second doigt du pouce : le stick droit
+  const clavier = creerClavier();
+  const cmdClavier = creerCommande(), etatClavier = creerEtatClavier();
+  const lecteurPouce = creerLecteur();
   manettes.surSalon = () => surSalon();
   manettes.surDemarrer = () => surDemarrer();
+  manettes.surTouches = (marque) => surTouches(marque);
   let pause = false, pauseManette = false;
   const poserPause = (v, parManette = false) => { if (v === pause) return; if (v && !(m().phase === 'jeu' || m().phase === 'engagement')) return; pause = v; pauseManette = v && parManette; etat.pause = pause; signaler(); };
   manettes.surPause = () => poserPause(!pause, true);
@@ -263,6 +279,12 @@ export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, 
     entree.allure = amp > 0.05 ? Math.min(1, amp / 0.85) : 0;
     entree.sprint = amp > 0.85 ? (amp - 0.85) / 0.15 : 0;
     entree.regard = m().balle.p;
+    // le second doigt : le stick droit des gestes (le même lecteur que la manette)
+    const M = m(), jc = M.joueurs[M.controle[0] ?? MOI];
+    if (pouce.geste.actif || lecteurPouce.actif) {
+      const a = lireGesteStick(lecteurPouce, pouce.geste.x, pouce.geste.y, performance.now() / 1000, M, jc, ecranVersJeu);
+      if (a && porteur(M) === jc && !actionPouce) actionPouce = a;
+    }
     entree.action = actionPouce; actionPouce = null;
     entree.changer = changerPouce; changerPouce = null;
     return entree;
@@ -275,11 +297,20 @@ export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, 
    * rend à l'IA après 2 s sans geste : jamais un Noir planté jusqu'à la fin.
    */
   const pouceJoue = () => !avecManettes || (pouce.utilise && performance.now() - pouce.vu < 2000);
+  const clavierTenu = () => { for (const k of clavier.tenues) if (k !== 'shift') return true; return false; };
+  const clavierJoue = () => clavier.utilise && clavier.vu >= pouce.vu && (!avecManettes || clavierTenu() || performance.now() - clavier.vu < 2000);
+  /** Le clavier : une lecture par image, comme une manette (seulement pendant le jeu, sans manette chez les Noirs). */
+  function lireClavier(t) {
+    if (m().phase !== 'jeu' || manettes.equipes()[0] || !clavier.utilise || pause) { if (cmdClavier.vu) oublier(cmdClavier); return; }
+    const jc = m().controle[0] != null ? m().joueurs[m().controle[0]] : null;
+    etatDepuisTouches(clavier.tenues, t, etatClavier, jc?.cap ?? null, jeuVersEcran);
+    lireManette(cmdClavier, etatClavier, t, m(), 0, ecranVersJeu);
+  }
   function lireEntrees() {
     if (scene) return scene.entrees(m());
     if (banc.auto || m().phase !== 'jeu') { entrees[0] = null; entrees[1] = null; return entrees; }
     const eq = manettes.equipes();
-    entrees[0] = eq[0] ? manettes.intention(0) : pouceJoue() ? lireEntree() : null;
+    entrees[0] = eq[0] ? manettes.intention(0) : clavierJoue() ? intentionDe(cmdClavier) : pouceJoue() ? lireEntree() : null;
     entrees[1] = eq[1] ? manettes.intention(1) : null;
     return entrees;
   }
@@ -289,7 +320,7 @@ export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, 
     const M = m();
     if (banc.auto || scene) return;
     const eq = manettes.equipes();
-    humainsVoulus[0] = !!eq[0] || pouceJoue(); humainsVoulus[1] = !!eq[1];
+    humainsVoulus[0] = !!eq[0] || clavierJoue() || pouceJoue(); humainsVoulus[1] = !!eq[1];
     aidesVoulues[0] = eq[0] ? 0.5 : 1; aidesVoulues[1] = eq[1] ? 0.5 : 0;
     if (M.humains[0] !== humainsVoulus[0] || M.humains[1] !== humainsVoulus[1] || M.aides[0] !== aidesVoulues[0] || M.aides[1] !== aidesVoulues[1]) changerHumains(M, humainsVoulus, aidesVoulues);
   }
@@ -304,14 +335,11 @@ export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, 
     }
     if (p && p.e !== j.e && Math.hypot(p.p.x - j.p.x, p.p.z - j.p.z) < 2.2) actionPouce = { type: 'tacle', glisse: false };
   };
-  // le clavier : S lobée, F profondeur (puissance moyenne, vers la course), Q changer de joueur, E tacle glissé
-  pouce.surClavier = (k) => {
+  // le second doigt touché sans bouger : la semelle (R3)
+  pouce.surSemelle = () => {
     if (m().phase !== 'jeu') return;
     const j = m().joueurs[m().controle[0] ?? MOI];
-    const st = pouce.stick, a = Math.hypot(st.x, st.y) > 0.3, g = ecranVersJeu(st.x, st.y);
-    if (k === 'changer') { changerPouce = true; return; }
-    if (k === 'tacle') { actionPouce = { type: 'tacle', glisse: true }; return; }
-    actionPouce = { type: k, p: 0.5, dx: a ? g.x : Math.sin(j.cap), dz: a ? g.z : Math.cos(j.cap) };
+    if (porteur(m()) === j) actionPouce = { type: 'semelle' };
   };
   pouce.surLancer = (dx, dy, force) => {
     if (m().phase !== 'jeu') return;
@@ -408,7 +436,7 @@ export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, 
     anneauB.visible = visibleJeu && c1 != null;
     if (c1 != null) { const I = vus[c1].interp; anneauB.position.set(I.x, 0.05, I.z); }
     for (const e of [0, 1]) {
-      const o = jauges[e], q = M.controle[e], f = manettes.jauge(e);
+      const o = jauges[e], q = M.controle[e], f = e === 0 && !manettes.equipes()[0] && clavierJoue() ? cmdClavier.p : manettes.jauge(e);
       o.visible = visibleJeu && q != null && f > 0.02;
       if (o.visible) { const I = vus[q].interp; o.position.set(I.x, 0.055, I.z); o.geometry.setDrawRange(0, 6 * Math.max(1, Math.round(48 * f))); }
     }
@@ -505,6 +533,7 @@ export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, 
     const dtReel = Math.min(0.25, horloge.getDelta());
     // les manettes : une lecture par image, avant les pas ; puis qui joue quelle équipe
     manettes.lire(ms / 1000, m());
+    lireClavier(ms / 1000);
     majHumains();
     // plus aucune manette d'équipe branchée (batterie, câble) : la pause qu'elle avait mise se lève d'elle-même
     if (pause && pauseManette && manettes.rangees() === 0) poserPause(false);
@@ -567,6 +596,7 @@ export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, 
       avecManettes = !!(manettes.equipes()[0] || manettes.equipes()[1]);
       etat.manettes = avecManettes;
       pouce.utilise = false; pause = false; etat.pause = false;
+      clavier.utilise = false; oublier(cmdClavier); oublierLecteur(lecteurPouce);
       majHumains();
       demarrerMonde(m(), { intro: true, reduit });
       etat.message = null; etat.buteur = null; derniereSeconde = -1;
@@ -579,7 +609,7 @@ export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, 
     manettes: { abonner: manettes.abonner, instantane: manettes.instantane, reconnues: manettes.reconnues },
     // banc d'essai (?banc) : l'état, la graine, des pas exacts, l'empreinte, les scénarios de capture
     _test: {
-      etat, banc, anneau, anneauB, pouce, manettes,
+      etat, banc, anneau, anneauB, pouce, manettes, clavier, cmdClavier,
       get pause() { return pause; },
       get monde() { return m(); },
       get joueurs() { return m().joueurs; },
@@ -615,6 +645,7 @@ export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, 
       removeEventListener('keydown', clavierPause);
       ro.disconnect();
       pouce.detruire();
+      clavier.detruire();
       manettes.detruire();
       for (const v of vus) v.perso.liberer();
       pl.composer.dispose?.();

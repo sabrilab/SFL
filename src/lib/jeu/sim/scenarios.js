@@ -246,6 +246,55 @@ export const SCENARIOS = {
       return { entrees(m) { m.balle.dernierT = m.t; return [null, intention(0, 0, 0, 0)]; } };
     },
   },
+  // ── (bola-app#26, lot 3) les gestes des touches ──
+  // 16 : double passement (LT + quart de cercle) en course face à un défenseur.
+  doublePassement: {
+    graine: 116, presents: [0, 4, 5, 6],
+    creer(M) {
+      M.humains = [true, false]; M.controleFixe = [4, null];
+      poser(M.joueurs[4], 0, 6, Math.PI, 0, -3);
+      balleA(M, 0, 5.4, 0, -3.3, 4);
+      poser(M.joueurs[6], 0.2, 2.4, 0);
+      let n = 0;
+      return { entrees() { n++; return [intention(0, -1, 0.6, 0, { action: n === 30 ? { type: 'passement', dx: 1, dz: 0, double: true } : null }), null]; } };
+    },
+  },
+  // 17 : jonglage sur place (LB + RB tenus).
+  jongle: {
+    graine: 117, presents: [0, 4, 5],
+    creer(M) {
+      M.humains = [true, false]; M.controleFixe = [4, null];
+      poser(M.joueurs[4], 0, 4, Math.PI, 0, 0);
+      balleA(M, 0, 3.6, 0, 0, 4);
+      let n = 0;
+      return { entrees() { n++; return [intention(0, 0, 0, 0, { action: n % 36 === 6 ? { type: 'jongle' } : null, regard: M.balle.p }), null]; } };
+    },
+  },
+  // 18 : feinte de frappe (X puis A) devant un défenseur, qui part pour la frappe.
+  feinteFrappe: {
+    graine: 118, presents: [0, 4, 5, 6],
+    creer(M) {
+      M.humains = [true, false]; M.controleFixe = [4, null];
+      poser(M.joueurs[4], 0, 2, Math.PI, 0, 0);
+      balleA(M, 0, 1.55, 0, 0, 4);
+      poser(M.joueurs[6], 0.3, -0.6, 0);
+      let n = 0;
+      return { entrees() { n++; return [intention(0, -1, n < 60 ? 0 : 0.5, 0, { action: n === 6 ? { type: 'feinteFrappe' } : null }), null]; } };
+    },
+  },
+  // 19 : l'enchaînement crochet → roulette → frappe, la frappe en file pendant la roulette.
+  enchainement: {
+    graine: 119, presents: [0, 4, 5, 7],
+    creer(M) {
+      M.humains = [true, false]; M.controleFixe = [4, null];
+      poser(M.joueurs[4], 1, 6, Math.PI, 0, -4.2);
+      balleA(M, 1, 5.4, 0, -4.6, 4);
+      poser(M.joueurs[7], -2.5, -1, 0);
+      let n = 0;
+      const A = { 12: { type: 'crochet', dx: -1, dz: 0 }, 48: { type: 'roulette', dx: 0, dz: -1 }, 70: { type: 'frappe', p: 0.55, x: -0.8 } };
+      return { entrees() { n++; return [intention(0, -1, 1, 0, { action: A[n] ?? null }), null]; } };
+    },
+  },
 };
 
 export { PAS };

@@ -29,6 +29,6 @@ export function etatAnim(M, j, I, porteur, balle, cache) {
   const tc = j.tireCible != null ? M.joueurs[j.tireCible] : null;
   e.tire = tc ? Object.assign((cache.tire ??= {}), { x: tc.p.x, y: 1.15, z: tc.p.z }) : null;
   const F = j.figure;
-  e.figure = F && M.t - F.t0 < F.duree ? Object.assign((cache.figure ??= {}), { type: F.type, age: M.t - F.t0, duree: F.duree, cote: F.cote }) : null;
+  e.figure = F && M.t - F.t0 < F.duree ? Object.assign((cache.figure ??= {}), { type: F.type, age: M.t - F.t0, duree: F.duree, cote: F.cote, double: !!F.double }) : null;
   return e;
 }

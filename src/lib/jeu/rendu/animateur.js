@@ -289,8 +289,11 @@ export function creerAnimateur(perso, { gardien = false, reduit = false, versMon
     }
     // (le passement : les hanches suivent le pied qui fait le tour de la balle)
     const F = e.figure;
-    const uF = F ? clamp(F.age / F.duree, 0, 1) : 0;
-    const balancier = F && F.type === 'passement' ? F.cote * 9 * DEG * Math.sin(Math.PI * uF) : 0;
+    const uF0 = F ? clamp(F.age / F.duree, 0, 1) : 0;
+    // (lot 3 : le double passement, deux demi-tours de pied, un de chaque côté)
+    const uF = F?.double ? (uF0 * 2) % 1 : uF0;
+    const coteF = F ? (F.double && uF0 >= 0.5 ? -F.cote : F.cote) : 0;
+    const balancier = F && F.type === 'passement' ? coteF * 9 * DEG * Math.sin(Math.PI * uF) : 0;
     const roulis = ressort(etat, 'rl', (clamp(-0.6 * Math.atan((e.aLat ?? 0) / 9.81), -16 * DEG, 16 * DEG) + appui) * amp * (1 - gesteW) + balancier * amp, dt, 9);
     corps.rotation.z = roulis;
     corps.rotation.x = 0;
@@ -375,7 +378,7 @@ export function creerAnimateur(perso, { gardien = false, reduit = false, versMon
       const env = Math.sin(Math.PI * uF);
       const fx = avant.x, fz = avant.z, gx = -lateral.x, gz = -lateral.z; // avant et gauche du joueur (monde)
       let P = null;
-      if (F.type === 'passement') P = F.cote > 0 ? pieds[0] : pieds[1];
+      if (F.type === 'passement') P = coteF > 0 ? pieds[0] : pieds[1];
       else {
         // (talonnade, sombrero : le pied le plus proche de la balle)
         let bd = Infinity;
@@ -386,7 +389,7 @@ export function creerAnimateur(perso, { gardien = false, reduit = false, versMon
         if (F.type === 'passement') {
           // de l'intérieur de la balle, par-dessus, vers l'extérieur : un demi-cercle de 0,24 m, 0,14 m au plus haut
           const a = Math.PI * uF, r = 0.24;
-          tmpv.set(bw.x + (-Math.cos(a) * F.cote) * r * gx + Math.sin(a) * r * fx, 0.09 + 0.14 * Math.sin(a), bw.z + (-Math.cos(a) * F.cote) * r * gz + Math.sin(a) * r * fz);
+          tmpv.set(bw.x + (-Math.cos(a) * coteF) * r * gx + Math.sin(a) * r * fx, 0.09 + 0.14 * Math.sin(a), bw.z + (-Math.cos(a) * coteF) * r * gz + Math.sin(a) * r * fz);
         } else if (F.type === 'talon') {
           // le talon part en arrière, derrière la jambe d'appui
           tmpv.set(cible.x - fx * 0.32 * env, cible.y + 0.22 * env, cible.z - fz * 0.32 * env);

@@ -3,11 +3,15 @@
 //     (au-delà de 85 % du rayon : le sprint) ;
 //   · un coup sec puis lâché : la frappe (surLancer, avec la direction et la vivacité du dernier mouvement) ;
 //   · touché bref sans bouger : le dribble (surTouche).
-// À la souris, c'est pareil (cliquer-glisser) ; au clavier, flèches pour courir, Maj pour sprinter, Espace pour frapper
-// (maintenu = plus fort), D pour la passe, S la lobée, F la profondeur, Q pour changer de joueur, E le tacle glissé
-// (surClavier). « utilise » passe à vrai au premier vrai geste de jeu (stick poussé au-delà de 30 %, frappe, touche,
-// une touche de jeu), pas à un simple toucher ni à Maj ; « vu » garde l'instant du dernier geste : quand des manettes
-// jouent, le pouce ne prend les Noirs que s'il sert (match.js les rend à l'IA après 2 s sans geste).
+//   · (bola-app#26, lot 3) un second doigt posé pendant que le premier tient le stick : c'est le stick droit des gestes
+//     techniques (geste : { x, y } de -1 à 1, son déplacement depuis son point de pose, 46 px = poussé à fond ; mêmes
+//     motifs qu'à la manette, lus par match.js avec entrees/geste-stick.js) ; touché sans bouger, c'est R3, la semelle
+//     (surSemelle).
+// À la souris, c'est pareil (cliquer-glisser). Le clavier est à part depuis le lot 3 (entrees/clavier.js : une manette
+// faite de touches). « utilise » passe à vrai au premier vrai geste de jeu (stick poussé au-delà de 30 %, frappe,
+// touche), pas à un simple toucher ; « vu » garde l'instant du dernier geste : quand des manettes jouent, le pouce ne
+// prend les Noirs que s'il sert (match.js les rend à l'IA après 2 s sans geste).
+import { stickDoigt } from './entrees/geste-stick.js';
 
 const ZONE = 0.55; // le pouce se pose sous cette fraction de la hauteur
 const RAYON = 58; // px : le stick plein
@@ -36,7 +40,8 @@ export function creerPouce(el) {
     stick: { x: 0, y: 0 },
     surTouche: null,
     surLancer: null,
-    surClavier: null,
+    surSemelle: null,
+    geste: { x: 0, y: 0, actif: false },
     actif: false,
     utilise: false,
     vu: -1e9,
@@ -45,8 +50,18 @@ export function creerPouce(el) {
   let id = null, ox = 0, oy = 0, debut = 0, bouge = 0;
   const trace = []; // derniers points { x, y, t }
 
+  // le second doigt : le stick droit
+  let id2 = null, ox2 = 0, oy2 = 0, debut2 = 0, bouge2 = 0;
   function poser(e) {
-    if (id !== null) return;
+    if (id !== null) {
+      if (id2 !== null || e.pointerType === 'mouse') return;
+      id2 = e.pointerId;
+      try { el.setPointerCapture(id2); } catch {}
+      ox2 = e.clientX; oy2 = e.clientY; debut2 = performance.now(); bouge2 = 0;
+      p.geste.actif = true; p.geste.x = p.geste.y = 0;
+      e.preventDefault();
+      return;
+    }
     const r = el.getBoundingClientRect();
     if (e.clientY - r.top < r.height * ZONE && e.pointerType !== 'mouse') return;
     id = e.pointerId;
@@ -62,6 +77,14 @@ export function creerPouce(el) {
     e.preventDefault();
   }
   function glisser(e) {
+    if (e.pointerId === id2) {
+      const dx = e.clientX - ox2, dy = e.clientY - oy2;
+      bouge2 = Math.max(bouge2, Math.hypot(dx, dy));
+      const g = stickDoigt(dx, dy);
+      p.geste.x = g.x; p.geste.y = g.y;
+      if (bouge2 > 14) servir();
+      return;
+    }
     if (e.pointerId !== id) return;
     const r = el.getBoundingClientRect();
     const x = e.clientX - r.left, y = e.clientY - r.top;
@@ -79,6 +102,12 @@ export function creerPouce(el) {
     while (trace.length > 2 && t - trace[0].t > 90) trace.shift();
   }
   function lacher(e) {
+    if (e.pointerId === id2) {
+      id2 = null;
+      p.geste.actif = false; p.geste.x = p.geste.y = 0;
+      if (performance.now() - debut2 < 260 && bouge2 < 12) { servir(); p.surSemelle?.(); }
+      return;
+    }
     if (e.pointerId !== id) return;
     id = null;
     p.actif = false;
@@ -102,50 +131,13 @@ export function creerPouce(el) {
   el.addEventListener('pointerup', lacher);
   el.addEventListener('pointercancel', lacher);
 
-  // clavier (ordinateur)
-  const touches = new Set();
-  let espace = 0;
-  const majClavier = () => {
-    if (p.actif) return;
-    p.stick.x = (touches.has('ArrowRight') ? 1 : 0) - (touches.has('ArrowLeft') ? 1 : 0);
-    p.stick.y = (touches.has('ArrowUp') ? 1 : 0) - (touches.has('ArrowDown') ? 1 : 0);
-    const L = Math.hypot(p.stick.x, p.stick.y);
-    const amp = touches.has('Shift') ? 1 : 0.7;
-    if (L) { p.stick.x *= amp / L; p.stick.y *= amp / L; }
-  };
-  const bas = (e) => {
-    if (e.repeat) return;
-    if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' '].includes(e.key)) e.preventDefault();
-    // (Maj seule ne compte pas : c'est la touche qu'on presse pour autre chose)
-    if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' ', 'd', 'D', 's', 'S', 'f', 'F', 'q', 'Q', 'e', 'E'].includes(e.key)) servir();
-    if (e.key === ' ') { espace = performance.now(); return; }
-    if (e.key === 'd' || e.key === 'D') { p.surTouche?.(); return; }
-    const k = { s: 'lob', f: 'profondeur', q: 'changer', e: 'tacle' }[e.key.toLowerCase()];
-    if (k) { p.surClavier?.(k); return; }
-    touches.add(e.key); majClavier();
-  };
-  const haut = (e) => {
-    if (e.key === ' ' && espace) {
-      // Espace : maintenu = plus fort ; droit au but, infléchi par les flèches haut et bas
-      const f = Math.min(1, (performance.now() - espace) / 700);
-      espace = 0;
-      p.surLancer?.(1, p.stick.y * 0.6, f); // vers la droite : le but attaqué, vu de la tribune
-      return;
-    }
-    touches.delete(e.key); majClavier();
-  };
-  // (des flèches tenues : le pouce sert tant qu'on court)
   p.servir = servir;
-  addEventListener('keydown', bas);
-  addEventListener('keyup', haut);
 
   p.detruire = () => {
     el.removeEventListener('pointerdown', poser);
     el.removeEventListener('pointermove', glisser);
     el.removeEventListener('pointerup', lacher);
     el.removeEventListener('pointercancel', lacher);
-    removeEventListener('keydown', bas);
-    removeEventListener('keyup', haut);
     anneau.remove(); point.remove();
   };
   return p;

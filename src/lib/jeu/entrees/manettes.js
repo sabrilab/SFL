@@ -10,7 +10,8 @@
 //     XInput → Xbox (A B X Y) ; les autres prennent les icônes Xbox.
 //   · Salon (l'écran Manettes, avant le match) : A / ✕ rejoint (la 1re chez les Noirs, la 2e chez les Blancs), stick
 //     gauche ou croix pour changer de côté, B / ○ pour revenir au milieu, deux manettes du même côté : refusé (un petit
-//     choc de l'icône, compteur « choc ») ; Menu / Options lance le match (surDemarrer).
+//     choc de l'icône, compteur « choc ») ; Menu / Options lance le match (surDemarrer) ; Vue / Share ouvre ou ferme
+//     le schéma des touches, aux boutons de cette manette (surTouches, bola-app#26 lot 3).
 //   · Repos (avant « Jouer », après la fin) : A / ✕ ou Menu / Options ouvre le salon (surSalon).
 //   · Match : chaque manette rangée dans une équipe écrit l'intention de cette équipe (entrees/commande.js). Débranchée,
 //     son équipe repasse à l'IA au pas suivant (la page lit equipes() à chaque image), sans pause ni plantage ;
@@ -103,7 +104,7 @@ export function creerManettes({ versJeu = (sx, sy) => ({ x: -sy, z: -sx }) } = {
   let mode = 'repos';
   let version = 0, instant = null;
   const abonnes = new Set();
-  const api = { surSalon: null, surDemarrer: null, surPause: null };
+  const api = { surSalon: null, surDemarrer: null, surPause: null, surTouches: null };
 
   const changer = () => { version++; instant = null; for (const f of abonnes) f(); };
 
@@ -143,6 +144,7 @@ export function creerManettes({ versJeu = (sx, sy) => ({ x: -sy, z: -sx }) } = {
     if (gauche) { if (p.equipe === 1) poser(p, null); else if (p.equipe == null) poser(p, 0); else { p.choc++; changer(); } }
     if (droite) { if (p.equipe === 0) poser(p, null); else if (p.equipe == null) poser(p, 1); else { p.choc++; changer(); } }
     if (bas(K.MENU)) api.surDemarrer?.();
+    if (bas(K.VUE)) api.surTouches?.(p.marque);
   }
 
   /** Une image : lit les manettes, tient le salon, nourrit les commandes. t en secondes, M le monde. */

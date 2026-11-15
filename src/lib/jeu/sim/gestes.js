@@ -418,7 +418,8 @@ function clipFrappe(j, b, spec) {
   const hv = s > 0.3 ? atan2(j.v.x, j.v.z) : j.cap;
   const cb = spec._cible ?? null;
   const ecart = cb ? Math.abs(enrouler(atan2(cb.x - b.p.x, cb.z - b.p.z) - hv)) : 0;
-  const course = s > 2.2 && ecart < (70 * Math.PI) / 180;
+  // (lot 3 : une frappe enchaînée sur un geste technique part sur appuis, sans course d'élan)
+  const course = s > 2.2 && ecart < (70 * Math.PI) / 180 && !spec.enchaine;
   // la hauteur de la balle à l'impact (un premier jet à 0,22 s)
   const yb = hauteurDans(b, 0.22);
   if (yb > 0.3 || b.p.y > 0.45) {
