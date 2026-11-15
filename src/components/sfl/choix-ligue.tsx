@@ -16,6 +16,12 @@
 // comme le texte par un masque : pleins quand on y est, effacés sinon. Le
 // sigle SFL (tools/sigle-sfl.ts, 23/10) a les métriques du logo BOLA : à
 // hauteur égale, les lettres de SFL et de BOLA ont la même taille.
+//
+// Bola Club (12/11/2026, lib/sfl/club/drapeau.ts) : un joueur licencié dans
+// un club a « simplement un onglet club en plus ». Sous le drapeau, et une
+// fois /club ouvert sur ce téléphone, le menu a une troisième ligne : le
+// club, son écusson et son nom (LigneClubDuMenu). Sinon, rien ne change, et
+// rien du club n'est chargé (hooks/use-club-menu.ts).
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
@@ -23,6 +29,9 @@ import { ChevronDown } from "lucide-react";
 import { BoutonRecherche } from "@/components/layout/bouton-recherche";
 import { cn } from "@/lib/utils";
 import { useHorsSfl } from "@/hooks/use-hors-sfl";
+import { useClubDuMenu } from "@/hooks/use-club-menu";
+import { Ecusson } from "@/components/sfl/equipe/ecusson";
+import { fondDe, type Blason } from "@/lib/sfl/blason";
 
 type Actif = "/ligue" | "/ligue-vierge" | "/bola-team";
 
@@ -74,6 +83,8 @@ export function EnteteLigue({ actif, className, children }: { actif: Actif; clas
   // Un joueur Bola, hors de la SFL (hooks/use-hors-sfl.ts) : le seul sigle
   // de Bola, sans l'autre ligue à dérouler.
   const horsSfl = useHorsSfl();
+  // Le club du joueur licencié (Bola Club), une fois ouvert sur ce téléphone.
+  const club = useClubDuMenu();
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!ouvert) return;
@@ -122,6 +133,7 @@ export function EnteteLigue({ actif, className, children }: { actif: Actif; clas
                 <SigleLigue ligue={l.ligue} hauteur={16} />
               </Link>
             ))}
+            {club && <LigneClubDuMenu club={club} onClick={() => setOuvert(false)} />}
           </nav>
         )}
       </div>
@@ -132,6 +144,36 @@ export function EnteteLigue({ actif, className, children }: { actif: Actif; clas
         <BoutonRecherche className="size-10" />
       </div>
     </div>
+  );
+}
+
+/** Le club d'un licencié dans le menu des ligues : son écusson (ses couleurs ne vivent que là) et son nom. */
+export function LigneClubDuMenu({
+  club,
+  actif = false,
+  onClick,
+}: {
+  club: { nom: string; initiales: string; blason: Blason };
+  actif?: boolean;
+  onClick?: () => void;
+}) {
+  return (
+    <Link
+      href="/club"
+      role="menuitem"
+      aria-current={actif ? "page" : undefined}
+      onClick={onClick}
+      className={cn(
+        "flex h-12 items-center gap-2.5 rounded-[14px] px-3.5 transition-colors",
+        actif ? "bg-foreground/[0.08] text-foreground" : "text-encre-2"
+      )}
+    >
+      {/* L'écusson répète le club : le lecteur d'écran lit son nom une fois. */}
+      <span aria-hidden className="grid shrink-0">
+        <Ecusson initiales={club.initiales} fond={fondDe(club.blason)} blason={club.blason} taille={24} />
+      </span>
+      <span className="titre-lettrage text-[15px] leading-none">{club.nom}</span>
+    </Link>
   );
 }
 
