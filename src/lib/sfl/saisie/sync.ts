@@ -25,7 +25,7 @@ import { getSession } from "@/lib/sfl/auth/session";
 import { adoptSaison, CURRENT_SEED_VERSION, localStorageStore } from "./store";
 import type { Saison } from "./types";
 import { sansVitrine } from "../compte-vitrine";
-import { avecFinsDeLaBase } from "../revelation";
+import { avecFinsDeLaBase, avecMainsDeLaBase, type MainSurLeVote } from "../revelation";
 
 // Même canal d'événement que SeasonProvider (littéral pour éviter le cycle
 // d'imports : season-provider importe store, qui importe ce module).
@@ -250,10 +250,10 @@ async function publierMaintenant(saison: Saison, forcer: boolean): Promise<Resul
     if (error?.hint === "feuille-tenue")
       return { ok: false, raison: "Feuille de match tenue par un joueur.", feuille: (error.details ?? "").split("|").filter(Boolean) };
     if (error) return { ok: false, raison: motif(error.message) };
-    const r = data as { ok: boolean; version: number; fins?: Record<string, string | null> };
+    const r = data as { ok: boolean; version: number; fins?: Record<string, string | null>; mains?: Record<string, MainSurLeVote | null> };
     if (!r.ok) return { ok: false, raison: CONFLIT, conflit: true };
     retenir(r.version);
-    if (r.fins) adopterFins(r.fins);
+    if (r.fins || r.mains) adopterFins(r.fins ?? {}, r.mains);
     // Le bilan d'XP du serveur se refait (hooks/use-bilan-serveur.ts) : une journée publiée ouvre des paliers.
     window.dispatchEvent(new Event(SAISON_PUBLIEE_EVENT));
     return { ok: true };
@@ -269,10 +269,13 @@ async function publierMaintenant(saison: Saison, forcer: boolean): Promise<Resul
  * la valeur de la base et calculait toute la soirée ses propres 18 h et
  * 19 h. Rien ne repart en base : c'est déjà sa valeur.
  */
-function adopterFins(fins: Record<string, string | null>) {
+function adopterFins(fins: Record<string, string | null>, mains?: Record<string, MainSurLeVote | null>) {
   try {
     const local = localStorageStore.load();
-    const neuf = avecFinsDeLaBase(local, fins);
+    // La main de l'admin sur le vote suit le même chemin (15/11/2026) : la
+    // base remet celle d'une journée déjà révélée, l'appareil la reprend.
+    const avecFins = avecFinsDeLaBase(local, fins);
+    const neuf = mains ? avecMainsDeLaBase(avecFins, mains) : avecFins;
     if (neuf === local) return;
     localStorageStore.save(neuf);
     window.dispatchEvent(new Event(SAISIE_EVENT));

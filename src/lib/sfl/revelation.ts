@@ -56,7 +56,8 @@
 // ferme à l'instant. La révélation suit toujours d'une heure, minuit au plus
 // tard. Sans geste, la règle ci-dessus ne change pas. Un geste ne vaut que le
 // jour de la journée ; passé la révélation, plus rien ne se règle (une
-// journée comptée ne se décompte pas).
+// journée comptée ne se décompte pas), et aucun changement de main ne révèle
+// une journée sur-le-champ (tenirMainSurLeVote, et la base de même).
 //
 // L'heure, côté téléphone, est celle du serveur (horloge.ts) : un téléphone
 // à l'heure fausse ne révèle ni avant, ni après les autres.
@@ -284,10 +285,9 @@ export function etatRevelation(s: SaisonLignes, j: number, t: Date): EtatRevelat
   }
   if (journeeComptee(s, j, t)) return "revelee";
   const fin = finDuVote(meta, numero, t);
-  const ouvert = !!fin && t.getTime() < fin.getTime();
-  if (finDesMatchs(meta)) return ouvert ? "vote" : "attente";
-  // Sans F, la fin du vote est minuit, sauf si l'admin l'a fermé à la main.
-  if (journeeTerminee(s, j)) return leJour && ouvert ? "vote" : "attente";
+  if (finDesMatchs(meta)) return fin && t.getTime() < fin.getTime() ? "vote" : "attente";
+  // Sans F, le vote tient jusqu'à minuit, sauf si l'admin l'a fermé à la main.
+  if (journeeTerminee(s, j)) return leJour && !voteFermeALaMain(meta) ? "vote" : "attente";
   return estLeJourOuSaNuit(meta.date, t) ? "en-direct" : "bloquee";
 }
 
@@ -430,18 +430,23 @@ export function avecFinsDeLaBase(s: Saison, fins: Record<string, string | null |
  *   · garder : le vote est ouvert et fermera d'office avant minuit (la règle) ;
  *   · fermer : le vote est ouvert ;
  *   · rouvrir : le vote est fermé (d'office ou à la main) ; il rouvre jusqu'à minuit.
+ * Un vote fermé à la main se rouvre aussi pendant qu'une feuille est reprise
+ * (la journée rouverte, sans fin des matchs) : sinon la fermeture resterait
+ * collée jusqu'à la fin de la feuille. Et il est fermé quelle que soit la
+ * minute de l'écran (`t` peut dater du dernier tic, juste avant le geste).
  */
 export function reglageDuVote(s: SaisonLignes, j: number, t: Date): { garder: boolean; fermer: boolean; rouvrir: boolean } | null {
   const meta = metaDe(s, j);
   const numero = numeroSaison(s);
   if (!meta || !nouveauRegime(numero, j) || estBrouillon(meta) || estEnSuspens(meta)) return null;
   if (!avecVote(s, meta) || !estLeJour(meta.date, t)) return null;
-  if (!finDesMatchs(meta) && !journeeTerminee(s, j)) return null;
+  const aLaMain = voteFermeALaMain(meta);
+  if (!finDesMatchs(meta) && !journeeTerminee(s, j) && !aLaMain) return null;
   if (journeeComptee(s, j, t)) return null;
   const fin = finDuVote(meta, numero, t);
   const minuit = minuitDuSoir(meta.date, t);
   if (!fin || !minuit) return null;
-  const ouvert = t.getTime() < fin.getTime();
+  const ouvert = !aLaMain && t.getTime() < fin.getTime();
   return { garder: ouvert && fin.getTime() < minuit.getTime(), fermer: ouvert, rouvrir: !ouvert };
 }
 
@@ -478,7 +483,11 @@ export function fermerLeVote(s: Saison, j: number, t: Date): Saison {
  * La main de l'admin sur le vote ne bouge plus une fois la journée comptée :
  * `apres` garde les gestes d'`avant` pour toute journée du nouveau régime
  * déjà comptée dans `avant` à l'instant t (un « Annuler » tardif ne décompte
- * pas une journée révélée). La base fait de même
+ * pas une journée révélée). Elle ne bouge pas non plus quand le changement
+ * ferait compter la journée à l'instant : annuler à 21 h 30 un « Garder les
+ * votes ouverts » de 19 h rendrait la règle, dont la révélation (20 h 12)
+ * est déjà passée — tout tomberait d'un coup, sans retour. L'admin passe par
+ * « Fermer les votes » : la révélation une heure après. La base fait de même
  * (public.saison_fin_des_matchs). Même référence si rien ne change.
  */
 export function tenirMainSurLeVote(avant: Saison, apres: Saison, t: Date): Saison {
@@ -489,7 +498,7 @@ export function tenirMainSurLeVote(avant: Saison, apres: Saison, t: Date): Saiso
     const a = metaDe(avant, m.j);
     if (!a || !nouveauRegime(numero, m.j)) return m;
     if ((a.votesOuvertsLe ?? null) === (m.votesOuvertsLe ?? null) && (a.votesFermesLe ?? null) === (m.votesFermesLe ?? null)) return m;
-    if (!journeeComptee(avant, m.j, t)) return m;
+    if (!journeeComptee(avant, m.j, t) && !journeeComptee(apres, m.j, t)) return m;
     change = true;
     return {
       ...sansMainSurLeVote(m),
@@ -498,6 +507,31 @@ export function tenirMainSurLeVote(avant: Saison, apres: Saison, t: Date): Saiso
     };
   });
   return change ? { ...apres, journees } : apres;
+}
+
+/** La main de l'admin sur le vote d'une journée, telle que la base la rend (publier_saison, `mains`). */
+export type MainSurLeVote = { votesOuvertsLe?: string | null; votesFermesLe?: string | null };
+
+/**
+ * La main de l'admin sur le vote que la base a gardée, reprise par son
+ * appareil (publier_saison rend `mains` : « 6 » → les deux instants, ou
+ * null). La base remet la main d'avant sur une journée déjà révélée : sans
+ * cette reprise, l'appareil de l'admin afficherait un vote rouvert que la
+ * base refuse. Seules les journées que la réponse nomme changent ; même
+ * référence si tout est déjà d'accord.
+ */
+export function avecMainsDeLaBase(s: Saison, mains: Record<string, MainSurLeVote | null | undefined>): Saison {
+  let change = false;
+  const journees = s.journees.map((m) => {
+    const k = String(m.j);
+    if (!(k in mains)) return m;
+    const ouverts = mains[k]?.votesOuvertsLe || null;
+    const fermes = mains[k]?.votesFermesLe || null;
+    if ((m.votesOuvertsLe ?? null) === ouverts && (m.votesFermesLe ?? null) === fermes) return m;
+    change = true;
+    return { ...sansMainSurLeVote(m), ...(ouverts ? { votesOuvertsLe: ouverts } : {}), ...(fermes ? { votesFermesLe: fermes } : {}) };
+  });
+  return change ? { ...s, journees } : s;
 }
 
 /* ------------------------------ Les libellés ------------------------------ */
