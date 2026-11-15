@@ -572,6 +572,18 @@ ESSAIS.changerA.suite = appuyer(['LB'], 3);
   verifier('enchaînement crochet → roulette → frappe', ok, `crochet ${f(t0)} s, roulette ${f(t1)} s, élan de la frappe ${f(te)} s (${t0 != null && te != null ? (te - t0).toFixed(2) : '—'} s, seuil 1,2), balle frappée ${f(t2)} s (seuil 1,5) ; la frappe a attendu en file : ${r.evts.some((e: Any) => e.type === 'enchaine')}`);
 }
 
+// ── (correctifs) la feinte de frappe « X puis A » quand A arrive juste APRÈS le relâché de X (16 à 200 ms) :
+// l'élan de la frappe est annulé, la balle n'est pas frappée (le A ne va pas en file derrière la frappe) ──
+{
+  const rates: string[] = [];
+  for (const d of [1, 3, 8, 12]) {
+    const r = jouerSuite({}, [...tenir(25, { b: ['X'] }), ...tenir(d), ...tenir(2, { b: ['A'] })], 'pad', 60);
+    const fr = r.evts.some((e: Any) => e.type === 'frappe'), ff = r.evts.some((e: Any) => e.type === 'feinteFrappe');
+    if (fr || !ff) rates.push(`A ${d} image(s) après : frappe ${fr}, feinte ${ff}`);
+  }
+  verifier('feinte de frappe après le relâché de X', rates.length === 0, rates.length ? rates.join(' ; ') : 'A 1, 3, 8, 12 images après le relâché : feinte, aucune frappe');
+}
+
 // ── aucun geste en défense ──
 {
   const motifs: Image[][] = [sec(GA), sec(AV), sec(AR), [...tenir(30, { rs: AR }), ...tenir(3)], [...tenir(3, { rs: AR }), ...tenir(3, { rs: GA }), ...tenir(3, { rs: AV }), ...tenir(3)], tenir(60, { b: ['LB', 'RB'] }), [...tenir(3, { b: ['R3'] }), ...tenir(3)]];
@@ -613,6 +625,30 @@ ESSAIS.changerA.suite = appuyer(['LB'], 3);
   const { TOUCHES_JEU }: Any = Clv;
   const libre = !TOUCHES_JEU.has('m') && !TOUCHES_JEU.has('enter');
   verifier('ralenti passé à la manette, son coupé au clavier', salon === 0 && tenu === 2 && libre, `A dans le salon : ${salon} ; deux appuis de A en match (tenus 2 images) : ${tenu} ; M et Entrée libres dans le tableau du clavier : ${libre ? 'oui' : 'NON'}`);
+}
+// ── (correctifs) le A / ✕ qui passe le ralenti (phase « but ») ne devient pas une passe au coup d'envoi ──
+{
+  const pads: Any[] = [];
+  const btn2 = (on: number[]) => Array.from({ length: 17 }, (_, i) => ({ pressed: on.includes(i), value: on.includes(i) ? 1 : 0 }));
+  const g = (on: number[] = []) => ({ index: 0, id: 'Xbox Wireless Controller (STANDARD GAMEPAD Vendor: 045e Product: 0b13)', connected: true, mapping: 'standard', buttons: btn2(on), axes: [0, 0, 0, 0] });
+  Object.defineProperty(globalThis, 'navigator', { value: { getGamepads: () => pads }, configurable: true, writable: true });
+  const M = Man.creerManettes({ versJeu });
+  const m3: Any = creerMonde({ graine: 3, humains: [true, false], aides: [0.5, 0] }); demarrer(m3, { intro: false });
+  M.mode('salon'); pads[0] = g(); M.lire(0, null); pads[0] = g([0]); M.lire(0.02, null); pads[0] = g(); M.lire(0.04, null);
+  const rangee = M.equipes()[0] != null;
+  M.mode('match');
+  let t = 1; const lire = (on: number[] = []) => { pads[0] = g(on); M.lire(t, m3); t += 1 / 60; };
+  m3.phase = 'but'; m3.phaseT = 0.5;
+  lire(); for (let i = 0; i < 8; i++) lire([0]); lire();
+  engagement(m3, 0); m3.phase = 'jeu'; m3.phaseT = 0;
+  const evts: string[] = [];
+  for (let k = 0; k < 60; k++) { lire(); for (let s2 = 0; s2 < 2; s2++) { pas(m3, [M.intention(0), null]); for (const ev of m3.evts) if (ev.type === 'passe' || ev.type === 'elan' || ev.type === 'frappe') evts.push(ev.type); m3.evts.length = 0; } }
+  // (puis un vrai A en jeu fait bien une passe : la commande n'est pas cassée)
+  for (let i = 0; i < 12; i++) { lire([0]); pas(m3, [M.intention(0), null]); pas(m3, [M.intention(0), null]); }
+  let passeEnJeu = false;
+  for (let k = 0; k < 90; k++) { lire(); for (let s2 = 0; s2 < 2; s2++) { pas(m3, [M.intention(0), null]); for (const ev of m3.evts) if (ev.type === 'passe' || ev.type === 'frappe') passeEnJeu = true; m3.evts.length = 0; } }
+  M.detruire();
+  verifier('A du ralenti oublié au coup d\'envoi', rangee && evts.length === 0 && passeEnJeu, `manette rangée ${rangee} ; 1 s de jeu après le A du ralenti : ${evts.join(', ') || 'rien'} ; un A en jeu ensuite : passe ${passeEnJeu}`);
 }
 console.log(echecs ? `\n${echecs} contrôle(s) en échec` : '\nTout est vert.');
 process.exit(echecs ? 1 : 0);

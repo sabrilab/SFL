@@ -174,7 +174,10 @@ export function creerManettes({ versJeu = (sx, sy) => ({ x: -sy, z: -sx }) } = {
         // (bola-app#26, lot 4) A / ✕ passe le ralenti du but (match.js ne l'écoute que pendant le ralenti)
         if (bas(K.A)) api.surPasser?.();
         if (p.equipe != null) {
-          lireManette(p.cmd, p.etat, t, M, p.equipe, versJeu);
+          // (hors du jeu, but, ralenti, engagement, fin : rien n'est gardé pour plus tard, sinon le A qui passe le
+          // ralenti deviendrait une passe au coup d'envoi ; comme le clavier, la commande est oubliée)
+          if (M.phase === 'jeu') lireManette(p.cmd, p.etat, t, M, p.equipe, versJeu);
+          else if (p.cmd.vu) oublier(p.cmd);
           if (bas(K.MENU)) api.surPause?.();
         } else if (bas(K.A)) {
           const e = p.ancienne != null && libre(p.ancienne, p) ? p.ancienne : libre(0, p) ? 0 : libre(1, p) ? 1 : null;

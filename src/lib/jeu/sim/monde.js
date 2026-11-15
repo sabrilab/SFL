@@ -223,6 +223,8 @@ function agir(m, j) {
   j.int.action = null;
   const p = porteur(m);
   if (a.type === 'tacle') { if ((!p || p.e !== j.e) && m.ecart?.e !== j.e) demanderTacle(m, j, !!a.glisse); return; }
+  // (la feinte de frappe annule l'élan d'une frappe déjà lancée : elle ne va pas en file derrière cette frappe)
+  if (a.type === 'feinteFrappe' && (j.demande || (j.g && j.g.type === 'frappe' && !j.g.fait))) { feinteFrappe(m, j); return; }
   // (un humain balle au pied, dans un geste : l'action attend son tour)
   if (humain && !libre(j) && j.mode === 'geste' && enFile(a) && (p === j || p == null)) { j.file = { a, t: m.t }; return; }
   if (a.type === 'roulette') { roulette(m, j, a.dx ?? 1, a.dz ?? 0); return; }
