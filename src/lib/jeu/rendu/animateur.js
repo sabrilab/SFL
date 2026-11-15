@@ -12,7 +12,7 @@
 //     donne la phase de foulée de la simulation (φ, corps.js), calée pour chaque clip sur l'appui de son pied gauche :
 //     le pied d'appui ne saute jamais d'un clip à l'autre, et la cadence suit la vitesse sans borne.
 //   · Couches procédurales, filtrées (ressorts amortis, aucun bruit) : buste penché à l'accélération et plus bas en
-//     sprint, en arrière au freinage et au contrôle de la poitrine (18°), roulis dans les virages, au déséquilibre et
+//     sprint, en arrière au freinage et au contrôle de la poitrine (18°), relevé (assis, 48°) pendant le tacle glissé, roulis dans les virages, au déséquilibre et
 //     vers l'adversaire dans un duel d'épaule, tête et cou vers la balle (60° au plus) ; le coup reçu (hit_l / hit_r,
 //     clip additif du haut du corps, du côté d'où vient la poussée, au poids du déséquilibre) ; les gestes techniques
 //     sans clip (passement : le pied fait le tour de la balle par-dessus ; talonnade ; sombrero en course) en IK du
@@ -280,7 +280,10 @@ export function creerAnimateur(perso, { gardien = false, reduit = false, versMon
       const x = (G.t - G.impact) / 0.3;
       poitrine = -18 * DEG * Math.exp(-x * x * 2);
     }
-    const tangage = ressort(etat, 'tg', (clamp(0.03 * (e.aLong ?? 0), -10 * DEG, 14 * DEG) + penSprint) * amp * (1 - gesteW) + poitrine * amp, dt, 12);
+    // (correctifs #26) le tacle glissé : le clip (sprint_to_backslide) finit à plat dos ; le buste se relève (assis sur
+    // la hanche, 48°) pendant la glissade, comme un vrai tacle, au lieu d'un corps couché « mort »
+    const assis = G && G.nom === 'slide' && G.type === 'tacle' ? 48 * DEG * clamp((G.t - 0.18) / 0.22, 0, 1) : 0;
+    const tangage = ressort(etat, 'tg', (clamp(0.03 * (e.aLong ?? 0), -10 * DEG, 14 * DEG) + penSprint) * amp * (1 - gesteW) + poitrine * amp + assis, dt, 12);
     let appui = 0;
     const A = e.appui;
     if (A && A.age < 0.35) {

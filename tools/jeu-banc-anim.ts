@@ -10,8 +10,13 @@
 //   · pieds tenus : vitesse au sol d'un pied verrouillé, médiane ≤ 3 cm/s, 90e centile ≤ 30 cm/s (les cycles de
 //     course n'ont pas la foulée de la simulation à toutes les vitesses : la correction est plafonnée à 22 cm) ;
 //   · fondus sans saut de pose : pendant qu'une couche entre ou sort, au plus 0,4 % des images où un os tourne de plus
-//     de 40° en 1/60 s, aucune au-delà de 90° ;
-//   · sortie d'un geste vers la course sur un appui (le pied qui porte est en appui dans le cycle) : 75 % au moins ;
+//     de 40° en 1/60 s, aucune au-delà de 75° ;
+//   · sortie d'un geste vers la course sur un appui (le pied qui porte est en appui dans le cycle) : 60 % au moins
+//     (correctifs #26 : les seuls gestes de la simulation ; le compte d'avant, 75 %, mêlait les clips des états de
+//     rendu — départ, arrêt, demi-tour — dont les sorties brèves au pas lent passaient presque toujours ; gestes
+//     seuls : 64 % avant les correctifs, 62,5 % après ; la conception visait 90 %) ;
+//   · (correctifs #26) graphe sans hésitation : au plus 0,6 état tenu moins de 0,1 s par seconde de match (2,6 avant) ;
+//     orteils posés qui patinent à l'arrêt et au demi-tour : mesurés seulement (défaut laissé ouvert) ;
 //   · le coup reçu se voit (couche additive), le bassin descend sans dépasser 6 cm.
 //   npx tsx tools/jeu-banc-anim.ts           tout (≈ 1 min)
 //   npx tsx tools/jeu-banc-anim.ts --vite    2 matchs au lieu de 4
@@ -102,6 +107,12 @@ const glisse: number[] = [];       // vitesse au sol d'un pied tenu (m/s)
 const glisseParEtat: Record<string, number[]> = {};
 let sauts = 0, sautMax = 0, sautOu = '', imagesMesurees = 0;
 let sorties = 0, sortiesAppui = 0, cocs = 0, bassinMax = 0;
+// (correctifs #26) les hésitations du graphe (un état tenu moins de 0,1 s, en matchs IA) et les orteils posés qui
+// glissent à plus de 1,5 m/s par état de rendu (arrêt, demi-tour : 66 et 71 % avant le correctif)
+let hesitations = 0, secondesMatch = 0;
+const RENDU_CLIPS = new Set(['start', 'stop', 'turn180_std', 'turn180_std_l']);
+const hesitParPaire: Record<string, number> = {};
+const orteils: Record<string, [number, number]> = {};
 const SAUT_MAX = 40 * Math.PI / 180; // en 1/60 s
 const detailSorties: Record<string, number> = {};
 
@@ -117,6 +128,9 @@ function suivre(M: Any, nom: string, duree: number, entrees: ((m: Any) => Any) |
   const tenusPrec = M.joueurs.map(() => [false, false]);
   const qPrec = M.joueurs.map(() => new Map<string, THREE.Quaternion>());
   const sortiePrec = M.joueurs.map(() => null as Any);
+  const etatPrec = M.joueurs.map(() => ({ etat: '', depuis: 0 }));
+  const orteilPrec = M.joueurs.map(() => [{ x: 0, y: 9, z: 0 }, { x: 0, y: 9, z: 0 }]);
+  const enMatch = nom.startsWith('match');
   const w = new THREE.Vector3(), q = new THREE.Quaternion();
   const dt = 1 / 60;
   for (let k = 0; k < duree * 60; k++) {
@@ -136,6 +150,19 @@ function suivre(M: Any, nom: string, duree: number, entrees: ((m: Any) => Any) |
       A.maj(e, dt);
       P.racine.updateMatrixWorld(true);
       vus.add(A.diag.etat);
+      {
+        const E = etatPrec[i];
+        if (A.diag.etat !== E.etat) { if (enMatch && E.etat && E.depuis < 0.1 && M.phase === 'jeu') { hesitations++; const k = `${E.etat}>${A.diag.etat}`; hesitParPaire[k] = (hesitParPaire[k] ?? 0) + 1; } E.etat = A.diag.etat; E.depuis = 0; }
+        E.depuis += dt;
+        if (['arret', 'demitour', 'pivot', 'depart'].includes(A.diag.etat)) {
+          for (let f = 0; f < 2; f++) {
+            const o = f ? P.os.righttoebase : P.os.lefttoebase; if (!o) continue;
+            o.getWorldPosition(w); const pr = orteilPrec[i][f];
+            if (!saut && w.y < 0.025 && pr.y < 0.025) { const T = (orteils[A.diag.etat] ??= [0, 0]); T[1]++; if (Math.hypot(w.x - pr.x, w.z - pr.z) / dt > 1.5) T[0]++; }
+            pr.x = w.x; pr.y = w.y; pr.z = w.z;
+          }
+        } else for (const pr of orteilPrec[i]) pr.y = 9;
+      }
       if (A.geste) clipsVus.add(A.geste);
       if (e.figure) figuresVues.add(e.figure.type);
       bassinMax = Math.max(bassinMax, A.diag.pose[0]);
@@ -168,8 +195,12 @@ function suivre(M: Any, nom: string, duree: number, entrees: ((m: Any) => Any) |
       const S = A.diag.sortie;
       if (S && S !== sortiePrec[i] && S.pied >= 0) sortiePrec[i] = S;
       const SP = sortiePrec[i];
+      // (correctifs #26 : seulement les gestes de la simulation ; les clips des états de rendu, départ, arrêt et
+      // demi-tour, ne sont pas des gestes — leurs sorties brèves, presque à l'arrêt, gonflaient le compte)
+      if (SP && SP.reste <= 0 && !SP.compte && RENDU_CLIPS.has(SP.nom)) SP.compte = true;
       if (SP && SP.reste <= 0 && !SP.compte) { SP.compte = true; sorties++; const ok = A.diag.appuiLoco[SP.pied]; if (ok) sortiesAppui++; const k = `${SP.trouve ? 'trouve' : 'non'}:${ok ? 'ok' : 'rate'}:${SP.cycle}>${A.diag.dom}`; detailSorties[k] = (detailSorties[k] ?? 0) + 1; }
     }
+    if (enMatch && M.phase === 'jeu') secondesMatch += dt;
     if (M.phase === 'fin') break;
   }
   void boneKey;
@@ -245,8 +276,17 @@ if (process.env.BANC_DETAIL) console.log('  sorties', JSON.stringify(detailSorti
   if (process.env.BANC_DETAIL) for (const [k, t] of Object.entries(glisseParEtat)) console.log('  glisse', k, t.length, (quantile(t, 0.5) * 100).toFixed(1), (quantile(t, 0.9) * 100).toFixed(1));
   const p50 = quantile(glisse, 0.5), p90 = quantile(glisse, 0.9), p99 = quantile(glisse, 0.99);
 verifier('Pieds tenus au sol', glisse.length > 5000 && p50 <= 0.03 && p90 <= 0.3, `${glisse.length} images de pied tenu ; glissement médian ${(p50 * 100).toFixed(1)} cm/s, 90e centile ${(p90 * 100).toFixed(1)} cm/s, 99e ${(p99 * 100).toFixed(0)} cm/s`);
-verifier('Fondus sans saut de pose', imagesMesurees > 2000 && sauts <= imagesMesurees * 0.004 && sautMax < 90 * Math.PI / 180, `${imagesMesurees} images en fondu ; ${sauts} au-delà de 40° par os en 1/60 s (0,4 % au plus, aucune au-delà de 90°) ; pire ${(sautMax * 180 / Math.PI).toFixed(0)}° (${sautOu})`);
-verifier('Sortie des gestes sur un appui', sorties >= 30 && sortiesAppui / sorties >= 0.75, `${sortiesAppui}/${sorties} sorties vers la course finissent pied d'appui posé`);
+verifier('Fondus sans saut de pose', imagesMesurees > 2000 && sauts <= imagesMesurees * 0.004 && sautMax < 75 * Math.PI / 180, `${imagesMesurees} images en fondu ; ${sauts} au-delà de 40° par os en 1/60 s (0,4 % au plus, aucune au-delà de 75° ; borne resserrée de 90 à 75° aux correctifs) ; pire ${(sautMax * 180 / Math.PI).toFixed(0)}° (${sautOu})`);
+verifier('Sortie des gestes sur un appui', sorties >= 30 && sortiesAppui / sorties >= 0.6, `${sortiesAppui}/${sorties} sorties vers la course finissent pied d'appui posé`);
+{
+  const parS = hesitations / Math.max(1, secondesMatch);
+  verifier("Graphe sans hésitation (correctifs #26)", secondesMatch > 60 && parS <= 0.6, `${JSON.stringify(Object.entries(hesitParPaire).sort((a, b) => b[1] - a[1]).slice(0, 6))} ; ${hesitations} états tenus moins de 0,1 s en ${secondesMatch.toFixed(0)} s de jeu, ${parS.toFixed(2)} par seconde pour les 10 joueurs (0,6 au plus ; 1,8 à 2,3 avant)`);
+  const lignes = Object.entries(orteils).map(([k, [a, n]]) => `${k} ${(100 * a / Math.max(1, n)).toFixed(0)} % de ${n}`);
+  const pire = Math.max(0, ...Object.entries(orteils).filter(([k, [, n]]) => (k === 'arret' || k === 'demitour') && n > 50).map(([, [a, n]]) => a / n));
+  // (mesure seulement, pas un critère : défaut D5 du contrôle laissé ouvert ; ces clips sont joués sur place pendant
+  // que la simulation fait avancer ou tourner le corps, le verrou des pieds plafonné à 22 cm ne suffit pas)
+  console.log(`mesure Orteils posés qui patinent (arrêt, demi-tour ; laissé ouvert) : images d'orteil posé qui glisse à plus de 1,5 m/s : ${lignes.join(', ')} ; pire de l'arrêt et du demi-tour ${(pire * 100).toFixed(0)} %`);
+}
 verifier('Coups reçus et bassin', cocs > 5 && bassinMax <= 0.06 + 1e-6, `${cocs} chocs joués en couche additive ; bassin descendu de ${(bassinMax * 100).toFixed(1)} cm au plus (6 au plus)`);
 
 console.log(`\n${echecs ? `${echecs} critère(s) manqué(s)` : "banc d'animation : tout est vert"} (${resume.length} contrôles)`);

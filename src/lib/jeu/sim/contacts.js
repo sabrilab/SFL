@@ -10,7 +10,7 @@
 //     balle). Le duel se gagne au moment m (v·n) + F dt (×1,3 pour qui protège la balle) ; le perdant prend du
 //     déséquilibre et dérive de côté, le gagnant garde sa ligne.
 //   · tacle glissé (bola-app#26) : le tacleur part au sol, couché sur le dos, pieds devant (clip « slide »), et
-//     glisse de sa vitesse sur le gazon (4,5 m/s²) ; tant qu'il glisse hanches au sol (sous 0,25 m), ses deux pieds (table du clip)
+//     glisse de sa vitesse sur le gazon (7,5 m/s², ~0,9 s) ; tant qu'il glisse hanches au sol (sous 0,25 m), ses deux pieds (table du clip)
 //     balaient la balle et les jambes (0,22 m de rayon). Balle touchée d'abord : elle repart le long de la glissade.
 //     Jambes du porteur d'abord : il tombe (balayé, ou croc-en-jambe par derrière). Les deux : la balle part et le
 //     porteur est déséquilibré. De face, la balle passe presque toujours en premier ; par derrière, les jambes. Il se

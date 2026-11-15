@@ -602,7 +602,7 @@ function coupFranc(m, A) {
 /**
  * Pendant le coup franc : la balle reste posée ; le tireur vient derrière elle, les adversaires reculent à 3 m, les
  * coéquipiers se placent (IA), les gardiens restent dans leur but. Fin : la pause passée, le tireur à la balle et les adversaires à 3 m (4,5 s au
- * plus) ; ensuite les adversaires restent à 3 m (tenirEcart) tant qu'elle n'est pas jouée.
+ * plus, 6 s si un adversaire n'est pas encore à 2,4 m) ; ensuite les adversaires restent à 3 m (tenirEcart) tant qu'elle n'est pas jouée.
  */
 function pasArret(m) {
   const A = m.arret, b = m.balle, dist = JEU.coupFranc.distance;
@@ -618,7 +618,24 @@ function pasArret(m) {
     if (j.gardien) { pasGardien(m, j); continue; }
     if (j === T) { aller(j, it, A.x - (ux / L) * 0.5, A.z - (uz / L) * 0.5, 4); continue; }
     const d = hypot(j.p.x - A.x, j.p.z - A.z);
-    if (j.e !== A.e) { if (d < dist + 0.3) { const q = pointRecul(m, j, A.x, A.z, dist + 0.6); aller(j, it, q.x, q.z, 5); contourner(m, j, it); } continue; }
+    if (j.e !== A.e) {
+      if (d < dist + 0.3) {
+        const q = pointRecul(m, j, A.x, A.z, dist + 0.6); aller(j, it, q.x, q.z, 5); contourner(m, j, it);
+        // (correctifs #26) collé au tireur qui vient à la balle (contre un panneau, ils se poussaient 5 s) : il
+        // s'efface sur le côté de son chemin, tant que le tireur n'est pas à la balle
+        const tx = A.x - T.p.x, tz = A.z - T.p.z, TL = hypot(tx, tz) || 1;
+        if (hypot(j.p.x - T.p.x, j.p.z - T.p.z) < 1.1 && hypot(T.p.x - A.x, T.p.z - A.z) > 1.0) {
+          const cote = Math.sign((j.p.x - T.p.x) * tz - (j.p.z - T.p.z) * tx) || 1;
+          let sx = (tz / TL) * cote, sz = (-tx / TL) * cote;
+          // (pas vers un panneau : de l'autre côté du chemin)
+          if (Math.abs(j.p.x + sx) > BX - 0.5 || Math.abs(j.p.z + sz) > BZ - 0.5) { sx = -sx; sz = -sz; }
+          // (sans oublier de reculer : le pas de côté s'ajoute au recul)
+          const rx = (it.dx ?? 0) + sx * 1.2, rz = (it.dz ?? 0) + sz * 1.2, RL = hypot(rx, rz) || 1;
+          it.dx = rx / RL; it.dz = rz / RL; it.allure = Math.max(it.allure ?? 0, 0.8);
+        }
+      }
+      continue;
+    }
     pasIA(m, j);
     j.int.action = null;
   }
@@ -633,7 +650,10 @@ function pasArret(m) {
   // (prêt : le tireur à la balle, et les adversaires debout à 3 m, à 0,3 m près)
   const loin = m.joueurs.every((o) => o.absent || o.gardien || o.e === A.e || o.mode === 'sol' || o.mode === 'releve' || hypot(o.p.x - A.x, o.p.z - A.z) >= dist - 0.3);
   const pret = hypot(T.p.x - A.x, T.p.z - A.z) < 1.0 && T.mode === 'loco' && loin;
-  if ((A.t <= 0 && pret) || A.age > 4.5) {
+  // (correctifs #26 : passé 4,5 s, la reprise attend encore que les adversaires soient à 2,4 m au moins, 6 s au plus ;
+  // un fautif relevé tard sur le point du coup franc restait à 1,2 m de la balle)
+  const presque = m.joueurs.every((o) => o.absent || o.gardien || o.e === A.e || hypot(o.p.x - A.x, o.p.z - A.z) >= dist - 0.6);
+  if ((A.t <= 0 && pret) || (A.age > 4.5 && presque) || A.age > 6) {
     m.arret = null;
     m.ecart = { e: 1 - A.e, x: A.x, z: A.z, tireur: A.tireur, fin: m.t + JEU.coupFranc.garde };
     T.decision = 0.05;
@@ -648,22 +668,24 @@ function pasArret(m) {
 function pointRecul(m, j, bx, bz, dist) {
   let ux = j.p.x - bx, uz = j.p.z - bz; const L = hypot(ux, uz);
   if (L < 1e-6) { ux = -Math.sign(bx || 1); uz = 0; } else { ux /= L; uz /= L; }
-  let repli = null;
+  // (correctifs #26 : sans chemin libre, le point dont le chemin passe le plus loin des autres corps, et non le
+  // premier venu : collé au tireur contre un panneau, il le poussait au lieu de le contourner)
+  let repli = null, repliMarge = -1;
   for (let k = 0; k < 12; k++) {
     const a = (k % 2 ? 1 : -1) * Math.ceil(k / 2) * (Math.PI / 6), c = cos(a), sn = sin(a);
     const dx = ux * c + uz * sn, dz = -ux * sn + uz * c;
     const x = bx + dx * dist, z = bz + dz * dist;
     if (!(Math.abs(x) < BX - 0.6 && Math.abs(z) < BZ - 0.6)) continue;
-    repli ??= { x, z };
     // (le chemin du joueur à ce point : aucun autre corps à moins de 0,7 m)
     const ex = x - j.p.x, ez = z - j.p.z, E = ex * ex + ez * ez || 1;
-    let libreC = true;
+    let marge = Infinity;
     for (const o of m.joueurs) {
       if (o === j || o.absent) continue;
       const u = clamp(((o.p.x - j.p.x) * ex + (o.p.z - j.p.z) * ez) / E, 0, 1);
-      if (hypot(o.p.x - j.p.x - ex * u, o.p.z - j.p.z - ez * u) < 0.7) { libreC = false; break; }
+      marge = Math.min(marge, hypot(o.p.x - j.p.x - ex * u, o.p.z - j.p.z - ez * u));
     }
-    if (libreC) return { x, z };
+    if (marge >= 0.7) return { x, z };
+    if (marge > repliMarge) { repliMarge = marge; repli = { x, z }; }
   }
   return repli ?? { x: bx + ux * dist, z: bz + uz * dist };
 }
@@ -839,8 +861,9 @@ function fin(m) {
   m.phase = 'fin';
   const gagne = m.score[0] > m.score[1] ? 0 : m.score[1] > m.score[0] ? 1 : -1;
   for (const j of m.joueurs) {
-    j.v.x = 0; j.v.z = 0;
-    if (j.gardien) { j.g = null; j.mode = 'loco'; continue; }
+    // (correctifs #26 : les corps freinent sur leurs appuis, pasCorps de la phase « fin », au lieu de s'arrêter net :
+    // la vitesse à 0 d'un coup faisait sauter la pose de course à l'arrêt, 91° à l'avant-bras en 1/60 s)
+    if (j.gardien) { j.v.x = 0; j.v.z = 0; j.g = null; j.mode = 'loco'; continue; }
     if (j.e === gagne) lancerGeste(j, m.humains[j.e] && j.role === 'A' ? 'samba' : 'clapping', { type: 'fete', fin: 1e9 });
     else { j.g = null; j.mode = 'loco'; }
   }

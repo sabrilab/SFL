@@ -111,8 +111,10 @@ function lacetPropre(nom) {
   const out = [tr[0]];
   for (let i = 1; i < tr.length; i++) { let d = tr[i] - tr[i - 1]; d -= Math.round(d / (2 * Math.PI)) * 2 * Math.PI; out.push(out[i - 1] + d); }
   lacets.set(nom, out);
+  lacetsAbs.set(nom, out.map(Math.abs));
   return out;
 }
+const lacetsAbs = new Map();
 
 /** Inverse d'une courbe croissante échantillonnée (tab, n images sur dur s) : le temps où elle vaut v. */
 function inverser(tab, n, stride, off, v, dur) {
@@ -131,12 +133,16 @@ function inverser(tab, n, stride, off, v, dur) {
  * à jouer à ce temps (null : la locomotion seule). e : l'état d'animation (rendu/etat.js).
  */
 export function creerGraphe({ gardien = false } = {}) {
-  const g = { etat: 'loco', depuis: 0, clip: null, d0: 0, cap0: 0, tour: 0, dist: 0 };
+  const g = { etat: 'loco', depuis: 0, clip: null, d0: 0, cap0: 0, tour: 0, dist: 0, repos: 9 };
   let sPrec = 0, capPrec = null;
-  const rend = (etat, clip) => { if (etat !== g.etat) { g.etat = etat; g.depuis = 0; } g.clip = clip; return g; };
+  // (correctifs #26) repos : le temps depuis la sortie d'un état autre que la course (geste, départ, arrêt…) ; on n'y
+  // rentre (départ, arrêt, demi-tour) pas avant 0,3 s, et on y reste 0,12 à 0,15 s au moins (sinon six états en
+  // 0,12 s entre 0,3 et 0,9 m/s : le graphe hésitait)
+  const rend = (etat, clip) => { if (etat !== g.etat) { if (g.etat !== 'loco') g.repos = 0; g.etat = etat; g.depuis = 0; } g.clip = clip; return g; };
 
   function maj(e, dt) {
-    g.depuis += dt;
+    g.depuis += dt; g.repos += dt;
+    const reposOk = g.repos > 0.3;
     const s = Math.hypot(e.vx, e.vz);
     let dcap = 0;
     if (capPrec != null) { dcap = e.cap - capPrec; while (dcap > Math.PI) dcap -= 2 * Math.PI; while (dcap < -Math.PI) dcap += 2 * Math.PI; }
@@ -147,17 +153,18 @@ export function creerGraphe({ gardien = false } = {}) {
     if (gardien) return rend('loco', null);
     const libre = e.mode === 'loco' || e.mode === 'frein';
     // le départ : arrêté (sous 0,6 m/s), il accélère fort (sans balle : la conduite a son cycle)
-    if (g.etat !== 'depart' && libre && !e.balle && CLIPS.start && sP < 0.6 && s >= 0.6 && (e.aLong ?? 0) > 2.5) { g.dist = 0; rend('depart', null); }
+    if (g.etat !== 'depart' && reposOk && libre && !e.balle && CLIPS.start && sP < 0.6 && s >= 0.6 && (e.aLong ?? 0) > 2.5) { g.dist = 0; rend('depart', null); }
     if (g.etat === 'depart') {
       g.dist += s * dt;
       const c = CLIPS.start;
       const t = inverser(c.root, c.n, 2, 1, g.dist, c.dur);
       // (il sort du départ après deux appuis, à 5 m/s, sur un changement de direction ou en freinant)
-      if (!libre || e.balle || t > 0.72 * c.dur || s > 5.2 || (e.aLong ?? 0) < -1 || Math.abs(dcap) > 3 * dt) return rend('loco', null);
+      // (correctifs #26 : tenu 0,15 s au moins, sauf s'il n'est plus libre ou prend la balle)
+      if (!libre || e.balle || (g.depuis >= 0.15 && (t > 0.72 * c.dur || s > 5.2 || (e.aLong ?? 0) < -1 || Math.abs(dcap) > 3 * dt))) return rend('loco', null);
       return rend('depart', { nom: 'start', t });
     }
     // l'arrêt : lancé (plus de 2,5 m/s), il freine fort (le frein de la simulation, sans intention)
-    if (g.etat !== 'arret' && libre && !e.balle && CLIPS.stop && s > 2.2 && s < 4.5 && (e.aLong ?? 0) < -5 && e.mode === 'loco') {
+    if (g.etat !== 'arret' && reposOk && libre && !e.balle && CLIPS.stop && s > 2.2 && s < 4.5 && (e.aLong ?? 0) < -5 && e.mode === 'loco') {
       g.d0 = (s * s) / (2 * Math.max(4, -(e.aLong ?? 8)));
       rend('arret', null);
     }
@@ -167,11 +174,14 @@ export function creerGraphe({ gardien = false } = {}) {
       const reste = (s * s) / (2 * Math.max(4, -(e.aLong ?? 8)));
       const u = clamp(1 - reste / Math.max(0.05, g.d0), 0, 1);
       const t = inverser(c.root, c.n, 2, 1, u * total, c.dur);
-      if (!libre || e.balle || (s < 0.15 && g.depuis > 0.3) || (e.aLong ?? 0) > 1.5 || g.depuis > 1.5) return rend('loco', null);
+      // (correctifs #26 : il sort aussi dès qu'il ne freine plus, ou que l'arrêt s'éloigne ; avant, le clip d'arrêt
+      // jouait 0,6 s sur un joueur qui filait à 3,2 m/s, les deux pieds patinaient)
+      const plusDeFrein = (e.aLong ?? 0) > -1.5 && g.depuis > 0.12;
+      if (!libre || e.balle || (g.depuis >= 0.12 && ((s < 0.15 && g.depuis > 0.3) || (e.aLong ?? 0) > 1.5 || plusDeFrein || reste > g.d0 * 1.15 || g.depuis > 1.5))) return rend('loco', null);
       return rend('arret', { nom: 'stop', t: Math.min(t, c.dur * 0.98) });
     }
     // le demi-tour sur place : presque arrêté, le cap tourne vite (la simulation tourne le corps : 6 rad/s)
-    if (g.etat !== 'demitour' && libre && CLIPS.turn180_std && s < 0.9 && Math.abs(dcap) > 3.5 * dt) { g.tour = 0; rend('demitour', null); }
+    if (g.etat !== 'demitour' && reposOk && libre && CLIPS.turn180_std && s < 0.9 && Math.abs(dcap) > 3.5 * dt) { g.tour = 0; rend('demitour', null); }
     if (g.etat === 'demitour') {
       g.tour += dcap;
       // (le clip tourne vers sa droite, lacet négatif ; son miroir, turn180_std_l, vers sa gauche)
@@ -179,8 +189,9 @@ export function creerGraphe({ gardien = false } = {}) {
       const c = CLIPS[nom], tr = lacetPropre(nom), tour = Math.abs(g.tour);
       // (la courbe de lacet du clip : 17 points ; le temps où le clip aurait tourné de ce qu'a tourné le corps)
       let t = c.dur * clamp(tour / Math.PI, 0, 1);
-      if (tr) { const fin = Math.abs(tr[tr.length - 1]) || Math.PI; t = inverser(tr.map(Math.abs), tr.length, 1, 0, tour * fin / Math.PI, c.dur); }
-      if (!libre || s > 1.6 || tour >= Math.PI * 0.98 || (Math.abs(dcap) < 0.5 * dt && g.depuis > 0.15) || g.depuis > 1.2) return rend('loco', null);
+      if (tr) { const fin = Math.abs(tr[tr.length - 1]) || Math.PI; t = inverser(lacetsAbs.get(nom), tr.length, 1, 0, tour * fin / Math.PI, c.dur); }
+      // (correctifs #26 : sur place seulement, sous 1,1 m/s ; le clip ne se déplace pas, au-delà les pieds patinent)
+      if (!libre || (g.depuis >= 0.15 && (s > 1.1 || tour >= Math.PI * 0.98 || (Math.abs(dcap) < 0.5 * dt && g.depuis > 0.25) || g.depuis > 1.2))) return rend('loco', null);
       return rend('demitour', { nom, t });
     }
     return rend('loco', null);

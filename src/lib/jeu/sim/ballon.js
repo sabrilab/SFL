@@ -259,7 +259,7 @@ export function antiBlocage(b, dt = PAS) {
   if (b.garde == null && (coin || toit) && s < 0.3) b.coinT += dt; else b.coinT = 0;
   if (b.coinT > 1.5) {
     b.coinT = 0;
-    if (toit) { b.v.z = -Math.sign(b.p.z) * 1.6; b.v.x = 0; return true; }
+    if (toit) { b.v.x = Math.sign(b.p.x || 1) * 2.2; b.v.z = -Math.sign(b.p.z) * 0.4; return true; } // (correctifs #26 : elle roule sur le côté du toit ; poussée vers le terrain, elle butait sur la barre et revenait)
     const L = hypot(b.p.x, b.p.z) || 1;
     b.v.x = (-b.p.x / L) * 2.2; b.v.z = (-b.p.z / L) * 2.2;
     return true;

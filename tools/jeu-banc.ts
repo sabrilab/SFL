@@ -29,6 +29,7 @@ import * as Ral from '../src/lib/jeu/rendu/ralenti.js';
 import * as Eff from '../src/lib/jeu/rendu/effets.js';
 import * as Son from '../src/lib/jeu/rendu/son.js';
 import * as Pol from '../src/lib/jeu/police.js';
+import * as Scn from '../src/lib/jeu/sim/scenarios.js';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Any = any;
@@ -275,10 +276,12 @@ const totaux: Record<string, number> = {};
 // aériennes, et le gardien sur la bissectrice de l'angle balle-poteaux
 const SM: Record<string, number> = { passes: 0, passesOk: 0, arrets: 0, fautes: 0, vols: 0, uneDeux: 0, aeriens: 0, avantages: 0, coupsFrancs: 0, tirages: 0, appels: 0, contresTacle: 0 };
 let bisN = 0, bisSomme = 0, fautesOuvertes = 0, ecartMin = Infinity;
+const surPlaceMax = { d: 0, ou: '' };
 const { surAngle }: Any = Gar;
 for (let g = 1; g <= N; g++) {
   let passeEq = -1;
   let immobile = 0, memePorteur = 0, dernierPorteur = -1;
+  const surPlace = { x: 0, z: 0, t: 0 };
   const coince = new Float64Array(10), locoDepuis = new Float64Array(10);
   const m = matchIA(g, 150, (m: Any) => {
     for (const j of m.joueurs) {
@@ -290,6 +293,7 @@ for (let g = 1; g <= N; g++) {
     }
     const b = m.balle;
     if (!Number.isFinite(b.p.x + b.p.y + b.p.z + b.v.x + b.v.y + b.v.z)) nan++;
+    if (m.phase !== 'jeu') { surPlace.x = b.p.x; surPlace.z = b.p.z; surPlace.t = m.t; }
     if (m.phase === 'jeu') {
       const p = porteur(m);
       if (!p && b.garde == null && Math.hypot(b.v.x, b.v.z) < 0.2) immobile += PAS; else immobile = 0;
@@ -297,6 +301,10 @@ for (let g = 1; g <= N; g++) {
       const id = p ? p.i : b.garde ?? -1;
       if (id >= 0 && id === dernierPorteur) memePorteur += PAS; else { memePorteur = 0; dernierPorteur = id; }
       if (memePorteur > 30) { blocages++; detailsBlocage.push(`g${g} même porteur ${id} à ${m.t.toFixed(1)} s`); memePorteur = -1e9; }
+      // (correctifs #26) la balle qui reste sur place (dans un rond de 2 m) : coincée dans un coin avec des joueurs
+      // autour, 14 s sans issue avant le correctif (graine 7) ; au plus 15 s en jeu
+      if (Math.hypot(b.p.x - surPlace.x, b.p.z - surPlace.z) > 2) { surPlace.x = b.p.x; surPlace.z = b.p.z; surPlace.t = m.t; }
+      else if (m.t - surPlace.t > surPlaceMax.d) { surPlaceMax.d = m.t - surPlace.t; surPlaceMax.ou = `g${g} à ${m.t.toFixed(1)} s (${b.p.x.toFixed(1)} ; ${b.p.z.toFixed(1)})`; }
       for (const j of m.joueurs) locoDepuis[j.i] = j.mode === 'sol' || j.mode === 'releve' ? 0 : locoDepuis[j.i] + PAS;
       for (let a = 0; a < 10; a++) for (let c = a + 1; c < 10; c++) {
         const A = m.joueurs[a], B = m.joueurs[c];
@@ -340,6 +348,7 @@ for (let g = 1; g <= N; g++) {
   const mb = moy(buts);
   verifier(`Matchs IA contre IA (${N} × 150 s)`, nan === 0 && blocages === 0 && dehorsCorps === 0 && mb >= 1.5 && mb <= 10 && sansBut <= 0.25,
     `NaN ${nan}, blocages ${blocages}${detailsBlocage.length ? ' (' + detailsBlocage.slice(0, 4).join(', ') + ')' : ''}, corps hors du terrain ${dehorsCorps}, buts par match ${f2(mb)} (de ${Math.min(...buts)} à ${Math.max(...buts)}, ${(sansBut * 100).toFixed(0)} % sans but), relances de coin ${antiBlocages}`);
+  verifier('Balle jamais coincée (correctifs #26)', surPlaceMax.d <= 15, `au plus ${surPlaceMax.d.toFixed(1)} s dans un rond de 2 m en jeu (${surPlaceMax.ou}) ; borne 15 s`);
   const per = (k: string) => f2((totaux[k] ?? 0) / N);
   console.log(`      par match : passes ${per('passe')}, frappes ${per('frappe')}, tacles balle ${per('tacleBalle')}, tacles jambes ${per('tacleJambes')}, épaules ${per('epaule')}, chutes ${per('chute')}, plongeons ${per('plongeon')}, parades ${per('parade')}, captés ${per('capte')}, poteaux ${per('poteau')}`);
   {
@@ -1187,7 +1196,7 @@ const balleA = (m: Any, x: number, z: number, vx = 0, vz = 0, pos: number | null
       }
       return { m, lectures, buts, filets, butsAvecFilet, emp: empreinte(m), pas: m.pas };
     };
-    const A = jouer(true), B = jouer(false), C = jouer(true, true);
+    const A = jouer(true), B = jouer(false), C = jouer(true, true, 7); // (correctifs #26 : la graine 7, riche en buts ; la 9 n'en a plus aucun depuis les correctifs de l'IA)
     // une seconde graine, plus riche en buts : mêmes exigences
     const A2 = jouer2(true), B2 = jouer2(false);
     const L = [...A.lectures, ...A2.lectures];
@@ -1229,18 +1238,18 @@ const balleA = (m: Any, x: number, z: number, vx = 0, vz = 0, pos: number | null
     // joueur debout ou qui marche n'en laisse pas
     const { hancheA }: Any = Crp2;
     const m: Any = creerMonde({ graine: 3, humains: [false, false], aides: [0, 0] }); demarrer(m, { intro: false });
-    let traces = 0, glisses = 0, faux = 0; const etats: Any[] = m.joueurs.map(() => ({}));
+    let traces = 0, glisses = 0, faux = 0; const fauxNoms = new Set<string>(); const etats: Any[] = m.joueurs.map(() => ({}));
     for (let i = 0; i < 120 * 150; i++) {
       pas(m); m.evts.length = 0; if (i % 2) continue;
       for (const j of m.joueurs) {
         const h = j.g && (j.mode === 'geste' || j.mode === 'sol') ? hancheA(j.g.nom, j.g.t) : 0.95;
         const T = traceGlisse(etats[j.i], { x: j.p.x, y: h, z: j.p.z }, m.t);
-        if (T) { traces++; if (j.g?.nom === 'slide' || j.g?.nom === 'c_slide' || /fall|trip/.test(j.g?.nom ?? '')) glisses++; else faux++; }
+        if (T) { traces++; if (j.g?.nom === 'slide' || j.g?.nom === 'c_slide' || /fall|trip|volley|bicycle/.test(j.g?.nom ?? '')) glisses++; else { faux++; fauxNoms.add(`${j.mode}:${j.g?.nom ?? '-'}`); } }
       }
     }
     const e2: Any = {}; let marche = 0; for (let i = 0; i < 60; i++) if (traceGlisse(e2, { x: 0, y: 0.95, z: i * 0.05 }, i / 60)) marche++;
     const e3: Any = {}; let lent = 0; for (let i = 0; i < 60; i++) if (traceGlisse(e3, { x: 0, y: 0.2, z: i * 0.01 }, i / 60)) lent++;
-    verifier('Herbe qui marque', traces > 0 && faux === 0 && marche === 0 && lent === 0, `${traces} traits peints sur un match IA (${glisses} de glissades et chutes, ${faux} ailleurs) ; joueur debout qui court : ${marche} ; corps au sol presque immobile : ${lent}`);
+    verifier('Herbe qui marque', traces > 0 && faux === 0 && marche === 0 && lent === 0, `${traces} traits peints sur un match IA (${glisses} de glissades, chutes, ciseaux et retournés, ${faux} ailleurs${faux ? ' : ' + [...fauxNoms].join(', ') : ''}) ; joueur debout qui court : ${marche} ; corps au sol presque immobile : ${lent}`);
   }
 
   // ── le son (le plan, sans navigateur) et la police ──
@@ -1285,6 +1294,46 @@ const balleA = (m: Any, x: number, z: number, vx = 0, vz = 0, pos: number | null
   const m: Any = creerMonde({ graine: 21, humains: [false, false], aides: [0, 0] }); demarrer(m, { intro: false }); for (let i = 0; i < 6000; i++) pas(m);
   const ref = empreinte(m);
   verifier('Reproductible', a === b2 && a !== c && e60 === ref && e144 === ref && eIrr === ref, `graine 11 deux fois ${a === b2 ? 'identique' : 'DIFFÉRENTE'} (${a.split(':')[0]}), graine 12 ${a !== c ? 'différente' : 'IDENTIQUE'} ; découpes 1/60, 1/144, irrégulière : ${e60}, ${e144}, ${eIrr} (référence ${ref})`);
+}
+
+// ══ correctifs du contrôle de #26 ══
+{
+  const { SCENARIOS }: Any = Scn;
+  const scene = (nom: string, T: number, suivi: (m: Any, t: number) => void) => {
+    const S = SCENARIOS[nom];
+    const m: Any = creerMonde({ graine: S.graine, humains: [false, false], aides: [0, 0], presents: S.presents }); demarrer(m, { intro: false });
+    const sc = S.creer(m); const t0 = m.t;
+    while (m.t - t0 < T) { pas(m, sc.entrees(m)); suivi(m, m.t - t0); m.evts.length = 0; }
+    return m;
+  };
+  // le tacle glissé : une glissade courte (≤ 1 s, ≤ 4 m) et la victime au sol tout de suite (≤ 0,45 s après le contact)
+  {
+    const { hancheA }: Any = Crp;
+    let deb = -1, fin = -1, x0 = 0, z0 = 0, dist = 0, contact = -1, basse = -1;
+    scene('tacle', 3, (m, t) => {
+      const A = m.joueurs[2], V = m.joueurs[9];
+      if (contact < 0 && m.evts.some((e: Any) => e.type === 'tacleJambes')) contact = t;
+      if (A.g?.nom === 'slide' && deb < 0) { deb = t; x0 = A.p.x; z0 = A.p.z; }
+      if (deb >= 0 && fin < 0 && A.g?.nom !== 'slide') { fin = t; dist = Math.hypot(A.p.x - x0, A.p.z - z0); }
+      const hv = V.g && (V.mode === 'sol' || V.mode === 'geste') ? hancheA(V.g.nom, V.g.t) : 0.95;
+      if (contact >= 0 && basse < 0 && hv < 0.45) basse = t;
+    });
+    verifier('Tacle glissé : glissade courte, victime au sol à l\'impact', deb >= 0 && fin - deb <= 1.0 && dist <= 4 && contact >= 0 && basse >= 0 && basse - contact <= 0.45,
+      `glissade ${f2(fin - deb)} s sur ${f2(dist)} m (bornes 1 s, 4 m ; 1,42 s et 5,7 m avant) ; victime au sol ${f2(basse - contact)} s après le contact (borne 0,45 ; 0,92 avant)`);
+  }
+  // le ciseau : jamais pour un dégagement (scène « centre » : le défenseur Blanc dégage de la tête ou de volée basse),
+  // et toujours suivi d'un passage au sol puis du relevé (avant : debout en 0,13 s)
+  {
+    const choix: string[] = [];
+    scene('centre', 2, (m) => { for (const e of m.evts) if (e.type === 'elan' && e.j === 7) choix.push(e.nom); });
+    let fins = 0, solOk = 0;
+    for (let g = 1; g <= 12; g++) {
+      const prev: string[] = [];
+      matchIA(g, 150, (m: Any) => { for (const j of m.joueurs) { const k = j.mode + ':' + (j.g?.nom ?? ''); if (/^geste:(volley|bicycle)/.test(prev[j.i] ?? '') && !k.startsWith('geste:')) { fins++; if (j.mode === 'sol') solOk++; } prev[j.i] = k; } });
+    }
+    verifier('Ciseau : seulement pour frapper, et suivi du relevé', !choix.includes('volley') && choix.length > 0 && fins > 0 && solOk === fins,
+      `dégagement du défenseur (scène centre) : ${choix.join(', ') || 'aucun'} ; 12 matchs : ${solOk}/${fins} ciseaux ou retournés finis au sol puis relevés`);
+  }
 }
 
 console.log(`\n${echecs ? `${echecs} critère(s) manqué(s)` : 'banc du jeu : tout est vert'} (${resume.length} contrôles)`);

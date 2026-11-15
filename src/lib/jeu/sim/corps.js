@@ -176,11 +176,15 @@ export function finirGeste(j) {
 // avant lancée (trip, avec son root motion). Le relevé suit la pose au sol : du dos (getup_dos) ou du ventre
 // (getup_ventre, à la place de getting_up, 8,6 s joué depuis 72 %).
 export const CHUTES = { avant: 'trip', cote: 'fall_side', arriere: 'fall_back', balaye: 'fall_sweep', croc: 'fall_trip' };
-const RELEVES = { trip: 'getup_ventre', fall_trip: 'getup_ventre', fall_side: 'getup_dos', fall_back: 'getup_dos', fall_sweep: 'getup_dos', slide: 'getup_dos' };
+const AU_SOL = /^(volley|bicycle)/;
+const RELEVES = { volley: 'getup_dos', bicycle: 'getup_dos', trip: 'getup_ventre', fall_trip: 'getup_ventre', fall_side: 'getup_dos', fall_back: 'getup_dos', fall_sweep: 'getup_dos', slide: 'getup_dos' };
 // le relevé : depuis (part du clip), rythme, et la part du clip où il est debout (il peut rejouer la balle)
 const RELEVE = { getup_dos: { depuis: 0.04, taux: 1.9, debout: 0.62 }, getup_ventre: { depuis: 0.05, taux: 1.6, debout: 0.5, fin: 0.72 }, getup: { depuis: 0.72, taux: 1.6, debout: 0.92 } };
 // le rythme des chutes sans root motion (la simulation fait glisser le corps) : au sol en 0,7 à 1,1 s
 const TAUX_CHUTE = { fall_side: 1.5, fall_back: 1.45, fall_sweep: 1.35, fall_trip: 1.5 };
+// (correctifs #26) balayé ou croché, le corps part tout de suite : ces deux clips restent debout près d'une seconde
+// avant de basculer (hanches à 0,8 m jusqu'à 1,1 s) ; ils sont pris à partir de 36 % (au sol en ~0,3 s)
+const DEPUIS_CHUTE = { fall_sweep: 0.36, fall_trip: 0.36 };
 
 /** Le genre de chute que donne une poussée (px, pz : la direction où le corps est poussé), dans son repère. */
 export function genreChute(j, px, pz) {
@@ -208,7 +212,7 @@ export function tomber(j, genre = 'avant') {
     lancerGeste(j, 'trip', { taux: 1.5, rm: true, echelle: clamp(s / 3.4, 0.5, 1.4), type: 'chute', donnees: { vLim: s + 0.5 } });
   } else {
     // (de côté ou en arrière : le corps garde son cap, il est emporté par sa course)
-    lancerGeste(j, nom, { taux: TAUX_CHUTE[nom] ?? 1.4, type: 'chute', donnees: { vLim: Math.min(6, s + 0.5), glisse: { x: s > 0.3 ? j.v.x / s : 0, z: s > 0.3 ? j.v.z / s : 0 } } });
+    lancerGeste(j, nom, { taux: TAUX_CHUTE[nom] ?? 1.4, depuis: DEPUIS_CHUTE[nom] ?? 0, type: 'chute', donnees: { vLim: Math.min(6, s + 0.5), glisse: { x: s > 0.3 ? j.v.x / s : 0, z: s > 0.3 ? j.v.z / s : 0 } } });
   }
   j.mode = 'sol';
   j.solT = 0;
@@ -422,6 +426,9 @@ function pasGeste(j, dt) {
   }
   if (fini) {
     if (g.type === 'pivot') { j.g = null; j.mode = 'loco'; return; }
+    // (correctifs #26) le ciseau et le retourné finissent au sol : le clip va au bout, couché, puis le relevé du dos
+    // (avant : debout en 0,13 s, sans relevé)
+    if (g.type === 'frappe' && AU_SOL.test(g.nom)) { j.mode = 'sol'; j.solT = 0; j.recup = 3; return; }
     finirGeste(j);
   }
 }

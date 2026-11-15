@@ -403,8 +403,8 @@ const hauteurDans = (b, T) => Math.max(R, b.p.y + b.v.y * T - 0.5 * G * T * T);
  * Le clip d'un geste de balle, selon la course, la hauteur de la balle à l'impact et son côté (bola-app#26) :
  *   · au sol : frappe en course (strike_run, la frappe puissante), frappe arrêtée (shoot), passe et finesse de
  *     l'intérieur du pied arrêté (pass, jouée plus vite pour la finesse) ;
- *   · volée basse (0,3 à 0,65 m) : la jambe tendue de kick_soccerball (1) (shoot2) ; volée haute (0,65 à 1,8 m) :
- *     le ciseau (volley) ; dos au but entre 0,7 et 1,2 m : le retourné (bicycle) ; tête (1,25 m et plus, face au
+ *   · volée basse (0,3 à 1 m) : la jambe tendue de kick_soccerball (1) (shoot2) ; volée haute (0,9 à 1,8 m) :
+ *     le ciseau (volley, de côté ou dos à la cible, au-dessus de 0,9 m ; couché à la fin, puis relevé du dos) ; dos au but entre 0,7 et 1,2 m : le retourné (bicycle) ; tête (1,25 m et plus, face au
  *     jeu) : la tête debout (head_std) ou en extension (header2) ;
  *   · le pied du côté de la balle (_l : le miroir) ; l'instant d'impact est l'image où la surface (pied ou tête) est
  *     à la hauteur de la balle, pour les gestes aériens.
@@ -426,8 +426,9 @@ function clipFrappe(j, b, spec) {
     const choix = [];
     if (yb > 1.25 && ecart < 1.9) choix.push('head_std', 'header2');
     if (yb > 0.7 && yb < 1.25 && ecart > 1.9 && CLIPS.bicycle) choix.push('bicycle');
-    if (yb > 0.65) choix.push('volley');
-    if (yb < 0.7) choix.push('shoot2');
+    // (correctifs #26) le ciseau (volley) seulement pour une frappe, de côté ou dos à la cible (un dégagement : volée basse ou tête) ; de face, la volée basse jusqu'à 1 m
+    if (yb > 0.9 && ecart > 1.0 && spec.type !== 'passe') choix.push('volley');
+    if (yb < 1.0) choix.push('shoot2');
     let best = null;
     for (const n0 of choix) {
       const tete = /^head/.test(n0);
@@ -511,7 +512,7 @@ export function pasDemande(m, j) {
 /**
  * La reprise d'une balle aérienne (bola-app#26, lot 2) : la trajectoire prédite (traînée, effet, rebonds) donne
  * l'instant tc et le point où elle passe au plus près du joueur (dans 1 s) ; le geste est choisi par la hauteur de ce
- * point (tête au-dessus de 1,25 m, ciseau de 0,65 à 1,8 m, jambe tendue sous 0,7 m, retourné dos au but), son image de
+ * point (tête au-dessus de 1,25 m, ciseau de 0,9 à 1,8 m de côté ou dos à la cible, jambe tendue sous 1 m, retourné dos au but), son image de
  * contact à cette hauteur, et son rythme pour que le contact tombe à tc (0,8 à 2,2 fois la capture) ; le joueur va au
  * point de rencontre en attendant. Renvoie null si la balle ne passe pas à sa portée (le cas général reprend la
  * main), sinon vrai.
@@ -542,8 +543,9 @@ function reprendre(m, j, dm, cible) {
   // (la tête debout jusqu'à 1,65 m ; au-dessus, la tête en extension, sautée)
   if (P.y > 1.25 && ecart < 1.9) choix.push(P.y < 1.65 ? 'head_std' : 'header2');
   if (P.y > 0.7 && P.y < 1.25 && ecart > 1.9 && CLIPS.bicycle) choix.push('bicycle');
-  if (P.y > 0.65 && P.y < 1.8) choix.push('volley');
-  if (P.y < 0.75) choix.push('shoot2');
+  // (correctifs #26) le ciseau (volley) seulement pour une frappe, de côté ou dos à la cible (un dégagement : volée basse ou tête) ; de face, la volée basse jusqu'à 1 m
+  if (P.y > 0.9 && P.y < 1.8 && ecart > 1.0 && dm.spec.type !== 'passe') choix.push('volley');
+  if (P.y < 1.0) choix.push('shoot2');
   let g = null;
   for (const n0 of choix) {
     const tete = /^head/.test(n0);

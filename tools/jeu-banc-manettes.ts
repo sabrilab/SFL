@@ -266,7 +266,7 @@ function deuxManettes(graine: number) {
   // relevés, contrôles anticipés, plongeons bas, IA qui glisse moins souvent — d3f4e37b avant ; re-bénie par le lot 2 :
   // duels (tirage, poussée de dos, tacle contré), fautes et avantage, effet au pied, contrôle raté, centres et reprises,
   // appels, une-deux, pressing coordonné, gardien sur l'angle — 7c88787c avant ; les manettes ne la changent pas)
-  const REF = '7919334a';
+  const REF = '43ecc41a'; // (correctifs #26 : l'IA sort des coins, le ciseau et le tacle glissé corrigés ; 7919334a avant)
   verifier('IA contre IA inchangée (graine 7)', empreinte(m) === REF, `${empreinte(m)} (attendu ${REF}, celle du banc physique)`);
 }
 

@@ -61,6 +61,12 @@ function couloirLibre(m, e, ax, az, bx, bz, marge = 1.1) {
   return true;
 }
 
+/** (correctifs #26) Le porteur est-il derrière une ligne de but (la sienne ou celle d'en face), ou dans un coin ? */
+function coinDe(j) {
+  const az = Math.abs(j.p.z);
+  return az > LB - 0.2 || (Math.abs(j.p.x) > BX - 3 && az > LB - 2.5);
+}
+
 /** L'intention d'un joueur de champ de l'IA. */
 export function pasIA(m, j) {
   const it = intentionVide(j.int);
@@ -132,7 +138,9 @@ export function pasIA(m, j) {
     const db = hypot(b.p.x - j.p.x, b.p.z - j.p.z);
     if (d < 2.4) {
       j.essai = 0.7;
-      const ch = m.controle[p.e] === p.i ? 0.3 : 0.2;
+      // (correctifs #26) un porteur coincé dans un coin, presque à l'arrêt : on va au contact franchement
+      const coince = hypot(p.v.x, p.v.z) < 1.2 && (Math.abs(p.p.x) > BX - 2.5 || Math.abs(p.p.z) > LB - 0.5) && Math.abs(p.p.z) > LB - 3;
+      const ch = (m.controle[p.e] === p.i ? 0.3 : 0.2) * (coince ? 2.5 : 1);
       // le tacle debout : la balle devant lui, pas derrière les jambes du porteur
       const devant = (b.p.x - j.p.x) * sin(j.cap) + (b.p.z - j.p.z) * cos(j.cap) > 0.3;
       // (bola-app#26, lot 2) collé dans le dos du porteur, la balle hors d'atteinte : il le tient par le maillot
@@ -211,14 +219,22 @@ function porteurIA(m, j, it) {
   if (proche && dp < 3.5) cx = j.p.x + Math.sign(j.p.x - proche.p.x || 1) * 4;
   // le long d'un panneau, il revient vers le milieu (la balle coincée contre le panneau ne se joue plus)
   if (Math.abs(j.p.x) > BX - 2.2) cx = Math.sign(j.p.x) * (BX - 5);
+  // (correctifs #26) derrière une ligne de but, ou dans un coin : il ressort vers le terrain (avant, il visait
+  // la ligne de but et restait collé au coin avec trois défenseurs autour, 14 s sans que rien ne se passe)
+  const coin = coinDe(j);
+  if (coin) { cz = Math.sign(j.p.z) * (LB - 4.5); cx = Math.sign(j.p.x || 1) * Math.min(Math.abs(j.p.x), BX - 4.5); }
   cx = clamp(cx, -BX + 1.5, BX - 1.5);
   aller(j, it, cx, cz, 5.6);
   // il garde la balle : il court vers elle quand elle file devant
   conduire(m, j, it);
-  // il protège un moment, puis s'en va de l'autre côté
+  // il protège un moment, puis s'en va de l'autre côté (dans un coin : vers le terrain, pas dans les panneaux)
   j.protegeT = proche && dp < 1.4 && hypot(j.v.x, j.v.z) < 2 ? (j.protegeT ?? 0) + PAS : 0;
-  if (j.protegeT > 0 && j.protegeT < 1.2) { it.protege = true; it.regard = proche.p; }
-  else if (j.protegeT >= 1.2 && proche) { const ax = j.p.x - proche.p.x, az = j.p.z - proche.p.z, L = hypot(ax, az) || 1; it.dx = ax / L; it.dz = az / L; it.allure = 0.8; if (j.protegeT > 2.4) j.protegeT = 0; }
+  if (j.protegeT > 0 && j.protegeT < (coin ? 0.6 : 1.2)) { it.protege = true; it.regard = proche.p; }
+  else if (j.protegeT > 0 && proche) {
+    let ax = j.p.x - proche.p.x, az = j.p.z - proche.p.z, L = hypot(ax, az) || 1; ax /= L; az /= L;
+    if (coin) { const tx = cx - j.p.x, tz = cz - j.p.z, T = hypot(tx, tz) || 1; ax = ax * 0.35 + tx / T; az = az * 0.35 + tz / T; L = hypot(ax, az) || 1; ax /= L; az /= L; }
+    it.dx = ax; it.dz = az; it.allure = 0.8; if (j.protegeT > 2.4) j.protegeT = 0;
+  }
   // (bola-app#26, lot 2) la remise du une-deux : le passeur est reparti dans l'espace, le couloir est libre → remise
   // en une touche, tout de suite (une fois par passe reçue)
   // (bola-app#26, lot 2) la remise du une-deux, en deux touches (en une, elle part avant le contrôle : pasIA)
@@ -227,7 +243,9 @@ function porteurIA(m, j, it) {
   if (j.decision > 0) return;
   j.decision = 0.28 + rng.u() * 0.15;
   const dBut = hypot(j.p.x, zb - j.p.z);
-  if (dBut < 7.5 || (dBut < 10 && rng.u() < 0.6) || (dBut < 13 && Math.abs(j.p.x) < 6 && rng.u() < 0.28)) {
+  // (correctifs #26) pas de frappe de derrière la ligne ni d'un angle fermé : il remet en retrait
+  const ferme = (j.p.z - zb) * Math.sign(zb) > -0.3 || Math.abs(j.p.x) > BUT_DL + 2.2 * Math.abs(zb - j.p.z);
+  if (!ferme && (dBut < 7.5 || (dBut < 10 && rng.u() < 0.6) || (dBut < 13 && Math.abs(j.p.x) < 6 && rng.u() < 0.28))) {
     // près d'un poteau (l'erreur de la frappe fait le reste : à côté, ou dedans)
     // le côté que le gardien couvre le moins
     const g = m.joueurs.find((o) => o.gardien && o.e !== j.e);
@@ -245,7 +263,7 @@ function porteurIA(m, j, it) {
     for (const o of m.joueurs) if (o.e === j.e && o !== j && !o.gardien && !o.absent && Math.abs(o.p.x) < 3.2 && Math.abs(zb - o.p.z) < 8 && hypot(o.p.x - j.p.x, o.p.z - j.p.z) > 4) t = o;
     if (t && col.u() < 0.55) { it.action = { type: 'centre', p: 0.9, cible: t.i, dx: t.p.x - j.p.x, dz: t.p.z - j.p.z }; return; }
   }
-  if ((dp < 2.4 && rng.u() < 0.65) || (dp < 4 && rng.u() < 0.4) || rng.u() < 0.14 || Math.abs(j.p.x) > BX - 1.6) {
+  if ((dp < 2.4 && rng.u() < 0.65) || (dp < 4 && rng.u() < 0.4) || rng.u() < 0.14 || Math.abs(j.p.x) > BX - 1.6 || coin || ferme) {
     const cible = choisirPartenaire(m, j, sin(j.cap), cos(j.cap) + sens(j.e) * 0.6);
     if (cible) {
       const d = hypot(cible.p.x - j.p.x, cible.p.z - j.p.z);

@@ -47,8 +47,8 @@ export const CORPS = {
   impDes: 1.6,                      // m/s : impulsion (par unité de masse) d'un déséquilibre complet
   trebuche: 0.65, chute: 1.0,       // seuils de déséquilibre
   solChute: 0.9,                    // s au sol après une chute, avant le relevé
-  freinGlissade: 4.5,               // m/s² : le tacle glissé, couché sur le dos sur le gazon (bola-app#26)
-  vGlissade: [3.2, 8],                 // m/s : la vitesse de la glissade au départ (bornes)
+  freinGlissade: 7.5,               // m/s² : le tacle glissé sur le gazon (bola-app#26 ; correctifs : 4,5 → 7,5, ~0,9 s et ~3 m au lieu de 1,3 s et 5,4 m)
+  vGlissade: [3.2, 7],                 // m/s : la vitesse de la glissade au départ (bornes)
   forceEpaule: 900,                 // N
   restitution: 0.15, frottementCorps: 0.3,
   hanche: 0.957,                    // m : hanche du footballeur Ch38 (clips en hanches)
