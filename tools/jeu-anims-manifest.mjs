@@ -1,7 +1,11 @@
 // Les clips Mixamo ajoutés au jeu /jouer par bola-app#26 (lot 1), par paquet. Lu par tools/jeu-anims.mjs.
 //
-// file : nom du FBX de la bibliothèque Mixamo de Sabri (sabrilab/mixamo-library, « Mixamo Animations/Liam@<file>.fbx »,
-//        le même fichier que sabrilab/aeriea branche assets/mixamo-raw) ; les FBX ne sont JAMAIS copiés dans SFL : seul
+// Source : sabrilab/aeriea, branche assets/mixamo-raw, dossier « Mixamo Animations/Liam@<file>.fbx » (2 199 FBX ; le
+// 15/11/2026, les 2 160 clips mesurables ont été balayés et mesurés pour les gestes du stick droit : roulette inversée,
+// crochet, amorti de la poitrine trouvés ici ; feinte de frappe sur strike_foward_jog du paquet player ; passement,
+// talonnade, frappe de l'extérieur et sombrero absents, ils restent en couche calculée). sabrilab/mixamo-library en
+// est une copie exacte (mêmes empreintes git).
+// file : nom du FBX dans aeriea (ou mixamo-library, même fichier) ; les FBX ne sont JAMAIS copiés dans SFL : seul
 //        le .pak brouillé l'est (licence Mixamo : intégré au jeu, pas redistribué).
 // loop : boucle ; fps : images par seconde (30, 15 pour les clips lents : chutes, relevés, fêtes) ; mirror : symétrie
 // gauche / droite ; root: 'keep' : le déplacement des hanches reste dans le clip (plongeons) ; from / to : rognage (s) ;
@@ -42,6 +46,16 @@ export const PACKS = {
     turn180_std_l: O('quick_180_turn', { unturn: true, mirror: true }),
     feint_r: O('standing_dodge_right'),
     feint_l: O('standing_dodge_right', { mirror: true }),
+    // (bola-app#26, gestes trouvés dans aeriea) la roulette inversée : soccer_spin tourne vers la gauche (semelle
+    // droite sur la balle à 0,30–0,40 s, le pied gauche la tire derrière vers 0,63 s) ; son miroir tourne vers la droite
+    roulette_l: O('soccer_spin', { mirror: true, hitAt: 0.35 }),
+    // le crochet semelle (« drag turn ») de soccer_idle, de 3,85 à 4,75 s (le virage ; le clip revient ensuite) : appui
+    // droit, le pied gauche tire la balle dans le sens du virage (58° vers la gauche) ; lacet retiré (la simulation tourne
+    // le corps, rendu/graphe.js, CROCHET) ; miroir vers la droite
+    crochet_g: O('soccer_idle', { from: 3.85, to: 4.75, unturn: true, hitAt: 4.4 }),
+    crochet_d: O('soccer_idle', { from: 3.85, to: 4.75, unturn: true, hitAt: 4.4, mirror: true }),
+    // l'amorti de la poitrine : la cambrure de header_soccerball (bras levés, buste et tête reculés), avant la tête
+    chest: O('header_soccerball', { from: 0.3, to: 0.9, hitAt: 0.45 }),
   },
   keeper2: {
     k_catch_std: O('goalkeeper_catch (1)'),

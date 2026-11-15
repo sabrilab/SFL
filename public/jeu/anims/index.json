@@ -757,6 +757,92 @@
    ],
    "plant": 0,
    "source": "standing_dodge_right"
+  },
+  "roulette_l": {
+   "loop": false,
+   "dur": 1.267,
+   "move": [
+    0,
+    3.594
+   ],
+   "plant": 0,
+   "hit": 0.276,
+   "hitFixe": true,
+   "source": "soccer_spin"
+  },
+  "crochet_g": {
+   "loop": false,
+   "dur": 0.867,
+   "move": [
+    -0.239,
+    -0.043
+   ],
+   "plant": 0,
+   "hit": 0.615,
+   "hitFixe": true,
+   "turn": [
+    0,
+    0.189,
+    0.32,
+    0.403,
+    0.502,
+    0.612,
+    0.696,
+    0.767,
+    0.816,
+    0.808,
+    0.783,
+    0.804,
+    0.873,
+    0.942,
+    0.986,
+    1.008,
+    1.018
+   ],
+   "source": "soccer_idle"
+  },
+  "crochet_d": {
+   "loop": false,
+   "dur": 0.867,
+   "move": [
+    0.239,
+    -0.043
+   ],
+   "plant": 0,
+   "hit": 0.615,
+   "hitFixe": true,
+   "turn": [
+    0,
+    -0.189,
+    -0.32,
+    -0.403,
+    -0.502,
+    -0.612,
+    -0.696,
+    -0.767,
+    -0.816,
+    -0.808,
+    -0.783,
+    -0.804,
+    -0.873,
+    -0.942,
+    -0.986,
+    -1.008,
+    -1.018
+   ],
+   "source": "soccer_idle"
+  },
+  "chest": {
+   "loop": false,
+   "dur": 0.6,
+   "move": [
+    -0.035,
+    0.025
+   ],
+   "plant": 0,
+   "hit": 0.25,
+   "hitFixe": true,
+   "source": "header_soccerball"
   }
  },
  "keeper2": {

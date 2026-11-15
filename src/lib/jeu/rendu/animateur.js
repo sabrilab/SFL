@@ -16,7 +16,9 @@
 //     vers l'adversaire dans un duel d'épaule, tête et cou vers la balle (60° au plus) ; le coup reçu (hit_l / hit_r,
 //     clip additif du haut du corps, du côté d'où vient la poussée, au poids du déséquilibre) ; les gestes techniques
 //     sans clip (passement : le pied fait le tour de la balle par-dessus ; talonnade ; sombrero en course) en IK du
-//     pied sur une courbe. « Réduire les animations » divise ces amplitudes par deux.
+//     pied sur une courbe (gestes absents d'aeriea, la bibliothèque Mixamo) ; le contrôle de la poitrine, la roulette
+//     des deux côtés, le crochet semelle et la feinte de frappe en course sont des clips d'aeriea (paquet player2).
+//     « Réduire les animations » divise ces amplitudes par deux.
 //   · Pieds verrouillés : pendant un appui (table des appuis de sim/clips.js, des cycles et des gestes sur place), le
 //     pied est tenu à sa place au sol par une IK à deux os (cuisse, tibia ; le genou reste dans son plan), correction
 //     plafonnée à 8 cm et relâchée en 60 ms ; le bassin descend (6 cm au plus) quand un pied tenu serait hors de
@@ -278,7 +280,8 @@ export function creerAnimateur(perso, { gardien = false, reduit = false, versMon
     const penSprint = gardien ? 0 : clamp((s - 6) / 1.2, 0, 1) * 9 * DEG;
     let poitrine = 0;
     const G = e.geste;
-    if (G && G.surface === 'poitrine' && G.impact != null) {
+    // (la poitrine jouée par le clip chest, aeriea, a déjà sa cambrure : la couche calculée ne sert qu'à trap)
+    if (G && G.surface === 'poitrine' && G.impact != null && G.nom !== 'chest') {
       const x = (G.t - G.impact) / 0.3;
       poitrine = -18 * DEG * Math.exp(-x * x * 2);
     }

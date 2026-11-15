@@ -267,7 +267,7 @@ export function pasControle(m, j, contact = false) {
   // (plus de 1,6 m/s) : il est repris par le geste juste
   if (j.g?.type === 'amorti') {
     const ga = (b.p.x - j.p.x) * cos(j.cap) - (b.p.z - j.p.z) * sin(j.cap) > 0;
-    const pa = CLIPS[j.g.nom]?.piedImpact?.pied;
+    const pa = j.g.nom === 'chest' ? null : CLIPS[j.g.nom]?.piedImpact?.pied; // (la poitrine : d'aucun côté)
     if (sj > 1.6 || (pa && (pa === 'g') !== ga && Math.abs((b.p.x - j.p.x) * cos(j.cap) - (b.p.z - j.p.z) * sin(j.cap)) > 0.05)) { j.g = null; j.mode = 'loco'; }
   }
   if (j.g?.type !== 'amorti') {
@@ -288,7 +288,7 @@ export function pasControle(m, j, contact = false) {
 /**
  * Le clip d'un contrôle : au pied, l'amorti sur place (trap) quand le joueur est presque arrêté, la réception en
  * course (receive) sur une balle forte en courant, rien (la course continue) sinon ; pied levé (stall) pour une balle
- * entre 0,35 et 0,7 m ; la cuisse (knee) de 0,7 à 0,95 m ; la poitrine (trap, buste en arrière : couche du rendu) ;
+ * entre 0,35 et 0,7 m ; la cuisse (knee) de 0,7 à 0,95 m ; la poitrine (chest, la cambrure de header_soccerball) ;
  * la tête debout (head_std). Le clip est celui du pied (ou de la cuisse) du côté de la balle. impact : l'instant du
  * contact dans le clip (s), apres : ce que la simulation en joue après (s de clip : 0,25 à 0,3, le joueur rejoue
  * vite ; le rendu laisse le clip finir pendant son fondu vers la course).
@@ -314,7 +314,10 @@ export function clipControle(j, b, surface, sj, vin, possede = true) {
   } else if (surface === 'cuisse') {
     nom = b.p.y < 0.7 && sj < 2.5 ? cote('stall', pied('stall')) : cote('knee', pied('knee'));
     taux = 1.4; apres = 0.25;
-  } else if (surface === 'poitrine') { nom = cote('trap', pied('trap')); taux = 1.2; apres = 0.3; }
+  } else if (surface === 'poitrine') {
+    // (aeriea) l'amorti de la poitrine : la cambrure de header_soccerball (chest) ; à défaut, trap et la couche du rendu
+    if (CLIPS.chest) { nom = 'chest'; taux = 1.1; apres = 0.3; } else { nom = cote('trap', pied('trap')); taux = 1.2; apres = 0.3; }
+  }
   else if (surface === 'tete') { nom = 'head_std'; taux = 1.5; apres = 0.3; }
   if (!nom || !CLIPS[nom]) return null;
   return { nom, impact: imp(nom), taux, apres };

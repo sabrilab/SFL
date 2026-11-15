@@ -12,6 +12,9 @@
 //   · demi-tour sur place (quick_180_turn, lacet retiré) : un joueur presque arrêté qui se retourne ; le temps suit
 //     l'angle déjà tourné par la simulation (la courbe de lacet du clip, inversée).
 //
+// Un quatrième, le crochet semelle (crochet_g / crochet_d, aeriea), est joué dans l'état geste pendant le virage court
+// que la simulation fait dans la course (CROCHET, plus bas).
+//
 // États (catégorie) : loco, depart, arret, demitour, geste (passe, frappe, contrôle, roulette…), chute, tacle, sol,
 // releve, pivot, fete, gardien (plongeons, arrêts, relances). Chaque changement d'état fond les clips l'un dans
 // l'autre (jamais de poids qui saute, sauf quand la racine du corps saute : fin de plongeon) :
@@ -41,6 +44,14 @@ export const FONDUS = {
   gardien: { gardien: 0.1, '*': 0.15 },
 };
 export const fondu = (de, vers) => (FONDUS[de]?.[vers] ?? FONDUS[de]?.['*'] ?? 0.12);
+
+/**
+ * (aeriea) Le crochet semelle : la simulation ne joue pas de geste (le virage est dans la course, sim/corps.js,
+ * crochetT) ; le rendu joue crochet_g (soccer_idle de 3,85 à 4,75 s, virage à gauche) ou son miroir crochet_d, lacet
+ * retiré (la simulation tourne le corps), depuis l'instant où le pied gauche est levé (depuis, s de clip) : le
+ * contact (hit du clip, 0,32 s) tombe 0,05 s après la touche de la simulation ; il dure jusqu'à la fin du clip.
+ */
+export const CROCHET = { depuis: 0.25, taux: 1.6, get duree() { return ((CLIPS.crochet_g?.dur ?? 0.867) - this.depuis) / this.taux; } };
 
 /** La catégorie d'un geste de la simulation (type du geste, et mode du corps). */
 export function categorie(mode, type) {
@@ -152,6 +163,11 @@ export function creerGraphe({ gardien = false } = {}) {
     if (e.geste) return rend(categorie(e.mode, e.geste.type), { nom: e.geste.nom, t: e.geste.t });
     if (gardien) return rend('loco', null);
     const libre = e.mode === 'loco' || e.mode === 'frein';
+    // le crochet semelle (état geste, sans geste de la simulation) : le temps du clip suit l'âge du crochet
+    if (e.crochet && libre) {
+      const nom = e.crochet.cote > 0 ? 'crochet_g' : 'crochet_d', c = CLIPS[nom];
+      if (c) return rend('geste', { nom, t: Math.min(c.dur * 0.99, CROCHET.depuis + e.crochet.age * CROCHET.taux) });
+    }
     // le départ : arrêté (sous 0,6 m/s), il accélère fort (sans balle : la conduite a son cycle)
     if (g.etat !== 'depart' && reposOk && libre && !e.balle && CLIPS.start && sP < 0.6 && s >= 0.6 && (e.aLong ?? 0) > 2.5) { g.dist = 0; rend('depart', null); }
     if (g.etat === 'depart') {

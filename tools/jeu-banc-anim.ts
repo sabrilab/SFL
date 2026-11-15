@@ -6,7 +6,8 @@
 //
 // Contrôles (code de sortie 1 si l'un manque) ; les seuils sont ceux mesurés à la construction, un peu au-dessus :
 //   · chaque état du graphe, chaque clip ajouté au lot 1 (ATTENDUS) et chaque couche procédurale (passement,
-//     talonnade, sombrero) est atteint, en matchs IA et dans des scènes jouées (gestes, tacle, chutes, gardien) ;
+//     talonnade, sombrero) est atteint (et les clips d'aeriea branchés sur les gestes : roulette des deux côtés, crochet
+//     semelle, poitrine, feinte de frappe en course), en matchs IA et dans des scènes jouées (gestes, tacle, chutes, gardien) ;
 //   · pieds tenus : vitesse au sol d'un pied verrouillé, médiane ≤ 3 cm/s, 90e centile ≤ 31 cm/s (correctifs #26 : 30
 //     avant ; 26,9 à 30,1 mesurés selon les matchs que joue l'IA, le seuil tombait au hasard du contenu) (les cycles de
 //     course n'ont pas la foulée de la simulation à toutes les vitesses : la correction est plafonnée à 22 cm) ;
@@ -102,7 +103,9 @@ function creerPerso(gardien: boolean) {
 const ATTENDUS_ETATS = ['loco', 'depart', 'arret', 'demitour', 'geste', 'chute', 'tacle', 'releve', 'pivot', 'fete', 'gardien'];
 // (« a|b » : l'un ou l'autre côté suffit)
 const ATTENDUS_CLIPS = ['slide', 'getup_dos', 'getup_ventre', 'trap', 'trap_l', 'stall|stall_l', 'knee|knee_l', 'head_std', 'stagger', 'fall_side', 'fall_back', 'fall_sweep', 'fall_trip',
-  'start', 'stop', 'turn180_std|turn180_std_l', 'feint_r', 'feint_l', 'kickup|kickup_l', 'k_catch_std', 'k_high', 'k_low_l|k_low_r', 'k_roll', 'c_thumbs', 'shoot2|shoot2_l', 'volley|header2|head_std'];
+  'start', 'stop', 'turn180_std|turn180_std_l', 'feint_r', 'feint_l', 'kickup|kickup_l', 'k_catch_std', 'k_high', 'k_low_l|k_low_r', 'k_roll', 'c_thumbs', 'shoot2|shoot2_l', 'volley|header2|head_std',
+  // (gestes trouvés dans aeriea) la roulette des deux côtés, le crochet semelle des deux côtés, la poitrine, la feinte de frappe en course
+  'roulette', 'roulette_l', 'crochet_g', 'crochet_d', 'chest', 'strike_run|strike_run_l'];
 const vus = new Set<string>(), clipsVus = new Set<string>(), figuresVues = new Set<string>();
 const glisse: number[] = [];       // vitesse au sol d'un pied tenu (m/s)
 const glisseParEtat: Record<string, number[]> = {};
@@ -232,7 +235,9 @@ function scene(nom: string, actions: Array<[number, Any]>, prep: (M: Any) => voi
 const poser = (j: Any, x: number, z: number, cap: number, vz = 0) => { j.p.x = x; j.p.z = z; j.cap = cap; j.v.x = 0; j.v.z = vz; };
 const balleA = (M: Any, x: number, z: number, vz: number, poss: number | null) => { const b = M.balle; b.p.x = x; b.p.y = 0.11; b.p.z = z; b.v.x = 0; b.v.y = 0; b.v.z = vz; rouler(b); b.possesseur = poss; b.dernier = poss; b.dernierT = M.t; };
 for (const [nom, act] of [['feinte', { type: 'feinte', dx: 1, dz: 0 }], ['feinte2', { type: 'feinte', dx: -1, dz: 0 }], ['passement', { type: 'passement', dx: 1, dz: 0 }],
-  ['talon', { type: 'talonnade' }], ['sombrero', { type: 'sombrero' }], ['sombrero2', { type: 'sombrero' }], ['petitpont', { type: 'petitPont' }]] as Array<[string, Any]>) {
+  ['talon', { type: 'talonnade' }], ['sombrero', { type: 'sombrero' }], ['sombrero2', { type: 'sombrero' }], ['petitpont', { type: 'petitPont' }],
+  ['crochet-g', { type: 'crochet', dx: 1, dz: 0 }], ['crochet-d', { type: 'crochet', dx: -1, dz: 0 }],
+  ['roulette-g', { type: 'roulette', dx: 1, dz: 0 }], ['roulette-d', { type: 'roulette', dx: -1, dz: 0 }], ['feinte-frappe', { type: 'feinteFrappe' }]] as Array<[string, Any]>) {
   scene(nom, [[0.15, act]], (M) => {
     const lent = nom === 'feinte' || nom === 'feinte2' || nom === 'sombrero';
     poser(M.joueurs[4], 0, 4, Math.PI, lent ? 0 : -3); balleA(M, 0, 3.6, lent ? 0 : -3.2, 4);

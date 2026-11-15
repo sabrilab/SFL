@@ -227,7 +227,7 @@ function agir(m, j) {
   if (a.type === 'feinteFrappe' && (j.demande || (j.g && j.g.type === 'frappe' && !j.g.fait))) { feinteFrappe(m, j); return; }
   // (un humain balle au pied, dans un geste : l'action attend son tour)
   if (humain && !libre(j) && j.mode === 'geste' && enFile(a) && (p === j || p == null)) { j.file = { a, t: m.t }; return; }
-  if (a.type === 'roulette') { roulette(m, j, a.dx ?? 1, a.dz ?? 0); return; }
+  if (a.type === 'roulette') { roulette(m, j, a.dx ?? 1, a.dz ?? 0, !!a.inverse); return; }
   if (a.type === 'crochet') { crochet(m, j, a.dx ?? 1, a.dz ?? 0, a.court ? 70 : 100); return; }
   if (a.type === 'semelle') { semelle(m, j); return; }
   if (a.type === 'feinte' || a.type === 'passement') { feinte(m, j, a.dx ?? 1, a.dz ?? 0, a.type, !!a.double); return; }
@@ -263,14 +263,19 @@ function agir(m, j) {
   }
 }
 
-/** La roulette : un pas de côté balle au pied, vers (dx, dz) ; le défenseur trop près reste planté un instant. */
-function roulette(m, j, dx, dz) {
+/**
+ * La roulette : un pas de côté balle au pied, vers (dx, dz) ; le défenseur trop près reste planté un instant. Le corps
+ * tourne du côté demandé : vers la gauche, soccer_spin (« roulette ») ; vers la droite, son miroir (« roulette_l »,
+ * la roulette inversée, aeriea) ; inverse (le geste du stick fini à l'envers) prend l'autre sens.
+ */
+function roulette(m, j, dx, dz, inverse = false) {
   if (!libre(j) || porteur(m) !== j) return;
   const s = hypot(j.v.x, j.v.z);
   // la roulette part en biais : moitié devant, moitié du côté demandé
   const fx = sin(j.cap), fz = cos(j.cap), L = hypot(dx, dz) || 1;
+  const gauche = (fz * dx - fx * dz) / L > 0 !== inverse;
   j.cap = atan2(fx * 0.55 + (dx / L) * 0.85, fz * 0.55 + (dz / L) * 0.85);
-  lancerGeste(j, 'roulette', { taux: 1.25, rm: true, echelle: clamp(Math.max(2.5, s) / 3.4, 0.7, 1.3), type: 'roulette', fin: 0.85 * 1.267 });
+  lancerGeste(j, gauche || !CLIPS.roulette_l ? 'roulette' : 'roulette_l', { taux: 1.25, rm: true, echelle: clamp(Math.max(2.5, s) / 3.4, 0.7, 1.3), type: 'roulette', fin: 0.85 * 1.267 });
   j.intouchable = 0.75;
   for (const o of m.joueurs) if (o.e !== j.e && !o.gardien && !o.absent && hypot(o.p.x - j.p.x, o.p.z - j.p.z) < 2.6) { o.plante = 0.85; desequilibrer(m, o, 0.2); }
   m.ev('roulette', { j: j.i });
@@ -297,6 +302,9 @@ function crochet(m, j, dx, dz, angMax = 100, nomEv = 'crochet') {
   j.toucheT = m.t;
   j.v.x *= 0.55; j.v.z *= 0.55;
   j.crochetH = h; j.crochetT = 0.32;
+  // (le rendu : le crochet semelle de soccer_idle, aeriea, du côté du virage ; rendu/graphe.js. Le tirer en arrière
+  // garde la course seule)
+  if (nomEv === 'crochet') j.crochetR = { t0: m.t, cote };
   for (const o of m.joueurs) {
     if (o.e === j.e || o.gardien || o.absent) continue;
     const rx = o.p.x - j.p.x, rz = o.p.z - j.p.z, d = hypot(rx, rz);
@@ -475,12 +483,21 @@ function feinteFrappe(m, j) {
     g.fait = true; g.type = 'feinteFrappe'; g.fin = Math.min(g.fin, g.impact - 0.02);
   } else {
     if (!balleAuPied(m, j, 1.2)) return;
-    const b = m.balle, fx = sin(j.cap), fz = cos(j.cap);
-    const nom = (b.p.x - j.p.x) * fz - (b.p.z - j.p.z) * fx > 0.08 && CLIPS.shoot_l ? 'shoot_l' : 'shoot';
+    const b = m.balle, fx = sin(j.cap), fz = cos(j.cap), s = hypot(j.v.x, j.v.z);
+    const gauche = (b.p.x - j.p.x) * fz - (b.p.z - j.p.z) * fx > 0.08;
+    // (aeriea) en course, le grand armé de la frappe en course (strike_foward_jog : la pointe monte à 0,5 m et recule
+    // de 0,6 m derrière, de 0,20 à 0,30 s), root motion gardé ; arrêté, l'élan court de kick_soccerball
+    const course = s > 2.2 && CLIPS.strike_run && CLIPS.strike_run_l;
+    const nom = course ? (gauche ? 'strike_run_l' : 'strike_run') : gauche && CLIPS.shoot_l ? 'shoot_l' : 'shoot';
     if (!CLIPS[nom]) return;
     const imp = impactDe(nom);
-    lancerGeste(j, nom, { taux: clamp(imp / 0.22, 0.8, 2.4), type: 'feinteFrappe', depuis: Math.max(0, imp - 0.32) / duree(nom), fin: imp - 0.03 });
-    j.v.x *= 0.6; j.v.z *= 0.6;
+    if (course) {
+      const taux = clamp(imp / 0.26, 0.8, 2.4);
+      lancerGeste(j, nom, { taux, rm: true, echelle: clamp(s / (2.19 * taux), 0.6, 2), type: 'feinteFrappe', depuis: 0.05 / duree(nom), fin: imp - 0.03 });
+    } else {
+      lancerGeste(j, nom, { taux: clamp(imp / 0.22, 0.8, 2.4), type: 'feinteFrappe', depuis: Math.max(0, imp - 0.32) / duree(nom), fin: imp - 0.03 });
+      j.v.x *= 0.6; j.v.z *= 0.6;
+    }
   }
   for (const o of trompes(m, j, 3)) { o.plante = Math.max(o.plante, 0.5); desequilibrer(m, o, 0.16); }
   m.ev('feinteFrappe', { j: j.i });
