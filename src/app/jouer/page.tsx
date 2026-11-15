@@ -11,7 +11,8 @@
 //
 // Gestes, dans le bas de l'écran : glisser = courir (loin = sprint) ; toucher =
 // passe (ou tacle en défense) ; coup sec vers la droite = frappe ; coup sec
-// vers le haut ou le bas = roulette ; sans la balle, coup sec vers le porteur = tacle glissé. Depuis bola-app#23, le
+// vers le haut ou le bas = roulette ; sans la balle, coup sec vers le porteur = tacle glissé ; un second doigt = le stick
+// droit des gestes techniques (bola-app#26, lot 3). Depuis bola-app#23, le
 // match est une simulation physique à pas fixe (lib/jeu/sim) : élan, contacts, ballon libre, gardiens qui lisent la
 // trajectoire ; ?banc&graine=N rejoue le même match. La caméra est sur le côté, comme à la télé. Pas de texte d'aide : un pouce fantôme montre le geste tant
 // qu'on n'a pas touché l'écran (pas quand on joue à la manette).
@@ -21,7 +22,8 @@
 // Noirs contre Blancs). A / ✕ ou Menu sur une manette, avant le match, l'ouvre aussi ; Menu / Options ou « Jouer » le
 // lance. Une manette branchée ou débranchée en plein match ne l'arrête pas : l'IA reprend son équipe. Menu / Options
 // met en pause (deux barres au milieu, sans texte ; Échap ou P au clavier ; un toucher sur le voile reprend). Sur
-// l'écran d'attente, une manette branchée apparaît tout de suite en petit au-dessus de « Jouer ».
+// l'écran d'attente, une manette branchée apparaît tout de suite en petit au-dessus de « Jouer ». (bola-app#26, lot 3)
+// L'écran Manettes ouvre le schéma des touches (./touches.tsx ; Vue / Share sur la manette aussi).
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
@@ -32,6 +34,9 @@ import { isAdmin } from "@/lib/sfl/admin";
 import { photoPerso, rafraichirPhotos } from "@/lib/sfl/photos";
 import { cn } from "@/lib/utils";
 import { EcranManettes, ManettesVues, type MagasinManettes } from "./manettes";
+import { SchemaTouches, type Appareil } from "./touches";
+// la police du score et de « BUT » : un mot à changer dans lib/jeu/police.js pour passer à Inter 800 (décision 1 de #25)
+import { CLASSE_SCORE } from "@/lib/jeu/police.js";
 
 type Etat = {
   phase: "attente" | "intro" | "engagement" | "jeu" | "but" | "fin";
@@ -42,12 +47,14 @@ type Etat = {
   buteur: "moi" | "noirs" | "blancs" | null;
   pause: boolean;
   manettes: boolean;
+  ralenti: boolean;
 };
 type Match = {
   demarrer: () => void;
   detruire: () => void;
   salon: (ouvert: boolean) => void;
   reprendre: () => void;
+  passer: () => void;
   manettes: MagasinManettes & { reconnues: () => number };
 };
 
@@ -68,6 +75,8 @@ export default function JouerPage() {
   const boite = useRef<HTMLDivElement>(null);
   const match = useRef<Match | null>(null);
   const [salon, setSalon] = useState(false);
+  // le schéma des touches (bola-app#26, lot 3), ouvert depuis l'écran Manettes : l'appareil montré d'abord
+  const [touches, setTouches] = useState<Appareil | null>(null);
   const [reduit, setReduit] = useState(false);
   // (les manettes appellent ces deux-là depuis la boucle du jeu : on passe par des références)
   const ouvrirSalon = useRef<() => void>(() => {});
@@ -83,6 +92,7 @@ export default function JouerPage() {
     lancer.current = () => {
       if (!match.current) return;
       setSalon(false);
+      setTouches(null);
       match.current.demarrer();
     };
   }, [phaseVue]);
@@ -105,6 +115,7 @@ export default function JouerPage() {
           surProgres: (p: number) => setProgres(p),
           surSalon: () => ouvrirSalon.current(),
           surDemarrer: () => lancer.current(),
+          surTouches: (marque: string) => setTouches((t) => (t ? null : marque === "playstation" ? "playstation" : "xbox")),
         })) as unknown as Match;
         if (fini) {
           m.detruire();
@@ -146,8 +157,8 @@ export default function JouerPage() {
         <div className={cn("pointer-events-auto transition-opacity", enJeu && "opacity-0")}>
           <BoutonRetour parent="/" titre="Map" />
         </div>
-        {etat && enJeu && (
-          <div className="absolute left-1/2 top-[calc(env(safe-area-inset-top)+10px)] flex -translate-x-1/2 items-center overflow-hidden rounded-full bg-black/55 font-[family-name:var(--font-anton)] leading-none backdrop-blur">
+        {etat && enJeu && !etat.ralenti && (
+          <div className={cn("absolute left-1/2 top-[calc(env(safe-area-inset-top)+10px)] flex -translate-x-1/2 items-center overflow-hidden rounded-full bg-black/55 leading-none backdrop-blur", CLASSE_SCORE)}>
             <span className="flex items-center gap-2 py-1.5 pl-3.5 pr-3 text-[22px] tabular-nums">
               <span className="h-2.5 w-2.5 rounded-full border border-white/70 bg-black" />
               {etat.noirs}
@@ -160,15 +171,30 @@ export default function JouerPage() {
         )}
       </div>
 
-      {/* le mot du résultat, au milieu */}
+      {/* le mot du résultat, en haut (correctifs #26 : au milieu, à 64 %, il couvrait le buteur qui célèbre au plan
+          rapproché) */}
       {etat?.message && (
-        <div className="pointer-events-none absolute inset-x-0 top-[64%] text-center">
+        <div className="pointer-events-none absolute inset-x-0 top-[17%] text-center">
           <span
             key={`${etat.noirs}-${etat.blancs}`}
-            className="jeu-mot inline-block font-[family-name:var(--font-anton)] text-[84px] leading-none tracking-tight"
+            className={cn("jeu-mot inline-block text-[84px] leading-none tracking-tight", CLASSE_SCORE)}
           >
             {etat.message}
           </span>
+        </div>
+      )}
+
+      {/* le ralenti du but (bola-app#26, lot 4) : deux bandes noires, comme un replay de télé ; un toucher le passe */}
+      {etat?.ralenti && (
+        <div
+          className="absolute inset-0"
+          onPointerDown={(e) => {
+            e.stopPropagation();
+            match.current?.passer();
+          }}
+        >
+          <div className="jeu-bande absolute inset-x-0 top-0 h-[7%] bg-black" />
+          <div className="jeu-bande absolute inset-x-0 bottom-0 h-[7%] bg-black" />
         </div>
       )}
 
@@ -198,8 +224,17 @@ export default function JouerPage() {
 
       {/* l'écran Manettes */}
       {salon && magasin && (phase === "attente" || phase === "fin") && (
-        <EcranManettes magasin={magasin} reduit={reduit} onJouer={() => lancer.current()} />
+        <EcranManettes
+          magasin={magasin}
+          reduit={reduit}
+          onJouer={() => lancer.current()}
+          onTouches={() => {
+            const pads = magasin.instantane().pads.filter((p) => p.reconnue);
+            setTouches(pads.length && pads.every((p) => p.marque === "playstation") ? "playstation" : "xbox");
+          }}
+        />
       )}
+      {salon && touches && (phase === "attente" || phase === "fin") && <SchemaTouches depart={touches} onFermer={() => setTouches(null)} />}
 
       {/* avant, et après */}
       {!salon && (phase === "attente" || phase === "fin") && (
@@ -208,7 +243,7 @@ export default function JouerPage() {
           style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 28px)" }}
         >
           {phase === "fin" && etat && (
-            <div className="flex items-center gap-5 font-[family-name:var(--font-anton)] text-[88px] leading-none tabular-nums">
+            <div className={cn("flex items-center gap-5 text-[88px] leading-none tabular-nums", CLASSE_SCORE)}>
               <span className={cn(etat.noirs < etat.blancs && "text-white/40")}>{etat.noirs}</span>
               <span className="text-[40px] text-white/40">–</span>
               <span className={cn(etat.blancs < etat.noirs && "text-white/40")}>{etat.blancs}</span>
@@ -243,6 +278,8 @@ export default function JouerPage() {
         .jeu-mot { animation: jeu-mot .5s cubic-bezier(.2,.9,.3,1.2) both; text-shadow: 0 6px 30px rgba(0,0,0,.45); }
         @keyframes jeu-mot { from { transform: scale(.6); opacity: 0 } to { transform: none; opacity: 1 } }
         .jeu-fantome { animation: jeu-fantome 2.2s ease-in-out infinite; }
+        .jeu-bande { animation: jeu-bande .35s ease-out both; }
+        @keyframes jeu-bande { from { transform: scaleY(0) } to { transform: none } }
         @keyframes jeu-fantome {
           0% { transform: translate(0, 0); opacity: 0 }
           12% { opacity: .9 }
@@ -250,7 +287,7 @@ export default function JouerPage() {
           62% { transform: translate(110px, 0); opacity: 0 }
           100% { opacity: 0 }
         }
-        @media (prefers-reduced-motion: reduce) { .jeu-mot, .jeu-fantome { animation: none } }
+        @media (prefers-reduced-motion: reduce) { .jeu-mot, .jeu-fantome, .jeu-bande { animation: none } }
       `}</style>
     </div>
   );

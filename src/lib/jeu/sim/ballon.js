@@ -45,6 +45,16 @@ export function sortirBalle(b, cx, cy, cz, nx, ny, nz, d) {
   b.p.x = cx + nx * d; b.p.y = Math.max(R, cy + ny * d); b.p.z = cz + nz * d;
 }
 
+/**
+ * (bola-app#26, lot 2) La balle posée par l'arbitre pour un coup franc (monde.js) : au sol, immobile, sans effet.
+ * C'est l'autre pose permise, avec l'engagement.
+ */
+export function poserBalle(b, x, z) {
+  b.p.x = x; b.p.y = R; b.p.z = z;
+  b.v.x = 0; b.v.y = 0; b.v.z = 0; b.w.x = 0; b.w.y = 0; b.w.z = 0;
+  b.sol = true; b.coinT = 0;
+}
+
 export function copierBalle(b, o = creerBalle()) {
   o.p.x = b.p.x; o.p.y = b.p.y; o.p.z = b.p.z;
   o.v.x = b.v.x; o.v.y = b.v.y; o.v.z = b.v.z;
@@ -158,19 +168,22 @@ function bords(b, ev) {
           const ox = (p.x - sx * BUT_DL) * sx; // > 0 : dehors, de ce côté
           if (Math.abs(ox) < R && p.y < BUT_H) {
             p.x = sx * BUT_DL + Math.sign(ox || -1) * R * sx;
-            choc(b, Math.sign(ox || -1) * sx, 0, 0, B.filetBut, 0.3);
+            const vn = choc(b, Math.sign(ox || -1) * sx, 0, 0, B.filetBut, 0.3);
+            if (vn > 1) ev?.('filet', vn); // (bola-app#26, lot 4 : la vue seulement, le filet qui bouge et le son)
           }
         }
         if (Math.abs(p.x) < BUT_DL && Math.abs(p.y - BUT_H) < R) {
           const dessus = p.y > BUT_H;
           p.y = BUT_H + (dessus ? R : -R);
-          choc(b, 0, dessus ? 1 : -1, 0, B.filetBut, 0.3);
+          const vn = choc(b, 0, dessus ? 1 : -1, 0, B.filetBut, 0.3);
+          if (vn > 1) ev?.('filet', vn);
         }
       }
       if (dedans && dz > BUT_P - R && dz < BUT_P + R) {
         const derriere = dz > BUT_P;
         p.z = zl + s * (BUT_P + (derriere ? R : -R));
-        choc(b, 0, 0, derriere ? s : -s, B.filetBut, 0.3);
+        const vn = choc(b, 0, 0, derriere ? s : -s, B.filetBut, 0.3);
+        if (vn > 1) ev?.('filet', vn);
       }
     }
   }
@@ -246,7 +259,7 @@ export function antiBlocage(b, dt = PAS) {
   if (b.garde == null && (coin || toit) && s < 0.3) b.coinT += dt; else b.coinT = 0;
   if (b.coinT > 1.5) {
     b.coinT = 0;
-    if (toit) { b.v.z = -Math.sign(b.p.z) * 1.6; b.v.x = 0; return true; }
+    if (toit) { b.v.x = Math.sign(b.p.x || 1) * 2.2; b.v.z = -Math.sign(b.p.z) * 0.4; return true; } // (correctifs #26 : elle roule sur le côté du toit ; poussée vers le terrain, elle butait sur la barre et revenait)
     const L = hypot(b.p.x, b.p.z) || 1;
     b.v.x = (-b.p.x / L) * 2.2; b.v.z = (-b.p.z / L) * 2.2;
     return true;

@@ -18,7 +18,7 @@
 //     y cale les clips de course ; piedLoco donne, à cette phase, où est chaque pied (la touche de balle et le
 //     contrôle se mesurent depuis lui).
 // Pas fixe (constantes.js, PAS), aucune allocation par pas, rien de three.
-import { CORPS as C } from './constantes.js';
+import { CORPS as C, DUELS } from './constantes.js';
 import { CLIPS, FPS_CLIPS } from './clips.js';
 import { atan2, cos, exp, hypot, sin } from './maths.js';
 
@@ -68,6 +68,20 @@ export function mainsA(nom, t, out) {
   out.y = echantillon(c.mains, c.n, 3, 1, t, c.dur) / 100;
   out.z = echantillon(c.mains, c.n, 3, 2, t, c.dur) / 100;
   return out;
+}
+/** La tête (m, repère du joueur) d'un clip de tête au temps t ; à défaut, le haut du corps. */
+export function teteA(nom, t, out) {
+  const c = CLIPS[nom];
+  if (!c?.tete) { out.x = 0; out.y = 1.6; out.z = 0.1; return out; }
+  out.x = echantillon(c.tete, c.n, 3, 0, t, c.dur) / 100;
+  out.y = echantillon(c.tete, c.n, 3, 1, t, c.dur) / 100;
+  out.z = echantillon(c.tete, c.n, 3, 2, t, c.dur) / 100;
+  return out;
+}
+/** La hauteur des hanches (m) d'un clip au temps t (1 m si le clip n'est pas mesuré). */
+export function hancheA(nom, t) {
+  const c = CLIPS[nom];
+  return c?.hanche ? echantillon(c.hanche, c.n, 1, 0, t, c.dur) / 100 : 1;
 }
 export const duree = (nom) => CLIPS[nom]?.dur ?? 1;
 /** L'instant d'impact d'un geste (s de clip) : le contact mesuré au pied, sinon l'impact noté. */
@@ -126,6 +140,7 @@ export function creerCorps(i, e, role) {
     intouchable: 0,
     crochetT: 0, crochetH: 0, // un crochet en cours (monde.js) : le virage très court sur les appuis, vers crochetH
     regard: null,          // vers où regarde la tête (x, z), pour le rendu
+    figure: null,          // un geste technique joué en couche par le rendu (passement, talon, sombrero) : { type, t0, duree, cote }
     int: null,             // l'intention du pas
     pieds: [{ x: 0, z: 0 }, { x: 0, z: 0 }],
   };
@@ -137,11 +152,11 @@ const tmp = { x: 0, y: 0, z: 0 };
  * Un geste : nom du clip, rythme (taux), root motion appliqué ou non (avec son échelle), et ce qu'il fait (type,
  * données libres). Le temps du clip avance de dt × taux ; le rendu pose le clip à ce temps, sans le laisser avancer seul.
  */
-export function lancerGeste(j, nom, { taux = 1, depuis = 0, rm = false, echelle = 1, type = nom, fin = null, finApresImpact = null, donnees = null } = {}) {
+export function lancerGeste(j, nom, { taux = 1, depuis = 0, rm = false, echelle = 1, type = nom, fin = null, finApresImpact = null, donnees = null, impact = null } = {}) {
   j.mode = 'geste';
   j.g = {
     nom, type, t: depuis * duree(nom), taux, rm, echelle, cap0: j.cap, donnees,
-    impact: impactDe(nom), fait: false,
+    impact: impact ?? impactDe(nom), fait: false,
     fin: fin ?? duree(nom),
     finApresImpact, // s de jeu après l'impact où le geste rend la main (le reste des clips de passe est trop long)
     age: 0,
@@ -155,26 +170,80 @@ export function finirGeste(j) {
   if (j.mode === 'geste') j.mode = 'loco';
 }
 
-/** La chute : le corps garde son élan (root motion de trip, borné à 6 m/s), puis reste au sol, puis se relève. */
-export function tomber(j) {
+// ── les chutes et les relevés (bola-app#26) ──
+// La chute dépend du contact : poussé de face (en arrière, fall_back), de côté (coup d'épaule, fall_side), par
+// derrière (croc-en-jambe, fall_trip, sur le ventre), balayé par un tacle (fall_sweep) ; sans direction, la chute en
+// avant lancée (trip, avec son root motion). Le relevé suit la pose au sol : du dos (getup_dos) ou du ventre
+// (getup_ventre, à la place de getting_up, 8,6 s joué depuis 72 %).
+export const CHUTES = { avant: 'trip', cote: 'fall_side', arriere: 'fall_back', balaye: 'fall_sweep', croc: 'fall_trip' };
+const AU_SOL = /^(volley|bicycle)/;
+const RELEVES = { volley: 'getup_dos', bicycle: 'getup_dos', trip: 'getup_ventre', fall_trip: 'getup_ventre', fall_side: 'getup_dos', fall_back: 'getup_dos', fall_sweep: 'getup_dos', slide: 'getup_dos' };
+// le relevé : depuis (part du clip), rythme, et la part du clip où il est debout (il peut rejouer la balle)
+const RELEVE = { getup_dos: { depuis: 0.04, taux: 1.9, debout: 0.62 }, getup_ventre: { depuis: 0.05, taux: 1.6, debout: 0.5, fin: 0.72 }, getup: { depuis: 0.72, taux: 1.6, debout: 0.92 } };
+// le rythme des chutes sans root motion (la simulation fait glisser le corps) : au sol en 0,7 à 1,1 s
+const TAUX_CHUTE = { fall_side: 1.5, fall_back: 1.45, fall_sweep: 1.35, fall_trip: 1.5 };
+// (correctifs #26) balayé ou croché, le corps part tout de suite : ces deux clips restent debout près d'une seconde
+// avant de basculer (hanches à 0,8 m jusqu'à 1,1 s) ; ils sont pris à partir de 36 % (au sol en ~0,3 s)
+const DEPUIS_CHUTE = { fall_sweep: 0.36, fall_trip: 0.36 };
+
+/** Le genre de chute que donne une poussée (px, pz : la direction où le corps est poussé), dans son repère. */
+export function genreChute(j, px, pz) {
+  const L = hypot(px, pz);
+  if (L < 1e-6) return 'avant';
+  const av = (px * sin(j.cap) + pz * cos(j.cap)) / L;
+  if (av > 0.5) return hypot(j.v.x, j.v.z) > 2.5 ? 'croc' : 'avant';
+  if (av < -0.5) return 'arriere';
+  return 'cote';
+}
+
+/**
+ * La chute : le corps garde son élan (borné, 6 m/s au plus), freine dès le contact et frotte au sol, puis se relève.
+ * genre : voir CHUTES. La chute en avant suit le root motion de trip ; les autres clips sont sur place : le corps
+ * glisse de sa vitesse, freiné de 4 m/s² puis de 7 m/s² une fois les hanches au sol.
+ */
+export function tomber(j, genre = 'avant') {
   if (j.mode === 'sol' || j.mode === 'releve') return;
+  const nom = CHUTES[genre] && CLIPS[CHUTES[genre]] ? CHUTES[genre] : 'trip';
   const s = hypot(j.v.x, j.v.z);
   const h = s > 0.3 ? atan2(j.v.x, j.v.z) : j.cap;
-  j.cap = h;
   // (la vitesse du corps qui tombe ne dépasse jamais celle d'avant le contact plus 0,5 m/s, puis ne fait que baisser)
-  lancerGeste(j, 'trip', { taux: 1.5, rm: true, echelle: clamp(s / 3.4, 0.5, 1.4), type: 'chute', donnees: { vLim: s + 0.5 } });
+  if (nom === 'trip') {
+    j.cap = h;
+    lancerGeste(j, 'trip', { taux: 1.5, rm: true, echelle: clamp(s / 3.4, 0.5, 1.4), type: 'chute', donnees: { vLim: s + 0.5 } });
+  } else {
+    // (de côté ou en arrière : le corps garde son cap, il est emporté par sa course)
+    lancerGeste(j, nom, { taux: TAUX_CHUTE[nom] ?? 1.4, depuis: DEPUIS_CHUTE[nom] ?? 0, type: 'chute', donnees: { vLim: Math.min(6, s + 0.5), glisse: { x: s > 0.3 ? j.v.x / s : 0, z: s > 0.3 ? j.v.z / s : 0 } } });
+  }
   j.mode = 'sol';
   j.solT = 0;
   j.d = 0;
   j.recup = 3;
 }
 
-/** Trébucher : la première moitié de la chute, puis la course reprend. */
+/** Le relevé, selon la pose au sol du clip qui finit. */
+export function relever(j, apres) {
+  const nom = RELEVES[apres] && CLIPS[RELEVES[apres]] ? RELEVES[apres] : 'getup';
+  const r = RELEVE[nom];
+  lancerGeste(j, nom, { taux: r.taux, depuis: r.depuis, type: 'releve', fin: (r.fin ?? 1) * duree(nom), donnees: { debout: r.debout } });
+  j.mode = 'releve';
+  j.v.x = 0; j.v.z = 0;
+}
+
+/**
+ * Trébucher (déséquilibre sans chute) : le déséquilibre en course de shove_reaction (le corps part en avant, se
+ * rattrape sur ses appuis, reste debout), à la vitesse d'avant le contact au plus, puis la course reprend.
+ */
 export function trebucher(j) {
   if (j.mode !== 'loco') return;
   const s = hypot(j.v.x, j.v.z);
   if (s > 0.3) j.cap = atan2(j.v.x, j.v.z);
-  lancerGeste(j, 'trip', { taux: 1.6, rm: true, echelle: clamp(s / 3.4, 0.4, 1.1), type: 'trebuche', fin: 0.45 * duree('trip'), donnees: { vLim: s + 0.5 } });
+  const nom = CLIPS.stagger ? 'stagger' : 'trip';
+  if (nom === 'trip') lancerGeste(j, 'trip', { taux: 1.6, rm: true, echelle: clamp(s / 3.4, 0.4, 1.1), type: 'trebuche', fin: 0.45 * duree('trip'), donnees: { vLim: s + 0.5 } });
+  else {
+    // (le clip avance de 2,5 m en 2,4 s : son root motion est mis à l'échelle de la course, 1,1 s de clip à 1,5 fois)
+    const fin = 1.1, vClip = Math.max(0.3, racineA('stagger', fin, tmp).z / fin);
+    lancerGeste(j, 'stagger', { taux: 1.5, rm: true, echelle: clamp((0.8 * s) / (vClip * 1.5), 0.3, 3), type: 'trebuche', fin, donnees: { vLim: s + 0.5 } });
+  }
   j.recup = Math.max(j.recup, 0.5);
 }
 
@@ -184,6 +253,8 @@ function vitesseVoulue(j, it, balle) {
   if (it.contenir) v = Math.min(v, C.vChasse);
   if (it.protege) v = Math.min(v, C.vProtege);
   if (j.plante > 0) v = Math.min(v, 0.6);
+  // (bola-app#26, lot 2) tenu par le maillot (ou en train de tenir) : 15 % d'allure en moins
+  if (j.tireF > 0) v *= 1 - DUELS.tirage.frein;
   return v * (1 - 0.5 * clamp(j.d, 0, 1));
 }
 
@@ -198,6 +269,8 @@ export function pasCorps(j, dt, balle) {
   j.plante = Math.max(0, j.plante - dt);
   j.intouchable = Math.max(0, j.intouchable - dt);
   j.crochetT = Math.max(0, (j.crochetT ?? 0) - dt);
+  if (j.tireF > 0) { j.tireF = Math.max(0, j.tireF - dt); if (j.tireF === 0) j.tirePar = null; }
+  if (j.leve > 0) j.leve = Math.max(0, j.leve - dt); // (lot 2) vient de se relever : il se dégage seul des autres
   j.d = Math.max(0, j.d - C.retourDes * dt);
 
   if (j.mode === 'geste' || j.mode === 'sol' || j.mode === 'releve' || j.mode === 'pivot') pasGeste(j, dt);
@@ -304,6 +377,19 @@ function pasGeste(j, dt) {
       const vn = j.v.x * j.bloque.x + j.v.z * j.bloque.z;
       if (vn > 0) { j.v.x -= vn * j.bloque.x; j.v.z -= vn * j.bloque.z; }
     }
+  } else if (g.donnees?.glisse) {
+    // une chute (ou une glissade de tacle) sans root motion : le corps file dans sa direction, freiné de 4 m/s², de
+    // 7 m/s² (5 pour la glissade, sur le dos) une fois les hanches au sol ; jamais de réaccélération
+    const G = g.donnees.glisse, auSol = hancheA(g.nom, g.t) < 0.4;
+    const sv = Math.max(0, Math.min(g.donnees.vLim, hypot(j.v.x, j.v.z)) - (auSol ? (g.type === 'tacle' ? C.freinGlissade : 7) : 4) * dt);
+    g.donnees.vLim = sv;
+    j.v.x = G.x * sv; j.v.z = G.z * sv;
+    // (une chute ne passe pas à travers un corps debout ; la glissade du tacle, elle, passe dessous : ce sont ses
+    // jambes qui touchent, contacts.js)
+    if (j.bloqueT > 0 && g.type !== 'tacle') {
+      const vn = j.v.x * j.bloque.x + j.v.z * j.bloque.z;
+      if (vn > 0) { j.v.x -= vn * j.bloque.x; j.v.z -= vn * j.bloque.z; }
+    }
   } else if (g.type === 'pivot') {
     // le pivot : la vitesse d'entrée meurt sur l'appui, puis le joueur repart dans l'autre sens
     const u = clamp(g.t / duree(g.nom), 0, 1), s0 = g.donnees.s0, h0 = g.donnees.h0;
@@ -320,30 +406,29 @@ function pasGeste(j, dt) {
   // fin du geste
   const fini = g.t >= g.fin - 1e-6 || (g.finApresImpact != null && g.fait && g.age >= g.impactAge + g.finApresImpact);
   if (j.mode === 'sol') {
-    if (g.nom === 'trip' && g.t >= duree('trip')) {
-      // au sol : frottement 7 m/s²
-      const s = hypot(j.v.x, j.v.z);
-      if (s > 0) { const ns = Math.max(0, s - 7 * dt); j.v.x *= ns / s; j.v.z *= ns / s; }
-      g.rm = false;
-      g.t = duree('trip');
+    if (g.t >= duree(g.nom)) {
+      // au sol : la pose de fin tenue, frottement 7 m/s² (le root motion est fini), puis le relevé
+      g.t = duree(g.nom);
+      if (g.rm) g.rm = false;
+      if (!g.donnees?.glisse) { const sv = hypot(j.v.x, j.v.z); if (sv > 0) { const ns = Math.max(0, sv - 7 * dt); j.v.x *= ns / sv; j.v.z *= ns / sv; } }
       j.solT += dt;
-      if (j.solT > C.solChute) {
-        lancerGeste(j, 'getup', { taux: 1.6, depuis: 0.72, type: 'releve' });
-        j.mode = 'releve';
-        j.v.x = 0; j.v.z = 0;
-      }
-    } else if (g.rm && g.t >= duree(g.nom)) { g.rm = false; }
+      // (la glissade du tacle : relevé dès que le corps s'arrête ; une chute : après solChute au sol)
+      const arrete = hypot(j.v.x, j.v.z) < (g.type === 'tacle' ? 0.9 : 0.3);
+      if (g.type === 'tacle' ? arrete && j.solT > 0.1 : j.solT > C.solChute) relever(j, g.nom);
+    }
     return;
   }
   if (j.mode === 'releve') {
     j.v.x = 0; j.v.z = 0;
-    const u = (g.t / duree('getup') - 0.72) / 0.28;
-    if (u >= 0.7) j.recup = Math.min(j.recup, 0.05);
-    if (g.t >= duree('getup')) { j.g = null; j.mode = 'loco'; }
+    if (g.t >= (g.donnees?.debout ?? 0.9) * duree(g.nom)) j.recup = Math.min(j.recup, 0.05);
+    if (g.t >= g.fin - 1e-6) { j.g = null; j.mode = 'loco'; j.leve = 0.5; }
     return;
   }
   if (fini) {
     if (g.type === 'pivot') { j.g = null; j.mode = 'loco'; return; }
+    // (correctifs #26) le ciseau et le retourné finissent au sol : le clip va au bout, couché, puis le relevé du dos
+    // (avant : debout en 0,13 s, sans relevé)
+    if (g.type === 'frappe' && AU_SOL.test(g.nom)) { j.mode = 'sol'; j.solT = 0; j.recup = 3; return; }
     finirGeste(j);
   }
 }

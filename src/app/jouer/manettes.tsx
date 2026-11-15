@@ -11,6 +11,8 @@
 // stick ou croix pour changer de côté, B / ○ revenir au milieu, Menu / Options lancer) ; « Jouer » au doigt lance
 // aussi. Deux manettes du même côté : refusé, l'icône a un petit choc. Noir et blanc, Inter ; avec « Réduire les
 // animations », les manettes changent de colonne sans glisser et le choc devient un simple clignement.
+// (bola-app#26, lot 3) Sous « Jouer », « Touches » ouvre le schéma des touches (./touches.tsx) ; Vue / Share sur une
+// manette aussi, aux boutons de sa marque.
 //
 // L'état vient de lib/jeu/entrees/manettes.js par un abonnement (useSyncExternalStore) : la page ne relit rien.
 
@@ -119,7 +121,7 @@ export function ManettesVues({ magasin }: { magasin: MagasinManettes }) {
 
 const COLONNE = ["16.67%", "50%", "83.33%"];
 
-export function EcranManettes({ magasin, reduit, onJouer }: { magasin: MagasinManettes; reduit: boolean; onJouer: () => void }) {
+export function EcranManettes({ magasin, reduit, onJouer, onTouches }: { magasin: MagasinManettes; reduit: boolean; onJouer: () => void; onTouches: () => void }) {
   const inst = useSyncExternalStore(magasin.abonner, magasin.instantane, magasin.instantane);
   const pads = inst.pads;
   const marques = Array.from(new Set(pads.filter((p) => p.reconnue).map((p) => (p.marque === "playstation" ? "playstation" : "xbox")))) as PadVu["marque"][];
@@ -133,7 +135,7 @@ export function EcranManettes({ magasin, reduit, onJouer }: { magasin: MagasinMa
   }
   return (
     <div className="absolute inset-0 z-10 flex flex-col bg-black/85 font-[family-name:var(--font-inter)] text-white" onPointerDown={(e) => e.stopPropagation()}>
-      <div className="grid grid-cols-3 px-4" style={{ paddingTop: "calc(env(safe-area-inset-top) + 76px)" }}>
+      <div className="salon-haut grid grid-cols-3 px-4">
         <div className="flex flex-col items-center gap-2.5">
           <span className="h-4 w-4 rounded-full border-[1.5px] border-white bg-black" />
           <span className="text-[15px] font-extrabold uppercase tracking-[0.2em]">Noirs</span>
@@ -145,7 +147,7 @@ export function EcranManettes({ magasin, reduit, onJouer }: { magasin: MagasinMa
         </div>
       </div>
 
-      <div className="relative mx-4 mt-8 flex-1">
+      <div className="salon-milieu relative mx-4 mt-8 flex-1">
         <div className="absolute inset-y-0 left-1/3 w-px bg-white/10" />
         <div className="absolute inset-y-0 left-2/3 w-px bg-white/10" />
         {pads.map((p) => {
@@ -154,7 +156,7 @@ export function EcranManettes({ magasin, reduit, onJouer }: { magasin: MagasinMa
             <div
               key={p.cle}
               className={cn("absolute -translate-x-1/2", !reduit && "transition-[left] duration-200 ease-out")}
-              style={{ left: COLONNE[c], top: `${(rangs.get(p.cle) ?? 0) * 74 + 8}px` }}
+              style={{ left: COLONNE[c], top: `calc(${rangs.get(p.cle) ?? 0} * var(--salon-pas, 74px) + 8px)` }}
             >
               <div key={p.choc} className={cn(p.choc > 0 && (reduit ? "jeu-choc-r" : "jeu-choc"), !p.reconnue && "opacity-50")}>
                 <IconeManette marque={p.marque} reconnue={p.reconnue} pleine={p.equipe != null} />
@@ -165,7 +167,7 @@ export function EcranManettes({ magasin, reduit, onJouer }: { magasin: MagasinMa
         })}
       </div>
 
-      <div className="flex flex-col items-center gap-5 px-6" style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 28px)" }}>
+      <div className="salon-bas flex flex-col items-center gap-5 px-6">
         <p className="text-[17px] font-semibold">
           {marques.map((mq, i) => (
             <span key={mq}>
@@ -180,9 +182,18 @@ export function EcranManettes({ magasin, reduit, onJouer }: { magasin: MagasinMa
             e.stopPropagation();
             onJouer();
           }}
-          className="h-14 w-full max-w-[320px] rounded-full bg-white text-[17px] font-bold text-black"
+          className="salon-jouer h-14 w-full max-w-[320px] rounded-full bg-white text-[17px] font-bold text-black"
         >
           Jouer
+        </button>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onTouches();
+          }}
+          className="-mt-1 h-10 px-5 text-[14px] font-semibold uppercase tracking-[0.18em] text-white/70"
+        >
+          Touches
         </button>
       </div>
 
@@ -191,6 +202,16 @@ export function EcranManettes({ magasin, reduit, onJouer }: { magasin: MagasinMa
         @keyframes jeu-choc { 0%,100% { transform: none } 20% { transform: translateX(-7px) } 45% { transform: translateX(6px) } 70% { transform: translateX(-3px) } }
         .jeu-choc-r { animation: jeu-choc-r .3s steps(2, jump-none) both; }
         @keyframes jeu-choc-r { 0%,100% { opacity: 1 } 50% { opacity: .35 } }
+        .salon-haut { padding-top: calc(env(safe-area-inset-top) + 76px); }
+        .salon-bas { padding-bottom: calc(env(safe-area-inset-bottom) + 28px); }
+        /* (correctifs #26) téléphone en largeur (844×390) : moins de marges, sinon les manettes du milieu tombaient
+           sur « A / ✕ pour rejoindre » */
+        @media (max-height: 500px) {
+          .salon-haut { padding-top: calc(env(safe-area-inset-top) + 14px); }
+          .salon-milieu { margin-top: 10px; --salon-pas: 58px; }
+          .salon-bas { gap: 8px; padding-bottom: calc(env(safe-area-inset-bottom) + 10px); }
+          .salon-jouer { height: 44px; }
+        }
       `}</style>
     </div>
   );

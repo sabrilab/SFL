@@ -11,6 +11,7 @@ import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { loadPak } from './pak.js';
 import { makeRig, clipsFor, boneKey } from './library.js';
+import { matiere } from './rendu/materiaux.js';
 
 const HAUTEUR = 1.8; // taille d'un joueur (m)
 
@@ -204,12 +205,16 @@ function habiller(o, tenue) {
   o.castShadow = true; o.receiveShadow = false; o.frustumCulled = false;
   const nom = o.name.toLowerCase();
   const piece = /shirt/.test(nom) ? 'maillot' : /short/.test(nom) ? 'short' : /sock/.test(nom) ? 'chaussettes' : null;
-  const cle = `${tenue}:${o.material.name}:${piece ?? 'peau'}`;
+  const genre = piece ? 'tissu' : /hair|eyelash/.test(nom) ? 'cheveux' : /shoe/.test(nom) ? 'crampons' : 'peau';
+  // (les crampons partagent l'atlas du corps : une matière à eux quand même, d'où le genre dans la clé)
+  const cle = `${tenue}:${o.material.name}:${piece ?? 'peau'}:${genre}`;
   if (!materiauxEquipe.has(cle)) {
     const m = o.material.clone();
     if (piece) m.color.set((TEINTE[tenue] ?? TEINTE.noirs)[piece]);
     m.metalness = 0; m.roughness = piece ? 0.9 : 0.7;
     if (m.transparent) { m.alphaTest = 0.4; m.transparent = false; m.depthWrite = true; } // cheveux : pas de tri par image
+    // (bola-app#26, lot 4) la matière de chaque pièce : tissu, peau, cheveux, crampons (rendu/materiaux.js)
+    matiere(m, genre);
     materiauxEquipe.set(cle, m);
   }
   o.material = materiauxEquipe.get(cle);

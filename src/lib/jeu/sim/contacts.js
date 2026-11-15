@@ -9,30 +9,62 @@
 //   · épaule : deux joueurs côte à côte, qui vont dans le même sens, dont un charge (bouton, ou l'IA qui va à la
 //     balle). Le duel se gagne au moment m (v·n) + F dt (×1,3 pour qui protège la balle) ; le perdant prend du
 //     déséquilibre et dérive de côté, le gagnant garde sa ligne.
-//   · tacle glissé : le corps glisse sur la courbe du clip « tackle » ; à l'impact, le pied (table des clips) balaie
-//     un segment de 0,22 m de rayon. Balle touchée d'abord : elle repart le long du balayage. Jambes du porteur
-//     d'abord : il tombe. Les deux : la balle part et le porteur est déséquilibré. De face, la balle passe presque
-//     toujours en premier ; par derrière, les jambes. Le tacleur reste au sol jusqu'au bout du clip : environ 2 s.
+//   · tacle glissé (bola-app#26) : le tacleur part au sol, couché sur le dos, pieds devant (clip « slide »), et
+//     glisse de sa vitesse sur le gazon (7,5 m/s², ~0,9 s) ; tant qu'il glisse hanches au sol (sous 0,25 m), ses deux pieds (table du clip)
+//     balaient la balle et les jambes (0,22 m de rayon). Balle touchée d'abord : elle repart le long de la glissade.
+//     Jambes du porteur d'abord : il tombe (balayé, ou croc-en-jambe par derrière). Les deux : la balle part et le
+//     porteur est déséquilibré. De face, la balle passe presque toujours en premier ; par derrière, les jambes. Il se
+//     relève du dos (getup_dos) dès que la glissade s'arrête : environ 2,3 s en tout.
 //   · tacle debout : une extension de jambe (clip « shoot2 », rapide) de portée 0,9 m ; réussi si la balle est dans
 //     le secteur, sinon un contact qui déséquilibre sans prendre la balle.
 //   · le ballon contre les corps (balleCorps) : personne n'est traversé. Jambes et buste en capsules, corps couché ou qui
 //     se relève ; la balle en ressort (e = 0,3, frottement 0,5), une frappe contrée n'est plus un tir ; un joueur debout
 //     et libre qui la prend dans les jambes la contrôle (moins bien).
-// Aucune faute n'est sifflée (décision proposée à Sabri : la chute suffit comme punition).
-import { CORPS as C, BALLON, BALLE_CORPS as BC, BX, BZ } from './constantes.js';
-import { lancerGeste, tomber, trebucher, piedA, racineA, impactDe, versMonde, clamp, enrouler, libre } from './corps.js';
+//   · (bola-app#26, lot 2) tirage de maillot : un défenseur collé dans le dos du porteur le tient (intention « tire »,
+//     ou l'IA qui revient par derrière) : le porteur perd 15 % d'allure, les deux perdent de l'équilibre ; tenu plus de
+//     0,8 s, c'est une faute. Protection : le porteur qui protège recule dans le défenseur collé dans son dos (poussée de
+//     dos, 420 N) et le déséquilibre. Tacle debout : balle prise, balle contrée (les deux pieds dessus : elle gicle),
+//     ou jambes. Fautes légères (JEU.fautes, règle à faire valider par Sabri) : des jambes touchées avant la balle sur
+//     le porteur (tacle glissé, tacle debout qui le fait trébucher ou tomber) ou un tirage trop long ; l'arbitre laisse
+//     l'avantage (monde.js, pasAvantage) : si l'équipe fautée garde ou reprend la balle dans les 2,5 s, le jeu continue,
+//     sinon coup franc au point de la faute.
+import { CORPS as C, BALLON, BALLE_CORPS as BC, BX, BZ, JEU, DUELS } from './constantes.js';
+import { lancerGeste, tomber, trebucher, genreChute, piedA, hancheA, duree, versMonde, clamp, enrouler, libre } from './corps.js';
 import { rouler, pasControle } from './gestes.js';
 import { sortirBalle } from './ballon.js';
 import { atan2, cos, hypot, sin } from './maths.js';
 
 const t1 = { x: 0, y: 0, z: 0 }, t2 = { x: 0, y: 0, z: 0 };
 
-/** Applique un déséquilibre (et ses conséquences : trébucher, tomber). */
-export function desequilibrer(m, j, dd) {
+/**
+ * Applique un déséquilibre (et ses conséquences : trébucher, tomber). pousse : la direction où le corps est poussé
+ * (x, z), qui choisit la chute (corps.js, genreChute) ; genre : une chute imposée (le balayage d'un tacle). Un
+ * déséquilibre sous le seuil se voit aussi : le rendu joue le choc reçu (j.chocT, j.chocX, j.chocZ, j.chocF).
+ */
+export function desequilibrer(m, j, dd, pousse = null, genre = null) {
   if (j.mode === 'sol' || j.mode === 'releve' || dd <= 0) return;
   j.d += dd;
-  if (j.d >= C.chute) { tomber(j); m.ev('chute', { j: j.i }); }
+  if (pousse && dd > 0.08) { j.chocT = m.t; j.chocX = pousse.x; j.chocZ = pousse.z; j.chocF = Math.min(1, dd); }
+  if (j.d >= C.chute) { const gc = genre ?? (pousse ? genreChute(j, pousse.x, pousse.z) : 'avant'); tomber(j, gc); m.ev('chute', { j: j.i, genre: gc }); }
   else if (j.d >= C.trebuche && j.mode === 'loco') { trebucher(j); m.ev('trebuche', { j: j.i }); }
+}
+
+/**
+ * Une faute légère (bola-app#26, lot 2) de auteur sur victime : seulement si l'équipe de la victime avait la balle (le
+ * porteur, ou une balle libre qu'elle a touchée en dernier à moins de 2 m de lui). L'arbitre regarde l'avantage
+ * (monde.js) : la faute est notée avec son point, et le jeu continue. Renvoie vrai si la faute est notée.
+ */
+export function faute(m, auteur, victime, genre) {
+  if (!JEU.fautes || auteur.e === victime.e || victime.gardien) return false;
+  const b = m.balle;
+  const aLaBalle = b.possesseur === victime.i
+    || (b.possesseur == null && b.garde == null && b.dernier != null && m.joueurs[b.dernier].e === victime.e && hypot(b.p.x - victime.p.x, b.p.z - victime.p.z) < 2);
+  if (!aLaBalle) return false;
+  if (m.avantage || m.arret) return false; // (une faute à la fois : la suivante attend que celle-ci soit réglée)
+  m.avantage = { e: victime.e, auteur: auteur.i, victime: victime.i, x: victime.p.x, z: victime.p.z, t0: m.t, genre };
+  m.stats.fautes++;
+  m.ev('faute', { j: auteur.i, o: victime.i, genre, x: victime.p.x, z: victime.p.z });
+  return true;
 }
 
 /** Le joueur est-il contre un panneau dans la direction (dx, dz) ? */
@@ -80,17 +112,67 @@ export function demeler(m) {
     nx /= d; nz /= d;
     // (au plus 4 cm par passe : deux corps emmêlés, un joueur qui se relève sur un autre, se démêlent en glissant, pas
     // d'un saut)
-    const ia = 1 / A.m, ib = 1 / B.m, corr = Math.min(0.04, 0.95 * (rr - d));
+    // (lot 2 : un relevé emmêlé se démêle doucement, 2 cm par passe : il ne chasse pas l'autre dans un troisième)
+    const ia = 1 / A.m, ib = 1 / B.m, corr = Math.min((A.leve ?? 0) > 0 || (B.leve ?? 0) > 0 ? 0.02 : 0.04, 0.95 * (rr - d));
     const murA = contreMur(A, -nx, -nz), murB = contreMur(B, nx, nz);
-    const pa = murA ? 0 : murB ? 1 : ia / (ia + ib), pb = murB ? 0 : murA ? 1 : ib / (ia + ib);
+    const [pa, pb] = parts(A, B, murA, murB, ia, ib);
     ecarter(A, B, nx, nz, corr, pa, pb);
   }
+}
+
+/**
+ * Qui recule, entre A et B (parts de la correction) : pas celui qui est contre un panneau ; (lot 2) celui qui vient de se
+ * relever (j.leve, 0,5 s) se dégage seul, sans pousser l'autre dans un troisième (un relevé emmêlé dans un coin) ;
+ * sinon au prorata inverse des masses.
+ */
+function parts(A, B, murA, murB, ia, ib) {
+  if (murA) return [0, 1];
+  if (murB) return [1, 0];
+  const la = (A.leve ?? 0) > 0, lb = (B.leve ?? 0) > 0;
+  if (la && !lb) return [1, 0];
+  if (lb && !la) return [0, 1];
+  return [ia / (ia + ib), ib / (ia + ib)];
 }
 
 /** Corps contre corps, pour toutes les paires (45 au plus). */
 export function pasCorpsACorps(m, dt) {
   pasPaires(m, dt);
+  tirages(m, dt);
   demeler(m);
+}
+
+/**
+ * Le tirage de maillot (bola-app#26, lot 2) : le défenseur collé dans le dos du porteur (centres à moins de 0,78 m, il
+ * est derrière lui), qui le veut (intention « tire », l'IA qui revient par derrière), le tient : le porteur perd 15 %
+ * d'allure (corps.js, tireF), les deux perdent de l'équilibre ; tenu plus de 0,8 s : faute (si elle est sifflée), et le
+ * défenseur lâche. Pour le rendu : j.tireCible (le défenseur tend le bras vers lui), j.tirePar (le porteur tiré).
+ */
+function tirages(m, dt) {
+  const b = m.balle, T = DUELS.tirage;
+  const p = b.possesseur != null ? m.joueurs[b.possesseur] : null;
+  for (const o of m.joueurs) {
+    if (o.absent || o.gardien) continue;
+    const tient = p && o.e !== p.e && o.int?.tire && o.mode === 'loco' && p.mode !== 'sol' && p.mode !== 'releve' && m.t >= (o.tireRepos ?? -9);
+    let ok = false;
+    if (tient) {
+      const rx = o.p.x - p.p.x, rz = o.p.z - p.p.z, d = hypot(rx, rz);
+      // derrière lui : du côté opposé à sa course (ou à son cap s'il est arrêté)
+      const s = hypot(p.v.x, p.v.z);
+      const fx = s > 0.8 ? p.v.x / s : sin(p.cap), fz = s > 0.8 ? p.v.z / s : cos(p.cap);
+      ok = d < T.portee && d > 1e-6 && (rx * fx + rz * fz) < -0.35 * d;
+    }
+    if (!ok) { if (o.tireCible != null) { o.tireCible = null; o.tireT = 0; } continue; }
+    if (o.tireCible !== p.i) { o.tireCible = p.i; o.tireT = 0; m.ev('tirage', { j: o.i, o: p.i }); m.stats.tirages++; }
+    o.tireT += dt;
+    p.tireF = 0.12; p.tirePar = o.i; o.tireF = 0.12;
+    // (au plus 0,6 de déséquilibre par le tirage : il gêne, il ne fait pas tomber)
+    if (p.d < 0.6) desequilibrer(m, p, T.desPorteur * dt);
+    if (o.d < 0.6) desequilibrer(m, o, T.desTireur * dt);
+    if (o.tireT > T.faute) {
+      faute(m, o, p, 'tirage');
+      o.tireCible = null; o.tireT = 0; o.tireRepos = m.t + T.repos;
+    }
+  }
 }
 
 function pasPaires(m, dt) {
@@ -105,12 +187,13 @@ function pasPaires(m, dt) {
     if (d >= rr + 0.15 || d < 1e-6) continue;
     nx /= d; nz /= d;
     epaule(m, A, B, nx, nz, d, dt);
+    dos(m, A, B, nx, nz, d, dt);
     if (d >= rr + 0.01) continue;
     const ia = 1 / A.m, ib = 1 / B.m;
-    const pen = rr - d, corr = Math.max(0, Math.min(0.06, 0.95 * pen));
+    const pen = rr - d, corr = Math.max(0, Math.min((A.leve ?? 0) > 0 || (B.leve ?? 0) > 0 ? 0.02 : 0.06, 0.95 * pen));
     // (un corps collé à un panneau ne recule pas : l'autre prend toute la correction)
     const murA = contreMur(A, -nx, -nz), murB = contreMur(B, nx, nz);
-    const pa = murA ? 0 : murB ? 1 : ia / (ia + ib), pb = murB ? 0 : murA ? 1 : ib / (ia + ib);
+    const [pa, pb] = parts(A, B, murA, murB, ia, ib);
     ecarter(A, B, nx, nz, corr, pa, pb);
     // (le prochain pas d'un geste à root motion ne poussera plus dans l'autre corps)
     if (pen > 0) { A.bloque = A.bloque ?? { x: 0, z: 0 }; A.bloque.x = nx; A.bloque.z = nz; B.bloque = B.bloque ?? { x: 0, z: 0 }; B.bloque.x = -nx; B.bloque.z = -nz; A.bloqueT = B.bloqueT = 1; }
@@ -134,9 +217,30 @@ function pasPaires(m, dt) {
     // (entre coéquipiers, on s'évite : moitié moins)
     const f = A.e === B.e ? 0.5 : 1;
     const dva = jn * ia, dvb = jn * ib;
-    if (dva > 1.4) desequilibrer(m, A, (f * (dva - 1.4)) / (2 * C.impDes));
-    if (dvb > 1.4) desequilibrer(m, B, (f * (dvb - 1.4)) / (2 * C.impDes));
+    if (dva > 1.4) desequilibrer(m, A, (f * (dva - 1.4)) / (2 * C.impDes), { x: -nx, z: -nz });
+    if (dvb > 1.4) desequilibrer(m, B, (f * (dvb - 1.4)) / (2 * C.impDes), { x: nx, z: nz });
     if (jn * Math.max(ia, ib) > 1.2) m.ev('choc', { a: A.i, b: B.i, force: jn });
+  }
+}
+
+/**
+ * La poussée de dos (bola-app#26, lot 2) : le porteur qui protège la balle (dos à l'adversaire) recule dans le
+ * défenseur collé derrière lui : le défenseur est repoussé (420 N) et perd un peu d'équilibre ; le porteur, lui, tient.
+ */
+function dos(m, A, B, nx, nz, d, dt) {
+  if (A.e === B.e || A.gardien || B.gardien || d > 2 * C.rayon + 0.06) return;
+  for (const [P, D, s] of [[A, B, 1], [B, A, -1]]) {
+    if (!P.int?.protege || m.balle.possesseur !== P.i || D.mode === 'sol' || D.mode === 'releve') continue;
+    // le défenseur est dans le dos du porteur (son cap regarde à l'opposé)
+    const ux = s * nx, uz = s * nz; // du porteur vers le défenseur
+    if (ux * sin(P.cap) + uz * cos(P.cap) > -0.4) continue;
+    // (le défenseur contre un panneau ne recule plus : la poussée l'écraserait dans le coin)
+    if (contreMur(D, ux, uz)) continue;
+    const F = DUELS.dos.force;
+    D.v.x += (F / D.m) * ux * dt; D.v.z += (F / D.m) * uz * dt;
+    if (D.d < 0.5) desequilibrer(m, D, DUELS.dos.des * dt);
+    if (m.t - (P.dosT ?? -9) > 0.8) { P.dosT = m.t; m.ev('dos', { j: P.i, o: D.i }); }
+    P.appuiX = ux; P.appuiZ = uz; P.appuiF = 0.6; P.appuiT = m.t;
   }
 }
 
@@ -171,9 +275,9 @@ function epaule(m, A, B, nx, nz, d, dt) {
   const perdant = ecart > 0 ? B : A, gagnant = ecart > 0 ? A : B;
   const f = Math.abs(ecart);
   if (f > 0.08) {
-    desequilibrer(m, perdant, f * 1.1 * dt * 6);
     // dérive latérale du perdant
     const s = perdant === B ? 1 : -1;
+    desequilibrer(m, perdant, f * 1.1 * dt * 6, { x: s * nx, z: s * nz });
     perdant.v.x += s * nx * f * 3 * dt; perdant.v.z += s * nz * f * 3 * dt;
   }
   if (m.t - (A.epauleT ?? -9) > 0.6 && (engA >= 1 || engB >= 1)) {
@@ -181,6 +285,21 @@ function epaule(m, A, B, nx, nz, d, dt) {
     m.ev('epaule', { a: A.i, b: B.i, gagnant: gagnant.i });
     m.stats.epaules++;
   }
+}
+
+/**
+ * La portée des pieds pendant la glissade (hanches au sol) : le plus loin devant le corps (z, m) et leur écart moyen
+ * de côté (x, m, repère du joueur : la jambe gauche, tendue, mène).
+ */
+let porteeG = null;
+function porteeGlissade() {
+  if (porteeG) return porteeG;
+  let z = 0.8, sx = 0, n = 0;
+  for (let t = 0; t <= duree('slide'); t += 1 / 30) {
+    if (hancheA('slide', t) > 0.3) continue;
+    for (let p = 0; p < 2; p++) { piedA('slide', t, p, t1); z = Math.max(z, t1.z); sx += t1.x; n++; }
+  }
+  return (porteeG = { z, x: n ? sx / n : 0 });
 }
 
 /** Demande un tacle (glissé ou debout). */
@@ -191,25 +310,30 @@ export function demanderTacle(m, j, glisse) {
   // vers la balle
   const h = atan2(cible.p.x - j.p.x, cible.p.z - j.p.z);
   if (glisse) {
-    // la glissade vise où sera la balle à l'impact : cap et longueur de glissade (échelle du root motion) choisis pour
-    // que le pied du clip arrive dessus ; bornés (on ne glisse ni de travers ni deux fois plus loin que le clip)
-    // le rythme : l'impact tombe quand la balle et le pied se rejoignent (une balle qui vient vers lui : plus vite)
-    const ti = impactDe('tackle');
-    racineA('tackle', ti, t1);
-    piedA('tackle', ti, 1, t2);
-    const portee = t1.z + t2.z; // ce que la glissade couvre jusqu'à l'impact, à l'échelle 1
-    const rx = cible.p.x - j.p.x, rz = cible.p.z - j.p.z, d0 = hypot(rx, rz) || 1;
-    const vient = -(cible.v.x * rx + cible.v.z * rz) / d0; // vitesse de la balle vers lui
-    let taux = 1.3;
-    for (let k = 0; k < 3; k++) { const T = ti / taux; const reste = d0 - vient * T; taux = clamp(ti / Math.max(0.2, (T * reste) / Math.max(0.3, portee)), 1.0, 2.6); }
-    const T = ti / taux;
-    const bx = cible.p.x + cible.v.x * T, bz = cible.p.z + cible.v.z * T;
-    const hb = atan2(bx - j.p.x, bz - j.p.z);
+    // (bola-app#26) le vrai tacle glissé : le corps part au sol, couché sur le dos, pieds devant (clip slide), et
+    // glisse de sa vitesse sur le gazon (freinGlissade). La glissade vise où sera la balle quand les pieds y arrivent :
+    // la portée des pieds devant le corps (table du clip, ~1 m) et la vitesse de départ (bornée) sont choisies pour ça.
+    const { z: portee, x: decale } = porteeGlissade();
+    const a = C.freinGlissade;
+    const [vmin, vmax] = C.vGlissade;
+    let v0 = clamp(s + 2, vmin, vmax), bx = cible.p.x, bz = cible.p.z, hb = j.cap;
+    for (let k = 0; k < 3; k++) {
+      // (le corps vise à côté de la balle : ce sont les pieds, décalés de côté, qui doivent passer dessus)
+      const cx = bx - decale * cos(hb), cz = bz + decale * sin(hb);
+      hb = atan2(cx - j.p.x, cz - j.p.z);
+      const L = Math.max(0, hypot(cx - j.p.x, cz - j.p.z) - portee);
+      // le temps pour couvrir L en glissant (v0 t − a t² / 2 = L), sinon le bout de la glissade
+      const disc = v0 * v0 - 2 * a * L;
+      const T = disc > 0 ? (v0 - Math.sqrt(disc)) / a : v0 / a;
+      bx = cible.p.x + cible.v.x * T; bz = cible.p.z + cible.v.z * T;
+      // la vitesse qu'il faut pour y être à T (bornée : on ne glisse ni sur place ni à plus de 8 m/s)
+      const L2 = Math.max(0, hypot(bx - j.p.x, bz - j.p.z) - portee);
+      v0 = clamp(Math.max(s + 1, Math.sqrt(2 * a * L2 * 1.2)), vmin, vmax);
+    }
     j.cap = Math.abs(enrouler(hb - j.cap)) < 1.4 || s < 2 ? hb : j.cap;
-    const dist = hypot(bx - j.p.x, bz - j.p.z);
-    // (et jamais plus de 6,5 m/s de glissade : un rythme rapide raccourcit la glissade au lieu de l'accélérer)
-    const echelle = Math.min(clamp((dist - t2.z) / Math.max(0.5, t1.z), 0.6, 1.6), 6.5 / (4.2 * taux));
-    lancerGeste(j, 'tackle', { taux, rm: true, echelle, type: 'tacle', donnees: { touche: null } });
+    lancerGeste(j, 'slide', { taux: 1.15, type: 'tacle', donnees: { vLim: v0, glisse: { x: sin(j.cap), z: cos(j.cap) } } });
+    j.mode = 'sol'; j.solT = 0; j.recup = 3;
+    j.v.x = sin(j.cap) * v0; j.v.z = cos(j.cap) * v0;
   } else {
     j.cap = h;
     lancerGeste(j, 'shoot2', { taux: 1.6, type: 'tacleDebout', finApresImpact: 0.2, donnees: {} });
@@ -224,31 +348,46 @@ export function pasTacle(m, j) {
   if (!g) return;
   const b = m.balle;
   if (g.type === 'tacle') {
-    const a = g.impact - 0.1, z = g.impact + 0.15;
-    if (g.donnees.fini || g.t < a) return;
-    if (g.t > z) { g.donnees.fini = true; j.recup = Math.max(j.recup, (g.fin - g.t) / g.taux); finTacle(m, j); return; }
-    piedA('tackle', g.t, 1, t1);
-    versMonde(g.cap0, t1.x, t1.z, t2);
-    const fx = j.p.x + t2.x, fz = j.p.z + t2.z;
+    // le balayage : tant que le tacleur est au sol et glisse (hanches sous 0,3 m, encore lancé), ses deux pieds
+    // balaient la balle et les jambes des adversaires ; la balle touchée part le long de la glissade, les jambes
+    // touchées tombent (balayé de côté ou de face, croc-en-jambe par derrière)
+    if (g.donnees.fini) return;
+    const sv = hypot(j.v.x, j.v.z);
+    if (hancheA(g.nom, g.t) > 0.25) { if (g.t > duree(g.nom) * 0.5) { g.donnees.fini = true; finTacle(m, j); } return; }
+    if (sv < 0.6) { g.donnees.fini = true; finTacle(m, j); return; }
     const rr = C.rayonJambes;
-    // la balle
-    if (!g.donnees.balle && b.garde == null && b.p.y < 0.5 && hypot(b.p.x - fx, b.p.z - fz) < rr + BALLON.R) {
-      g.donnees.balle = m.t;
-      const sv = clamp(hypot(j.v.x, j.v.z) * 1.1, 4, 7);
-      const h = g.cap0 + (m.rng.contacts.u() - 0.5) * 0.6;
-      b.v.x = sin(h) * sv; b.v.z = cos(h) * sv; b.v.y = 0.4;
-      rouler(b);
-      b.dernier = j.i; b.dernierT = m.t; b.possesseur = null; b.recepteur = null; b.tir = null;
-      m.ev('tacleBalle', { j: j.i });
-    }
-    // les jambes des adversaires
-    for (const o of m.joueurs) {
-      if (o.absent || o.e === j.e || o.mode === 'sol' || o.gardien || g.donnees['j' + o.i]) continue;
-      if (hypot(o.p.x - fx, o.p.z - fz) < rr + C.rayonJambes) {
-        g.donnees['j' + o.i] = m.t;
-        const balleAvant = g.donnees.balle && g.donnees.balle < m.t;
-        desequilibrer(m, o, balleAvant ? 0.6 : 1.2);
-        m.ev('tacleJambes', { j: j.i, o: o.i, balleAvant: !!balleAvant });
+    for (let pied = 0; pied < 2; pied++) {
+      piedA(g.nom, g.t, pied, t1);
+      versMonde(j.cap, t1.x, t1.z, t2);
+      const fx = j.p.x + t2.x, fz = j.p.z + t2.z;
+      // la balle
+      if (!g.donnees.balle && b.garde == null && b.p.y < 0.5 && hypot(b.p.x - fx, b.p.z - fz) < rr + BALLON.R) {
+        g.donnees.balle = m.t; g.donnees.impactH = hancheA(g.nom, g.t);
+        // (l'issue : la balle repart du pied, plus fort si le tacleur est lancé, déviée selon l'angle d'attaque)
+        const sb = clamp(sv * 1.1 + 0.4 * hypot(b.v.x, b.v.z), 3.5, 7.5);
+        const h = j.cap + (m.rng.contacts.u() - 0.5) * 0.7;
+        b.v.x = sin(h) * sb; b.v.z = cos(h) * sb; b.v.y = 0.3 + m.rng.contacts.u() * 0.6;
+        rouler(b);
+        b.dernier = j.i; b.dernierT = m.t; b.possesseur = null; b.recepteur = null; b.tir = null;
+        m.ev('tacleBalle', { j: j.i, h: g.donnees.impactH });
+      }
+      // les jambes des adversaires
+      for (const o of m.joueurs) {
+        if (o.absent || o.e === j.e || o.mode === 'sol' || o.gardien || g.donnees['j' + o.i]) continue;
+        // (toute la jambe balaie : le segment du genou, 0,35 m devant les hanches, au pied)
+        const kx = j.p.x + sin(j.cap) * 0.35, kz = j.p.z + cos(j.cap) * 0.35;
+        const ex = fx - kx, ez = fz - kz, E = ex * ex + ez * ez || 1;
+        const u = clamp(((o.p.x - kx) * ex + (o.p.z - kz) * ez) / E, 0, 1);
+        if (hypot(o.p.x - kx - ex * u, o.p.z - kz - ez * u) < rr + C.rayonJambes) {
+          g.donnees['j' + o.i] = m.t;
+          const balleAvant = g.donnees.balle && g.donnees.balle < m.t;
+          // par derrière (le porteur file dans le sens de la glissade) : croc-en-jambe ; sinon balayé
+          const memeSens = o.v.x * sin(j.cap) + o.v.z * cos(j.cap) > 1.5;
+          // (la faute : les jambes avant la balle ; elle se note avant la chute, quand le porteur a encore la balle)
+          if (!balleAvant) faute(m, j, o, memeSens ? 'derriere' : 'glisse');
+          desequilibrer(m, o, balleAvant ? 0.6 : 1.2, { x: sin(j.cap), z: cos(j.cap) }, memeSens ? 'croc' : 'balaye');
+          m.ev('tacleJambes', { j: j.i, o: o.i, balleAvant: !!balleAvant, h: hancheA(g.nom, g.t) });
+        }
       }
     }
   } else if (g.type === 'tacleDebout' && !g.fait && g.t >= g.impact) {
@@ -258,7 +397,20 @@ export function pasTacle(m, j) {
     const al = d > 0 ? (rx * fx + rz * fz) / d : 1;
     const p = b.possesseur != null ? m.joueurs[b.possesseur] : null;
     const dp = p && p.e !== j.e ? hypot(p.p.x - j.p.x, p.p.z - j.p.z) : 99;
-    if (b.garde == null && b.p.y < 0.6 && d < 0.9 + BALLON.R && al > 0.64 && d < dp - 0.05) {
+    // (bola-app#26, lot 2) la balle sous le pied du porteur : les deux pieds la touchent ensemble, elle gicle (contrée)
+    const dbp = p && p.e !== j.e ? hypot(b.p.x - p.p.x, b.p.z - p.p.z) : 99;
+    if (b.garde == null && b.p.y < 0.6 && d < 0.9 + BALLON.R && al > 0.64 && d < dp - 0.05 && dbp < DUELS.contre.pied && m.rng.duels.u() < DUELS.contre.part) {
+      const r = m.rng.duels;
+      const h = atan2(fx, fz) + (r.u() < 0.5 ? -1 : 1) * (0.9 + r.u() * 1.2);
+      const sv = 2.5 + r.u() * 2.5;
+      b.v.x = sin(h) * sv; b.v.z = cos(h) * sv; b.v.y = 0.4 + r.u() * 1.4;
+      b.w.x = (r.u() - 0.5) * 30; b.w.y = (r.u() - 0.5) * 20; b.w.z = (r.u() - 0.5) * 30;
+      b.dernier = j.i; b.dernierT = m.t; b.possesseur = null; b.recepteur = null; b.tir = null;
+      desequilibrer(m, p, 0.25, { x: fx, z: fz });
+      desequilibrer(m, j, 0.15, { x: -fx, z: -fz });
+      m.ev('tacleContre', { j: j.i, o: p.i });
+      m.stats.contresTacle++;
+    } else if (b.garde == null && b.p.y < 0.6 && d < 0.9 + BALLON.R && al > 0.64 && d < dp - 0.05) {
       const h = atan2(fx, fz) + (m.rng.contacts.u() - 0.5) * 1.2;
       const sv = 3 + m.rng.contacts.u() * 2;
       b.v.x = sin(h) * sv + j.v.x * 0.3; b.v.z = cos(h) * sv + j.v.z * 0.3; b.v.y = 0.2;
@@ -267,7 +419,15 @@ export function pasTacle(m, j) {
       m.ev('tacleBalle', { j: j.i, debout: true });
       m.stats.vols++;
     } else if (p && dp < 0.95) {
-      desequilibrer(m, p, 0.7);
+      // (les jambes sans la balle ; la faute se note avant le choc, balle encore à lui. Un contact jambe contre jambe qui le fait trébucher : l'arbitre siffle une fois sur deux par derrière ou de
+      // côté, une fois sur sept de face ; toujours s'il tombe)
+      const pv = hypot(p.v.x, p.v.z), pfx = pv > 0.8 ? p.v.x / pv : sin(p.cap), pfz = pv > 0.8 ? p.v.z / pv : cos(p.cap);
+      const deFace = ((j.p.x - p.p.x) * pfx + (j.p.z - p.p.z) * pfz) > 0.3 * dp;
+      // (le choc des jambes : 0,4 à 0,85 de déséquilibre)
+      const dd = 0.4 + 0.45 * m.rng.duels.u();
+      const u = m.rng.duels.u();
+      if (p.d + dd >= C.chute || (p.d + dd >= C.trebuche && u < (deFace ? 0.15 : 0.5))) faute(m, j, p, 'debout');
+      desequilibrer(m, p, dd, { x: fx, z: fz });
       m.ev('tacleJambes', { j: j.i, o: p.i, debout: true });
     } else {
       j.plante = 0.45;
@@ -300,6 +460,8 @@ export function balleCorps(m) {
     if (j.i === b.possesseur && j.mode !== 'sol' && j.mode !== 'releve') continue;
     if (j.demande || j.g?.type === 'frappe' || j.g?.type === 'tacle' || j.g?.type === 'tacleDebout') continue;
     if (b.dernier === j.i && m.t - b.dernierT < BC.ignore) continue;
+    // (un petit pont réussi : ses jambes écartées laissent passer la balle, monde.js)
+    if ((j.ouvertT ?? -9) > m.t) continue;
     const dx0 = b.p.x - j.p.x, dz0 = b.p.z - j.p.z;
     if (dx0 * dx0 + dz0 * dz0 > 1.2 * 1.2) continue;
     // le point le plus proche sur l'axe de la capsule touchée, et son rayon
