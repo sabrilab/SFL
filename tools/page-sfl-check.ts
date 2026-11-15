@@ -779,6 +779,8 @@ function fautesCouverture(source: string, haut: string): string[] {
   v(/^const ESSAI = process\.env\.NODE_ENV !== "production" \|\| process\.env\.NEXT_PUBLIC_BOLA_ENV === "preview";$/m.test(cv), "12 · l'essai par l'adresse n'est plus limité au dev et aux aperçus");
   const lecteur = /^function lireAdresse\(\): CleCouverture \{\n {2}if \(!ESSAI\) return COUVERTURE_SFL;\n[\s\S]*?\n\}$/m.exec(cv);
   v(lecteur !== null, "12 · lireAdresse ne commence plus par rendre la variante de la page hors essai");
+  // Une valeur inconnue retombe sur la variante de la page : clé propre seulement (?couverture=toString ou constructor passent `in`, héritées du prototype).
+  v(lecteur !== null && /Object\.hasOwn\(VARIANTES_COUVERTURE, v\) \? \(v as CleCouverture\) : COUVERTURE_SFL;/.test(lecteur[0]) && !/ in VARIANTES_COUVERTURE/.test(lecteur[0]), "12 · lireAdresse accepte une clé héritée (?couverture=toString) au lieu de retomber sur la variante de la page");
   const horsLecteur = lecteur ? cv.replace(lecteur[0], "") : cv;
   v(!/location|URLSearchParams|searchParams|useSearchParams|document\.|history\./.test(horsLecteur), "12 · la couverture lit l'adresse ailleurs que dans lireAdresse (la production la lirait)");
   v((cv.match(/\bESSAI\b/g) ?? []).length === 2, "12 · ESSAI sert ailleurs que dans lireAdresse");
@@ -841,6 +843,7 @@ const muter = (t: string, a: string, b: string) => {
 };
 const mutantsCouverture: [string, () => [string, string]][] = [
   ["M1 l'adresse lue hors de lireAdresse", () => [muter(couverture, "  const v = VARIANTES_COUVERTURE[cle];", '  const force = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("couverture") : null;\n  const v = VARIANTES_COUVERTURE[(force as CleCouverture) ?? cle];'), page]],
+  ["M1c une clé héritée acceptée (?couverture=toString)", () => [muter(couverture, "Object.hasOwn(VARIANTES_COUVERTURE, v)", "v in VARIANTES_COUVERTURE"), page]],
   ["M1b l'essai ouvert en production", () => [muter(couverture, '|| process.env.NEXT_PUBLIC_BOLA_ENV === "preview"', '|| process.env.NEXT_PUBLIC_BOLA_ENV !== "development"'), page]],
   ["M2 <source> de l'ordinateur retirée", () => [muter(couverture, '<source media="(min-width: 960px)"', '<template data-x="(min-width: 960px)"'), page]],
   ["M3 sizes=300vw", () => [muter(couverture, 'sizes="100vw"', 'sizes="300vw"'), page]],

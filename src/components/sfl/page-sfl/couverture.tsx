@@ -56,7 +56,7 @@ const rien = () => () => {};
 function lireAdresse(): CleCouverture {
   if (!ESSAI) return COUVERTURE_SFL;
   const v = new URLSearchParams(window.location.search).get("couverture");
-  return v && v in VARIANTES_COUVERTURE ? (v as CleCouverture) : COUVERTURE_SFL;
+  return v && Object.hasOwn(VARIANTES_COUVERTURE, v) ? (v as CleCouverture) : COUVERTURE_SFL;
 }
 
 /**
