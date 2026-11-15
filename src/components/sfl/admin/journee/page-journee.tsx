@@ -45,6 +45,7 @@ import { ChoisirJoueurs } from "@/components/sfl/admin/choisir-joueurs";
 import { Confirmer, type Confirmation } from "@/components/sfl/admin/confirmer";
 import { PastilleSynchro, Synchro } from "@/components/sfl/admin/synchro";
 import { ResultatsVotes } from "@/components/sfl/admin/resultats-votes";
+import { GestesVote } from "@/components/sfl/admin/gestes-vote";
 import { DetailPoints } from "@/components/sfl/admin/detail-points";
 import { CarteDe, FORMAT_CARTE } from "@/components/sfl/mini-carte";
 import { usePresence } from "@/hooks/use-presence";
@@ -62,7 +63,7 @@ import { computeJournees } from "@/lib/sfl/saisie/engine";
 import { choixDEquipe } from "@/lib/sfl/saisie/equipes";
 import { placementsDeLaJournee } from "@/lib/sfl/saisie/effectif";
 import { etatJournee, gesteDuMoment, prochaineJournee } from "@/lib/sfl/saisie/etat-journee";
-import { aLHeure, fermerLeVote, garderLeVoteOuvert, libelleFinDuVote, libelleRevelation, reglageDuVote } from "@/lib/sfl/revelation";
+import { aLHeure, libelleFinDuVote, libelleRevelation } from "@/lib/sfl/revelation";
 import { maintenant as heureDeLaLigue } from "@/lib/sfl/horloge";
 import { verifierFeuille } from "@/lib/sfl/saisie/integrite";
 import { mvpAutomatique } from "@/lib/sfl/saisie/mvp";
@@ -149,7 +150,7 @@ export function PageJournee() {
   const geste = gesteDuMoment(saison, meta ? j : null, maintenant);
   const par = me ?? "admin";
   // La main sur le vote (15/11/2026) : le jour même, les feuilles finies, avant la révélation.
-  const reglageVote = useMemo(() => (j != null && meta ? reglageDuVote(saison, j, maintenant) : null), [saison, j, meta, maintenant]);
+  const mainVote = useMemo(() => ({ saison, commit, confirmer: setConfirmation }), [saison, commit]);
   // « Suspendre » : une journée publiée dont le coup d'envoi est passé (avant, il est dans Quand et Où).
   const peutSuspendre = !!meta && !estBrouillon(meta) && !estEnSuspens(meta) && etat !== "brouillon" && etat !== "en-ligne";
   // La convocation n'est celle de la journée ouverte que si c'est son dimanche :
@@ -337,40 +338,7 @@ export function PageJournee() {
             {meta.sflTime && <Pastille onClick={() => setQuandOu(null)}>SFL Time</Pastille>}
           </div>
           {/* La main sur le vote : le garder ouvert jusqu'à minuit, le fermer, le rouvrir. */}
-          {reglageVote && (
-            <div className="-mt-2 flex flex-wrap items-center gap-1.5">
-              {(reglageVote.garder || reglageVote.rouvrir) && (
-                <Pastille
-                  onClick={() => {
-                    const avant = saisieStore.load();
-                    const apres = garderLeVoteOuvert(avant, j, heureDeLaLigue());
-                    if (apres !== avant && commit(apres, `Votes de la J${j} ouverts jusqu'à minuit`)) haptique.sceau();
-                  }}
-                >
-                  {reglageVote.rouvrir ? "Rouvrir les votes" : "Garder les votes ouverts"}
-                </Pastille>
-              )}
-              {reglageVote.fermer && (
-                <Pastille
-                  onClick={() => {
-                    const t = heureDeLaLigue();
-                    setConfirmation({
-                      titre: `Fermer les votes de la J${j} ?`,
-                      detail: `Révélation ${aLHeure(libelleRevelation(fermerLeVote(saison, j, t), j, t))}.`,
-                      action: "Fermer",
-                      faire: () => {
-                        const avant = saisieStore.load();
-                        const apres = fermerLeVote(avant, j, heureDeLaLigue());
-                        if (apres !== avant && commit(apres, `Votes de la J${j} fermés`)) haptique.sceau();
-                      },
-                    });
-                  }}
-                >
-                  Fermer les votes
-                </Pastille>
-              )}
-            </div>
-          )}
+          {j != null && meta && <GestesVote j={j} t={maintenant} main={mainVote} className="-mt-2" />}
           {/* Le motif de la suspension, tel que les joueurs le lisent. */}
           {etat === "a-rattraper" && meta.suspens?.motif && <p className="mono-label -mt-2 text-encre-2">{meta.suspens.motif}</p>}
 
@@ -729,7 +697,7 @@ export function PageJournee() {
         <Synchro saison={saison} nu />
       </Feuille>
       <Feuille open={votes} onOpenChange={setVotes} titre="Votes" haute>
-        <ResultatsVotes key={j ?? 0} j={j ?? undefined} />
+        <ResultatsVotes key={j ?? 0} j={j ?? undefined} main={mainVote} />
       </Feuille>
       <Feuille open={points} onOpenChange={setPoints} titre="Points" haute>
         <DetailPoints saison={saison} />

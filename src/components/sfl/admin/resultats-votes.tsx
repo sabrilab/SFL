@@ -31,6 +31,7 @@ import {
   type DecompteEquipe,
 } from "@/lib/sfl/votes";
 import { Nom } from "@/components/sfl/nom";
+import { GestesVote, type MainAdmin } from "@/components/sfl/admin/gestes-vote";
 import { cn } from "@/lib/utils";
 
 const pct = (a: number, b: number) => (b ? Math.round((a / b) * 100) : 0);
@@ -86,16 +87,22 @@ function Colonne({ titre, d }: { titre: string; d: Decompte }) {
   );
 }
 
-/** `j` : la journée ouverte d'abord (la page de la journée) ; sinon la dernière avec vote. */
-export function ResultatsVotes({ j }: { j?: number } = {}) {
+/**
+ * `j` : la journée ouverte d'abord (la page de la journée) ; sinon la dernière avec vote.
+ * `main` : la main de l'admin sur le vote (gestes-vote.tsx) : ses pastilles sous
+ * le compte des votants, et l'état lu sur sa saison, pour suivre le geste tout de suite.
+ */
+export function ResultatsVotes({ j, main }: { j?: number; main?: MainAdmin } = {}) {
   // Le direct : l'admin voit les scores et les votes avant la révélation.
-  const { saisonLue: saison, journeesDirect: journees } = useSeason();
+  const { saisonLue, journeesDirect: journees } = useSeason();
+  const saison = main?.saison ?? saisonLue;
   const votes = useVotes();
   const session = useSession();
-  const numero = saison.numero ?? 0;
+  const numero = saisonLue.numero ?? 0;
   const avecVote = useMemo(() => journees.filter(journeeAvecVote).sort((a, b) => b.j - a.j), [journees]);
   const [choix, setChoix] = useState<number | null>(j ?? null);
   const jn = avecVote.find((x) => x.j === choix) ?? avecVote[0];
+  const jCourant = jn?.j;
   const bilan = useMemo(() => (jn ? bilanJournee(votes, numero, jn) : null), [votes, numero, jn]);
 
   if (!session?.server) {
@@ -159,6 +166,7 @@ export function ResultatsVotes({ j }: { j?: number } = {}) {
             votants sur {bilan.inscrits} · {pct(bilan.votants, bilan.inscrits)} %
           </span>
         </div>
+        {main && jCourant != null && <GestesVote j={jCourant} t={t} main={main} className="mt-3" />}
       </div>
 
       <div className="flex flex-col gap-3 lg:grid lg:grid-cols-2 lg:items-start">
