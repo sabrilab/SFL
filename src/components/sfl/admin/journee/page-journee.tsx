@@ -94,7 +94,14 @@ export function PageJournee() {
   const presence = usePresence();
   // L'heure du serveur, à la minute (horloge.ts) : 18 h, 19 h et la journée
   // bloquée se voient sans rouvrir la page.
-  const maintenant = useMaintenant();
+  const tic = useMaintenant();
+  // Relue aussi à chaque changement de la saison : un geste daté de l'instant
+  // (« Fermer les votes ») se voit tout de suite, pas à la minute suivante.
+  const maintenant = useMemo(() => {
+    void tic;
+    void saison;
+    return heureDeLaLigue();
+  }, [tic, saison]);
 
   const [choix, setChoix] = useState<number | null | undefined>(undefined);
   const j = choix === undefined ? prochaineJournee(saison, maintenant) : choix;
@@ -335,7 +342,9 @@ export function PageJournee() {
               {(reglageVote.garder || reglageVote.rouvrir) && (
                 <Pastille
                   onClick={() => {
-                    if (faire((s) => garderLeVoteOuvert(s, j, heureDeLaLigue()), `Votes de la J${j} ouverts jusqu'à minuit`)) haptique.sceau();
+                    const avant = saisieStore.load();
+                    const apres = garderLeVoteOuvert(avant, j, heureDeLaLigue());
+                    if (apres !== avant && commit(apres, `Votes de la J${j} ouverts jusqu'à minuit`)) haptique.sceau();
                   }}
                 >
                   {reglageVote.rouvrir ? "Rouvrir les votes" : "Garder les votes ouverts"}
@@ -343,16 +352,19 @@ export function PageJournee() {
               )}
               {reglageVote.fermer && (
                 <Pastille
-                  onClick={() =>
+                  onClick={() => {
+                    const t = heureDeLaLigue();
                     setConfirmation({
                       titre: `Fermer les votes de la J${j} ?`,
-                      detail: "Révélation une heure après.",
+                      detail: `Révélation ${aLHeure(libelleRevelation(fermerLeVote(saison, j, t), j, t))}.`,
                       action: "Fermer",
                       faire: () => {
-                        if (faire((s) => fermerLeVote(s, j, heureDeLaLigue()), `Votes de la J${j} fermés`)) haptique.sceau();
+                        const avant = saisieStore.load();
+                        const apres = fermerLeVote(avant, j, heureDeLaLigue());
+                        if (apres !== avant && commit(apres, `Votes de la J${j} fermés`)) haptique.sceau();
                       },
-                    })
-                  }
+                    });
+                  }}
                 >
                   Fermer les votes
                 </Pastille>

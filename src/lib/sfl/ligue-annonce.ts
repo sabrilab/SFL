@@ -7,7 +7,8 @@
 // pendant une heure quand le serveur répond que tout le monde est prévenu
 // (une feuille remplie peut arriver à tout moment du dimanche). Quand une
 // révélation est attendue (revelation.ts), le serveur dit `apres` : le
-// téléphone se tait jusque-là et rappelle à l'heure dite.
+// téléphone se tait jusque-là et rappelle à l'heure dite, sans jamais
+// attendre plus que la relance (la révélation peut être avancée).
 
 import { supabase } from "@/lib/supabase";
 
@@ -42,7 +43,9 @@ export async function annoncerLigue(): Promise<void> {
     });
     const corps = (await r.json().catch(() => ({}))) as { fini?: boolean; apres?: string };
     const apres = corps.apres ? Date.parse(corps.apres) : NaN;
-    if (!Number.isNaN(apres) && apres > Date.now()) noter(apres - Date.now() + 30_000);
+    // Jamais plus loin que la relance : l'admin peut avancer la révélation
+    // (« Fermer les votes », 15/11/2026), le téléphone redemande alors à temps.
+    if (!Number.isNaN(apres) && apres > Date.now()) noter(Math.min(apres - Date.now() + 30_000, RELANCE));
     else if (corps.fini) noter(REPOS);
   } catch {
     /* une annonce perdue ne bloque rien : le prochain téléphone sonnera */
