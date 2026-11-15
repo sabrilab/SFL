@@ -35,7 +35,11 @@ function sauver(b) {
  * Renvoie le nombre de pas faits.
  */
 export function avancer(b, dt, entrees = null, ralenti = 1, apres = null) {
-  b.acc += Math.min(0.25, Math.max(0, dt)) * ralenti;
+  // (un dt NaN, négatif ou infini, et un accumulateur abîmé, ne gèlent jamais la boucle)
+  if (!(dt > 0) || !Number.isFinite(dt)) dt = 0;
+  if (!(ralenti >= 0) || !Number.isFinite(ralenti)) ralenti = 1;
+  if (!Number.isFinite(b.acc)) b.acc = 0;
+  b.acc += Math.min(0.25, dt) * ralenti;
   let n = 0;
   while (b.acc >= PAS) {
     sauver(b);

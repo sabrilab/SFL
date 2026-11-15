@@ -29,7 +29,8 @@ export const HAUT_FILET = TERRAIN.panneau + TERRAIN.filet; // 6,15 m
 // ── les corps ──
 export const CORPS = {
   masse: 75, masseGardien: 82,      // kg
-  rayon: 0.30,                      // m : le cylindre au sol, pour les contacts corps à corps
+  rayon: 0.33,                      // m : le cylindre des épaules, pour les contacts corps à corps (0,30 laissait
+                                    // les bras d'un clip entrer dans le dos de l'autre)
   rayonJambes: 0.22,                // m : les jambes, pour les tacles
   vMarche: 1.8, vTrot: 4.6, vCourse: 6.0, vSprint: 7.4, // m/s
   vSprintBalle: 6.6,                // m/s : balle au pied, au plus
@@ -71,9 +72,21 @@ export const BALLON = {
 BALLON.inertie = (2 / 3) * BALLON.masse * BALLON.R * BALLON.R; // sphère creuse
 BALLON.kAir = (BALLON.air * BALLON.section) / (2 * BALLON.masse); // k_d = ρ A / 2m (× C_d)
 
+// ── le ballon contre les corps (personne n'est traversé : jambes, buste, corps au sol) ──
+export const BALLE_CORPS = {
+  jambes: [0, 0.9, 0.14],           // capsule verticale : du sol à 0,9 m, rayon 0,14 m
+  buste: [0.9, 1.6, 0.2],           // de 0,9 à 1,6 m, rayon 0,2 m
+  sol: [0.8, 0.15, 0.15],           // au sol : couché le long du cap, demi-longueur 0,8 m, à 0,15 m de haut, rayon 0,15 m
+  releve: [0, 0.7, 0.18],           // pendant le relevé
+  e: 0.3, mu: 0.5,                  // restitution, frottement tangent (part de l'impulsion normale)
+  ignore: 0.15,                     // s : le joueur qui vient de toucher la balle ne la gêne pas
+};
+
 // ── le jeu de balle ──
 export const JEU = {
-  porteeFrappe: 0.30, porteeTouche: 0.38, porteeControle: 0.55, // m
+  porteeFrappe: 0.30,               // m : du pied qui frappe au centre du ballon, à l'impact
+  porteeTouche: 0.25,               // m : du pied prévu (table des pieds du clip de course) au centre du ballon
+  porteeControle: 0.35,             // m : du pied (ou de la cuisse, du buste) le plus proche au centre du ballon
   touche: { thetaMax: [35, 25, 18, 12] }, // écart max de la touche à la course de la balle : pas, trot, course, sprint (°)
   passeV0: [6, 12],                 // v0 = 6 + 12 p
   frappeV0: [14, 16],               // v0 = 14 + 16 p

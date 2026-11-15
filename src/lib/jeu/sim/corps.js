@@ -11,9 +11,12 @@
 //     à l'adversaire et se déplace en pas chassés ou en arrière (3 m/s au plus) ;
 //   · gestes à root motion (tacle, chute, roulette, frappe en course, relances du gardien) : la vitesse EST la courbe
 //     du clip (sim/clips.js), mise à l'échelle de la vitesse d'entrée ; plus de geste joué sur place ;
-//   · déséquilibre d (contacts.js) : il réduit vitesse et accélération, fait trébucher (≥ 0,65) ou tomber (≥ 1) ;
+//   · déséquilibre d (contacts.js) : il réduit vitesse et accélération, fait trébucher (≥ 0,65) ou tomber (≥ 1) ; le
+//     corps qui tombe garde au plus sa vitesse d'avant le contact plus 0,5 m/s, freine dès le contact (4 m/s²), ne
+//     réaccélère jamais et frotte au sol à 7 m/s² ;
 //   · la foulée : une phase φ ∈ [0 ; 2) qui avance de v / L(v) (L, longueur d'une foulée du clip voisin) ; le rendu
-//     y cale les clips de course, et la conduite de balle y cale ses touches (un appui tous les 0,5 de phase).
+//     y cale les clips de course ; piedLoco donne, à cette phase, où est chaque pied (la touche de balle et le
+//     contrôle se mesurent depuis lui).
 // Pas fixe (constantes.js, PAS), aucune allocation par pas, rien de three.
 import { CORPS as C } from './constantes.js';
 import { CLIPS, FPS_CLIPS } from './clips.js';
@@ -86,6 +89,25 @@ export function longueurFoulee(v) {
   return L_RUN;
 }
 
+/**
+ * Le pied (0 gauche, 1 droit) d'un joueur qui court, dans le monde (x, y, z) : la table des pieds du clip de course que
+ * montre le rendu (drib balle au pied sous 4,4 m/s, jog, run), posée à la phase de foulée φ avec le même calage que
+ * rendu/animateur.js. C'est le pied « prévu » : la touche de balle et le contrôle se mesurent depuis lui, pas depuis
+ * le centre du corps.
+ */
+export function piedLoco(j, balle, pied, out) {
+  const s = hypot(j.v.x, j.v.z);
+  const nom = balle && s < 4.4 ? 'drib' : s < 2.85 ? 'jog' : 'run';
+  const c = CLIPS[nom];
+  const cal = c?.appuis?.[0]?.[0]?.[0] ?? 0;
+  const u = nom === 'drib' ? ((j.phase / 2 + cal) % 1 + 1) % 1 : ((j.phase % 1) + cal) % 1;
+  piedA(nom, u * duree(nom), pied, out);
+  const lx = out.x, lz = out.z;
+  const cs = cos(j.cap), sn = sin(j.cap);
+  out.x = j.p.x + lx * cs + lz * sn; out.z = j.p.z - lx * sn + lz * cs;
+  return out;
+}
+
 // ── un joueur ──
 export function creerCorps(i, e, role) {
   const gardien = role === 'G';
@@ -139,7 +161,8 @@ export function tomber(j) {
   const s = hypot(j.v.x, j.v.z);
   const h = s > 0.3 ? atan2(j.v.x, j.v.z) : j.cap;
   j.cap = h;
-  lancerGeste(j, 'trip', { taux: 1.5, rm: true, echelle: clamp(s / 3.4, 0.5, 1.4), type: 'chute' });
+  // (la vitesse du corps qui tombe ne dépasse jamais celle d'avant le contact plus 0,5 m/s, puis ne fait que baisser)
+  lancerGeste(j, 'trip', { taux: 1.5, rm: true, echelle: clamp(s / 3.4, 0.5, 1.4), type: 'chute', donnees: { vLim: s + 0.5 } });
   j.mode = 'sol';
   j.solT = 0;
   j.d = 0;
@@ -151,7 +174,7 @@ export function trebucher(j) {
   if (j.mode !== 'loco') return;
   const s = hypot(j.v.x, j.v.z);
   if (s > 0.3) j.cap = atan2(j.v.x, j.v.z);
-  lancerGeste(j, 'trip', { taux: 1.6, rm: true, echelle: clamp(s / 3.4, 0.4, 1.1), type: 'trebuche', fin: 0.45 * duree('trip') });
+  lancerGeste(j, 'trip', { taux: 1.6, rm: true, echelle: clamp(s / 3.4, 0.4, 1.1), type: 'trebuche', fin: 0.45 * duree('trip'), donnees: { vLim: s + 0.5 } });
   j.recup = Math.max(j.recup, 0.5);
 }
 
@@ -191,7 +214,8 @@ export function pasCorps(j, dt, balle) {
       if (s <= C.pivotEntree) {
         j.v.x = sin(h) * s; j.v.z = cos(h) * s;
         j.cap = h;
-        const g = lancerGeste(j, 'turn180', { taux: 1, type: 'pivot', donnees: { s0: s, h0: h, cible: j.cible } });
+        // (joué 1,3 fois plus vite que la capture : sa mise en garde, jambes écartées, ne dure plus 0,4 s)
+        const g = lancerGeste(j, 'turn180', { taux: 1.3, type: 'pivot', donnees: { s0: s, h0: h, cible: j.cible } });
         j.mode = 'pivot';
         g.cap0 = h;
       } else { j.v.x = sin(h) * s; j.v.z = cos(h) * s; j.cap = h; }
@@ -267,6 +291,14 @@ function pasGeste(j, dt) {
     vitesseRacine(g.nom, g.t, tmp);
     versMonde(g.cap0, tmp.x * g.taux * g.echelle, tmp.z * g.taux * g.echelle, tmp);
     j.v.x = tmp.x; j.v.z = tmp.z;
+    // une chute (ou un trébuchement) : bornée à la vitesse d'avant le contact (+ 1 m/s), et jamais de réaccélération
+    const lim = g.donnees?.vLim;
+    if (lim != null) {
+      const sv = hypot(j.v.x, j.v.z);
+      if (sv > lim) { j.v.x *= lim / sv; j.v.z *= lim / sv; }
+      // (le corps qui tombe freine dès le contact : 4 m/s², puis le frottement au sol ; il ne glisse plus en plongeon)
+      g.donnees.vLim = Math.max(0, Math.min(lim, sv) - 4 * dt);
+    }
     // un autre corps devant (contacts.js) : le geste ne passe pas au travers
     if (j.bloqueT > 0) {
       const vn = j.v.x * j.bloque.x + j.v.z * j.bloque.z;
@@ -289,9 +321,9 @@ function pasGeste(j, dt) {
   const fini = g.t >= g.fin - 1e-6 || (g.finApresImpact != null && g.fait && g.age >= g.impactAge + g.finApresImpact);
   if (j.mode === 'sol') {
     if (g.nom === 'trip' && g.t >= duree('trip')) {
-      // au sol : frottement 4 m/s²
+      // au sol : frottement 7 m/s²
       const s = hypot(j.v.x, j.v.z);
-      if (s > 0) { const ns = Math.max(0, s - 4 * dt); j.v.x *= ns / s; j.v.z *= ns / s; }
+      if (s > 0) { const ns = Math.max(0, s - 7 * dt); j.v.x *= ns / s; j.v.z *= ns / s; }
       g.rm = false;
       g.t = duree('trip');
       j.solT += dt;

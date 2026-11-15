@@ -36,6 +36,15 @@ export function creerBalle() {
   };
 }
 
+/**
+ * Sort le ballon d'un obstacle (un corps, contacts.js) : il est posé à la distance d du point (cx, cy, cz) le long de
+ * la normale (nx, ny, nz), jamais sous le gazon. C'est la seule pose de position permise hors de l'intégrateur, avec
+ * l'engagement et les mains du gardien.
+ */
+export function sortirBalle(b, cx, cy, cz, nx, ny, nz, d) {
+  b.p.x = cx + nx * d; b.p.y = Math.max(R, cy + ny * d); b.p.z = cz + nz * d;
+}
+
 export function copierBalle(b, o = creerBalle()) {
   o.p.x = b.p.x; o.p.y = b.p.y; o.p.z = b.p.z;
   o.v.x = b.v.x; o.v.y = b.v.y; o.v.z = b.v.z;
@@ -228,13 +237,16 @@ export function pasBalle(b, ev, dt = PAS) {
   return -1;
 }
 
-/** Anti-blocage : un ballon arrêté dans un coin (ou collé à un panneau) plus de 1,5 s est relancé vers le centre. */
+/** Anti-blocage : un ballon arrêté dans un coin, ou sur le toit d'un but, plus de 1,5 s est relancé vers le terrain. */
 export function antiBlocage(b, dt = PAS) {
   const s = hypot(b.v.x, b.v.z);
   const coin = (Math.abs(b.p.x) > BX - 0.7 && Math.abs(b.p.z) > BZ - 0.7);
-  if (b.garde == null && coin && s < 0.3) b.coinT += dt; else b.coinT = 0;
+  // (ou posé sur le toit d'un but : il roule vers le terrain et retombe devant la barre)
+  const toit = Math.abs(b.p.z) > LB && Math.abs(b.p.x) < BUT_DL + 0.3 && b.p.y > BUT_H - 0.05;
+  if (b.garde == null && (coin || toit) && s < 0.3) b.coinT += dt; else b.coinT = 0;
   if (b.coinT > 1.5) {
     b.coinT = 0;
+    if (toit) { b.v.z = -Math.sign(b.p.z) * 1.6; b.v.x = 0; return true; }
     const L = hypot(b.p.x, b.p.z) || 1;
     b.v.x = (-b.p.x / L) * 2.2; b.v.z = (-b.p.z / L) * 2.2;
     return true;

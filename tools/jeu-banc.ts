@@ -414,6 +414,173 @@ function tacle(graine: number, deFace: boolean) {
     `${cadres.length} cadrées sur ${tirs.length} ; arrêts ${(tot * 100).toFixed(0)} % (centre ${(centre * 100).toFixed(0)} %, coins ${(coin * 100).toFixed(0)} % ; p ≤ 0,45 : ${(faible * 100).toFixed(0)} %, p ≥ 0,75 : ${(fort * 100).toFixed(0)} %) ; racine qui bouge en plongeon ${racineBouge}, mains dans un poteau ${mainPoteau}`);
 }
 
+// ─────────────────────────── les correctifs du contrôle (balle et corps, chutes, demi-tour, lob, gardien) ───────────
+{
+  // la balle ne traverse personne : 1 000 balles basses et mi-hautes tirées sur un joueur debout, couché ou qui se
+  // relève ; on compte les passages (centre du ballon plus près de l'axe que le rayon de la capsule, sans contact)
+  const { BALLE_CORPS: BCo }: Any = Cst;
+  let passages = 0, tirs = 0, contacts = 0;
+  for (let k = 0; k < 1000; k++) {
+    const mode = k % 3 === 0 ? 'loco' : k % 3 === 1 ? 'sol' : 'releve';
+    const m: Any = creerMonde({ graine: 500 + k, humains: [true, true], aides: [0, 0], presents: [4, 6] });
+    demarrer(m, { intro: false });
+    const d = m.joueurs[6], t = m.joueurs[4];
+    t.p.x = -8; t.p.z = 8;
+    d.p.x = 0; d.p.z = 0; d.cap = (k * 0.37) % (2 * Math.PI);
+    if (mode === 'sol') { Crp.tomber(d); d.g.t = Crp.duree('trip'); d.g.rm = false; d.v.x = d.v.z = 0; }
+    if (mode === 'releve') { d.mode = 'releve'; Crp.lancerGeste(d, 'getup', { taux: 1.6, depuis: 0.72, type: 'releve' }); d.mode = 'releve'; }
+    const b = m.balle, a = (k * 2.399) % (2 * Math.PI), v = 8 + (k % 7) * 3, y = mode === 'loco' ? 0.11 + (k % 5) * 0.3 : 0.11 + (k % 2) * 0.1;
+    // (couché, le corps est le long du cap : on vise un point de son segment)
+    const off = mode === 'sol' ? ((k % 9) / 8 - 0.5) * 1.2 : 0;
+    const cx = d.p.x + Math.sin(d.cap) * off, cz = d.p.z + Math.cos(d.cap) * off;
+    b.p.x = cx - Math.sin(a) * 4; b.p.z = cz - Math.cos(a) * 4; b.p.y = y; b.v.x = Math.sin(a) * v; b.v.z = Math.cos(a) * v; b.v.y = 0; rouler(b);
+    b.possesseur = null; b.dernier = 4; b.dernierT = -9; b.garde = null;
+    let touche = false, mini = Infinity;
+    tirs++;
+    for (let i = 0; i < 120; i++) {
+      pas(m, [{ dx: 0, dz: 0, allure: 0 }, { dx: 0, dz: 0, allure: 0 }]);
+      if (b.dernier === 6 || m.evts.some((e: Any) => e.type === 'controle' && e.j === 6)) touche = true;
+      m.evts.length = 0;
+      // la distance du ballon à l'axe de la capsule qu'il pourrait traverser
+      let dd: number;
+      if (d.mode === 'sol') { const fx = Math.sin(d.cap), fz = Math.cos(d.cap); const u = Math.max(-BCo.sol[0], Math.min(BCo.sol[0], (b.p.x - d.p.x) * fx + (b.p.z - d.p.z) * fz)); dd = Math.hypot(b.p.x - d.p.x - fx * u, b.p.y - BCo.sol[1], b.p.z - d.p.z - fz * u) - BCo.sol[2]; }
+      else dd = Math.hypot(b.p.x - d.p.x, b.p.z - d.p.z) - (d.mode === 'releve' ? BCo.releve[2] : b.p.y < 0.9 ? BCo.jambes[2] : BCo.buste[2]);
+      mini = Math.min(mini, dd);
+    }
+    if (touche) contacts++;
+    if (mini < R - 0.03 && !touche) passages++;
+  }
+  verifier('Balle contre les corps', passages === 0 && contacts > 900, `${tirs} balles (debout, au sol, au relevé), ${contacts} arrêtées ou contrôlées par le corps, ${passages} passage(s) à travers`);
+}
+{
+  // la chute : la vitesse du fauché ne dépasse jamais sa vitesse d'avant le contact + 1 m/s, et ne remonte pas au sol
+  let pireExces = -Infinity, reaccel = 0, n = 0;
+  for (let g = 1; g <= 40; g++) {
+    const m: Any = creerMonde({ graine: g, humains: [true, true], aides: [0, 0], presents: [4, 6] });
+    demarrer(m, { intro: false });
+    const p = m.joueurs[4], t = m.joueurs[6];
+    p.p.x = 0; p.p.z = 6; p.cap = Math.PI; p.v.z = -(3.5 + (g % 5) * 0.6);
+    const b = m.balle; b.p.x = 0; b.p.z = 5.4; b.v.z = p.v.z - 0.6; rouler(b); b.possesseur = 4; b.dernier = 4; b.dernierT = 0;
+    t.p.x = 0.25 * ((g % 3) - 1); t.p.z = 8.8; t.cap = Math.PI; t.v.z = -5.5;
+    let lance = false, v0 = 0, sPrec = Infinity, auSol = false, nSol = 0;
+    for (let i = 0; i < 480; i++) {
+      const dx = b.p.x - t.p.x, dz = b.p.z - t.p.z, d = Math.hypot(dx, dz);
+      const act = !lance && d < 2.0 ? { type: 'tacle', glisse: true } : null;
+      if (act) lance = true;
+      const avant = Math.hypot(p.v.x, p.v.z), modeAvant = p.mode;
+      pas(m, [{ dx: 0, dz: -1, allure: 0.85, sprint: 0 }, { dx: dx / d, dz: dz / d, allure: 1, sprint: 0.4, action: act }]);
+      m.evts.length = 0;
+      const s = Math.hypot(p.v.x, p.v.z);
+      if ((p.mode === 'sol') && modeAvant !== 'sol') { v0 = avant; auSol = true; n++; nSol = 0; }
+      // (le premier pas au sol peut prendre jusqu'à + 0,5 m/s, la poussée de la chute ; ensuite, elle ne fait que baisser)
+      if (auSol && p.mode === 'sol') { pireExces = Math.max(pireExces, s - (v0 + 1)); if (++nSol > 2 && s > sPrec + 1e-9) reaccel++; sPrec = s; }
+    }
+  }
+  verifier('Chute bornée', n >= 25 && pireExces <= 1e-9 && reaccel === 0, `${n} chutes ; vitesse au plus ${pireExces <= 0 ? 'sous' : 'AU-DESSUS de'} celle d'avant le contact + 1 m/s (écart ${f2(pireExces)}) ; réaccélérations au sol ${reaccel}`);
+}
+{
+  // le demi-tour balle au pied : stick retourné à 6 m/s, la balle à moins de 1,5 m : il la garde (crochet) ; et la
+  // touche part du pied prévu
+  let garde = 0, n = 0;
+  const distPied: number[] = [];
+  for (let g = 1; g <= 20; g++) {
+    const m: Any = sceneConduite(g, false);
+    m.journal = (type: string, i: number) => { if (type === 'touche' && i === 4) distPied.push(Gst.piedProche(m.joueurs[4], m.balle, true).d); };
+    let crochet = false;
+    for (let i = 0; i < 360; i++) {
+      const retourne = i > 150;
+      pas(m, [{ dx: 0, dz: retourne ? 1 : -1, allure: 1, sprint: retourne ? 0.3 : 1 }, null]);
+      for (const e of m.evts) if (e.type === 'crochet') crochet = true;
+      m.evts.length = 0;
+    }
+    n++;
+    const j = m.joueurs[4], b = m.balle;
+    if (crochet && porteur(m) === j && Math.hypot(b.p.x - j.p.x, b.p.z - j.p.z) < 2.5 && j.v.z > 0.5) garde++;
+  }
+  const pmax = Math.max(...distPied);
+  verifier('Demi-tour balle au pied', garde / n >= 0.8 && pmax <= Cst.JEU.porteeTouche + 1e-9, `${garde}/${n} demi-tours gardent la balle (crochet) ; ${distPied.length} touches de conduite, pied prévu à ${f2(med(distPied))} m en médiane, ${f2(pmax)} m au plus`);
+}
+{
+  // la passe lobée : 13 m, un adversaire à 3 m sur la ligne ; elle passe au-dessus (sommet ≥ 2,5 m, angle ≥ 40°)
+  let ok = 0, n = 0, apexMin = Infinity, angMin = Infinity;
+  for (let g = 1; g <= 20; g++) {
+    const m: Any = creerMonde({ graine: g, humains: [true, true], aides: [0, 0], presents: [4, 2, 6] });
+    demarrer(m, { intro: false });
+    const j = m.joueurs[4], c = m.joueurs[2], o = m.joueurs[6];
+    j.p.x = 0; j.p.z = 4; j.cap = Math.PI; c.p.x = 0.5 * ((g % 3) - 1); c.p.z = 4 - 13; o.p.x = 0.2 * ((g % 3) - 1); o.p.z = 1; m.controle[1] = 6;
+    const b = m.balle; b.p.x = 0; b.p.z = 3.55; b.possesseur = 4; b.dernier = 4; b.dernierT = 0; m.controle[0] = 4;
+    demanderFrappe(m, j, { type: 'lob', p: 0.6, cible: 2 });
+    let parti = false, apex = 0, ang = 0, prisParO = false;
+    for (let i = 0; i < 360; i++) {
+      const vAvant = { ...b.v };
+      // (l'adversaire reste sur la ligne de passe : il ne la prend que si elle passe à sa portée)
+      pas(m, [{ dx: 0, dz: 0, allure: 0 }, { dx: 0, dz: 0, allure: 0 }]);
+      for (const e of m.evts) { if (e.type === 'passe' && !parti) { parti = true; ang = Math.atan2(b.v.y, Math.hypot(b.v.x, b.v.z)) * 180 / Math.PI; } if (e.type === 'controle' && e.j === 6) prisParO = true; }
+      m.evts.length = 0; void vAvant;
+      if (parti) apex = Math.max(apex, b.p.y);
+    }
+    if (!parti) continue;
+    n++; apexMin = Math.min(apexMin, apex); angMin = Math.min(angMin, ang);
+    if (!prisParO && apex >= 2.5 && ang >= 40) ok++;
+  }
+  verifier('Passe lobée', n >= 15 && ok === n, `${ok}/${n} lobs passent au-dessus de l'adversaire ; sommet ${f2(apexMin)} m au moins, angle de départ ${angMin.toFixed(0)}° au moins`);
+}
+{
+  // le gardien plonge avant que la balle ne passe : aucun plongeon décidé après la ligne, et quand la balle passe son
+  // plan, les mains sont déjà parties vers elle (0,2 m au moins, si elle passe à plus de 0,6 m) ; trop tard, il est
+  // battu sur ses appuis au lieu de plonger dans le vide
+  let tard = 0, n = 0, mainsPrete = 0;
+  for (let k = 0; k < 120; k++) {
+    const m: Any = creerMonde({ graine: 900 + k, humains: [true, false], aides: [0, 0], presents: [4, 5] });
+    demarrer(m, { intro: false });
+    const j = m.joueurs[4], g = m.joueurs[5];
+    const x0 = ((k % 5) - 2) * 1.5;
+    j.p.x = x0; j.p.z = -LB + 11.6; j.cap = Math.PI;
+    const b = m.balle; b.p.x = x0; b.p.z = -LB + 11; b.v.x = 0; b.v.z = 0; b.possesseur = 4; b.dernier = 4; b.dernierT = 0;
+    g.p.x = x0 * 0.12; g.p.z = -LB + 1; g.cap = 0; m.controle[0] = 4;
+    for (let i = 0; i < 30; i++) pas(m, [{ dx: 0, dz: 0, allure: 0 }, null]);
+    demanderFrappe(m, j, { type: 'frappe', p: 0.4 + (k % 4) * 0.15, x: (k % 2 ? 1 : -1) * (0.9 + (k % 3) * 0.2), y: 0.4 + (k % 3) * 0.5 });
+    let tPlonge = -1, tPlan = -1, mains0: Any = null, ecart = 0;
+    for (let i = 0; i < 300; i++) {
+      pas(m, [{ dx: 0, dz: 0, allure: 0 }, null]);
+      for (const e of m.evts) if (e.type === 'plongeon' && tPlonge < 0) { tPlonge = m.t; mains0 = mainsMonde(g, { x: 0, y: 0, z: 0 }); }
+      m.evts.length = 0;
+      if (tPlan < 0 && b.p.z <= g.p.z) { tPlan = m.t; if (mains0) { const h = mainsMonde(g, { x: 0, y: 0, z: 0 }); const besoin = b.p.x - mains0.x; ecart = Math.abs(besoin) < 0.6 ? 1 : ((h.x - mains0.x) * Math.sign(besoin)); } }
+      if (m.phase !== 'jeu') break;
+    }
+    if (tPlonge < 0) continue;
+    n++;
+    if (tPlan >= 0 && tPlonge > tPlan) tard++;
+    // (une balle arrêtée avant son plan : les mains y étaient)
+    if (tPlan < 0 || ecart >= 0.2) mainsPrete++;
+  }
+  verifier('Gardien à temps', n >= 15 && tard === 0 && mainsPrete / n >= 0.8, `${n} plongeons ; ${tard} décidé(s) après le passage de la balle ; mains déjà parties vers la balle (≥ 0,2 m) à son passage : ${mainsPrete}/${n}`);
+}
+{
+  // pendant le ralenti du but, les corps ne se fondent plus l'un dans l'autre ; et les entrées folles ne cassent rien
+  let longs = 0;
+  for (let g = 1; g <= (vite ? 6 : 20); g++) {
+    const duree = new Float64Array(100);
+    matchIA(g, 150, (m: Any) => {
+      if (m.phase !== 'but' && m.phase !== 'fin') return;
+      for (let a = 0; a < 10; a++) for (let c = a + 1; c < 10; c++) {
+        const A = m.joueurs[a], B = m.joueurs[c];
+        const pen = 2 * CORPS.rayon - Math.hypot(A.p.x - B.p.x, A.p.z - B.p.z);
+        const k = a * 10 + c;
+        duree[k] = pen > 0.08 && A.mode !== 'sol' && B.mode !== 'sol' ? duree[k] + PAS : 0;
+        if (duree[k] > 1 && duree[k] - PAS <= 1) longs++;
+      }
+    });
+  }
+  const m: Any = creerMonde({ graine: 3, humains: [true, false], aides: [1, 0] });
+  demarrer(m, { intro: false });
+  for (let i = 0; i < 600; i++) pas(m, [{ dx: NaN, dz: Infinity, allure: NaN, sprint: -Infinity }, null]);
+  const sain = m.joueurs.every((j: Any) => Number.isFinite(j.p.x + j.p.z + j.v.x + j.v.z)) && Number.isFinite(m.balle.p.x);
+  const bc: Any = creerBoucle(m); const pas0 = m.pas;
+  avancer(bc, NaN); const n1 = avancer(bc, 1 / 30);
+  verifier('But au ralenti et entrées folles', longs === 0 && sain && n1 === 4 && m.pas === pas0 + 4, `chevauchements de plus de 8 cm pendant plus de 1 s au but : ${longs} ; intention NaN/infinie : ${sain ? 'aucune NaN' : 'NaN'} ; après un dt NaN, 1/30 s fait ${n1} pas`);
+}
+
 // ─────────────────────────── reproductible ───────────────────────────
 {
   const journal = (g: number) => { const l: string[] = []; const m: Any = creerMonde({ graine: g, humains: [false, false], aides: [0, 0], journal: (t: string) => l.push(t) }); demarrer(m, { intro: false }); for (let i = 0; i < 6000; i++) pas(m); return empreinte(m) + ':' + l.length + ':' + l.join(',').length; };

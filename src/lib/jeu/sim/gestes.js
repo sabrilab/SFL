@@ -2,13 +2,15 @@
 //
 // La balle n'est jamais collée au pied : « avoir la balle » veut dire être le dernier à l'avoir touchée et pouvoir la
 // toucher de nouveau (balle.possesseur). Tout passe par des impulsions données quand le pied est à portée :
-//   · conduite : une touche tombe sur un appui de la foulée (phase φ, corps.js) quand la balle est devant le pied ;
+//   · conduite : une touche tombe sur un appui de la foulée (phase φ, corps.js) quand le pied prévu (piedLoco, la table
+//     des pieds du clip de course à cette phase) est à moins de 0,25 m du centre du ballon ;
 //     elle repart à v + Δv, Δv = √(2 a L(v)) pour qu'elle prenne au plus L(v) = 0,4 + 0,38 v mètres d'avance (0,9 m au
 //     trot lent, 3 m en sprint) avant que le roulement ne la ramène, dans la direction voulue à θ_max près de sa course
 //     (35° à l'arrêt, 12° en sprint), avec une erreur à graine qui grandit avec la vitesse, la pression et le
 //     déséquilibre. En sprint, la balle part à 2,5-4 m : un défenseur peut s'interposer. À l'arrêt, la semelle
 //     ramène la balle par petites touches ; en protégeant, la balle est gardée de l'autre côté du corps.
-//   · contrôle orienté : la qualité q baisse avec la vitesse d'arrivée, l'angle de rotation, la pression, le
+//   · contrôle orienté (à portée : 0,35 m du pied prévu, de la cuisse ou du buste ; une balle qui vient de changer de
+//     camp ne se reprend pas avant 0,25 s) : la qualité q baisse avec la vitesse d'arrivée, l'angle de rotation, la pression, le
 //     déséquilibre et la surface (pied, cuisse, poitrine, tête) ; la balle sortante mêle la sortie voulue (q) et le
 //     rebond sur la surface (1 − q). Une passe à 22 m/s prise de travers rebondit sur le pied.
 //   · passes et frappes : le geste (clip et rythme) est choisi pour que l'impact tombe dans 0,22 s, le joueur règle
@@ -17,7 +19,7 @@
 //     graine σ = 0,6° + 5° p² + 4° pression + 3° v/7,4 + 4° angle/90° ; l'aide (pouce, manette) corrige la
 //     direction d'une passe, jamais sa force.
 import { PAS, G, BALLON, JEU, CORPS, BUT_DL, BUT_H, butDe, sens, LB, BX, BZ } from './constantes.js';
-import { piedA, racineA, versMonde, lancerGeste, impactDe, libre, clamp, enrouler, duree } from './corps.js';
+import { piedA, piedLoco, racineA, versMonde, lancerGeste, impactDe, libre, clamp, enrouler, duree } from './corps.js';
 import { predire } from './ballon.js';
 import { CLIPS } from './clips.js';
 import { acos, atan2, cos, hypot, sin } from './maths.js';
@@ -25,7 +27,14 @@ import { acos, atan2, cos, hypot, sin } from './maths.js';
 const R = BALLON.R;
 // la frappe en course : vitesse moyenne de son root motion au rythme 1 (strike_run, 2,97 hanches en 1,3 s)
 const DEG = Math.PI / 180;
-const t1 = { x: 0, y: 0, z: 0 }, t2 = { x: 0, y: 0, z: 0 };
+const t1 = { x: 0, y: 0, z: 0 }, t2 = { x: 0, y: 0, z: 0 }, f0 = { x: 0, y: 0, z: 0 }, f1 = { x: 0, y: 0, z: 0 };
+
+/** La distance (au sol) du pied prévu le plus proche au centre du ballon, et ce pied (0 ou 1). */
+export function piedProche(j, b, balle) {
+  piedLoco(j, balle, 0, f0); piedLoco(j, balle, 1, f1);
+  const d0 = hypot(b.p.x - f0.x, b.p.z - f0.z), d1 = hypot(b.p.x - f1.x, b.p.z - f1.z);
+  return d0 <= d1 ? { d: d0, pied: 0 } : { d: d1, pied: 1 };
+}
 
 /** La balle roule sans glisser dans la direction de sa vitesse (rotation de roulement). */
 export function rouler(b) {
@@ -114,11 +123,13 @@ export function pasConduite(m, j, appui) {
     }
     return;
   }
-  // le pied qui arrive frappe la balle quelque part entre 0,05 et 0,75 m devant le corps ; hors appui, seulement si
-  // le joueur la rattrape et qu'elle va passer sous lui (le pied en l'air la prend au passage)
-  const portee = avant > 0.05 && avant < 0.75 + s * 0.03 && Math.abs(cote) < 0.45;
-  if (!portee) return;
-  const rattrape = avant < 0.32 && (j.v.x - b.v.x) * fx + (j.v.z - b.v.z) * fz > 0.3;
+  // la touche part du pied : le pied prévu (table du clip de course, à la phase de la foulée) doit être à moins de
+  // porteeTouche (0,25 m) du centre du ballon, devant le corps ; un appui qui tombe à portée, ou un pied en l'air qui
+  // la rattrape au passage
+  if (!(avant > 0.0 && avant < 1.2 && Math.abs(cote) < 0.5)) return;
+  const pp = piedProche(j, b, true);
+  if (pp.d > JEU.porteeTouche) return;
+  const rattrape = (j.v.x - b.v.x) * fx + (j.v.z - b.v.z) * fz > 0.3;
   if (!appui && !rattrape) return;
   // la balle file déjà assez devant : pas besoin de la toucher à cet appui
   const k = classe(s);
@@ -151,7 +162,7 @@ export function pasConduite(m, j, appui) {
 /**
  * Un joueur qui veut la balle et l'a à portée la contrôle (ou la rate). Renvoie vrai s'il l'a touchée.
  */
-export function pasControle(m, j) {
+export function pasControle(m, j, contact = false) {
   const b = m.balle;
   if (!libre(j) || b.garde != null) return false;
   if (b.dernier === j.i && m.t - b.dernierT < 0.3) return false;
@@ -160,12 +171,18 @@ export function pasControle(m, j) {
   // la balle d'un porteur qui la conduit de près : c'est l'affaire du tacle, pas d'un contrôle
   // (pour la lui prendre, il faut un tacle ; une balle poussée loin devant, elle, se prend)
   if (pos && pos !== j && pos.e !== j.e && hypot(pos.p.x - b.p.x, pos.p.z - b.p.z) < 0.85 && (pos.mode === 'loco' || pos.mode === 'frein' || pos.mode === 'pivot')) return false;
-  // une balle qui vient de changer de pied ne change pas de nouveau tout de suite
-  if (b.dernier != null && m.joueurs[b.dernier].e !== j.e && m.t - b.dernierT < 0.25 && dhMax(m, j) < 0.3) return false;
+  // une balle qui vient de changer de pied ne change pas de nouveau tout de suite (plus de possession en ping-pong)
+  if (b.dernier != null && m.joueurs[b.dernier].e !== j.e && m.t - b.dernierT < 0.25) return false;
   if (pos && pos !== j && pos.e === j.e && hypot(pos.p.x - b.p.x, pos.p.z - b.p.z) < 1.2) return false;
-  if (b.p.y > 2.1) return false;
-  const fx = j.p.x + sin(j.cap) * 0.22, fz = j.p.z + cos(j.cap) * 0.22;
-  const dh = hypot(b.p.x - fx, b.p.z - fz);
+  if (b.p.y > 2.0) return false;
+  // la portée se mesure depuis la surface qui touche : le pied prévu le plus proche, la cuisse (0,15 m devant le
+  // corps), le buste ou la tête (l'axe du corps)
+  let dh;
+  if (b.p.y < 0.35) dh = piedProche(j, b, false).d;
+  else if (b.p.y < 0.95) dh = hypot(b.p.x - j.p.x - sin(j.cap) * 0.15, b.p.z - j.p.z - cos(j.cap) * 0.15);
+  else dh = hypot(b.p.x - j.p.x, b.p.z - j.p.z);
+  // (contact : la balle vient de heurter ses jambes ou son buste, contacts.js ; il la contrôle de là, moins bien)
+  if (contact) dh = Math.min(dh, 0.3);
   if (dh > JEU.porteeControle) return false;
   const vrx = b.v.x - j.v.x, vry = b.v.y, vrz = b.v.z - j.v.z;
   const vin = hypot(vrx, vry, vrz);
@@ -183,14 +200,15 @@ export function pasControle(m, j) {
   const vs = sj < 0.8 ? 0.5 : sj + 1;
   const bh = hypot(b.v.x, b.v.z);
   const rot = bh > 0.5 ? Math.abs(enrouler(atan2(ux, uz) - atan2(b.v.x, b.v.z))) : 0;
-  let q = 1 - Math.max(0, vin - 7) / 20 - 0.35 * (rot / Math.PI) - 0.2 * pr - 0.3 * j.d - (surface !== 'pied' ? 0.1 : 0) + 0.15 * aide;
+  let q = (contact ? 1 - 0.15 * clamp((vin - 10) / 8, 0, 1) : 1) - Math.max(0, vin - 7) / 20 - 0.35 * (rot / Math.PI) - 0.2 * pr - 0.3 * j.d - (surface !== 'pied' ? 0.1 : 0) + 0.15 * aide;
   q = clamp(q, 0, 1);
   const rng = m.rng.touches;
   // le rebond sur la surface : la vitesse relative réfléchie (la normale fait face à la balle), amortie
   const ep = { pied: 0.35, cuisse: 0.45, poitrine: 0.3, tete: 0.6 }[surface];
   const bruit = (1 - q) * 0.25;
   const rfx = -vrx * ep + rng.normal() * bruit * vin * 0.3, rfz = -vrz * ep + rng.normal() * bruit * vin * 0.3;
-  const rfy = Math.abs(vry) * ep * 0.5 + (surface === 'pied' ? 0 : 0.4);
+  // (la cuisse ne relève presque plus la balle, la poitrine la laisse tomber : elle retombe sous la gravité)
+  const rfy = surface === 'poitrine' ? 0 : Math.abs(vry) * ep * 0.5 + (surface === 'cuisse' ? 0.15 : 0);
   let ox, oy, oz;
   if (surface === 'tete') {
     // une tête : la balle repart vers où il veut, à 0,55 de sa vitesse, un peu levée
@@ -210,12 +228,13 @@ export function pasControle(m, j) {
   j.toucheT = m.t;
   m.ev('controle', { j: j.i, q, vin, surface, possede, tir: !!etaitTir });
   // l'animation : un contrôle de la cuisse, de la poitrine ou de la tête se voit ; au pied, la course continue
+  // (au pied, presque arrêté devant une balle forte : l'amorti du clip receive, le pied qui recule avec la balle)
   if (surface === 'cuisse' || surface === 'poitrine') lancerGeste(j, 'knee', { depuis: 0.05, taux: 1.4, fin: duree('knee') * 0.85, type: 'controle' });
   else if (surface === 'tete') lancerGeste(j, 'header', { depuis: 0.4, taux: 1.8, fin: duree('header') * 0.75, type: 'controle' });
+  else if (sj < 2 && vin > 7 && possede) lancerGeste(j, 'receive', { depuis: 3 / (30 * duree('receive')), taux: 1.3, fin: 0.62, type: 'controle' });
   return true;
 }
 
-const dhMax = (m, j) => hypot(m.balle.v.x - j.v.x, m.balle.v.z - j.v.z);
 
 // ── passes et frappes ──
 /** Le partenaire dans la direction (dx, dz), au cône d'aide près ; sinon le meilleur devant. */
@@ -420,9 +439,31 @@ function lancer(m, j, spec, cible, effleure) {
     let sig = (1 + 3 * p * p + 3 * pr + 2 * (s / CORPS.vSprint)) * DEG * (1 - 0.5 * aide);
     h += rng.normal() * sig;
     if (spec.type === 'lob') {
-      const th = clamp(28 + 17 * (dist / 25), 28, 45) * DEG;
+      // un vrai lob : 42 à 55° selon la distance (65° au plus), un sommet d'au moins 2,5 m, et 2,3 m au-dessus de
+      // l'adversaire le plus proche sur la ligne (à moins de 5 m)
+      let th = clamp(42 + 13 * (dist / 25), 42, 55) * DEG;
       const voulu = dist * (0.8 + 0.4 * p);
-      const v0 = chercherLob(b, h, th, voulu);
+      let v0 = chercherLob(b, h, th, voulu);
+      // l'adversaire le plus proche sur la ligne, à moins de 5 m : la balle doit y passer à 2,3 m au moins
+      let xo = 0;
+      for (const o of m.joueurs) {
+        if (o.absent || o.e === j.e || o.mode === 'sol') continue;
+        const rx = o.p.x - b.p.x, rz = o.p.z - b.p.z, along = rx * sin(h) + rz * cos(h), lat = Math.abs(rx * cos(h) - rz * sin(h));
+        if (along > 0.5 && along < 5 && lat < 1.2 && (!xo || along < xo)) xo = along;
+      }
+      for (let k = 0; k < 6; k++) {
+        // (le sommet et la hauteur au-dessus de l'adversaire sont prédits avec l'intégrateur : traînée et rétro-effet)
+        let q = essai(b, sin(h) * v0 * cos(th), v0 * sin(th), cos(h) * v0 * cos(th), { x: -cos(h) * 20, y: 0, z: sin(h) * 20 });
+        const sommet = predire(q, (x) => x.v.y <= 0, 3);
+        let haut = !sommet || sommet.p.y >= 2.5;
+        if (haut && xo) {
+          q = essai(b, sin(h) * v0 * cos(th), v0 * sin(th), cos(h) * v0 * cos(th), { x: -cos(h) * 20, y: 0, z: sin(h) * 20 });
+          const r = predire(q, (x) => hypot(x.p.x - b.p.x, x.p.z - b.p.z) >= xo, 2);
+          haut = !r || r.p.y >= 2.3;
+        }
+        if (haut || th >= 65 * DEG) break;
+        th = Math.min(65 * DEG, th + 4 * DEG); v0 = chercherLob(b, h, th, voulu);
+      }
       vx = sin(h) * v0 * cos(th); vz = cos(h) * v0 * cos(th); vy = v0 * sin(th);
       w = { x: -cos(h) * 20, y: 0, z: sin(h) * 20 }; // rétro-effet
     } else {

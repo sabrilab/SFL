@@ -1,8 +1,10 @@
 // Les manettes du jeu Bola (bola-app#23) : la Gamepad API, une ou deux manettes en local.
 //
 //   · Lecture : navigator.getGamepads() une fois par image (lire), avant les pas de simulation. Chaque manette a sa
-//     place, retrouvée par son index et son id ; celles en mapping « standard » sont lues telles quelles, l'ancienne
-//     DualShock 4 de Firefox sous Linux (054c-05c4, 054c-09cc, sans mapping) passe par une table de secours ; les
+//     place, retrouvée par son index et son id (ou par son id seul si elle revient sous un autre index : elle retrouve
+//     son équipe), oubliée une minute après son débranchement ; celles en mapping « standard » sont lues telles
+//     quelles, l'ancienne DualShock 4 (054c-05c4, 054c-09cc) et la Xbox 360 / One (pilote xpad) de Firefox sous Linux,
+//     sans mapping, passent par une table de secours (leurs gâchettes ne sont lues qu'une fois vues au repos) ; les
 //     autres sont « non reconnues » : l'écran Manettes les montre barrées, le jeu les ignore.
 //   · Marque : 054c, PlayStation, DualSense, DualShock, « Wireless Controller » → PlayStation (✕ ○ □ △) ; 045e, Xbox,
 //     XInput → Xbox (A B X Y) ; les autres prennent les icônes Xbox.
@@ -24,6 +26,9 @@ import { creerCommande, lireManette, intentionDe, oublier, BOUTONS as K } from '
 const RE_PS = /054c|playstation|dualsense|dualshock|wireless controller/i;
 const RE_XBOX = /045e|xbox|xinput/i;
 const RE_DS4_BRUT = /054c.*(05c4|09cc)|(05c4|09cc).*054c/i;
+// la Xbox 360 / One sans mapping (pilote xpad de Linux, sous Firefox) : A B X Y LB RB Back Start Guide L3 R3 ; axes
+// LX LY LT RX RY RT croixX croixY
+const RE_XPAD = /045e|xbox|x-box|xinput|xpad/i;
 
 /** La marque d'une manette d'après son id. */
 export function marqueDe(id = '') {
@@ -33,8 +38,20 @@ export function marqueDe(id = '') {
   return 'generique';
 }
 
-/** L'état rangé dans l'ordre standard, ou null si la manette n'est pas reconnue. */
-export function normaliser(g, out) {
+/**
+ * Une gâchette lue sur un axe (−1 au repos, 1 enfoncée), seulement une fois qu'on l'a vue au repos : certains
+ * navigateurs rendent 0 avant le premier appui, ce qui la ferait lire à moitié enfoncée (protéger et contenir tenus,
+ * sprint à 46 %). vu : l'état de la manette (vu.repos[k] passe à vrai au premier −1).
+ */
+function gachetteAxe(x, vu, k) {
+  if (x == null) return 0;
+  if (!vu) return x <= -0.9 ? 0 : (x + 1) / 2;
+  if (x <= -0.9) vu.repos[k] = true;
+  return vu.repos[k] ? (x + 1) / 2 : 0;
+}
+
+/** L'état rangé dans l'ordre standard, ou null si la manette n'est pas reconnue. vu : { repos: [] } par manette. */
+export function normaliser(g, out, vu = null) {
   const val = (x) => (x == null ? 0 : typeof x === 'number' ? x : x.value ?? (x.pressed ? 1 : 0));
   if (g.mapping === 'standard') {
     for (let i = 0; i < 17; i++) out.b[i] = val(g.buttons[i]);
@@ -46,11 +63,24 @@ export function normaliser(g, out) {
     const bt = g.buttons, a = g.axes;
     const brut = [0, 1, 3, 2, 4, 5, -1, -1, 8, 9, 11, 12];
     for (let i = 0; i < 12; i++) out.b[i] = brut[i] >= 0 ? val(bt[brut[i]]) : 0;
-    out.b[6] = Math.max(val(bt[6]), ((a[2] ?? -1) + 1) / 2);
-    out.b[7] = Math.max(val(bt[7]), ((a[5] ?? -1) + 1) / 2);
+    out.b[6] = Math.max(val(bt[6]), gachetteAxe(a[2], vu, 0));
+    out.b[7] = Math.max(val(bt[7]), gachetteAxe(a[5], vu, 1));
     const hx = a[6] ?? 0, hy = a[7] ?? 0;
     out.b[12] = hy < -0.5 ? 1 : 0; out.b[13] = hy > 0.5 ? 1 : 0; out.b[14] = hx < -0.5 ? 1 : 0; out.b[15] = hx > 0.5 ? 1 : 0;
     out.b[16] = val(bt[10]);
+    out.ax[0] = a[0] ?? 0; out.ax[1] = a[1] ?? 0; out.ax[2] = a[3] ?? 0; out.ax[3] = a[4] ?? 0;
+    return out;
+  }
+  if (RE_XPAD.test(g.id ?? '') && (g.buttons?.length ?? 0) >= 11 && (g.axes?.length ?? 0) >= 6) {
+    const bt = g.buttons, a = g.axes;
+    // A B X Y LB RB (LT RT sur les axes) Back Start L3 R3 (croix sur les axes) Guide
+    const brut = [0, 1, 2, 3, 4, 5, -1, -1, 6, 7, 9, 10];
+    for (let i = 0; i < 12; i++) out.b[i] = brut[i] >= 0 ? val(bt[brut[i]]) : 0;
+    out.b[6] = gachetteAxe(a[2], vu, 0);
+    out.b[7] = gachetteAxe(a[5], vu, 1);
+    const hx = a[6] ?? 0, hy = a[7] ?? 0;
+    out.b[12] = hy < -0.5 ? 1 : 0; out.b[13] = hy > 0.5 ? 1 : 0; out.b[14] = hx < -0.5 ? 1 : 0; out.b[15] = hx > 0.5 ? 1 : 0;
+    out.b[16] = val(bt[8]);
     out.ax[0] = a[0] ?? 0; out.ax[1] = a[1] ?? 0; out.ax[2] = a[3] ?? 0; out.ax[3] = a[4] ?? 0;
     return out;
   }
@@ -81,13 +111,18 @@ export function creerManettes({ versJeu = (sx, sy) => ({ x: -sy, z: -sx }) } = {
     try { return nav?.getGamepads ? Array.from(nav.getGamepads() ?? []) : []; } catch { return []; }
   }
 
-  function place(g) {
+  const minuteurs = new Set();
+  function place(g, t) {
     let p = places.find((q) => q.index === g.index && q.id === g.id);
+    // (rebranchée sous un autre index : on retrouve sa place, et son équipe d'avant)
+    if (!p) p = places.find((q) => !q.branchee && q.id === g.id && !places.some((r) => r !== q && r.branchee && r.index === g.index && r.id === g.id));
+    if (p && p.index !== g.index) { p.index = g.index; p.cle = `${g.index}:${g.id}`; changer(); }
     if (!p) {
       p = {
         cle: `${g.index}:${g.id}`, index: g.index, id: g.id, marque: marqueDe(g.id), reconnue: false, branchee: true,
         equipe: null, ancienne: null, cmd: creerCommande(),
         etat: { b: new Float64Array(17), ax: new Float64Array(4) }, prec: new Float64Array(17), vu: false, gx: 0, choc: 0,
+        repos: { repos: [false, false] }, debrancheT: t,
       };
       places.push(p);
       changer();
@@ -116,10 +151,10 @@ export function creerManettes({ versJeu = (sx, sy) => ({ x: -sy, z: -sx }) } = {
     const vues = new Set();
     for (const g of pads) {
       if (!g || g.connected === false) continue;
-      const p = place(g);
+      const p = place(g, t);
       vues.add(p);
       if (!p.branchee) { p.branchee = true; changer(); }
-      const ok = !!normaliser(g, p.etat);
+      const ok = !!normaliser(g, p.etat, p.repos);
       if (ok !== p.reconnue) { p.reconnue = ok; changer(); }
       if (!ok) continue;
       const b = p.etat.b;
@@ -146,11 +181,13 @@ export function creerManettes({ versJeu = (sx, sy) => ({ x: -sy, z: -sx }) } = {
     }
     for (const p of places) {
       if (vues.has(p) || !p.branchee) continue;
-      p.branchee = false; p.vu = false;
+      p.branchee = false; p.vu = false; p.debrancheT = t;
       if (p.equipe != null) { p.ancienne = p.equipe; p.equipe = null; }
       oublier(p.cmd);
       changer();
     }
+    // (une place débranchée depuis plus d'une minute est oubliée)
+    for (let i = places.length - 1; i >= 0; i--) if (!places[i].branchee && t - places[i].debrancheT > 60) places.splice(i, 1);
   }
 
   /** La manette de chaque équipe (null = l'IA, ou le pouce pour les Noirs). */
@@ -171,7 +208,7 @@ export function creerManettes({ versJeu = (sx, sy) => ({ x: -sy, z: -sx }) } = {
         const r = a.playEffect('dual-rumble', { startDelay: 0, duration: Math.round(ef.duree), strongMagnitude: Math.min(1, ef.fort), weakMagnitude: Math.min(1, ef.faible) });
         r?.catch?.(() => {});
       } else g.hapticActuators?.[0]?.pulse?.(Math.min(1, Math.max(ef.fort, ef.faible)), Math.round(ef.duree))?.catch?.(() => {});
-      if (ef.puis) setTimeout(() => vibrerPlace(p, { ...ef.puis, puis: null }), ef.duree + ef.puis.pause);
+      if (ef.puis) { const h = setTimeout(() => { minuteurs.delete(h); vibrerPlace(p, { ...ef.puis, puis: null }); }, ef.duree + ef.puis.pause); minuteurs.add(h); }
     } catch { /* une manette qui ne sait pas vibrer : rien */ }
   }
 
@@ -179,7 +216,7 @@ export function creerManettes({ versJeu = (sx, sy) => ({ x: -sy, z: -sx }) } = {
     if (!instant) {
       instant = {
         version, mode,
-        pads: places.filter((p) => p.branchee).map((p) => ({ cle: p.cle, marque: p.marque, reconnue: p.reconnue, equipe: p.equipe, choc: p.choc })),
+        pads: places.filter((p) => p.branchee).map((p) => ({ cle: p.cle, marque: p.marque, reconnue: p.reconnue, equipe: p.equipe, choc: p.choc, numero: p.index + 1 })),
       };
     }
     return instant;
@@ -198,6 +235,8 @@ export function creerManettes({ versJeu = (sx, sy) => ({ x: -sy, z: -sx }) } = {
     reconnues: () => places.filter((p) => p.branchee && p.reconnue).length,
     abonner: (f) => { abonnes.add(f); return () => abonnes.delete(f); },
     instantane,
-    detruire: () => { if (typeof window !== 'undefined') { removeEventListener('gamepadconnected', onCo); removeEventListener('gamepaddisconnected', onCo); } abonnes.clear(); },
+    /** une manette rangée dans une équipe est-elle branchée ? (sinon la pause ne peut pas être levée par elle) */
+    rangees: () => places.filter((p) => p.branchee && p.reconnue && p.equipe != null).length,
+    detruire: () => { if (typeof window !== 'undefined') { removeEventListener('gamepadconnected', onCo); removeEventListener('gamepaddisconnected', onCo); } abonnes.clear(); for (const h of minuteurs) clearTimeout(h); minuteurs.clear(); },
   });
 }

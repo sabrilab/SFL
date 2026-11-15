@@ -142,14 +142,17 @@ function appui(P: Any, bouton: number, n: number, autres?: (e: Any[]) => void) {
   for (let i = 0; i < 10; i++) P.image((e) => { e[0].ax[0] = 1; e[0].ax[3] = i < 5 ? -1 : 0; });
   P.images(40, (e) => { e[0].ax[0] = 1; });
   const crochet = evt('crochet');
-  engagement(P.m, 0); P.m.phase = 'jeu';
+  // (depuis que la balle ne traverse plus les corps, l'attaquant blanc placé devant au coup d'envoi la bloque : on
+  // l'écarte, le geste se joue balle au pied, sans adversaire sur la route)
+  const ecarter = () => { const o = P.m.joueurs[9]; o.p.x = 7; o.p.z = 6; };
+  engagement(P.m, 0); P.m.phase = 'jeu'; ecarter();
   P.images(40, (e) => { e[0].ax[0] = 1; });
   // demi-cercle : du bas, par la droite, vers le haut
   for (let i = 0; i <= 16; i++) { const a = -Math.PI / 2 + (Math.PI * i) / 16; P.image((e) => { e[0].ax[0] = 1; e[0].ax[2] = Math.cos(a); e[0].ax[3] = -Math.sin(a); }); }
   P.images(4, (e) => { e[0].ax[0] = 1; e[0].ax[2] = 0; e[0].ax[3] = 0; });
   const roulette = evt('roulette');
   P.images(120);
-  engagement(P.m, 0); P.m.phase = 'jeu';
+  engagement(P.m, 0); P.m.phase = 'jeu'; ecarter();
   P.images(60, (e) => { e[0].ax[0] = 1; });
   for (let i = 0; i < 4; i++) P.image((e) => { e[0].ax[0] = 1; e[0].b[K.R3] = i < 2 ? 1 : 0; });
   const semelle = evt('semelle');
@@ -242,7 +245,44 @@ function deuxManettes(graine: number) {
   const m: Any = creerMonde({ graine: 7, duree: 150, humains: [false, false], aides: [0, 0] });
   demarrer(m, { intro: false });
   for (let i = 0; i < 18000; i++) { pas(m); m.evts.length = 0; }
-  verifier('IA contre IA inchangée (graine 7)', empreinte(m) === 'eef79bf1', `${empreinte(m)} (attendu eef79bf1, celle du lot Physique)`);
+  // (la référence de tools/jeu-banc.ts --graine=7 après les correctifs du contrôle : balle contre les corps, chutes,
+  // demi-tour, gardien ; les manettes ne la changent pas)
+  verifier('IA contre IA inchangée (graine 7)', empreinte(m) === 'c43e6a9a', `${empreinte(m)} (attendu c43e6a9a, celle du banc physique)`);
+}
+
+// ── les correctifs du contrôle : gâchettes vues au repos, Xbox sous Linux, manette rebranchée sous un autre index ──
+{
+  const btn = (n: number, on: number[]) => Array.from({ length: n }, (_, i) => ({ pressed: on.includes(i), value: on.includes(i) ? 1 : 0 }));
+  const ds4 = '054c-05c4-Sony Computer Entertainment Wireless Controller';
+  const vu = { repos: [false, false] };
+  const a0 = normaliser({ id: ds4, mapping: '', buttons: btn(13, []), axes: [0, 0, 0, 0, 0, 0, 0, 0] }, pad(), vu);
+  const g0 = a0.b[6], d0 = a0.b[7];
+  normaliser({ id: ds4, mapping: '', buttons: btn(13, []), axes: [0, 0, -1, 0, 0, -1, 0, 0] }, pad(), vu);
+  const a2 = normaliser({ id: ds4, mapping: '', buttons: btn(13, []), axes: [0, 0, 1, 0, 0, 0, 0, 0] }, pad(), vu);
+  verifier('gâchettes DS4 à 0 avant le premier appui', g0 === 0 && d0 === 0 && a2.b[6] === 1 && Math.abs(a2.b[7] - 0.5) < 1e-9, `axes à 0 au départ : L2 ${f2(g0)}, R2 ${f2(d0)} ; vues au repos puis enfoncées : L2 ${f2(a2.b[6])}, R2 ${f2(a2.b[7])}`);
+  const x360 = '045e-028e-Microsoft X-Box 360 pad';
+  const x = normaliser({ id: x360, mapping: '', buttons: btn(11, [0, 7]), axes: [0.5, 0, -1, 0, 0, -1, 0, 1] }, pad(), { repos: [false, false] });
+  verifier('Xbox 360 sans mapping (Linux)', !!x && x.b[0] === 1 && x.b[9] === 1 && x.b[13] === 1 && x.ax[0] === 0.5 && x.b[6] === 0, x ? `reconnue : A ${x.b[0]}, Menu ${x.b[9]}, croix bas ${x.b[13]}, LX ${f2(x.ax[0])}, LT ${f2(x.b[6])}` : 'non reconnue');
+  // rebranchée sous un autre index : elle retrouve son équipe d'avant (les Blancs), pas la première libre
+  const pads: Any[] = [];
+  const g = (index: number, id: string, on: number[] = []) => ({ index, id, connected: true, mapping: 'standard', buttons: btn(17, on), axes: [0, 0, 0, 0] });
+  Object.defineProperty(globalThis, 'navigator', { value: { getGamepads: () => pads }, configurable: true, writable: true });
+  const M = Man.creerManettes({ versJeu });
+  const xb = 'Xbox Wireless Controller (STANDARD GAMEPAD Vendor: 045e Product: 0b13)', ps = 'DualSense Wireless Controller (STANDARD GAMEPAD Vendor: 054c Product: 0ce6)';
+  M.mode('salon');
+  pads[0] = g(0, xb); pads[1] = g(1, ps); M.lire(0, null);
+  pads[0] = g(0, xb, [0]); pads[1] = g(1, ps, [0]); M.lire(0.02, null); // A / ✕ : la Xbox chez les Noirs, la DualSense chez les Blancs
+  pads[0] = g(0, xb); pads[1] = g(1, ps); M.lire(0.04, null);
+  const avant = M.equipes().map((p: Any) => p?.marque ?? null).join('/');
+  const m2: Any = creerMonde({ graine: 3, humains: [true, true], aides: [0.5, 0.5] }); demarrer(m2, { intro: false });
+  M.mode('match');
+  pads.length = 1; M.lire(1, m2);                                    // la DualSense se débranche
+  pads[1] = undefined; pads[2] = g(2, ps); M.lire(2, m2);             // elle revient sous l'index 2
+  pads[2] = g(2, ps, [0]); M.lire(2.02, m2);                          // ✕ pour rejoindre
+  const apres = M.equipes().map((p: Any) => p?.marque ?? null).join('/');
+  const nPlaces = M.instantane().pads.length;
+  M.detruire();
+  verifier('manette rebranchée sous un autre index', avant === 'xbox/playstation' && apres === 'xbox/playstation' && nPlaces === 2, `avant ${avant}, après ${apres} ; ${nPlaces} places branchées`);
 }
 
 console.log(echecs ? `\n${echecs} contrôle(s) en échec` : '\nTout est vert.');

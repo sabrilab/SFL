@@ -5,7 +5,7 @@
 // Ses décisions reprennent celles d'avant (placement par formation, chasseur et couvreur, porteur qui va au but,
 // passes, tirs, tacles), avec trois changements : le chasseur est celui qui arrive le premier à la balle (temps
 // d'arrivée, élan compris) ; le hasard vient de la graine (flux « ia ») ; le couvreur contient (pas chassés face au
-// porteur) au lieu de foncer.
+// porteur) au lieu de foncer. Deux coéquipiers ne se collent plus (ecarterCoequipiers : 0,75 m au moins).
 import { PAS, CORPS as C, FORMATION, LB, BX, BZ, BUT_DL, butDe, sens } from './constantes.js';
 import { clamp, libre } from './corps.js';
 import { porteur, choisirPartenaire, adversaireProche } from './gestes.js';
@@ -125,8 +125,16 @@ export function pasIA(m, j) {
     // une passe arrive : à sa rencontre
     cx = b.p.x + b.v.x * 0.3; cz = b.p.z + b.v.z * 0.3; vmax = 6; it.vaBalle = true;
   }
-  cx = clamp(cx, -BX + 0.5, BX - 0.5); cz = clamp(cz, -BZ + 0.6, BZ - 0.6);
+  // (le chasseur va jusqu'au panneau : une balle collée au panneau du fond se joue aussi)
+  const bord = it.vaBalle ? 0.38 : 0.5;
+  cx = clamp(cx, -BX + bord, BX - bord); cz = clamp(cz, -BZ + bord + 0.1 * (bord === 0.5 ? 1 : 0), BZ - bord - 0.1 * (bord === 0.5 ? 1 : 0));
   aller(j, it, cx, cz, vmax);
+  // tout près de la balle, il va dessus (au lieu de s'arrêter à côté) : son pied doit l'atteindre
+  if (it.vaBalle) {
+    const dx = b.p.x - j.p.x, dz = b.p.z - j.p.z, d = hypot(dx, dz);
+    if (d < 0.9 && d > 1e-6) { it.dx = dx / d; it.dz = dz / d; it.allure = Math.max(it.allure, 0.35); }
+  }
+  ecarterCoequipiers(m, j, it);
   // le tacle, sur le porteur d'en face
   if (p && p.e !== j.e && j.essai <= 0) {
     const d = hypot(p.p.x - j.p.x, p.p.z - j.p.z);
@@ -142,6 +150,27 @@ export function pasIA(m, j) {
       else if (d < 1.0 && rng.u() < 0.3) it.charge = true;
     }
   }
+}
+
+/**
+ * Deux coéquipiers ne se collent pas : sous 1,1 m l'un de l'autre (0,75 m au moins entre les centres), l'intention
+ * s'écarte de l'autre, d'autant plus qu'ils sont près (le chasseur, qui va à la balle, s'écarte moins).
+ */
+export function ecarterCoequipiers(m, j, it) {
+  let rx = 0, rz = 0;
+  for (const o of m.joueurs) {
+    if (o === j || o.absent || o.e !== j.e || o.mode === 'sol') continue;
+    const dx = j.p.x - o.p.x, dz = j.p.z - o.p.z, d = hypot(dx, dz);
+    if (d > 1.1 || d < 1e-6) continue;
+    const w = (1.1 - d) / (1.1 - 0.75 * 0.5);
+    rx += (dx / d) * w; rz += (dz / d) * w;
+  }
+  if (!(rx || rz)) return;
+  const k = it.vaBalle ? 0.6 : 1.5;
+  const vx = it.dx * it.allure + rx * k, vz = it.dz * it.allure + rz * k, L = hypot(vx, vz);
+  if (L < 0.02) return;
+  it.dx = vx / L; it.dz = vz / L;
+  it.allure = clamp(Math.max(it.allure, Math.min(0.6, L)), 0, 1);
 }
 
 /** Aide de conduite (IA et humains) : la course se règle sur la balle qui file devant, pour la rattraper. */

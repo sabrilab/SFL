@@ -15,18 +15,19 @@
 // roulette. Pour l'IA, rien ne change : l'IA contre l'IA garde la même empreinte.
 //
 // Ordre d'un pas de jeu : main au bon joueur → intentions (humains, IA, gardiens) → gestes demandés → corps
-// (locomotion, gestes à root motion) → frappes et tacles en cours → contacts entre corps → balle (conduite, contrôle,
-// gardiens, intégration, but) → horloge. Le monde publie la liste des événements du pas (ev) pour le rendu, le son et
+// (locomotion, gestes à root motion ; un demi-tour balle au pied passe par le crochet) → frappes et tacles en cours →
+// contacts entre corps → balle (conduite, contrôle, intégration, corps qui la bloquent, gardiens, but) → horloge.
+// Pendant le but et la fin, les corps se démêlent aussi. Une intention NaN ou infinie est remise à zéro à l'entrée. Le monde publie la liste des événements du pas (ev) pour le rendu, le son et
 // les vibrations ; la simulation n'en dépend pas.
 import { PAS, JEU, ROLES, ENGAGEMENT, BX, BZ, LB, butDe, sens, BALLON } from './constantes.js';
 import { creerHasard } from './hasard.js';
 import { creerCorps, pasCorps, libre, lancerGeste, clamp } from './corps.js';
 import { creerBalle, pasBalle, antiBlocage } from './ballon.js';
 import { pasConduite, pasControle, demanderFrappe, pasDemande, pasFrappe, porteur } from './gestes.js';
-import { pasCorpsACorps, demanderTacle, pasTacle, desequilibrer } from './contacts.js';
+import { pasCorpsACorps, demanderTacle, pasTacle, desequilibrer, demeler, balleCorps } from './contacts.js';
 import { pasGardien, pasCorpsGardien, contactGardien, tenirBalle } from './gardien.js';
 import { pasIA, intentionVide, conduire } from './ia.js';
-import { atan2, cos, hypot, sin } from './maths.js';
+import { acos, atan2, cos, hypot, sin } from './maths.js';
 
 /**
  * Crée un match. humains : [bool, bool] (une équipe jouée par un humain) ; aides : [aide0, aide1] (1 = pouce,
@@ -160,12 +161,14 @@ function presser(m, j) {
 }
 
 /** Copie l'intention d'un humain sur le joueur qu'il joue (les actions sont consommées une fois). */
+const fini = (x) => (Number.isFinite(x) ? x : 0);
 function copierIntention(j, src) {
   const it = j.int;
-  it.dx = src.dx ?? 0; it.dz = src.dz ?? 0;
+  // (une entrée folle, NaN ou infinie, ne doit jamais entrer dans la simulation : elle contaminerait les dix joueurs)
+  it.dx = fini(src.dx); it.dz = fini(src.dz);
   const L = hypot(it.dx, it.dz);
-  if (L > 1e-6) { it.dx /= L; it.dz /= L; }
-  it.allure = clamp(src.allure ?? 0, 0, 1); it.sprint = clamp(src.sprint ?? 0, 0, 1);
+  if (L > 1e-6 && Number.isFinite(L)) { it.dx /= L; it.dz /= L; } else { it.dx = 0; it.dz = 0; }
+  it.allure = clamp(fini(src.allure), 0, 1); it.sprint = clamp(fini(src.sprint), 0, 1);
   it.regard = src.regard ?? null; it.contenir = !!src.contenir; it.protege = !!src.protege; it.charge = !!src.charge; it.vaBalle = true;
   it.action = src.action ?? null;
 }
@@ -203,13 +206,13 @@ function roulette(m, j, dx, dz) {
  * 100° de sa course, freine et vire très court sur ses appuis (sim/corps.js, crochetT) ; le défenseur lancé devant
  * lui est pris à contre-pied un instant.
  */
-function crochet(m, j, dx, dz) {
+function crochet(m, j, dx, dz, angMax = 100) {
   const b = m.balle;
   if (!libre(j) || porteur(m) !== j || b.p.y > 0.4 || hypot(b.p.x - j.p.x, b.p.z - j.p.z) > 1.0) return;
   const L = hypot(dx, dz) || 1, ux = dx / L, uz = dz / L;
   const fx = sin(j.cap), fz = cos(j.cap);
   const cote = Math.sign(fz * ux - fx * uz) || 1; // > 0 : à gauche du cap
-  const ang = clamp(Math.acos(clamp(fx * ux + fz * uz, -1, 1)), (45 * Math.PI) / 180, (100 * Math.PI) / 180);
+  const ang = clamp(acos(clamp(fx * ux + fz * uz, -1, 1)), (45 * Math.PI) / 180, (angMax * Math.PI) / 180);
   const h = j.cap + cote * ang;
   const s = hypot(j.v.x, j.v.z);
   const vb = clamp(1.4 + 0.5 * s, 2.2, 4.2);
@@ -238,6 +241,36 @@ function semelle(m, j) {
   j.toucheT = m.t;
   lancerGeste(j, 'stop', { rm: true, echelle: clamp(s / 4, 0.3, 1.2), type: 'semelle', fin: 0.7 });
   m.ev('semelle', { j: j.i });
+}
+
+/**
+ * Le demi-tour balle au pied : un porteur lancé qui demande plus de 120° avec la balle à moins de 2,5 m va d'abord la
+ * chercher (0,6 s au plus, sans freiner), puis la ramène par un crochet dès qu'elle est à 1 m (la balle part dans le
+ * nouveau sens, il vire sur ses appuis), au lieu de freiner pendant qu'elle file. S'il freine quand même (balle trop
+ * loin), la balle n'est plus à lui dès qu'elle est à 1,6 m : l'anneau ne ment pas.
+ */
+function demiTour(m) {
+  const p = porteur(m), b = m.balle;
+  if (!p || p.gardien || !libre(p)) return;
+  const it = p.int, s = hypot(p.v.x, p.v.z);
+  const d = hypot(b.p.x - p.p.x, b.p.z - p.p.z);
+  if (p.mode === 'frein' && d > 1.6) { b.possesseur = null; return; }
+  // (un demi-tour déjà engagé : il va d'abord chercher la balle, 0,6 s au plus, puis la ramène)
+  const engage = p.demiTour != null && m.t - p.demiTour.t < 0.6;
+  if (!engage) p.demiTour = null;
+  if (p.crochetT > 0 || b.p.y > 0.4) return;
+  if (!engage) {
+    if (s < 2 || !(it.dx || it.dz) || it.allure < 0.3 || m.t - (p.toucheT ?? -9) < 0.2) return;
+    const c = (it.dx * p.v.x + it.dz * p.v.z) / s;
+    if (c > cos((120 * Math.PI) / 180) || d > 2.5) return;
+    p.demiTour = { t: m.t, dx: it.dx, dz: it.dz };
+  }
+  const D = p.demiTour;
+  // (la semelle tirée en arrière : la balle repart jusqu'à 170° de la course, dans le sens du stick)
+  if (d <= 1.0) { crochet(m, p, D.dx, D.dz, 170); p.demiTour = null; return; }
+  // la balle file encore devant : il la rattrape (la course continue vers elle, sans freiner)
+  const rx = b.p.x + b.v.x * 0.1 - p.p.x, rz = b.p.z + b.v.z * 0.1 - p.p.z, L = hypot(rx, rz) || 1;
+  it.dx = rx / L; it.dz = rz / L; it.allure = 1; it.sprint = Math.max(it.sprint, 0.6);
 }
 
 /** Pendant la roulette, la balle suit la semelle par petites touches. */
@@ -295,8 +328,12 @@ export function pas(m, entrees = null) {
     return;
   }
   if (m.phase === 'but' || m.phase === 'fin') {
-    for (const j of m.joueurs) { intentionVide(j.int); j.int.regard = b.p; pasCorps(j, PAS, false); borner(j); }
+    for (const j of m.joueurs) { intentionVide(j.int); j.int.regard = b.p; pasCorps(j, PAS, false); }
+    // (pendant le ralenti du but et la fin, les corps se démêlent aussi : personne ne se fond dans un autre)
+    demeler(m);
+    for (const j of m.joueurs) borner(j);
     pasBalle(b, null);
+    balleCorps(m);
     if (m.phase === 'but') {
       const avant = m.phaseT;
       m.phaseT -= PAS;
@@ -334,6 +371,7 @@ export function pas(m, entrees = null) {
     } else { pasIA(m, j); j.aide = 0; }
   }
   for (const j of m.joueurs) if (!j.absent) { agir(m, j); pasDemande(m, j); }
+  demiTour(m);
   const p = porteur(m);
   for (let i = 0; i < m.joueurs.length; i++) {
     const j = m.joueurs[i];
@@ -372,6 +410,8 @@ export function pas(m, entrees = null) {
     }
     const p0 = m._p0; p0.x = b.p.x; p0.y = b.p.y; p0.z = b.p.z;
     const marque = pasBalle(b, (type, f) => { if (type === 'poteau') m.ev('poteau', { force: f }); else if (type === 'panneau' && f > 6) m.ev('panneau', { force: f }); });
+    // personne n'est traversé : jambes, buste, corps au sol (contacts.js)
+    balleCorps(m);
     for (const k of m.joueurs) if (k.gardien && !k.absent && contactGardien(m, k, p0)) break;
     if (antiBlocage(b)) { m.stats.antiBlocages++; m.ev('relanceCoin', {}); }
     melee(m);

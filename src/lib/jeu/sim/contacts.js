@@ -1,8 +1,9 @@
 // Les contacts entre joueurs : corps contre corps, épaule contre épaule, déséquilibre, tacles debout et glissés
 // (bola-app#23). Plus de « séparation » qui déplace les corps sans conséquence : les vitesses changent vraiment.
 //
-//   · corps : cylindres de 0,30 m au sol. Pour une paire qui se recouvre : correction de position au prorata inverse
-//     des masses (95 % de la pénétration, 20 cm par pas au plus), impulsion J = −(1 + e) v_rel·n / (1/m₁ + 1/m₂)
+//   · corps : cylindres de 0,33 m (les épaules). Pour une paire qui se recouvre : correction de position au prorata
+//     inverse des masses (95 % de la pénétration, 6 cm par pas et 4 cm par passe de démêlage au plus : jamais de saut ;
+//     contre un panneau ou dans un coin, l'autre prend la part refusée), impulsion J = −(1 + e) v_rel·n / (1/m₁ + 1/m₂)
 //     (e = 0,15) seulement s'ils se rapprochent, frottement tangent 0,3 J. Un joueur lancé dans un autre est freiné,
 //     l'autre est poussé ; un choc fort déséquilibre.
 //   · épaule : deux joueurs côte à côte, qui vont dans le même sens, dont un charge (bouton, ou l'IA qui va à la
@@ -14,10 +15,14 @@
 //     toujours en premier ; par derrière, les jambes. Le tacleur reste au sol jusqu'au bout du clip : environ 2 s.
 //   · tacle debout : une extension de jambe (clip « shoot2 », rapide) de portée 0,9 m ; réussi si la balle est dans
 //     le secteur, sinon un contact qui déséquilibre sans prendre la balle.
+//   · le ballon contre les corps (balleCorps) : personne n'est traversé. Jambes et buste en capsules, corps couché ou qui
+//     se relève ; la balle en ressort (e = 0,3, frottement 0,5), une frappe contrée n'est plus un tir ; un joueur debout
+//     et libre qui la prend dans les jambes la contrôle (moins bien).
 // Aucune faute n'est sifflée (décision proposée à Sabri : la chute suffit comme punition).
-import { CORPS as C, BALLON, BX, BZ } from './constantes.js';
+import { CORPS as C, BALLON, BALLE_CORPS as BC, BX, BZ } from './constantes.js';
 import { lancerGeste, tomber, trebucher, piedA, racineA, impactDe, versMonde, clamp, enrouler, libre } from './corps.js';
-import { rouler } from './gestes.js';
+import { rouler, pasControle } from './gestes.js';
+import { sortirBalle } from './ballon.js';
 import { atan2, cos, hypot, sin } from './maths.js';
 
 const t1 = { x: 0, y: 0, z: 0 }, t2 = { x: 0, y: 0, z: 0 };
@@ -36,8 +41,35 @@ function contreMur(j, dx, dz) {
   return (dx > 0.3 && j.p.x >= BX - lim) || (dx < -0.3 && j.p.x <= -BX + lim) || (dz > 0.3 && j.p.z >= BZ - lim) || (dz < -0.3 && j.p.z <= -BZ + lim);
 }
 
+/**
+ * Écarte A et B de corr le long de n (de A vers B), au prorata (pa, pb) ; un panneau ne se traverse pas : la part
+ * qu'il refuse à l'un (sa composante vers le panneau) est donnée à l'autre, et dans un coin chacun glisse le long de
+ * son panneau (deux corps coincés dans un coin ne restent plus l'un dans l'autre).
+ */
+const LIM_MUR = 0.35;
+function bloque(j, dx, dz, out) {
+  out.x = (dx > 0 && j.p.x >= BX - LIM_MUR - 1e-9) || (dx < 0 && j.p.x <= -BX + LIM_MUR + 1e-9) ? 0 : dx;
+  out.z = (dz > 0 && j.p.z >= BZ - LIM_MUR - 1e-9) || (dz < 0 && j.p.z <= -BZ + LIM_MUR + 1e-9) ? 0 : dz;
+  return out;
+}
+const ca = { x: 0, z: 0 }, cb = { x: 0, z: 0 };
+function ecarter(A, B, nx, nz, corr, pa, pb) {
+  bloque(A, -nx * corr * pa, -nz * corr * pa, ca);
+  bloque(B, nx * corr * pb, nz * corr * pb, cb);
+  let sa = -(ca.x * nx + ca.z * nz), sb = cb.x * nx + cb.z * nz;
+  const manque = corr - sa - sb;
+  if (manque > 1e-6) {
+    // l'autre prend ce qui manque, dans les directions qui lui restent ouvertes
+    if (sb > 1e-6 || pb === 0) { bloque(B, nx * corr, nz * corr, cb); sb = cb.x * nx + cb.z * nz; }
+    if (sa + sb < corr - 1e-6) { bloque(A, -nx * corr, -nz * corr, ca); sa = -(ca.x * nx + ca.z * nz); }
+    const tot = sa + sb;
+    if (tot > 1e-6) { const k = Math.min(3, corr / tot); ca.x *= k; ca.z *= k; cb.x *= k; cb.z *= k; }
+  }
+  A.p.x += ca.x; A.p.z += ca.z; B.p.x += cb.x; B.p.z += cb.z;
+}
+
 /** Deux passes de plus sur les positions seules : trois corps serrés (contre un panneau) se démêlent ensemble. */
-function demeler(m) {
+export function demeler(m) {
   const J = m.joueurs, rr = 2 * C.rayon;
   for (let it = 0; it < 2; it++) for (let a = 0; a < J.length; a++) for (let c = a + 1; c < J.length; c++) {
     const A = J[a], B = J[c];
@@ -46,11 +78,12 @@ function demeler(m) {
     const d = hypot(nx, nz);
     if (d >= rr || d < 1e-6) continue;
     nx /= d; nz /= d;
-    const ia = 1 / A.m, ib = 1 / B.m, corr = 0.95 * (rr - d);
+    // (au plus 4 cm par passe : deux corps emmêlés, un joueur qui se relève sur un autre, se démêlent en glissant, pas
+    // d'un saut)
+    const ia = 1 / A.m, ib = 1 / B.m, corr = Math.min(0.04, 0.95 * (rr - d));
     const murA = contreMur(A, -nx, -nz), murB = contreMur(B, nx, nz);
     const pa = murA ? 0 : murB ? 1 : ia / (ia + ib), pb = murB ? 0 : murA ? 1 : ib / (ia + ib);
-    A.p.x -= nx * corr * pa; A.p.z -= nz * corr * pa;
-    B.p.x += nx * corr * pb; B.p.z += nz * corr * pb;
+    ecarter(A, B, nx, nz, corr, pa, pb);
   }
 }
 
@@ -74,12 +107,11 @@ function pasPaires(m, dt) {
     epaule(m, A, B, nx, nz, d, dt);
     if (d >= rr + 0.01) continue;
     const ia = 1 / A.m, ib = 1 / B.m;
-    const pen = rr - d, corr = Math.max(0, Math.min(0.2, 0.95 * pen));
+    const pen = rr - d, corr = Math.max(0, Math.min(0.06, 0.95 * pen));
     // (un corps collé à un panneau ne recule pas : l'autre prend toute la correction)
     const murA = contreMur(A, -nx, -nz), murB = contreMur(B, nx, nz);
     const pa = murA ? 0 : murB ? 1 : ia / (ia + ib), pb = murB ? 0 : murA ? 1 : ib / (ia + ib);
-    A.p.x -= nx * corr * pa; A.p.z -= nz * corr * pa;
-    B.p.x += nx * corr * pb; B.p.z += nz * corr * pb;
+    ecarter(A, B, nx, nz, corr, pa, pb);
     // (le prochain pas d'un geste à root motion ne poussera plus dans l'autre corps)
     if (pen > 0) { A.bloque = A.bloque ?? { x: 0, z: 0 }; A.bloque.x = nx; A.bloque.z = nz; B.bloque = B.bloque ?? { x: 0, z: 0 }; B.bloque.x = -nx; B.bloque.z = -nz; A.bloqueT = B.bloqueT = 1; }
     const rvx = B.v.x - A.v.x, rvz = B.v.z - A.v.z;
@@ -126,6 +158,9 @@ function epaule(m, A, B, nx, nz, d, dt) {
   const engB = B.int?.charge ? 1 : B.int?.vaBalle ? 0.6 : 0.15;
   const prA = A.int?.protege || m.balle.possesseur === A.i ? 1.3 : 1, prB = B.int?.protege || m.balle.possesseur === B.i ? 1.3 : 1;
   const Fa = C.forceEpaule * engA, Fb = C.forceEpaule * engB;
+  // (pour le rendu : chacun s'appuie vers l'autre, buste penché selon la poussée qu'il reçoit et qu'il donne)
+  A.appuiX = nx; A.appuiZ = nz; A.appuiF = (Fa + Fb) / (2 * C.forceEpaule); A.appuiT = m.t;
+  B.appuiX = -nx; B.appuiZ = -nz; B.appuiF = A.appuiF; B.appuiT = m.t;
   // les deux se poussent l'un l'autre, de côté
   A.v.x -= (Fb / A.m) * nx * dt; A.v.z -= (Fb / A.m) * nz * dt;
   B.v.x += (Fa / B.m) * nx * dt; B.v.z += (Fa / B.m) * nz * dt;
@@ -244,4 +279,76 @@ function finTacle(m, j) {
   const g = j.g;
   if (g.donnees.balle) m.stats.vols++;
   if (!g.donnees.balle) j.plante = 0.45;
+}
+
+// ── le ballon contre les corps ──
+const pc = { x: 0, y: 0, z: 0 };
+/**
+ * La balle ne traverse personne : jambes (capsule du sol à 0,9 m, r 0,14), buste (0,9 à 1,6 m, r 0,2), corps couché
+ * (le long du cap, à 0,15 m) ou qui se relève. Une balle qui entre dans une capsule en ressort par la normale, sa vitesse
+ * relative au corps réfléchie (e = 0,3) et freinée de côté (μ = 0,5). Ignorés : le porteur qui la conduit, un joueur
+ * qui frappe ou tacle (ses gestes la touchent eux-mêmes), celui qui vient de la toucher (0,15 s), les gardiens
+ * (gardien.js : mains et corps). Une frappe contrée n'est plus un tir ; le corps touché devient le dernier à l'avoir
+ * jouée. Renvoie l'index du joueur touché, ou -1.
+ */
+export function balleCorps(m) {
+  const b = m.balle;
+  if (b.garde != null || b.p.y > 1.6 + BALLON.R + 0.2) return -1;
+  const R = BALLON.R;
+  for (const j of m.joueurs) {
+    if (j.absent || j.gardien) continue;
+    if (j.i === b.possesseur && j.mode !== 'sol' && j.mode !== 'releve') continue;
+    if (j.demande || j.g?.type === 'frappe' || j.g?.type === 'tacle' || j.g?.type === 'tacleDebout') continue;
+    if (b.dernier === j.i && m.t - b.dernierT < BC.ignore) continue;
+    const dx0 = b.p.x - j.p.x, dz0 = b.p.z - j.p.z;
+    if (dx0 * dx0 + dz0 * dz0 > 1.2 * 1.2) continue;
+    // le point le plus proche sur l'axe de la capsule touchée, et son rayon
+    let r = 0;
+    if (j.mode === 'sol') {
+      const [hl, y, rr] = BC.sol;
+      const fx = sin(j.cap), fz = cos(j.cap);
+      const u = clamp(dx0 * fx + dz0 * fz, -hl, hl);
+      pc.x = j.p.x + fx * u; pc.y = y; pc.z = j.p.z + fz * u; r = rr;
+    } else {
+      const caps = j.mode === 'releve' ? [BC.releve] : [BC.jambes, BC.buste];
+      let best = Infinity;
+      for (const [y0, y1, rr] of caps) {
+        const y = clamp(b.p.y, y0, y1);
+        const d = hypot(dx0, b.p.y - y, dz0) - rr;
+        if (d < best) { best = d; pc.x = j.p.x; pc.y = y; pc.z = j.p.z; r = rr; }
+      }
+    }
+    let nx = b.p.x - pc.x, ny = b.p.y - pc.y, nz = b.p.z - pc.z;
+    const d = hypot(nx, ny, nz);
+    if (d >= r + R || d < 1e-6) continue;
+    // un joueur debout et libre qui la reçoit dans les jambes ou le buste : un contrôle (moins bon), pas un rebond
+    if (j.mode !== 'sol' && j.mode !== 'releve' && b.p.y < 1.45 && pasControle(m, j, true)) return j.i;
+    nx /= d; ny /= d; nz /= d;
+    // hors de la capsule
+    sortirBalle(b, pc.x, pc.y, pc.z, nx, ny, nz, r + R);
+    // la vitesse relative au corps, réfléchie et freinée de côté
+    const rx = b.v.x - j.v.x, ry = b.v.y, rz = b.v.z - j.v.z;
+    const vn = rx * nx + ry * ny + rz * nz;
+    if (vn >= 0) continue;
+    const jn = -(1 + BC.e) * vn;
+    let ox = rx + jn * nx, oy = ry + jn * ny, oz = rz + jn * nz;
+    const tn = ox * nx + oy * ny + oz * nz;
+    const tx = ox - tn * nx, ty = oy - tn * ny, tz = oz - tn * nz, tl = hypot(tx, ty, tz);
+    if (tl > 1e-6) { const k = Math.max(0, 1 - (BC.mu * jn) / tl); ox = tn * nx + tx * k; oy = tn * ny + ty * k; oz = tn * nz + tz * k; }
+    b.v.x = ox + j.v.x; b.v.y = oy; b.v.z = oz + j.v.z;
+    b.w.x *= 0.4; b.w.y *= 0.4; b.w.z *= 0.4;
+    const vin = -vn;
+    // (un frôlement lent, une balle calée entre un corps et un panneau : le corps ne « joue » pas la balle, il reste
+    // libre de la contrôler au pas suivant)
+    if (vin < 1.5) continue;
+    if (b.possesseur !== j.i) b.possesseur = null;
+    if (b.tir && b.tir.e !== j.e) m.ev('contre', { j: j.i, v: vin });
+    b.tir = null;
+    if (b.recepteur != null && b.recepteur !== j.i) b.recepteur = null;
+    b.dernier = j.i; b.dernierT = m.t;
+    m.stats.contres = (m.stats.contres ?? 0) + 1;
+    if (vin > 6) m.ev('balleCorps', { j: j.i, v: vin });
+    return j.i;
+  }
+  return -1;
 }

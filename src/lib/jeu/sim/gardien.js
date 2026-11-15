@@ -2,12 +2,15 @@
 //
 //   · Placement : sur la bissectrice entre la balle et les deux poteaux, à 0,7-1,6 m de sa ligne selon la distance de
 //     la balle, face au jeu, en pas chassés (contenir, 2-3 m/s).
-//   · Lecture : après un temps de réaction à graine (0,18-0,26 s, plus lent sur une frappe de près), la trajectoire
+//   · Lecture : après un temps de réaction à graine (0,26-0,36 s, plus lent sur une frappe de près ; le plongeon, lui, part sans élan). Trop
+//     tard pour aller chercher une balle loin de lui (moins de 0,2 s avant qu'elle ne passe) : il ne plonge pas dans le
+//     vide, il est battu sur ses appuis, la trajectoire
 //     est PRÉDITE toutes les 30 ms avec le même intégrateur que le ballon (traînée, effet, rebonds), sans hasard,
 //     jusqu'à la ligne : on obtient le point de passage et l'instant. À côté ou au-dessus : il regarde passer.
 //   · Choix : près du corps et sous 1,9 m, arrêt debout (k_block en bas, k_catch à hauteur) ; sinon plongeon. La table
 //     des mains du clip (sim/clips.js) donne, image par image, où sont les mains : on choisit l'image, le côté
-//     (k_dive_r ou k_dive_l), le cap et le rythme (0,8-1,3) pour que les mains arrivent au point de passage à
+//     (k_dive_r ou k_dive_l, joué depuis 0,45 s : l'élan de la capture est sauté), le cap et le rythme (0,8-1,3)
+//     pour que les mains arrivent au point de passage à
 //     l'instant prédit. L'écart qui reste (0,5 m au plus) est pris par un appel au départ. La racine ne bouge plus
 //     pendant le plongeon (le clip porte déjà le déplacement des hanches) : c'est ce qui le faisait glisser deux fois.
 //     À la fin du clip, il est debout à côté de sa racine : la racine le rejoint (le rendu enchaîne sans fondu).
@@ -27,8 +30,10 @@ import { atan2, cos, hypot, sin } from './maths.js';
 const R = BALLON.R;
 // un plongeon se joue au plus 1,3 fois plus vite que la capture Mixamo : au-delà, le gardien serait surhumain
 const TAUX_MAX = 1.3;
-// la prise d'élan de la capture (les 0,2 premières secondes : le gardien se ramasse) est sautée : il part de l'appel
-const ELAN = 0.2;
+// la prise d'élan de la capture est sautée : les mains ne partent de côté qu'à 0,5 s de clip (table des mains), le
+// plongeon commence donc à 0,45 s, le gardien déjà sur son appel (avant : 0,2 s, et le corps ne bougeait qu'une fois
+// la balle au fond)
+const ELAN = 0.45;
 const t1 = { x: 0, y: 0, z: 0 }, t2 = { x: 0, y: 0, z: 0 }, t3 = { x: 0, y: 0, z: 0 };
 
 /** Les mains du gardien dans le monde (x, y, z), d'après le clip qu'il joue. */
@@ -41,6 +46,9 @@ export function mainsMonde(k, out) {
   // l'allonge des bras (IK, ± 0,4 m en hauteur) vers la balle, qui monte jusqu'à l'image visée et y reste
   const dy = g?.donnees?.dy;
   if (dy) out.y += dy * clamp(g.t / Math.max(0.05, g.donnees.tVise), 0, 1);
+  // sur sa ligne, les gants s'arrêtent au poteau (le plongeon plus tôt les y menait : ils ne le traversent pas)
+  const zb = butDe(k.e);
+  if (Math.abs(out.z - zb) < 0.35 && out.y < BUT_H + 0.1) { const lim = BUT_DL - BALLON.poteauR - 0.08; if (out.x > lim) out.x = lim; else if (out.x < -lim) out.x = -lim; }
   return out;
 }
 /** L'allonge des bras du gardien pendant un arrêt (m), pour le rendu (IK des bras). */
@@ -82,7 +90,7 @@ export function pasGardien(m, k) {
     if (!k.lecture || k.lecture.t0 !== t.t0) {
       const tireur = m.joueurs[t.j];
       const pres = hypot(tireur.p.x - k.p.x, tireur.p.z - k.p.z) < 6 ? 0.06 : 0;
-      k.lecture = { t0: t.t0, reaction: m.rng.gardiens.entre(0.24, 0.34) + pres, prochaine: 0, fait: false, pred: null };
+      k.lecture = { t0: t.t0, reaction: m.rng.gardiens.entre(0.26, 0.36) + pres, prochaine: 0, fait: false, pred: null };
     }
     const L = k.lecture;
     const age = m.t - t.t0;
@@ -163,6 +171,8 @@ function decider(m, k, r) {
     m.ev('arret', { j: k.i, nom });
     return;
   }
+  // trop tard : la balle passe dans moins de 0,2 s loin de lui ; il ne plonge pas après coup, il reste battu
+  if (reste < 0.2) { m.ev('battu', { j: k.i }); return; }
   // le plongeon : le côté, l'image, le cap, le rythme
   let meilleur = null;
   const face = dedansDe(k.e) > 0 ? 0 : Math.PI;
