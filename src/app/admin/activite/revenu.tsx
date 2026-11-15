@@ -4,13 +4,16 @@
 // 19/10/2026 : les matchs gratuits, la carrière payante plus tard) : la
 // partie le dit, puis montre ce qui annonce le revenu, la monnaie de l'app
 // qu'on dépense déjà : les packs ouverts contre de l'XP (table achats_xp),
-// combien de joueurs en ouvrent, et lesquels partent le plus.
+// combien de joueurs en ouvrent, et lesquels partent le plus. Entre les deux,
+// Bola Plus (./bola-plus.tsx, 12/11) : ceux que l'abonnement intéresse, avant
+// tout paiement.
 
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { pct } from "@/lib/sfl/retention";
 import { Barres } from "./graphiques";
 import { Section } from "./cadre";
+import { BolaPlusStats } from "./bola-plus";
 
 interface Achat {
   joueur: string;
@@ -83,6 +86,7 @@ export function Revenu({
           <span className="text-corps text-encre-3">Aucun paiement n&apos;est encore en place.</span>
         </div>
       </Section>
+      <BolaPlusStats />
       <Section id="packs" titre="Les packs ouverts en XP" sous="La monnaie de l'app qu'on dépense déjà : le signe de ce qui se vendra.">
         {achats === "erreur" ? (
           <p className="text-corps text-encre-3">Les packs n&apos;ont pas pu être lus.</p>
