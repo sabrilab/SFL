@@ -431,6 +431,22 @@ export function creerAnimateur(perso, { gardien = false, reduit = false, versMon
         ik2(B.haut, B.milieu, B.bout, cible);
       }
     }
+    // (bola-app#26, lot 2) le tirage de maillot : la main la plus proche tend vers le dos du porteur (0,45 m au plus
+    // de sa place dans le clip), avec un fondu de 0,15 s à l'entrée et à la sortie
+    etat.tireW = clamp((etat.tireW ?? 0) + (e.tire ? dt : -dt) / 0.15, 0, 1);
+    if (e.tire) { etat.tireDer ??= { x: 0, y: 0, z: 0 }; etat.tireDer.x = e.tire.x; etat.tireDer.y = e.tire.y; etat.tireDer.z = e.tire.z; }
+    if (etat.tireW > 0.01 && etat.tireDer && versMonde3 && !gardien) {
+      const bw = versMonde3(etat.tireDer, bal);
+      let best = null, bd = Infinity;
+      for (const B of bras) { if (!B.haut || !B.milieu || !B.bout) continue; B.bout.getWorldPosition(cible); const d = cible.distanceTo(bw); if (d < bd) { bd = d; best = B; } }
+      if (best) {
+        best.bout.getWorldPosition(cible);
+        tmpv.copy(bw).sub(cible);
+        const Lt = tmpv.length();
+        if (Lt > 0.45) tmpv.multiplyScalar(0.45 / Lt);
+        ik2(best.haut, best.milieu, best.bout, cible.add(tmpv.multiplyScalar(etat.tireW)));
+      }
+    }
     if (perso.majTete) perso.majTete();
   }
 

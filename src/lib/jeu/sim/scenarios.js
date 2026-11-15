@@ -4,7 +4,8 @@
 // image (la simulation est à graine et à pas fixe) ; la page l'avance par _test.avancer(n), sans dépendre des images
 // par seconde. Rien ici n'est montré au joueur : c'est un outil de banc, appelé seulement par /jouer?banc.
 import { PAS, BALLON } from './constantes.js';
-import { rouler } from './gestes.js';
+import { rouler, demanderFrappe } from './gestes.js';
+import { faute } from './contacts.js';
 import { cos, hypot, sin } from './maths.js';
 
 const R = BALLON.R;
@@ -156,6 +157,93 @@ export const SCENARIOS = {
       poser(M.joueurs[5], 0, -14, 0);
       let n = 0;
       return { entrees() { n++; return [intention(0, 0, 0, 0, { action: n === 12 ? { type: 'frappe', p: 0.3, x: 1.15, y: 0.2 } : null }), null]; } };
+    },
+  },
+  // ── (bola-app#26, lot 2) duels, ballon, IA collective ──
+  // 10 : tirage de maillot. Le n° 10 Noir file balle au pied, le défenseur Blanc collé dans son dos le tient (faute au
+  // bout de 0,8 s, l'arbitre regarde l'avantage).
+  tirage: {
+    graine: 110, presents: [0, 4, 5, 6],
+    creer(M) {
+      M.humains = [true, true]; M.controleFixe = [4, 6];
+      poser(M.joueurs[4], 1, 5, Math.PI, 0, -4.2);
+      balleA(M, 1, 4.4, 0, -5, 4);
+      poser(M.joueurs[6], 1.05, 5.62, Math.PI, 0, -4.2);
+      return {
+        entrees(m) {
+          const p = m.joueurs[4], d = m.joueurs[6];
+          return [intention(0, -1, 1, 0), intention((p.p.x - d.p.x) * 2, -1, 1, 0.3, { tire: true })];
+        },
+      };
+    },
+  },
+  // 11 : centre du côté gauche, l'attaquant Noir le reprend de la tête au point de penalty.
+  centre: {
+    graine: 61, presents: [1, 4, 5, 7],
+    creer(M) {
+      M.humains = [true, false]; M.controleFixe = [1, null];
+      poser(M.joueurs[1], -6.5, -9.5, Math.PI / 2);
+      balleA(M, -6.05, -9.5, 0, 0, 1);
+      poser(M.joueurs[4], 0.3, -9.8, Math.PI);
+      poser(M.joueurs[5], 0, -14.2, 0);
+      poser(M.joueurs[7], 2.5, -11.5, 0);
+      let n = 0;
+      return { entrees() { n++; return [intention(0, 0, 0, 0, { action: n === 6 ? { type: 'centre', p: 0.9, cible: 4 } : null }), null]; } };
+    },
+  },
+  // 12 : frappe brossée de l'intérieur du pied droit, de 12 m : la balle part à droite du but et revient sur le poteau.
+  brossee: {
+    graine: 112, presents: [4, 5],
+    creer(M) {
+      M.humains = [true, false]; M.controleFixe = [4, null];
+      poser(M.joueurs[4], 2.2, -2.4, Math.PI);
+      balleA(M, 2.36, -3.0, 0, 0, 4);
+      poser(M.joueurs[5], 0.3, -14, 0);
+      let n = 0;
+      return { entrees() { n++; return [intention(0, 0, 0, 0, { action: n === 12 ? { type: 'finesse', p: 0.6, x: -1.0, y: 1.0 } : null }), null]; } };
+    },
+  },
+  // 13 : coup franc. Une faute notée sur le porteur Noir, le Blanc prend la balle : coup franc au point de la faute, les
+  // Blancs reculent à 3 m, le Noir fauté le joue.
+  coupFranc: {
+    graine: 113, presents: [0, 2, 4, 5, 6, 8, 9],
+    creer(M) {
+      M.humains = [false, false];
+      poser(M.joueurs[4], 1, 2, Math.PI, 0, -3); balleA(M, 1, 1.55, 0, -3.3, 4);
+      poser(M.joueurs[6], 1.3, 2.8, Math.PI); poser(M.joueurs[8], 2.2, 0.6, 0); poser(M.joueurs[9], -0.4, -1.4, 0);
+      poser(M.joueurs[2], -4, -2, Math.PI);
+      faute(M, M.joueurs[6], M.joueurs[4], 'debout');
+      const o = M.joueurs[8]; balleA(M, o.p.x, o.p.z + 0.4, 0, 0, 8);
+      return { entrees: () => [null, null] };
+    },
+  },
+  // 14 : une-deux. Le Noir passe au mur, repart dans le dos du défenseur planté, reçoit la remise.
+  uneDeux: {
+    graine: 84, presents: [2, 4, 5, 8],
+    creer(M) {
+      M.humains = [false, true]; M.controleFixe = [null, 8];
+      poser(M.joueurs[2], -2, 2, Math.PI); balleA(M, -2, 1.55, 0, 0, 2);
+      poser(M.joueurs[4], 1.2, -1.6, Math.PI * 0.8); poser(M.joueurs[8], -2.0, 0.6, 0);
+      let n = 0;
+      return {
+        entrees(m) {
+          n++;
+          if (n === 3) { const a = m.joueurs[2]; a.uneDeux = { t: m.t, cible: 4, x: -3.4, z: -3.5 }; demanderFrappe(m, a, { type: 'passe', p: 0.25, cible: 4 }); }
+          return [null, intention(0, 0, 0, 0)];
+        },
+      };
+    },
+  },
+  // 15 : pressing coordonné sur un porteur Blanc dos au but : le chasseur, le second presseur qui ferme le milieu, le
+  // couvreur entre la balle et le but.
+  pressing: {
+    graine: 121, presents: [0, 1, 2, 3, 4, 8, 9],
+    creer(M) {
+      M.humains = [false, true]; M.controleFixe = [null, 9];
+      poser(M.joueurs[9], 0.5, -0.7, Math.PI); balleA(M, 0.5, -1.1, 0, 0, 9);
+      poser(M.joueurs[8], 4.5, 2.5, 0);
+      poser(M.joueurs[1], 0, 9, Math.PI); poser(M.joueurs[2], -2, 3.5, Math.PI); poser(M.joueurs[3], 2.5, 4.5, Math.PI); poser(M.joueurs[4], 0, 3, Math.PI);
+      return { entrees(m) { m.balle.dernierT = m.t; return [null, intention(0, 0, 0, 0)]; } };
     },
   },
 };

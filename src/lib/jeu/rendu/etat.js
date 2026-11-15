@@ -25,6 +25,9 @@ export function etatAnim(M, j, I, porteur, balle, cache) {
   e.appui = j.appuiT != null && M.t - j.appuiT < 0.35 ? Object.assign((cache.appui ??= {}), { x: j.appuiX, z: j.appuiZ, f: j.appuiF, age: M.t - j.appuiT }) : null;
   e.touche = j.toucheT != null && M.t - j.toucheT < 0.12 ? Object.assign((cache.touche ??= {}), { age: M.t - j.toucheT, b: balle }) : null;
   e.choc = j.chocT != null && M.t - j.chocT < 0.9 ? Object.assign((cache.choc ??= {}), { age: M.t - j.chocT, x: j.chocX, z: j.chocZ, f: j.chocF, t0: j.chocT }) : null;
+  // (bola-app#26, lot 2) le tirage de maillot : le dos du porteur que le défenseur tient (repère du jeu)
+  const tc = j.tireCible != null ? M.joueurs[j.tireCible] : null;
+  e.tire = tc ? Object.assign((cache.tire ??= {}), { x: tc.p.x, y: 1.15, z: tc.p.z }) : null;
   const F = j.figure;
   e.figure = F && M.t - F.t0 < F.duree ? Object.assign((cache.figure ??= {}), { type: F.type, age: M.t - F.t0, duree: F.duree, cote: F.cote }) : null;
   return e;
