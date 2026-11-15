@@ -348,23 +348,34 @@ function tacle(graine: number, deFace: boolean) {
   if (deFace) { t.p.x = 0.3 * ((graine % 3) - 1); t.p.z = 0.6; t.cap = 0; }
   else { t.p.x = 0.25 * ((graine % 3) - 1); t.p.z = 8.8; t.cap = Math.PI; t.v.z = -5.5; }
   m.controle = [4, 6];
-  let lance = false, balle = -1, jambes = -1, tombe = false;
-  for (let i = 0; i < 360; i++) {
+  let lance = false, balle = -1, jambes = -1, tombe = false, t0 = -1, debout = -1;
+  const hanches: number[] = [];
+  for (let i = 0; i < 480; i++) {
     const dx = b.p.x - t.p.x, dz = b.p.z - t.p.z, d = Math.hypot(dx, dz);
     const act = !lance && d < (deFace ? 2.2 : 2.0) ? { type: 'tacle', glisse: true } : null;
     if (act) lance = true;
     pas(m, [{ dx: 0, dz: -1, allure: 0.85, sprint: 0 }, { dx: dx / d, dz: dz / d, allure: 1, sprint: 0.4, action: act }]);
-    for (const e of m.evts) { if (e.type === 'tacleBalle' && balle < 0) balle = m.t; if (e.type === 'tacleJambes' && jambes < 0) jambes = m.t; if (e.type === 'chute' && e.j === 4) tombe = true; }
+    for (const e of m.evts) {
+      if (e.type === 'tacleBalle' && balle < 0) balle = m.t; if (e.type === 'tacleJambes' && jambes < 0) jambes = m.t; if (e.type === 'chute' && e.j === 4) tombe = true;
+      if ((e.type === 'tacleBalle' || e.type === 'tacleJambes') && e.j === 6 && e.h != null) hanches.push(e.h);
+    }
     m.evts.length = 0;
+    if (lance && t0 < 0 && t.g?.nom === 'slide') t0 = m.t;
+    if (t0 >= 0 && debout < 0 && t.mode === 'loco') debout = m.t - t0;
   }
-  return { gagnee: balle > 0 && (jambes < 0 || balle <= jambes), tombe, lance };
+  return { gagnee: balle > 0 && (jambes < 0 || balle <= jambes), tombe, lance, hanches, debout };
 }
 {
   let face = 0, derriere = 0, chutes = 0, nf = 0, nd = 0;
-  for (let g = 1; g <= 40; g++) { const r = tacle(g, true); if (r.lance) { nf++; if (r.gagnee) face++; } }
-  for (let g = 1; g <= 40; g++) { const r = tacle(g, false); if (r.lance) { nd++; if (r.gagnee) derriere++; if (r.tombe) chutes++; } }
-  verifier('Tacles', nf > 30 && nd > 30 && face / nf >= 0.75 && chutes / nd >= 0.7 && derriere / nd <= 0.15,
-    `de face : balle gagnée ${face}/${nf} ; par derrière : porteur à terre ${chutes}/${nd}, balle gagnée ${derriere}/${nd}`);
+  const hanches: number[] = [], releves: number[] = [];
+  const garder = (r: Any) => { hanches.push(...r.hanches); if (r.debout >= 0) releves.push(r.debout); else releves.push(99); };
+  for (let g = 1; g <= 40; g++) { const r = tacle(g, true); if (r.lance) { nf++; if (r.gagnee) face++; garder(r); } }
+  for (let g = 1; g <= 40; g++) { const r = tacle(g, false); if (r.lance) { nd++; if (r.gagnee) derriere++; if (r.tombe) chutes++; garder(r); } }
+  // (bola-app#26) le vrai tacle glissé : au sol (hanches sous 0,25 m) à chaque contact, et debout en 2,8 s au plus
+  // depuis le départ de la glissade (glissade de 1 à 1,6 s, relevé du dos 1,3 s)
+  const hMax = Math.max(...hanches), rMax = Math.max(...releves);
+  verifier('Tacles', nf > 30 && nd > 30 && face / nf >= 0.75 && chutes / nd >= 0.7 && derriere / nd <= 0.15 && hanches.length >= 60 && hMax <= 0.25 && rMax <= 2.8,
+    `de face : balle gagnée ${face}/${nf} ; par derrière : porteur à terre ${chutes}/${nd}, balle gagnée ${derriere}/${nd} ; tacleur au sol à chaque contact (${hanches.length} contacts, hanches à ${(hMax * 100).toFixed(0)} cm au plus) ; relevé en ${f2(Math.max(...releves.filter((x) => x < 99)))} s au plus${rMax > 2.8 ? ' (TROP LENT)' : ''}`);
 }
 
 // ─────────────────────────── les gardiens ───────────────────────────
@@ -589,6 +600,64 @@ function tacle(graine: number, deFace: boolean) {
   const bc: Any = creerBoucle(m); const pas0 = m.pas;
   avancer(bc, NaN); const n1 = avancer(bc, 1 / 30);
   verifier('But au ralenti et entrées folles', longs === 0 && sain && n1 === 4 && m.pas === pas0 + 4, `chevauchements de plus de 8 cm pendant plus de 1 s au but : ${longs} ; intention NaN/infinie : ${sain ? 'aucune NaN' : 'NaN'} ; après un dt NaN, 1/30 s fait ${n1} pas`);
+}
+
+// ─────────────────────────── gestes au bon pied, contrôles, gestes techniques (bola-app#26) ───────────────────────────
+{
+  // des matchs IA : chaque frappe et passe part du pied du côté de la balle ; chaque contrôle prend le geste de sa
+  // surface (amorti au pied presque arrêté, pied levé, cuisse, poitrine, tête) au pied de ce côté ; la réception en
+  // course seulement en course
+  let elans = 0, bonPied = 0, ctrl = 0, ctrlBon = 0, trapCourse = 0, receiveArret = 0;
+  const vusClips = new Set<string>();
+  const coteClip = (nom: string) => (Clp.CLIPS as Any)[nom]?.piedImpact?.pied;
+  for (let g = 1; g <= (vite ? 4 : 10); g++) matchIA(400 + g, 150, (m: Any) => {
+    for (const e of m.evts) {
+      // (une balle dans l'axe, à 8 cm près : l'un ou l'autre pied convient)
+      if (e.type === 'elan' && e.pied !== 'tete') { elans++; if (Math.abs(e.cote) < 0.08 || (e.pied === 0) === (e.cote > 0)) bonPied++; }
+      if (e.type === 'controle' && e.clip) {
+        vusClips.add(e.clip);
+        if (e.clip === 'receive') { if (e.sj < 1) receiveArret++; continue; }
+        if (/^(trap|stall|knee)/.test(e.clip)) { ctrl++; if ((coteClip(e.clip) === 'g') === e.gauche) ctrlBon++; if (/^trap/.test(e.clip) && e.surface === 'pied' && e.sj > 1.6) trapCourse++; }
+      }
+    }
+  });
+  verifier('Gestes au bon pied', elans > 100 && bonPied / elans >= 0.9 && ctrl > 50 && ctrlBon / ctrl >= 0.9 && trapCourse === 0 && receiveArret === 0,
+    `frappes et passes : ${bonPied}/${elans} du pied du côté de la balle ; contrôles : ${ctrlBon}/${ctrl} au bon pied (${[...vusClips].sort().join(', ')}) ; amorti sur place en course ${trapCourse}, réception en course à l'arrêt ${receiveArret}`);
+}
+{
+  // les gestes techniques (le lot 3 les met sur le stick droit) : talonnade (la balle part derrière, 3 m au moins),
+  // sombrero (levée à 1,4 m au moins, au-dessus du défenseur), feinte (le défenseur face, à moins de 2 m, planté),
+  // petit pont (pieds écartés : la balle passe entre ses jambes)
+  const res: Record<string, string> = {};
+  let ok = true;
+  const essai = (nom: string, act: Any, prep: (m: Any) => void, mesure: (m: Any, d: Any) => boolean) => {
+    const m: Any = creerMonde({ graine: 3, humains: [true, false], aides: [0.5, 0], presents: [4, 6] });
+    demarrer(m, { intro: false });
+    m.controleFixe = [4, null];
+    prep(m);
+    const d: Any = { y: 0, z0: m.balle.p.z, plante: 0 };
+    for (let i = 0; i < 180; i++) {
+      pas(m, [{ dx: 0, dz: -1, allure: i < 10 ? 0.3 : 0, sprint: 0, action: i === 2 ? act : null, regard: m.balle.p }, { dx: 0, dz: 0, allure: 0, regard: m.joueurs[4].p }]);
+      d.y = Math.max(d.y, m.balle.p.y); d.plante = Math.max(d.plante, m.joueurs[6].plante); d.zMax = Math.max(d.zMax ?? -99, m.balle.p.z);
+      for (const e of m.evts) if (e.type === 'petitPont') d.passe = e.passe;
+      m.evts.length = 0;
+    }
+    const r = mesure(m, d);
+    res[nom] = r ? 'ok' : 'RATÉ'; ok &&= r;
+  };
+  const poserJ = (m: Any, vz: number, dDef: number) => {
+    const j = m.joueurs[4], o = m.joueurs[6], b = m.balle;
+    j.p.x = 0; j.p.z = 4; j.cap = Math.PI; j.v.x = 0; j.v.z = vz;
+    b.p.x = 0; b.p.y = R; b.p.z = 3.55; b.v.x = 0; b.v.y = 0; b.v.z = vz; rouler(b); b.possesseur = 4; b.dernier = 4; b.dernierT = m.t;
+    o.p.x = 0; o.p.z = 4 - dDef; o.cap = 0; o.v.x = 0; o.v.z = 0;
+  };
+  essai('talonnade', { type: 'talonnade' }, (m) => poserJ(m, -2, 6), (m, d) => d.zMax - d.z0 >= 3 || m.balle.p.z - d.z0 >= 3);
+  essai('sombrero', { type: 'sombrero' }, (m) => poserJ(m, 0, 1.8), (_m, d) => d.y >= 1.4);
+  essai('sombrero en course', { type: 'sombrero' }, (m) => poserJ(m, -3, 2.2), (_m, d) => d.y >= 1.4);
+  essai('feinte', { type: 'feinte', dx: 1, dz: 0 }, (m) => poserJ(m, 0, 1.6), (_m, d) => d.plante >= 0.3);
+  essai('passement', { type: 'passement', dx: 1, dz: 0 }, (m) => poserJ(m, -3, 1.9), (m, d) => d.plante >= 0.3 && !!m.joueurs[4].figure);
+  essai('petit pont', { type: 'petitPont' }, (m) => { poserJ(m, -2, 1.1); m.joueurs[6].phase = 0.25; m.joueurs[6].v.z = 2; m.joueurs[6].int = { ...m.joueurs[6].int }; }, (m, d) => d.passe === true && m.balle.p.z < m.joueurs[6].p.z);
+  verifier('Gestes techniques', ok, Object.entries(res).map(([k, v]) => `${k} ${v}`).join(' ; '));
 }
 
 // ─────────────────────────── les mesures des clips (.pak) ───────────────────────────

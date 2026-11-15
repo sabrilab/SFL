@@ -146,7 +146,8 @@ export function pasIA(m, j) {
       const devant = (b.p.x - j.p.x) * sin(j.cap) + (b.p.z - j.p.z) * cos(j.cap) > 0.3;
       // (une balle protégée derrière le porteur : le tacle debout passe par ses jambes et le déséquilibre)
       if (db < 1.1 && (devant || d < 0.8) && rng.u() < ch) it.action = { type: 'tacle', glisse: false };
-      else if (db < 2.2 && db > 1.0 && rng.u() < ch * 0.4) it.action = { type: 'tacle', glisse: true };
+      // (bola-app#26 : le vrai tacle glissé porte plus loin, pieds devant ; l'IA le tente moins souvent)
+      else if (db < 2.2 && db > 1.2 && rng.u() < ch * 0.25) it.action = { type: 'tacle', glisse: true };
       else if (d < 1.0 && rng.u() < 0.3) it.charge = true;
     }
   }

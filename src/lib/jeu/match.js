@@ -48,10 +48,10 @@ import { creerPlateau, DIM } from './plateau.js';
 import { creerPersonnage } from './personnage.js';
 import { creerPouce } from './pouce.js';
 import { creerAnimateur } from './rendu/animateur.js';
+import { etatAnim } from './rendu/etat.js';
 import { creerMonde, demarrer as demarrerMonde, empreinte } from './sim/monde.js';
 import { creerBoucle, avancer, avancerPas, joueurInterpole, balleInterpolee } from './sim/boucle.js';
 import { PAS, BALLON, JEU, butDe } from './sim/constantes.js';
-import { allongeBras } from './sim/gardien.js';
 import { porteur } from './sim/gestes.js';
 import { SCENARIOS } from './sim/scenarios.js';
 import { chargerMesuresUrl } from './sim/clips.js';
@@ -173,7 +173,8 @@ export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, 
     // (les têtes 3D des joueurs viendront après, avec leur accord)
     const perso = await creerPersonnage({
       modele: 'footballeur', tenue: e === 0 ? 'noirs' : 'blancs', tete: null, peau: null,
-      packs: role === 'G' ? ['keeper', 'celeb'] : ['player', 'celeb'],
+      // (bola-app#26 : player2, keeper2, celeb2, les clips de tools/jeu-anims.mjs)
+      packs: role === 'G' ? ['keeper', 'keeper2', 'celeb', 'celeb2'] : ['player', 'player2', 'celeb', 'celeb2'],
     });
     perso.racine.traverse((o) => { o.castShadow = false; });
     surProgres(0.4 + (++charges / specs.length) * 0.55);
@@ -181,7 +182,7 @@ export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, 
     ombre.renderOrder = 2;
     monde.add(perso.racine, ombre);
     const anim = creerAnimateur(perso, { gardien: role === 'G', reduit, versMonde3: (v, out) => versMondeDir(v, out) });
-    return { e, role, perso, ombre, anim, interp: { x: 0, z: 0, cap: 0 }, prec: { x: 0, z: 0 } };
+    return { e, role, perso, ombre, anim, interp: { x: 0, z: 0, cap: 0 }, prec: { x: 0, z: 0 }, cache: {} };
   }));
   // les ombres du décor, une fois pour toutes, avant que les joueurs ne bougent
   pl.majOmbres();
@@ -390,14 +391,8 @@ export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, 
       v.ombre.position.set(I.x, 0.04, I.z);
       v.perso.racine.visible = !j.absent;
       v.ombre.visible = !j.absent;
-      const g = j.g;
-      v.anim.maj({
-        vx: j.v.x, vz: j.v.z, cap: I.cap, phase: j.phase, balle: p === j,
-        geste: g && (j.mode === 'geste' || j.mode === 'sol' || j.mode === 'releve' || j.mode === 'pivot') ? { nom: g.nom, t: g.t } : null,
-        saut, aLong: j.aLong, aLat: j.aLat, d: j.d, regard: M.balle.p, pos: I, allonge: j.gardien ? allongeBras(j) : 0,
-        appui: j.appuiT != null && M.t - j.appuiT < 0.35 ? (v.appui ??= { x: 0, z: 0, f: 0, age: 0 }, Object.assign(v.appui, { x: j.appuiX, z: j.appuiZ, f: j.appuiF, age: M.t - j.appuiT })) : null,
-        touche: j.toucheT != null && M.t - j.toucheT < 0.12 ? (v.touche ??= { age: 0, b: bInterp }, (v.touche.age = M.t - j.toucheT), v.touche) : null,
-      }, dt);
+      v.cache.saut = saut;
+      v.anim.maj(etatAnim(M, j, I, p, bInterp, v.cache), dt);
     }
     balleInterpolee(bc, bInterp);
     balle.position.set(bInterp.x, bInterp.y, bInterp.z);

@@ -18,10 +18,13 @@
 //     son segment du pas (rien ne passe à travers à 30 m/s). Captée sous 16 m/s de vitesse relative, au centre des
 //     mains, sous 1,6 m ; repoussée sinon (restitution 0,35-0,5, vers l'extérieur du but) ; du bout des doigts au
 //     bord : déviée de 5 à 20°. Plus de tirage au sort de l'arrêt : c'est la géométrie qui décide.
+//   · (bola-app#26) Dans l'axe : parade couchée (k_block), arrêt face (k_catch_std), saut (k_high) ; balle basse loin
+//     de lui : le plongeon bas sur le côté (k_low_l / k_low_r) concourt avec le plongeon haut ; trop tard : battu
+//     (k_miss). Relance roulée (k_roll) pour un partenaire à moins de 8 m.
 //   · Après : relance à la main (k_throw, avec son root motion) ou au pied (k_kick) au bout de 0,9 à 3 s ; sortie sur
 //     une balle libre de sa surface s'il y arrive le premier.
 import { PAS, BALLON, BUT_DL, BUT_H, TERRAIN, butDe, LB } from './constantes.js';
-import { lancerGeste, mainsA, piedA, versMonde, clamp, enrouler, duree, finirGeste } from './corps.js';
+import { lancerGeste, mainsA, piedA, versMonde, clamp, enrouler, duree, finirGeste, impactDe } from './corps.js';
 import { CLIPS, FPS_CLIPS } from './clips.js';
 import { predire } from './ballon.js';
 import { choisirPartenaire, rouler } from './gestes.js';
@@ -33,7 +36,8 @@ const TAUX_MAX = 1.3;
 // la prise d'élan de la capture est sautée : les mains ne partent de côté qu'à 0,5 s de clip (table des mains), le
 // plongeon commence donc à 0,45 s, le gardien déjà sur son appel (avant : 0,2 s, et le corps ne bougeait qu'une fois
 // la balle au fond)
-const ELAN = 0.45;
+// (bola-app#26) la parade couchée sur le côté (goalkeeper_body_block, hanches gardées) : ses mains partent à 0,4 s
+const ELANS = { k_dive_r: 0.45, k_dive_l: 0.45, k_low_r: 0.35, k_low_l: 0.35 };
 const t1 = { x: 0, y: 0, z: 0 }, t2 = { x: 0, y: 0, z: 0 }, t3 = { x: 0, y: 0, z: 0 };
 
 /** Les mains du gardien dans le monde (x, y, z), d'après le clip qu'il joue. */
@@ -78,7 +82,7 @@ export function pasGardien(m, k) {
   k.attente = m.rng.gardiens.entre(0.9, 2.2);
 
   // un plongeon ou un arrêt en cours : rien d'autre
-  if (k.g && (k.g.type === 'plongeon' || k.g.type === 'arret')) {
+  if (k.g && (k.g.type === 'plongeon' || k.g.type === 'arret' || k.g.type === 'battu')) {
     finPlongeon(m, k);
     return;
   }
@@ -157,9 +161,10 @@ function finPlongeon(m, k) {
 function decider(m, k, r) {
   const T = r.p, reste = r.t;
   const lat = T.x - k.p.x;
-  if (Math.abs(lat) < 0.6 && T.y < 1.9) {
-    const haut = T.y > 0.9;
-    const nom = haut ? 'k_catch' : 'k_block';
+  if (Math.abs(lat) < 0.6 && T.y < 2.1) {
+    // (bola-app#26) dans l'axe : la parade couchée en bas (k_block), l'arrêt face à hauteur de poitrine
+    // (k_catch_std), le saut sur une balle haute (k_high, sinon k_catch)
+    const nom = T.y <= 0.9 ? 'k_block' : T.y <= 1.55 && CLIPS.k_catch_std ? 'k_catch_std' : CLIPS.k_high ? 'k_high' : 'k_catch';
     // l'image où les mains sont les plus proches de la hauteur visée, dans la première moitié du clip
     const c = CLIPS[nom];
     let f = 10, best = Infinity;
@@ -171,14 +176,23 @@ function decider(m, k, r) {
     m.ev('arret', { j: k.i, nom });
     return;
   }
-  // trop tard : la balle passe dans moins de 0,2 s loin de lui ; il ne plonge pas après coup, il reste battu
-  if (reste < 0.2) { m.ev('battu', { j: k.i }); return; }
+  // trop tard : la balle passe dans moins de 0,2 s loin de lui ; il ne plonge pas après coup, il est battu (k_miss :
+  // l'élan qui part trop tard, sans les mains)
+  if (reste < 0.2) {
+    m.ev('battu', { j: k.i });
+    if (CLIPS.k_miss && Math.abs(lat) < 2.5) { k.cap = dedansDe(k.e) > 0 ? 0 : Math.PI; lancerGeste(k, 'k_miss', { taux: 1.3, depuis: 0.25, type: 'battu', fin: duree('k_miss') * 0.8 }); }
+    return;
+  }
   // le plongeon : le côté, l'image, le cap, le rythme
   let meilleur = null;
   const face = dedansDe(k.e) > 0 ? 0 : Math.PI;
-  for (const nom of ['k_dive_r', 'k_dive_l']) {
+  // les plongeons : haut (k_dive) et, pour une balle basse, la parade couchée sur le côté (k_low, hanches gardées) ;
+  // chacun saute sa prise d'élan (ELANS)
+  const noms = T.y < 0.75 && CLIPS.k_low_l ? ['k_dive_r', 'k_dive_l', 'k_low_r', 'k_low_l'] : ['k_dive_r', 'k_dive_l'];
+  for (const nom of noms) {
     const c = CLIPS[nom];
-    for (let i = 9; i < 46; i++) {
+    const ELAN = ELANS[nom] ?? ELANS.k_dive_r;
+    for (let i = nom.startsWith('k_low') ? Math.ceil(ELAN * FPS_CLIPS) + 2 : 9; i < Math.min(c.n, 46); i++) {
       const hx = c.mains[i * 3] / 100, hy = c.mains[i * 3 + 1] / 100, hz = c.mains[i * 3 + 2] / 100;
       const rho = hypot(hx, hz);
       const tx = T.x - k.p.x, tz = T.z - k.p.z, rt = hypot(tx, tz);
@@ -194,7 +208,7 @@ function decider(m, k, r) {
   }
   if (!meilleur) return;
   k.cap = meilleur.cap;
-  const g = lancerGeste(k, meilleur.nom, { taux: meilleur.taux, type: 'plongeon', depuis: ELAN / duree(meilleur.nom) });
+  const g = lancerGeste(k, meilleur.nom, { taux: meilleur.taux, type: 'plongeon', depuis: (ELANS[meilleur.nom] ?? ELANS.k_dive_r) / duree(meilleur.nom) });
   const appel = clamp(meilleur.appel, -0.5, 0.5), ta = 0.15;
   g.donnees = { appel: { x: (meilleur.tx / meilleur.rt) * appel / ta, z: (meilleur.tz / meilleur.rt) * appel / ta, t: ta }, err: meilleur.err, dy: meilleur.dy, tVise: meilleur.i / FPS_CLIPS };
   m.ev('plongeon', { j: k.i, nom: meilleur.nom, err: meilleur.err });
@@ -204,13 +218,13 @@ function decider(m, k, r) {
 /** Le gardien pendant un arrêt : l'appel de départ (seul déplacement de la racine), puis immobile. */
 export function pasCorpsGardien(k, dt) {
   const g = k.g;
-  if (!g || (g.type !== 'plongeon' && g.type !== 'arret')) return false;
+  if (!g || (g.type !== 'plongeon' && g.type !== 'arret' && g.type !== 'battu')) return false;
   g.age += dt; g.t += dt * g.taux;
   const a = g.donnees?.appel;
   if (a && g.age <= a.t) { k.v.x = a.x; k.v.z = a.z; }
   else { k.v.x = 0; k.v.z = 0; }
   k.p.x += k.v.x * dt; k.p.z += k.v.z * dt;
-  if (g.type === 'arret' && g.t >= g.fin) finirGeste(k);
+  if ((g.type === 'arret' || g.type === 'battu') && g.t >= g.fin) finirGeste(k);
   return true;
 }
 
@@ -222,6 +236,8 @@ export function contactGardien(m, k, p0) {
   // les gardiens ne jouent qu'avec les mains dans leur surface
   if (hypot(b.p.x, b.p.z - butDe(k.e)) > TERRAIN.surface + 0.5) return false;
   const h = mainsMonde(k, t1);
+  // (battu, k_miss : ses mains partent trop tard, elles ne comptent pas ; seul le corps peut encore la contrer)
+  if (k.g?.type === 'battu') h.y = -9;
   // la plus courte distance du segment p0 → p au centre des mains
   const sx = b.p.x - p0.x, sy = b.p.y - p0.y, sz = b.p.z - p0.z;
   const L2 = sx * sx + sy * sy + sz * sz;
@@ -336,9 +352,12 @@ function relancer(m, k) {
   const d = hypot(cible.p.x - k.p.x, cible.p.z - k.p.z);
   const pied = d > 14;
   k.cap = atan2(cible.p.x - k.p.x, cible.p.z - k.p.z);
-  // k_throw : la balle part à 0,98 s de clip ; k_kick : à 1,25 s (mesuré à l'œil sur le clip)
-  const nom = pied ? 'k_kick' : 'k_throw';
-  const g = lancerGeste(k, nom, { taux: 1.4, rm: true, echelle: 0.45, type: 'relance', fin: pied ? 1.9 : 1.6, donnees: { cible: cible.i, depart: pied ? 1.25 : 0.98 } });
+  // k_throw : la balle part à 0,98 s de clip ; k_kick : à 1,25 s (mesuré à l'œil sur le clip) ; (bola-app#26) la
+  // relance roulée à la main pour un partenaire à moins de 8 m (k_roll, goalie_throw : la main lâche à l'impact mesuré)
+  const roule = !pied && d < 8 && CLIPS.k_roll;
+  const nom = pied ? 'k_kick' : roule ? 'k_roll' : 'k_throw';
+  const depart = roule ? impactDe('k_roll') : pied ? 1.25 : 0.98;
+  const g = lancerGeste(k, nom, { taux: roule ? 1.5 : 1.4, rm: !roule, echelle: 0.45, type: 'relance', fin: roule ? depart + 0.6 : pied ? 1.9 : 1.6, donnees: { cible: cible.i, depart, roule } });
   void g;
 }
 
@@ -350,9 +369,11 @@ function pasRelance(m, k) {
   const d = hypot(c.p.x - b.p.x, c.p.z - b.p.z);
   const tx = c.p.x + c.v.x * 0.6 - b.p.x, tz = c.p.z + c.v.z * 0.6 - b.p.z, L = hypot(tx, tz) || 1;
   const pied = g.nom === 'k_kick';
-  const v = pied ? clamp(8 + d * 0.45, 10, 18) : clamp(Math.sqrt(4.5 * 4.5 + 2 * 1.3 * d), 7, 15);
+  const roule = !!g.donnees.roule;
+  const v = pied ? clamp(8 + d * 0.45, 10, 18) : roule ? clamp(4 + d * 0.55, 5, 9) : clamp(Math.sqrt(4.5 * 4.5 + 2 * 1.3 * d), 7, 15);
   b.garde = null;
-  b.v.x = (tx / L) * v; b.v.z = (tz / L) * v; b.v.y = pied ? 5 + d * 0.12 : 2.2;
+  if (roule) b.p.y = R;
+  b.v.x = (tx / L) * v; b.v.z = (tz / L) * v; b.v.y = pied ? 5 + d * 0.12 : roule ? 0 : 2.2;
   b.w.x = b.w.y = b.w.z = 0;
   if (!pied) rouler(b);
   b.dernier = k.i; b.dernierT = m.t; b.recepteur = c.i; b.possesseur = null;

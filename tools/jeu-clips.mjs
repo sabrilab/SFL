@@ -4,12 +4,14 @@
 // La simulation ne lit jamais le squelette animé (elle tourne aussi sans navigateur, dans le banc) : ce qu'elle doit
 // savoir des clips Mixamo est mesuré ici, une fois, hors navigateur. Le .pak est débrouillé en mémoire (pakcodec.js),
 // le GLB n'est jamais écrit sur disque, aucun FBX n'est lu. Pour chaque clip des paquets « player », « keeper »,
-// « player2 » et « keeper2 » (bola-app#26, tools/jeu-anims.mjs) :
+// « player2 », « keeper2 » et « celeb2 » (bola-app#26, tools/jeu-anims.mjs) :
 //   dur, hit (part du clip à l'impact, index.json), turn (courbe de lacet fournie, index.json) ;
 //   root : le déplacement horizontal de la racine (root motion), en mètres, à 30 images/s (x, z alternés) ;
 //   pieds : la position du milieu de chaque pied (entre cheville et orteil) dans le repère du joueur, sans le root
 //           motion, en centimètres, à 30 images/s : [gx, gy, gz, dx, dy, dz] par image ;
-//   appuis : pour les cycles, les intervalles de phase [début, fin] où chaque pied est posé ;
+//   appuis : pour les cycles et les gestes du joueur, les intervalles (part du clip) [début, fin] où chaque pied est
+//            posé ;
+//   hanche : la hauteur des hanches (cm) par image ; tete : pour les clips de tête, la tête (cm, repère du joueur) ;
 //   mains : pour le gardien, le milieu des deux mains (cm), hanches comprises (ses plongeons n'ont pas de racine) ;
 //   piedImpact : à l'impact, le pied qui frappe (« g » ou « d ») et sa position (m).
 // Unités : la hanche du footballeur Ch38 mesurée dans le jeu vaut 0,957 m (le squelette de référence a une hanche de 1).
@@ -40,7 +42,7 @@ const voir = process.argv.includes('--voir');
 
 await MeshoptDecoder.ready;
 const sortie = {}, sources = {};
-const PAQUETS = ['player', 'keeper', 'player2', 'keeper2'];
+const PAQUETS = ['player', 'keeper', 'player2', 'keeper2', 'celeb2'];
 for (const pack of PAQUETS) {
   const brut = fs.readFileSync(path.join(racine, `public/jeu/anims/${pack}.pak`));
   sources[pack] = empreinteOctets(brut);
@@ -59,7 +61,8 @@ for (const pack of PAQUETS) {
     const act = mixer.clipAction(clip);
     act.reset().play();
     const n = Math.max(2, Math.round(clip.duration * FPS) + 1);
-    const root = [], pd = [], mn = [];
+    const root = [], pd = [], mn = [], hy = [], tt = [];
+    const tete = /head/.test(clip.name) ? os('Head') : null;
     for (let i = 0; i < n; i++) {
       const t = Math.min(clip.duration, i / FPS);
       act.time = t; mixer.update(0);
@@ -71,23 +74,26 @@ for (const pack of PAQUETS) {
         a.add(b).multiplyScalar(0.5).sub(r0).multiplyScalar(HANCHE * 100);
         pd.push(Math.round(a.x), Math.round(a.y), Math.round(a.z));
       }
+      H.getWorldPosition(a); hy.push(Math.round(a.y * HANCHE * 100));
+      if (tete) { tete.getWorldPosition(a); a.sub(r0).multiplyScalar(HANCHE * 100); tt.push(Math.round(a.x), Math.round(a.y), Math.round(a.z)); }
       if (pack.startsWith('keeper')) {
         mains[0].getWorldPosition(a); mains[1].getWorldPosition(b);
         a.add(b).multiplyScalar(0.5).sub(r0).multiplyScalar(HANCHE * 100);
         mn.push(Math.round(a.x), Math.round(a.y), Math.round(a.z));
       }
     }
-    void H;
-    const e = { dur: +clip.duration.toFixed(4), n, root, pieds: pd };
+    const e = { dur: +clip.duration.toFixed(4), n, root, pieds: pd, hanche: hy };
+    if (tt.length) e.tete = tt;
     if (meta.hit != null) e.hit = meta.hit;
     if (meta.loop) e.boucle = true;
     if (meta.source) e.source = meta.source;
     if (meta.turn) e.turn = meta.turn.map((x) => +(+x).toFixed(4));
     if (mn.length) e.mains = mn;
     // les appuis d'un cycle : pied à moins de 7 cm du sol et lent (dans le repère du clip, qui avance avec la racine)
-    if (meta.loop) {
+    // (bola-app#26 : aussi pour les gestes, le graphe d'animation y cale la sortie d'un geste sur un appui)
+    if (meta.loop || pack.startsWith('player')) {
       const v = Math.hypot(root[(n - 1) * 2] - root[0], root[(n - 1) * 2 + 1] - root[1]) / clip.duration;
-      e.vitesse = +v.toFixed(3);
+      if (meta.loop) e.vitesse = +v.toFixed(3);
       e.appuis = [0, 1].map((p) => {
         const pose = [];
         for (let i = 0; i < n - 1; i++) {
@@ -99,8 +105,9 @@ for (const pack of PAQUETS) {
           pose.push(y < 0.085 && Math.hypot(wx, wz) * FPS < 1.2);
         }
         const iv = [];
-        for (let i = 0; i < pose.length; i++) if (pose[i] && !pose[(i - 1 + pose.length) % pose.length]) {
-          let k = i; while (pose[(k + 1) % pose.length] && k - i < pose.length) k++;
+        const L = pose.length, cyc = !!meta.loop;
+        for (let i = 0; i < L; i++) if (pose[i] && (cyc ? !pose[(i - 1 + L) % L] : i === 0 || !pose[i - 1])) {
+          let k = i; while ((cyc || k + 1 < L) && pose[(k + 1) % L] && k - i < L) k++;
           iv.push([+(i / (n - 1)).toFixed(3), +(((k + 1) / (n - 1)) % 1.0001).toFixed(3)]);
         }
         return iv;

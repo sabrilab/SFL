@@ -5,8 +5,8 @@
 //        le .pak brouillé l'est (licence Mixamo : intégré au jeu, pas redistribué).
 // loop : boucle ; fps : images par seconde (30, 15 pour les clips lents : chutes, relevés, fêtes) ; mirror : symétrie
 // gauche / droite ; root: 'keep' : le déplacement des hanches reste dans le clip (plongeons) ; from / to : rognage (s) ;
-// hit : instant d'impact (vitesse maximale de hitBone, entre hitAfter et hitBefore), hitAt : instant d'impact imposé (s) ; unturn : le lacet du bassin
-// est retiré et rendu à part (courbe turn) ; yaw : le corps entier tourné de cet angle autour de la verticale, sans
+// hit : instant d'impact (vitesse maximale de hitBone, entre hitAfter et hitBefore), hitAt : instant d'impact imposé
+// (s) ; unturn : le lacet du bassin est retiré et rendu à part (courbe turn) ; yaw : le corps entier tourné de cet angle autour de la verticale, sans
 // toucher au root motion (le tacle glissé : la glissade sur le dos de « sprint_to_backslide », tournée d'un demi-tour,
 // devient une glissade pieds devant) ; noRoot : pas de root motion (la simulation fait glisser le corps).
 // Les paquets player, keeper et celeb (bola-game, tools/anims/manifest.mjs) ne sont pas réécrits : ils marchent.
@@ -15,7 +15,7 @@ const L = (file, x = {}) => ({ file, loop: true, ...x }), O = (file, x = {}) => 
 export const PACKS = {
   player2: {
     // le tacle glissé : couché sur le dos, pieds devant, la jambe gauche tendue vers la balle ; la simulation glisse
-    slide: O('sprint_to_backslide', { from: 0.3, to: 1.1, yaw: Math.PI, noRoot: true, hitAt: 0.55 }),
+    slide: O('sprint_to_backslide', { from: 0.3, to: 0.8, yaw: Math.PI, noRoot: true, hitAt: 0.55 }),
     // les relevés : du dos (après une glissade, un coup d'épaule, une chute en arrière) et du ventre
     getup_dos: O('getting_up (1)', { fps: 15 }),
     getup_ventre: O('stand_up (1)', { fps: 15 }),
@@ -39,6 +39,7 @@ export const PACKS = {
     // départ, demi-tour sur place, feinte de corps
     start: O('two_cycle_sprint'),
     turn180_std: O('quick_180_turn', { unturn: true }),
+    turn180_std_l: O('quick_180_turn', { unturn: true, mirror: true }),
     feint_r: O('standing_dodge_right'),
     feint_l: O('standing_dodge_right', { mirror: true }),
   },

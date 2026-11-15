@@ -21,14 +21,14 @@
 // les vibrations ; la simulation n'en dépend pas.
 import { PAS, JEU, ROLES, ENGAGEMENT, BX, BZ, LB, butDe, sens, BALLON } from './constantes.js';
 import { creerHasard } from './hasard.js';
-import { creerCorps, pasCorps, libre, lancerGeste, clamp } from './corps.js';
+import { creerCorps, pasCorps, libre, lancerGeste, clamp, impactDe, duree } from './corps.js';
 import { creerBalle, pasBalle, antiBlocage } from './ballon.js';
-import { pasConduite, pasControle, demanderFrappe, pasDemande, pasFrappe, porteur } from './gestes.js';
+import { pasConduite, pasControle, demanderFrappe, pasDemande, pasFrappe, porteur, pasAnticipation } from './gestes.js';
 import { pasCorpsACorps, demanderTacle, pasTacle, desequilibrer, demeler, balleCorps } from './contacts.js';
 import { pasGardien, pasCorpsGardien, contactGardien, tenirBalle } from './gardien.js';
 import { pasIA, intentionVide, conduire } from './ia.js';
 import { acos, atan2, cos, hypot, sin } from './maths.js';
-import { exigerMesures } from './clips.js';
+import { exigerMesures, CLIPS } from './clips.js';
 
 /**
  * Crée un match. humains : [bool, bool] (une équipe jouée par un humain) ; aides : [aide0, aide1] (1 = pouce,
@@ -187,6 +187,10 @@ function agir(m, j) {
   if (a.type === 'roulette') { roulette(m, j, a.dx ?? 1, a.dz ?? 0); return; }
   if (a.type === 'crochet') { crochet(m, j, a.dx ?? 1, a.dz ?? 0); return; }
   if (a.type === 'semelle') { semelle(m, j); return; }
+  if (a.type === 'feinte' || a.type === 'passement') { feinte(m, j, a.dx ?? 1, a.dz ?? 0, a.type); return; }
+  if (a.type === 'talonnade') { talonnade(m, j); return; }
+  if (a.type === 'sombrero') { sombrero(m, j); return; }
+  if (a.type === 'petitPont') { petitPont(m, j); return; }
   // une passe ou une frappe : il faut la balle à portée
   if (p && p.e !== j.e) return;
   if (demanderFrappe(m, j, a)) m.stats.demandes++;
@@ -245,6 +249,105 @@ function semelle(m, j) {
   j.toucheT = m.t;
   lancerGeste(j, 'stop', { rm: true, echelle: clamp(s / 4, 0.3, 1.2), type: 'semelle', fin: 0.7 });
   m.ev('semelle', { j: j.i });
+}
+
+// ── les gestes techniques balle au pied (bola-app#26) : le lot 3 les branche sur le stick droit ──
+/** Les adversaires près du porteur et face à lui : ceux qu'un geste peut tromper. */
+function trompes(m, j, rayon) {
+  const fx = sin(j.cap), fz = cos(j.cap), out = [];
+  for (const o of m.joueurs) {
+    if (o.e === j.e || o.gardien || o.absent || o.mode !== 'loco') continue;
+    const rx = o.p.x - j.p.x, rz = o.p.z - j.p.z, d = hypot(rx, rz);
+    if (d < rayon && rx * fx + rz * fz > 0.2 * d) out.push(o);
+  }
+  return out;
+}
+const balleAuPied = (m, j, d = 1.0) => libre(j) && porteur(m) === j && m.balle.p.y < 0.4 && hypot(m.balle.p.x - j.p.x, m.balle.p.z - j.p.z) < d;
+
+/**
+ * La feinte (de corps, à l'arrêt : standing_dodge, gauche ou droite) ou le passement de jambes (en course : le pied
+ * fait le tour de la balle, couche du rendu) : la balle n'est pas touchée ; un défenseur à moins de 2 m, face au
+ * porteur, part du mauvais côté (déséquilibre vers ce côté, planté 0,4 s).
+ */
+function feinte(m, j, dx, dz, type) {
+  if (!balleAuPied(m, j, 1.3)) return;
+  const fx = sin(j.cap), fz = cos(j.cap);
+  const cote = Math.sign(fz * dx - fx * dz) || 1; // > 0 : vers la gauche du porteur
+  const s = hypot(j.v.x, j.v.z);
+  if (type === 'feinte' && s < 2.5 && CLIPS.feint_r) {
+    // (standing_dodge_right esquive vers la droite du joueur ; le miroir, vers la gauche)
+    lancerGeste(j, cote > 0 ? 'feint_l' : 'feint_r', { taux: 1.5, type: 'feinte', fin: 0.62 });
+  } else j.figure = { type: 'passement', t0: m.t, duree: 0.42, cote };
+  for (const o of trompes(m, j, 2)) {
+    o.plante = Math.max(o.plante, 0.4);
+    desequilibrer(m, o, 0.18, { x: cote * fz, z: -cote * fx });
+  }
+  m.ev(type === 'feinte' && s < 2.5 ? 'feinte' : 'passement', { j: j.i, cote });
+}
+
+/** La talonnade : la balle part vers l'arrière, de 3 à 6 m, du talon (couche du rendu : le pied part en arrière). */
+function talonnade(m, j) {
+  if (!balleAuPied(m, j)) return;
+  const b = m.balle, fx = sin(j.cap), fz = cos(j.cap), s = hypot(j.v.x, j.v.z);
+  const v = 3.2 + 0.25 * s;
+  b.v.x = -fx * v + j.v.x * 0.2; b.v.z = -fz * v + j.v.z * 0.2; b.v.y = 0;
+  b.w.z = -b.v.x / BALLON.R; b.w.x = b.v.z / BALLON.R;
+  b.dernier = j.i; b.dernierT = m.t; b.possesseur = null; b.recepteur = null; b.tir = null;
+  j.toucheT = m.t; j.recup = 0.35;
+  j.figure = { type: 'talon', t0: m.t, duree: 0.34, cote: 0 };
+  m.ev('talonnade', { j: j.i });
+}
+
+/**
+ * Le sombrero : la balle levée au-dessus du défenseur (2 à 2,3 m au sommet), devant le porteur. À l'arrêt, le clip
+ * kick_up_soccerball (le pied glisse sous la balle et la lève) ; en course, la pointe du pied la lève (couche du rendu).
+ */
+function sombrero(m, j) {
+  if (!balleAuPied(m, j)) return;
+  const s = hypot(j.v.x, j.v.z);
+  if (s < 2.2 && CLIPS.kickup) {
+    const b = m.balle, fx = sin(j.cap), fz = cos(j.cap);
+    const gauche = (b.p.x - j.p.x) * fz - (b.p.z - j.p.z) * fx > 0;
+    const nom = (CLIPS.kickup.piedImpact?.pied === 'g') === gauche ? 'kickup' : 'kickup_l';
+    lancerGeste(j, nom, { taux: 1.7, type: 'sombrero', depuis: Math.max(0, impactDe(nom) - 0.3) / duree(nom), fin: impactDe(nom) + 0.25, donnees: {} });
+  } else { leverBalle(m, j); j.figure = { type: 'sombrero', t0: m.t, duree: 0.3, cote: 0 }; }
+}
+function leverBalle(m, j) {
+  const b = m.balle, fx = sin(j.cap), fz = cos(j.cap), s = hypot(j.v.x, j.v.z);
+  const vy = 6.2 + m.rng.touches.u() * 0.4, vh = Math.max(1.8, s * 0.9 + 0.6);
+  b.v.x = fx * vh; b.v.z = fz * vh; b.v.y = vy; b.w.x = b.w.y = b.w.z = 0;
+  b.dernier = j.i; b.dernierT = m.t; b.possesseur = j.i;
+  j.toucheT = m.t;
+  // (le défenseur pris de vitesse : planté, et trop tard pour la reprendre de la tête pendant 0,6 s)
+  for (const o of trompes(m, j, 3)) { o.plante = Math.max(o.plante, 0.35); o.recup = Math.max(o.recup, 0.6); }
+  m.ev('sombrero', { j: j.i });
+}
+/** Pendant le sombrero à l'arrêt : la balle part à l'impact du clip. */
+function pasSombrero(m, j) {
+  const g = j.g;
+  if (!g || g.type !== 'sombrero' || g.fait || g.t < g.impact) return;
+  g.fait = true;
+  if (porteur(m) === j && m.balle.p.y < 0.5) leverBalle(m, j);
+}
+
+/**
+ * Le petit pont : la balle glissée entre les jambes du défenseur le plus proche devant (à moins de 1,4 m). Elle
+ * passe si ses pieds sont écartés (foulée entre deux appuis, ou pas chassé) : ses jambes ne la bloquent pas pendant
+ * 0,35 s ; sinon, elle les heurte (contacts.js, balleCorps).
+ */
+function petitPont(m, j) {
+  if (!balleAuPied(m, j)) return;
+  const [o] = trompes(m, j, 1.4).sort((a, c) => hypot(a.p.x - j.p.x, a.p.z - j.p.z) - hypot(c.p.x - j.p.x, c.p.z - j.p.z));
+  if (!o) return;
+  const b = m.balle, rx = o.p.x - b.p.x, rz = o.p.z - b.p.z, L = hypot(rx, rz) || 1;
+  const v = 5.5 + hypot(j.v.x, j.v.z) * 0.5;
+  b.v.x = (rx / L) * v; b.v.z = (rz / L) * v; b.v.y = 0;
+  b.w.z = -b.v.x / BALLON.R; b.w.x = b.v.z / BALLON.R;
+  b.dernier = j.i; b.dernierT = m.t; b.possesseur = null; b.tir = null; b.recepteur = null;
+  j.toucheT = m.t;
+  const u = (o.phase * 2) % 1, ecartes = hypot(o.v.x, o.v.z) < 0.6 ? (o.int?.contenir ?? false) : u > 0.2 && u < 0.8;
+  if (ecartes) { o.ouvertT = m.t + 0.35; o.plante = Math.max(o.plante, 0.5); }
+  m.ev('petitPont', { j: j.i, o: o.i, passe: ecartes });
 }
 
 /**
@@ -343,9 +446,15 @@ export function pas(m, entrees = null) {
       m.phaseT -= PAS;
       if (avant > JEU.butPause - 0.35 && m.phaseT <= JEU.butPause - 0.35 && m.buteur != null) {
         const j = m.joueurs[m.buteur];
-        const nom = m.humains[j.e] ? m.rng.fetes.choix(['victory', 'fist_pump', 'cheering']) : 'fist_pump';
-        lancerGeste(j, nom, { type: 'fete', fin: 1e9 });
+        // (bola-app#26 : quatre célébrations de plus ; la glissade de joie part avec son élan, root motion)
+        const nom = m.humains[j.e] ? m.rng.fetes.choix(['victory', 'fist_pump', 'cheering', 'c_chest', 'c_slide']) : m.rng.fetes.choix(['fist_pump', 'c_chest']);
+        const glisse = nom === 'c_slide' && !!CLIPS.c_slide;
+        lancerGeste(j, nom, { type: 'fete', fin: glisse ? duree(nom) : 1e9, rm: glisse, echelle: 0.85 });
         m.ev('fete', { j: j.i, nom });
+        // le coéquipier le plus proche vient applaudir (pouce levé)
+        let q = null, dq = 9;
+        for (const o of m.joueurs) if (o.e === j.e && o !== j && !o.gardien && !o.absent) { const d = hypot(o.p.x - j.p.x, o.p.z - j.p.z); if (d < dq) { dq = d; q = o; } }
+        if (q) lancerGeste(q, 'c_thumbs', { type: 'fete', fin: 1e9, depuis: 0.05 });
       }
       if (m.phaseT <= 0) {
         if (m.reste <= 0) fin(m);
@@ -374,7 +483,7 @@ export function pas(m, entrees = null) {
       j.aide = m.aides[e];
     } else { pasIA(m, j); j.aide = 0; }
   }
-  for (const j of m.joueurs) if (!j.absent) { agir(m, j); pasDemande(m, j); }
+  for (const j of m.joueurs) if (!j.absent) { agir(m, j); pasDemande(m, j); pasAnticipation(m, j); }
   demiTour(m);
   const p = porteur(m);
   for (let i = 0; i < m.joueurs.length; i++) {
@@ -386,6 +495,7 @@ export function pas(m, entrees = null) {
     if (j.g?.type === 'frappe') pasFrappe(m, j, PAS);
     if (j.g?.type === 'tacle' || j.g?.type === 'tacleDebout') pasTacle(m, j);
     if (j.g?.type === 'roulette') pasRoulette(m, j);
+    if (j.g?.type === 'sombrero') pasSombrero(m, j);
   }
   pasCorpsACorps(m, PAS);
   for (const j of m.joueurs) if (!j.absent) borner(j);

@@ -19,9 +19,9 @@
 //     graine σ = 0,6° + 5° p² + 4° pression + 3° v/7,4 + 4° angle/90° ; l'aide (pouce, manette) corrige la
 //     direction d'une passe, jamais sa force.
 import { PAS, G, BALLON, JEU, CORPS, BUT_DL, BUT_H, butDe, sens, LB, BX, BZ } from './constantes.js';
-import { piedA, piedLoco, racineA, versMonde, lancerGeste, impactDe, libre, clamp, enrouler, duree } from './corps.js';
+import { piedA, teteA, piedLoco, racineA, versMonde, lancerGeste, impactDe, libre, clamp, enrouler, duree } from './corps.js';
 import { predire } from './ballon.js';
-import { CLIPS } from './clips.js';
+import { CLIPS, FPS_CLIPS } from './clips.js';
 import { acos, atan2, cos, hypot, sin } from './maths.js';
 
 const R = BALLON.R;
@@ -164,7 +164,8 @@ export function pasConduite(m, j, appui) {
  */
 export function pasControle(m, j, contact = false) {
   const b = m.balle;
-  if (!libre(j) || b.garde != null) return false;
+  // (un amorti lancé d'avance, pasAnticipation, attend la balle : il peut la contrôler)
+  if (!(libre(j) || (j.g?.type === 'amorti' && j.recup <= 0)) || b.garde != null) return false;
   if (b.dernier === j.i && m.t - b.dernierT < 0.3) return false;
   if (b.possesseur === j.i) return false;
   const pos = b.possesseur != null ? m.joueurs[b.possesseur] : null;
@@ -226,15 +227,81 @@ export function pasControle(m, j, contact = false) {
   toucher(m, j, { possede });
   if (!possede) b.possesseur = null;
   j.toucheT = m.t;
-  m.ev('controle', { j: j.i, q, vin, surface, possede, tir: !!etaitTir });
-  // l'animation : un contrôle de la cuisse, de la poitrine ou de la tête se voit ; au pied, la course continue
-  // (au pied, presque arrêté devant une balle forte : l'amorti du clip receive, le pied qui recule avec la balle)
-  if (surface === 'cuisse' || surface === 'poitrine') lancerGeste(j, 'knee', { depuis: 0.05, taux: 1.4, fin: duree('knee') * 0.85, type: 'controle' });
-  else if (surface === 'tete') lancerGeste(j, 'header', { depuis: 0.4, taux: 1.8, fin: duree('header') * 0.75, type: 'controle' });
-  else if (sj < 2 && vin > 7 && possede) lancerGeste(j, 'receive', { depuis: 3 / (30 * duree('receive')), taux: 1.3, fin: 0.62, type: 'controle' });
+
+  // l'animation (bola-app#26) : chaque surface a son geste, au pied qui touche (côté de la balle) ; un amorti déjà
+  // lancé par l'anticipation (pasAnticipation) continue, calé pour que son contact tombe maintenant
+  let clip = null;
+  if (j.g?.type !== 'amorti') {
+    const c = clipControle(j, b, surface, sj, vin, possede);
+    if (c) { clip = c.nom; lancerGeste(j, c.nom, { depuis: Math.max(0, c.impact - 0.06) / duree(c.nom), taux: c.taux, fin: Math.min(duree(c.nom), c.impact + c.apres), type: 'controle', donnees: { surface } }); }
+  } else { clip = j.g.nom; j.g.type = 'controle'; j.g.donnees = { ...j.g.donnees, surface }; }
+  m.ev('controle', { j: j.i, q, vin, surface, possede, tir: !!etaitTir, clip, sj, gauche: (b.p.x - j.p.x) * cos(j.cap) - (b.p.z - j.p.z) * sin(j.cap) > 0 });
   return true;
 }
 
+
+// ── les gestes du contrôle (bola-app#26) ──
+/**
+ * Le clip d'un contrôle : au pied, l'amorti sur place (trap) quand le joueur est presque arrêté, la réception en
+ * course (receive) sur une balle forte en courant, rien (la course continue) sinon ; pied levé (stall) pour une balle
+ * entre 0,35 et 0,7 m ; la cuisse (knee) de 0,7 à 0,95 m ; la poitrine (trap, buste en arrière : couche du rendu) ;
+ * la tête debout (head_std). Le clip est celui du pied (ou de la cuisse) du côté de la balle. impact : l'instant du
+ * contact dans le clip (s), apres : ce que la simulation en joue après (s de clip : 0,25 à 0,3, le joueur rejoue
+ * vite ; le rendu laisse le clip finir pendant son fondu vers la course).
+ */
+export function clipControle(j, b, surface, sj, vin, possede = true) {
+  const fx = sin(j.cap), fz = cos(j.cap);
+  const gauche = (b.p.x - j.p.x) * fz - (b.p.z - j.p.z) * fx > 0; // la balle à gauche du joueur
+  const cote = (base, piedDuBase) => {
+    // base touche du pied piedDuBase (« g » ou « d ») ; son miroir est base_l (ou l'inverse)
+    const veut = gauche ? 'g' : 'd';
+    const alt = base.endsWith('_l') ? base.slice(0, -2) : base + '_l';
+    return veut === piedDuBase || !CLIPS[alt] ? base : alt;
+  };
+  const pied = (n) => CLIPS[n]?.piedImpact?.pied ?? 'd';
+  const imp = (n) => impactDe(n);
+  let nom = null, taux = 1.2, apres = 0.5;
+  // (une balle presque arrêtée à ses pieds, l'engagement : elle se prend sans geste)
+  if (vin < 2.5 && surface === 'pied') return null;
+  if (surface === 'pied') {
+    if (b.p.y > 0.22 && sj < 2.5) { nom = cote('stall', pied('stall')); apres = 0.3; }
+    else if (sj < 1.6) { nom = cote('trap', pied('trap')); taux = 1.25; apres = 0.25; }
+    else if (sj < 2 && vin > 7 && possede) return { nom: 'receive', impact: 3 / 30, taux: 1.3, apres: 0.55 };
+  } else if (surface === 'cuisse') {
+    nom = b.p.y < 0.7 && sj < 2.5 ? cote('stall', pied('stall')) : cote('knee', pied('knee'));
+    taux = 1.4; apres = 0.25;
+  } else if (surface === 'poitrine') { nom = cote('trap', pied('trap')); taux = 1.2; apres = 0.3; }
+  else if (surface === 'tete') { nom = 'head_std'; taux = 1.5; apres = 0.3; }
+  if (!nom || !CLIPS[nom]) return null;
+  return { nom, impact: imp(nom), taux, apres };
+}
+
+/**
+ * L'anticipation du contrôle : le receveur d'une passe, presque arrêté, lance son amorti avant que la balle n'arrive,
+ * pour que le contact du clip tombe à son arrivée (le pied s'avance, la poitrine s'ouvre) ; la balle est prédite
+ * (sans hasard) toutes les 0,05 s. S'il ne la touche pas, l'amorti finit seul et la course reprend.
+ */
+export function pasAnticipation(m, j) {
+  const b = m.balle;
+  if (b.recepteur !== j.i || !libre(j) || b.garde != null || j.gardien) return;
+  const sj = hypot(j.v.x, j.v.z);
+  if (sj > 1.6 || m.t < (j.anticipeT ?? 0)) return;
+  j.anticipeT = m.t + 0.05;
+  const bv = hypot(b.v.x, b.v.y, b.v.z);
+  if (bv < 2) return;
+  const r = predire(b, (q) => hypot(q.p.x - j.p.x, q.p.z - j.p.z) < 0.45, 1.2);
+  if (!r) return;
+  const surface = r.p.y < 0.35 ? 'pied' : r.p.y < 0.95 ? 'cuisse' : r.p.y < 1.45 ? 'poitrine' : 'tete';
+  // (la balle prédite, placée au point de contact, pour choisir le côté)
+  const q = { p: r.p };
+  const c = clipControle(j, q, surface, sj, hypot(r.v.x, r.v.y, r.v.z), true);
+  if (!c || c.nom === 'receive') return;
+  const avance = (c.impact - Math.max(0, c.impact - 0.35)) / c.taux; // l'amorti part 0,35 s de clip avant le contact
+  if (r.t > avance + 0.02) return;
+  const depuis = Math.max(0, c.impact - r.t * c.taux);
+  lancerGeste(j, c.nom, { depuis: depuis / duree(c.nom), taux: c.taux, fin: Math.min(duree(c.nom), c.impact + c.apres), type: 'amorti', donnees: { surface } });
+  m.ev('amorti', { j: j.i, nom: c.nom, dans: r.t });
+}
 
 // ── passes et frappes ──
 /** Le partenaire dans la direction (dx, dz), au cône d'aide près ; sinon le meilleur devant. */
@@ -269,13 +336,32 @@ export function demanderFrappe(m, j, spec) {
   const b = m.balle;
   if (!libre(j) || b.garde != null) return false;
   const d = hypot(b.p.x - j.p.x, b.p.z - j.p.z);
-  if (d > 3.5 || b.p.y > 1.2) return false;
+  // (bola-app#26 : une balle aérienne se reprend de volée ou de la tête, jusqu'à 2,2 m)
+  if (d > 3.5 || b.p.y > 2.2) return false;
   if (j.demande && !j.aide) return true; // l'IA ne relance pas une demande en cours
   j.demande = { spec, t0: j.demande?.t0 ?? m.t };
   return true;
 }
 
-/** Le clip d'un geste de balle, selon la course, la hauteur de la balle et son côté. */
+/** La surface qui frappe au temps t d'un clip (pied 0 / 1, ou « tete »), repère du joueur (m). */
+function surfaceA(nom, t, pied, out) {
+  if (pied === 'tete') return teteA(nom, t, out);
+  return piedA(nom, t, pied, out);
+}
+
+/** La hauteur de la balle dans T s (gravité seule, sans rebond : assez pour choisir le geste). */
+const hauteurDans = (b, T) => Math.max(R, b.p.y + b.v.y * T - 0.5 * G * T * T);
+
+/**
+ * Le clip d'un geste de balle, selon la course, la hauteur de la balle à l'impact et son côté (bola-app#26) :
+ *   · au sol : frappe en course (strike_run, la frappe puissante), frappe arrêtée (shoot), passe et finesse de
+ *     l'intérieur du pied arrêté (pass, jouée plus vite pour la finesse) ;
+ *   · volée basse (0,3 à 0,65 m) : la jambe tendue de kick_soccerball (1) (shoot2) ; volée haute (0,65 à 1,8 m) :
+ *     le ciseau (volley) ; dos au but entre 0,7 et 1,2 m : le retourné (bicycle) ; tête (1,25 m et plus, face au
+ *     jeu) : la tête debout (head_std) ou en extension (header2) ;
+ *   · le pied du côté de la balle (_l : le miroir) ; l'instant d'impact est l'image où la surface (pied ou tête) est
+ *     à la hauteur de la balle, pour les gestes aériens.
+ */
 function clipFrappe(j, b, spec) {
   const frappe = spec.type === 'frappe' || spec.type === 'finesse' || spec.type === 'lobFrappe';
   const s = hypot(j.v.x, j.v.z);
@@ -286,10 +372,37 @@ function clipFrappe(j, b, spec) {
   const cb = spec._cible ?? null;
   const ecart = cb ? Math.abs(enrouler(atan2(cb.x - b.p.x, cb.z - b.p.z) - hv)) : 0;
   const course = s > 2.2 && ecart < (70 * Math.PI) / 180;
-  const volee = b.p.y > 0.45;
-  let nom = volee ? 'volley' : course ? 'strike_run' : frappe ? 'shoot' : 'pass';
-  if (cote > 0.08 && !volee) nom += '_l';
-  return { nom, course: course && !volee, taux: clamp(impactDe(nom) / 0.22, 0.8, 2.4), s };
+  // la hauteur de la balle à l'impact (un premier jet à 0,22 s)
+  const yb = hauteurDans(b, 0.22);
+  if (yb > 0.3 || b.p.y > 0.45) {
+    const choix = [];
+    if (yb > 1.25 && ecart < 1.9) choix.push('head_std', 'header2');
+    if (yb > 0.7 && yb < 1.25 && ecart > 1.9 && CLIPS.bicycle) choix.push('bicycle');
+    if (yb > 0.65) choix.push('volley');
+    if (yb < 0.7) choix.push('shoot2');
+    let best = null;
+    for (const n0 of choix) {
+      const tete = /^head/.test(n0);
+      const n = !tete && n0 !== 'bicycle' && n0 !== 'volley' && cote > 0.08 && CLIPS[n0 + '_l'] ? n0 + '_l' : n0;
+      const c = CLIPS[n];
+      if (!c) continue;
+      const pied = tete ? 'tete' : CLIPS_PIED(n);
+      if (tete && !c.tete) continue;
+      // l'image où la surface est à la hauteur de la balle (dans les deux premiers tiers du clip)
+      for (let i = 3; i < (c.n * 2) / 3; i++) {
+        const t = i / FPS_CLIPS;
+        const y = surfaceA(n, t, pied, t1).y;
+        const taux = clamp(t / 0.25, 0.8, 2.2);
+        const err = Math.abs(y - hauteurDans(b, t / taux)) + (tete && n0 === 'header2' && yb < 1.5 ? 0.2 : 0);
+        if (!best || err < best.err) best = { nom: n, impact: t, taux, pied, err };
+      }
+    }
+    if (best && best.err < 0.35) return { nom: best.nom, course: false, taux: best.taux, s, impact: best.impact, pied: best.pied, cote };
+  }
+  let nom = course ? 'strike_run' : frappe && spec.type !== 'finesse' ? 'shoot' : 'pass';
+  if (cote > 0.08) nom += '_l';
+  const taux = clamp(impactDe(nom) / (spec.type === 'finesse' && !course ? 0.18 : 0.22), 0.8, 2.4);
+  return { nom, course, taux, s, impact: impactDe(nom), pied: CLIPS_PIED(nom), cote };
 }
 
 /**
@@ -304,10 +417,10 @@ export function pasDemande(m, j) {
   if (!libre(j) || b.garde != null || (p && p.e !== j.e && p !== j) || m.t - dm.t0 > 1.0) { j.demande = null; return; }
   const cible = viser(m, j, dm.spec, true);
   const c = clipFrappe(j, b, dm.spec);
-  const T = impactDe(c.nom) / c.taux;
+  const T = c.impact / c.taux;
   const bx = b.p.x + b.v.x * T, bz = b.p.z + b.v.z * T;
   const hc = atan2(cible.x - bx, cible.z - bz);
-  piedA(c.nom, impactDe(c.nom), CLIPS_PIED(c.nom), t1);
+  surfaceA(c.nom, c.impact, c.pied, t1);
   versMonde(hc, t1.x, t1.z, t2);
   // où le corps doit être à l'impact
   const sx = bx - sin(hc) * (R + 0.04) - t2.x, sz = bz - cos(hc) * (R + 0.04) - t2.z;
@@ -315,7 +428,7 @@ export function pasDemande(m, j) {
   let ex = j.p.x + j.v.x * T, ez = j.p.z + j.v.z * T;
   if (c.course) {
     const ech = clamp(c.s / (2.19 * c.taux), 0.6, 2);
-    racineA(c.nom, impactDe(c.nom), t1);
+    racineA(c.nom, c.impact, t1);
     versMonde(hc, t1.x * ech, t1.z * ech, t1);
     ex = j.p.x + t1.x; ez = j.p.z + t1.z;
   } else { const s = c.s, fr = Math.min(T, s / CORPS.freinPlante); const L = s || 1; ex = j.p.x + (j.v.x / L) * (s * fr - 0.5 * CORPS.freinPlante * fr * fr); ez = j.p.z + (j.v.z / L) * (s * fr - 0.5 * CORPS.freinPlante * fr * fr); }
@@ -327,11 +440,12 @@ export function pasDemande(m, j) {
     j.demande = null;
     // la course de frappe part dans la direction de la cible : le root motion du clip suit ce cap
     if (c.course) j.cap = hc;
-    const g = lancerGeste(j, c.nom, {
+    lancerGeste(j, c.nom, {
       taux: c.taux, rm: c.course, echelle: c.course ? clamp(c.s / (2.19 * c.taux), 0.6, 2) : 1,
-      type: 'frappe', finApresImpact: 0.25, donnees: { spec: dm.spec, pied: CLIPS_PIED(c.nom) },
+      type: 'frappe', finApresImpact: 0.25, impact: c.impact, donnees: { spec: dm.spec, pied: c.pied },
     });
-    void g;
+    // (pour le banc : le geste choisi, le pied qui frappe et le côté de la balle à l'élan)
+    m.ev('elan', { j: j.i, nom: c.nom, pied: c.pied, cote: c.cote, y: b.p.y });
     return;
   }
   // aller au point de frappe
@@ -363,7 +477,7 @@ export function pasFrappe(m, j, dt) {
   if (!g.rm) g.cap0 = j.cap; else g.cap0 = enrouler(g.cap0 + rot);
   if (reste > 0) {
     // où doit être le corps à l'impact pour que le pied soit derrière la balle
-    piedA(g.nom, g.impact, g.donnees.pied, t1);
+    surfaceA(g.nom, g.impact, g.donnees.pied, t1);
     versMonde(j.cap, t1.x, t1.z, t2);
     const hx = sin(hc), hz = cos(hc);
     const bx = b.p.x + b.v.x * reste, bz = b.p.z + b.v.z * reste;
@@ -383,7 +497,7 @@ export function pasFrappe(m, j, dt) {
   }
   // l'impact
   g.fait = true; g.impactAge = g.age;
-  piedA(g.nom, g.impact, g.donnees.pied, t1);
+  surfaceA(g.nom, g.impact, g.donnees.pied, t1);
   versMonde(j.cap, t1.x, t1.z, t2);
   const px = j.p.x + t2.x, pz = j.p.z + t2.z;
   const dp = hypot(b.p.x - px, b.p.z - pz);

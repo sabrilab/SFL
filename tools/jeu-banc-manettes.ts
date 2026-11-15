@@ -252,9 +252,11 @@ function deuxManettes(graine: number) {
   const m: Any = creerMonde({ graine: 7, duree: 150, humains: [false, false], aides: [0, 0] });
   demarrer(m, { intro: false });
   for (let i = 0; i < 18000; i++) { pas(m); m.evts.length = 0; }
-  // (la référence de tools/jeu-banc.ts --graine=7 après les correctifs du contrôle : balle contre les corps, chutes,
-  // demi-tour, gardien ; les manettes ne la changent pas)
-  verifier('IA contre IA inchangée (graine 7)', empreinte(m) === 'd3f4e37b', `${empreinte(m)} (attendu d3f4e37b, celle du banc physique)`);
+  // (la référence de tools/jeu-banc.ts --graine=7 ; re-bénie par bola-app#26, lot 1 : vrai tacle glissé, chutes et
+  // relevés, contrôles anticipés, plongeons bas, IA qui glisse moins souvent — d3f4e37b avant ; les manettes ne la
+  // changent pas)
+  const REF = '7c88787c';
+  verifier('IA contre IA inchangée (graine 7)', empreinte(m) === REF, `${empreinte(m)} (attendu ${REF}, celle du banc physique)`);
 }
 
 // ── les correctifs du contrôle : gâchettes vues au repos, Xbox sous Linux, manette rebranchée sous un autre index ──

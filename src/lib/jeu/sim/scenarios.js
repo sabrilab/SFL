@@ -1,5 +1,5 @@
 // Les scènes rejouables du jeu (bola-app#23) : placements, graine et suites d'intentions au pas près, pour les captures
-// 01 à 05 du compte rendu et les essais. Une scène = { graine, presents?, creer(monde) → { entrees(monde) } } ;
+// 01 à 09 des comptes rendus et les essais. Une scène = { graine, presents?, creer(monde) → { entrees(monde) } } ;
 // entrees rend, à chaque pas, les intentions des deux équipes (null = l'IA joue). Le même scénario rejoué donne la même
 // image (la simulation est à graine et à pas fixe) ; la page l'avance par _test.avancer(n), sans dépendre des images
 // par seconde. Rien ici n'est montré au joueur : c'est un outil de banc, appelé seulement par /jouer?banc.
@@ -102,6 +102,60 @@ export const SCENARIOS = {
           return [intention(0, 0, 0, 0, { action: n === 12 ? { type: 'frappe', p: 0.42, x: 1.05, y: 1.1 } : null }), null];
         },
       };
+    },
+  },
+  // (bola-app#26) 06 : une balle à hauteur de poitrine sur un Noir arrêté : l'amorti de la poitrine, anticipé.
+  poitrine: {
+    graine: 106, presents: [0, 3, 5, 8],
+    creer(M) {
+      M.humains = [true, false]; M.controleFixe = [3, null];
+      poser(M.joueurs[3], 1, 2, -Math.PI / 2);
+      poser(M.joueurs[8], -8, 2.5, -Math.PI / 2);
+      const b = M.balle;
+      b.p.x = -5; b.p.y = 1.05; b.p.z = 2; b.v.x = 9; b.v.y = 3.3; b.v.z = 0; b.w.x = b.w.y = b.w.z = 0;
+      b.possesseur = null; b.dernier = 8; b.dernierT = M.t; b.garde = null; b.tir = null; b.recepteur = 3;
+      return { entrees: () => [intention(0, 0, 0, 0), null] };
+    },
+  },
+  // 07 : passement de jambes en course face à un défenseur.
+  passement: {
+    graine: 107, presents: [0, 4, 5, 6],
+    creer(M) {
+      M.humains = [true, false]; M.controleFixe = [4, null];
+      poser(M.joueurs[4], 0, 6, Math.PI, 0, -3);
+      balleA(M, 0, 5.4, 0, -3.3, 4);
+      poser(M.joueurs[6], 0.2, 2.4, 0);
+      let n = 0;
+      return {
+        entrees() {
+          n++;
+          return [intention(0, -1, 0.6, 0, { action: n === 30 ? { type: 'passement', dx: 1, dz: 0 } : null }), null];
+        },
+      };
+    },
+  },
+  // 09 : sombrero à l'arrêt (kick_up_soccerball) au-dessus d'un défenseur qui arrive.
+  sombrero: {
+    graine: 109, presents: [0, 4, 5, 6],
+    creer(M) {
+      M.humains = [true, false]; M.controleFixe = [4, null];
+      poser(M.joueurs[4], 0, 4, Math.PI, 0, 0);
+      balleA(M, 0, 3.6, 0, 0, 4);
+      poser(M.joueurs[6], 0.1, 1.6, 0);
+      let n = 0;
+      return { entrees() { n++; return [intention(0, -1, n < 140 ? 0 : 0.6, 0, { action: n === 6 ? { type: 'sombrero' } : null, regard: M.balle.p }), null]; } };
+    },
+  },
+  // 08 : frappe basse vers le poteau : le plongeon bas du gardien, couché sur le côté.
+  plongeonBas: {
+    graine: 108, presents: [4, 5],
+    creer(M) {
+      M.humains = [true, false]; M.controleFixe = [4, null];
+      poser(M.joueurs[4], 0.4, -1.6, Math.PI);
+      balleA(M, 0.4, -2.2, 0, 0, 4);
+      poser(M.joueurs[5], 0, -14, 0);
+      let n = 0;
+      return { entrees() { n++; return [intention(0, 0, 0, 0, { action: n === 12 ? { type: 'frappe', p: 0.3, x: 1.15, y: 0.2 } : null }), null]; } };
     },
   },
 };
