@@ -471,5 +471,369 @@
    ],
    "plant": 0.257
   }
+ },
+ "player2": {
+  "slide": {
+   "loop": false,
+   "dur": 0.8,
+   "move": [
+    0,
+    0
+   ],
+   "plant": 0,
+   "hit": 0.312,
+   "hitFixe": true,
+   "source": "sprint_to_backslide"
+  },
+  "getup_dos": {
+   "loop": false,
+   "dur": 2.7,
+   "move": [
+    0.045,
+    0.014
+   ],
+   "plant": 0,
+   "source": "getting_up (1)"
+  },
+  "getup_ventre": {
+   "loop": false,
+   "dur": 2.333,
+   "move": [
+    0.081,
+    -0.376
+   ],
+   "plant": 0,
+   "source": "stand_up (1)"
+  },
+  "trap": {
+   "loop": false,
+   "dur": 1.4,
+   "move": [
+    0,
+    0
+   ],
+   "plant": 0,
+   "hit": 0.214,
+   "hitFixe": true,
+   "source": "receive"
+  },
+  "trap_l": {
+   "loop": false,
+   "dur": 1.4,
+   "move": [
+    0,
+    0
+   ],
+   "plant": 0,
+   "hit": 0.214,
+   "hitFixe": true,
+   "source": "receive"
+  },
+  "stall": {
+   "loop": false,
+   "dur": 2.133,
+   "move": [
+    0,
+    0
+   ],
+   "plant": 0,
+   "hit": 0.164,
+   "hitFixe": true,
+   "source": "stall_soccerball (2)"
+  },
+  "stall_l": {
+   "loop": false,
+   "dur": 2.3,
+   "move": [
+    0,
+    0
+   ],
+   "plant": 0,
+   "hit": 0.152,
+   "hitFixe": true,
+   "source": "stall_soccerball"
+  },
+  "kickup": {
+   "loop": false,
+   "dur": 1.333,
+   "move": [
+    -0.056,
+    -0.074
+   ],
+   "plant": 0,
+   "hit": 0.45,
+   "hitFixe": true,
+   "source": "kick_up_soccerball"
+  },
+  "kickup_l": {
+   "loop": false,
+   "dur": 1.333,
+   "move": [
+    0.056,
+    -0.074
+   ],
+   "plant": 0,
+   "hit": 0.45,
+   "hitFixe": true,
+   "source": "kick_up_soccerball"
+  },
+  "knee_l": {
+   "loop": false,
+   "dur": 0.633,
+   "move": [
+    0,
+    0
+   ],
+   "plant": 0,
+   "hit": 0.211,
+   "source": "kneeing_soccerball"
+  },
+  "head_std": {
+   "loop": false,
+   "dur": 1.433,
+   "move": [
+    0.003,
+    0
+   ],
+   "plant": 0,
+   "hit": 0.433,
+   "hitFixe": true,
+   "source": "header"
+  },
+  "hit_l": {
+   "loop": false,
+   "dur": 1,
+   "move": [
+    -0.85,
+    0
+   ],
+   "plant": 0,
+   "source": "standing_react_large_from_left (1)"
+  },
+  "hit_r": {
+   "loop": false,
+   "dur": 1,
+   "move": [
+    0.845,
+    0
+   ],
+   "plant": 0,
+   "source": "standing_react_large_from_right (2)"
+  },
+  "stagger": {
+   "loop": false,
+   "dur": 2.433,
+   "move": [
+    0,
+    2.639
+   ],
+   "plant": 0,
+   "source": "shove_reaction (1)"
+  },
+  "fall_side": {
+   "loop": false,
+   "dur": 3.1,
+   "move": [
+    -0.191,
+    -1.474
+   ],
+   "plant": 0,
+   "source": "shoulder_hit_and_fall"
+  },
+  "fall_back": {
+   "loop": false,
+   "dur": 3.333,
+   "move": [
+    0.014,
+    -1.813
+   ],
+   "plant": 0,
+   "source": "stumble_backwards"
+  },
+  "fall_sweep": {
+   "loop": false,
+   "dur": 2.5,
+   "move": [
+    -0.152,
+    -0.636
+   ],
+   "plant": 0,
+   "source": "sweep_fall"
+  },
+  "fall_trip": {
+   "loop": false,
+   "dur": 2.767,
+   "move": [
+    -0.083,
+    3.105
+   ],
+   "plant": 0,
+   "source": "tripping (1)"
+  },
+  "start": {
+   "loop": false,
+   "dur": 1.067,
+   "move": [
+    0,
+    6.455
+   ],
+   "plant": 0,
+   "source": "two_cycle_sprint"
+  },
+  "turn180_std": {
+   "loop": false,
+   "dur": 1.3,
+   "move": [
+    0.018,
+    -0.021
+   ],
+   "plant": 0,
+   "turn": [
+    0,
+    0.024,
+    0.079,
+    -0.043,
+    -0.378,
+    -0.745,
+    -1.062,
+    -1.492,
+    -2.072,
+    -2.565,
+    -3.05,
+    -3.379,
+    -3.457,
+    -3.395,
+    -3.255,
+    -3.169,
+    -3.142
+   ],
+   "source": "quick_180_turn"
+  },
+  "feint_r": {
+   "loop": false,
+   "dur": 0.967,
+   "move": [
+    -1.827,
+    0
+   ],
+   "plant": 0,
+   "source": "standing_dodge_right"
+  },
+  "feint_l": {
+   "loop": false,
+   "dur": 0.967,
+   "move": [
+    1.827,
+    0
+   ],
+   "plant": 0,
+   "source": "standing_dodge_right"
+  }
+ },
+ "keeper2": {
+  "k_catch_std": {
+   "loop": false,
+   "dur": 1.267,
+   "move": [
+    -0.388,
+    0.512
+   ],
+   "plant": 0,
+   "source": "goalkeeper_catch (1)"
+  },
+  "k_high": {
+   "loop": false,
+   "dur": 2.733,
+   "move": [
+    -0.042,
+    0.544
+   ],
+   "plant": 0,
+   "source": "goalkeeper_catch (2)"
+  },
+  "k_low_l": {
+   "loop": false,
+   "dur": 2.633,
+   "move": [
+    0,
+    0
+   ],
+   "plant": 0,
+   "source": "goalkeeper_body_block"
+  },
+  "k_low_r": {
+   "loop": false,
+   "dur": 2.633,
+   "move": [
+    0,
+    0
+   ],
+   "plant": 0,
+   "source": "goalkeeper_body_block"
+  },
+  "k_pass": {
+   "loop": false,
+   "dur": 3.133,
+   "move": [
+    0.125,
+    0.777
+   ],
+   "plant": 0,
+   "hit": 0.83,
+   "source": "goalkeeper_pass"
+  },
+  "k_roll": {
+   "loop": false,
+   "dur": 3.833,
+   "move": [
+    -0.127,
+    1.131
+   ],
+   "plant": 0,
+   "hit": 0.435,
+   "source": "goalie_throw"
+  }
+ },
+ "celeb2": {
+  "c_chest": {
+   "loop": false,
+   "dur": 2.833,
+   "move": [
+    0.001,
+    0.003
+   ],
+   "plant": 0,
+   "source": "standing_taunt_chest_thump"
+  },
+  "c_thumbs": {
+   "loop": false,
+   "dur": 4.167,
+   "move": [
+    -0.001,
+    0
+   ],
+   "plant": 0,
+   "source": "standing_thumbs_up"
+  },
+  "c_victory": {
+   "loop": true,
+   "dur": 1.867,
+   "move": [
+    0,
+    0
+   ],
+   "plant": 0.964,
+   "source": "victory_idle (1)"
+  },
+  "c_slide": {
+   "loop": false,
+   "dur": 2.067,
+   "move": [
+    0,
+    8.049
+   ],
+   "plant": 0,
+   "source": "sprint_to_backslide"
+  }
  }
 }

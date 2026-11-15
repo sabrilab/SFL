@@ -11,6 +11,7 @@
 // moyenne et la part de matchs sans but, plutôt que « chaque match entre 1 et 14 ») et la conduite (l'avance de la
 // balle en sprint).
 import fs from 'node:fs';
+import { execSync } from 'node:child_process';
 import path from 'node:path';
 import * as Cst from '../src/lib/jeu/sim/constantes.js';
 import * as Bal from '../src/lib/jeu/sim/ballon.js';
@@ -20,6 +21,7 @@ import * as Bcl from '../src/lib/jeu/sim/boucle.js';
 import * as Gst from '../src/lib/jeu/sim/gestes.js';
 import * as Gar from '../src/lib/jeu/sim/gardien.js';
 import * as Ia from '../src/lib/jeu/sim/ia.js';
+import * as Clp from '../src/lib/jeu/sim/clips.js';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Any = any;
@@ -32,6 +34,12 @@ const { creerBoucle, avancer }: Any = Bcl;
 const { porteur, demanderFrappe, rouler }: Any = Gst;
 const { mainsMonde }: Any = Gar;
 const { intentionVide }: Any = Ia;
+const { chargerMesures, oublierMesures, empreinteOctets, MESURES, CLIPS }: Any = Clp;
+
+// les mesures des clips (public/jeu/anims/mesures.pak) : la simulation refuse de démarrer sans elles
+const RACINE = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
+const lireMesures = () => chargerMesures(fs.readFileSync(path.join(RACINE, 'public/jeu/anims/mesures.pak')));
+lireMesures();
 
 const args = process.argv.slice(2);
 const vite = args.includes('--vite');
@@ -581,6 +589,36 @@ function tacle(graine: number, deFace: boolean) {
   const bc: Any = creerBoucle(m); const pas0 = m.pas;
   avancer(bc, NaN); const n1 = avancer(bc, 1 / 30);
   verifier('But au ralenti et entrées folles', longs === 0 && sain && n1 === 4 && m.pas === pas0 + 4, `chevauchements de plus de 8 cm pendant plus de 1 s au but : ${longs} ; intention NaN/infinie : ${sain ? 'aucune NaN' : 'NaN'} ; après un dt NaN, 1/30 s fait ${n1} pas`);
+}
+
+// ─────────────────────────── les mesures des clips (.pak) ───────────────────────────
+{
+  // (bola-app#26, décision 2 de #25) les mesures ne sont plus en clair : sim/clips.js est un registre vide, rempli par
+  // mesures.pak ; sans lui, la simulation refuse de démarrer ; un .pak abîmé est refusé ; les mesures ont été prises
+  // sur les paquets actuels (empreinte de chaque paquet) ; aucun FBX ni GLB d'animation Mixamo en clair dans public/
+  const texteClips = fs.readFileSync(path.join(RACINE, 'src/lib/jeu/sim/clips.js'), 'utf8');
+  const enClair = /"root"\s*:|"pieds"\s*:/.test(texteClips) || texteClips.length > 6000;
+  oublierMesures();
+  let refuse = false;
+  try { creerMonde({ graine: 1 }); } catch { refuse = true; }
+  const brut = new Uint8Array(fs.readFileSync(path.join(RACINE, 'public/jeu/anims/mesures.pak')));
+  const abime = brut.slice(); abime[abime.length - 9] ^= 0x5a;
+  let abimeRefuse = false;
+  try { chargerMesures(abime); } catch { abimeRefuse = true; }
+  lireMesures();
+  const perimes: string[] = [];
+  for (const [pack, h] of Object.entries(MESURES.sources as Record<string, string>)) {
+    const f = path.join(RACINE, `public/jeu/anims/${pack}.pak`);
+    if (!fs.existsSync(f) || empreinteOctets(new Uint8Array(fs.readFileSync(f))) !== h) perimes.push(pack);
+  }
+  const suivis = execSync('git ls-files public', { cwd: RACINE, encoding: 'utf8' }).split('\n').filter(Boolean);
+  // (les seuls modèles en clair autorisés : décors et corps Quaternius CC0, et le neutral_idle.fbx signalé dans #25)
+  const permis = /^public\/jeu\/(plateau|chars\/(homme|femme))|^public\/assets\/mixamo\/neutral_idle\.fbx$|^public\/sponsoring\//;
+  const clairs = suivis.filter((f) => /\.(fbx|glb|gltf)$/i.test(f) && !permis.test(f) && /anim|mixamo|jeu/i.test(f));
+  const nouveaux = ['slide', 'getup_dos', 'trap', 'stall', 'kickup', 'head_std', 'fall_side', 'k_low_l', 'k_low_r', 'k_high'];
+  const manque = nouveaux.filter((k) => !CLIPS[k]);
+  verifier('Mesures des clips en .pak', !enClair && refuse && abimeRefuse && perimes.length === 0 && clairs.length === 0 && manque.length === 0,
+    `clips.js en clair : ${enClair ? 'OUI' : 'non'} ; monde sans mesures ${refuse ? 'refusé' : 'ACCEPTÉ'} ; .pak abîmé ${abimeRefuse ? 'refusé' : 'ACCEPTÉ'} ; empreinte ${MESURES.empreinte}, ${Object.keys(CLIPS).length} clips mesurés sur ${Object.keys(MESURES.sources).join(', ')}${perimes.length ? ' ; PÉRIMÉES pour ' + perimes.join(', ') : ' (à jour)'} ; FBX/GLB d'animation en clair dans public/ : ${clairs.length ? clairs.join(', ') : 'aucun'}${manque.length ? ' ; clips absents : ' + manque.join(', ') : ''}`);
 }
 
 // ─────────────────────────── reproductible ───────────────────────────

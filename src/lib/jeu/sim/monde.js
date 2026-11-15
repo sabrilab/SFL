@@ -28,12 +28,15 @@ import { pasCorpsACorps, demanderTacle, pasTacle, desequilibrer, demeler, balleC
 import { pasGardien, pasCorpsGardien, contactGardien, tenirBalle } from './gardien.js';
 import { pasIA, intentionVide, conduire } from './ia.js';
 import { acos, atan2, cos, hypot, sin } from './maths.js';
+import { exigerMesures } from './clips.js';
 
 /**
  * Crée un match. humains : [bool, bool] (une équipe jouée par un humain) ; aides : [aide0, aide1] (1 = pouce,
  * 0,5 = manette, 0 = IA) ; journal : une fonction (type, ...valeurs) pour le banc.
  */
 export function creerMonde({ graine = 1, duree = JEU.duree, humains = [true, false], aides = [1, 0], journal = null, presents = null } = {}) {
+  // (les mesures des clips, public/jeu/anims/mesures.pak, doivent être chargées : sim/clips.js)
+  exigerMesures();
   const joueurs = [];
   for (const e of [0, 1]) for (const role of ROLES) {
     const j = creerCorps(joueurs.length, e, role);

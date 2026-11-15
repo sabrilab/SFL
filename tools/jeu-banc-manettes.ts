@@ -14,6 +14,13 @@ import * as Mon from '../src/lib/jeu/sim/monde.js';
 import * as Gst from '../src/lib/jeu/sim/gestes.js';
 import * as Cmd from '../src/lib/jeu/entrees/commande.js';
 import * as Man from '../src/lib/jeu/entrees/manettes.js';
+import * as Clp from '../src/lib/jeu/sim/clips.js';
+import fs from 'node:fs';
+import path from 'node:path';
+
+// les mesures des clips : la simulation refuse de démarrer sans elles (sim/clips.js)
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+(Clp as any).chargerMesures(fs.readFileSync(path.join(path.dirname(new URL(import.meta.url).pathname), '..', 'public/jeu/anims/mesures.pak')));
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Any = any;

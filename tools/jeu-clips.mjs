@@ -1,8 +1,10 @@
-// Les tables des clips pour la simulation du jeu (src/lib/jeu/sim/clips.js), lues dans les .pak d'animation.
+// Les tables des clips pour la simulation du jeu (public/jeu/anims/mesures.pak, chargé par src/lib/jeu/sim/clips.js),
+// lues dans les .pak d'animation.
 //
 // La simulation ne lit jamais le squelette animé (elle tourne aussi sans navigateur, dans le banc) : ce qu'elle doit
 // savoir des clips Mixamo est mesuré ici, une fois, hors navigateur. Le .pak est débrouillé en mémoire (pakcodec.js),
-// le GLB n'est jamais écrit sur disque, aucun FBX n'est lu. Pour chaque clip des paquets « player » et « keeper » :
+// le GLB n'est jamais écrit sur disque, aucun FBX n'est lu. Pour chaque clip des paquets « player », « keeper »,
+// « player2 » et « keeper2 » (bola-app#26, tools/jeu-anims.mjs) :
 //   dur, hit (part du clip à l'impact, index.json), turn (courbe de lacet fournie, index.json) ;
 //   root : le déplacement horizontal de la racine (root motion), en mètres, à 30 images/s (x, z alternés) ;
 //   pieds : la position du milieu de chaque pied (entre cheville et orteil) dans le repère du joueur, sans le root
@@ -12,7 +14,12 @@
 //   piedImpact : à l'impact, le pied qui frappe (« g » ou « d ») et sa position (m).
 // Unités : la hanche du footballeur Ch38 mesurée dans le jeu vaut 0,957 m (le squelette de référence a une hanche de 1).
 //
-//   node tools/jeu-clips.mjs        écrit src/lib/jeu/sim/clips.js
+// Les mesures ne sont plus en clair dans le dépôt (décision 2 de bola-app#25) : elles sont écrites en JSON brouillé
+// (pak(), nom « mesures ») dans public/jeu/anims/mesures.pak, avec l'empreinte FNV-1a de chaque paquet mesuré
+// (sources) et celle du JSON (empreinte) ; la page les charge avant de créer le monde, le banc les lit sur disque et
+// refuse des mesures plus vieilles que les paquets.
+//
+//   node tools/jeu-clips.mjs        écrit public/jeu/anims/mesures.pak
 //   node tools/jeu-clips.mjs --voir imprime le résumé sans rien écrire
 import fs from 'node:fs';
 import path from 'node:path';
@@ -23,7 +30,8 @@ const racine = path.resolve(ici, '..');
 const THREE = await import('three');
 const { GLTFLoader } = await import('three/examples/jsm/loaders/GLTFLoader.js');
 const { MeshoptDecoder } = await import('three/examples/jsm/libs/meshopt_decoder.module.js');
-const { unpak } = await import(path.join(racine, 'src/lib/jeu/pakcodec.js'));
+const { unpak, pak } = await import(path.join(racine, 'src/lib/jeu/pakcodec.js'));
+const { empreinteOctets } = await import(path.join(racine, 'src/lib/jeu/sim/clips.js'));
 
 const HANCHE = 0.957;
 const FPS = 30;
@@ -31,9 +39,12 @@ const index = JSON.parse(fs.readFileSync(path.join(racine, 'public/jeu/anims/ind
 const voir = process.argv.includes('--voir');
 
 await MeshoptDecoder.ready;
-const sortie = {};
-for (const pack of ['player', 'keeper']) {
-  const glb = unpak(fs.readFileSync(path.join(racine, `public/jeu/anims/${pack}.pak`)), pack);
+const sortie = {}, sources = {};
+const PAQUETS = ['player', 'keeper', 'player2', 'keeper2'];
+for (const pack of PAQUETS) {
+  const brut = fs.readFileSync(path.join(racine, `public/jeu/anims/${pack}.pak`));
+  sources[pack] = empreinteOctets(brut);
+  const glb = unpak(brut, pack);
   const g = await new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).parseAsync(glb.buffer.slice(glb.byteOffset, glb.byteOffset + glb.byteLength), '');
   const scene = g.scene;
   const os = (n) => scene.getObjectByName(n);
@@ -60,7 +71,7 @@ for (const pack of ['player', 'keeper']) {
         a.add(b).multiplyScalar(0.5).sub(r0).multiplyScalar(HANCHE * 100);
         pd.push(Math.round(a.x), Math.round(a.y), Math.round(a.z));
       }
-      if (pack === 'keeper') {
+      if (pack.startsWith('keeper')) {
         mains[0].getWorldPosition(a); mains[1].getWorldPosition(b);
         a.add(b).multiplyScalar(0.5).sub(r0).multiplyScalar(HANCHE * 100);
         mn.push(Math.round(a.x), Math.round(a.y), Math.round(a.z));
@@ -70,6 +81,7 @@ for (const pack of ['player', 'keeper']) {
     const e = { dur: +clip.duration.toFixed(4), n, root, pieds: pd };
     if (meta.hit != null) e.hit = meta.hit;
     if (meta.loop) e.boucle = true;
+    if (meta.source) e.source = meta.source;
     if (meta.turn) e.turn = meta.turn.map((x) => +(+x).toFixed(4));
     if (mn.length) e.mains = mn;
     // les appuis d'un cycle : pied à moins de 7 cm du sol et lent (dans le repère du clip, qui avance avec la racine)
@@ -104,8 +116,9 @@ for (const pack of ['player', 'keeper']) {
       const p = vitesse(0, i0) > vitesse(1, i0) ? 0 : 1;
       // l'impact marqué tombe parfois après le contact (pied déjà haut) : on prend, de 0,2 s avant à 0,05 s après,
       // l'image où ce pied est le plus bas en allant vite vers l'avant (le contact avec une balle au sol)
+      // (un impact imposé au manifeste, hitFixe : amorti, sombrero, tête, est gardé tel quel)
       let i = i0, best = Infinity;
-      for (let k = Math.max(0, i0 - 6); k <= Math.min(n - 1, i0 + 1); k++) {
+      for (let k = Math.max(0, i0 - 6); k <= Math.min(n - 1, i0 + 1) && !meta.hitFixe; k++) {
         const y = pd[k * 6 + p * 3 + 1] / 100, v = vitesse(p, k);
         if (v < 2.5) continue;
         const s = y - 0.02 * v;
@@ -120,14 +133,10 @@ for (const pack of ['player', 'keeper']) {
 }
 
 if (!voir) {
-  const cible = path.join(racine, 'src/lib/jeu/sim/clips.js');
-  const texte = `// GÉNÉRÉ par tools/jeu-clips.mjs depuis public/jeu/anims/player.pak et keeper.pak : ne pas modifier à la main.
-// Les tables des clips Mixamo que lit la simulation (durées, root motion, pieds, appuis, impacts, mains du gardien).
-// Voir l'en-tête de tools/jeu-clips.mjs pour les unités. Aucune géométrie ni animation complète : des mesures.
-export const FPS_CLIPS = ${FPS};
-export const HANCHE = ${HANCHE};
-export const CLIPS = ${JSON.stringify(sortie)};
-`;
-  fs.writeFileSync(cible, texte);
-  console.log('écrit', path.relative(racine, cible), (texte.length / 1024).toFixed(1), 'Ko');
+  const cible = path.join(racine, 'public/jeu/anims/mesures.pak');
+  const corps = { fps: FPS, hanche: HANCHE, sources, clips: sortie };
+  const texte = JSON.stringify(corps);
+  const octets = new TextEncoder().encode(JSON.stringify({ empreinte: empreinteOctets(new TextEncoder().encode(texte)), ...corps }));
+  fs.writeFileSync(cible, pak(octets, 'mesures'));
+  console.log('écrit', path.relative(racine, cible), (octets.length / 1024).toFixed(1), 'Ko,', Object.keys(sortie).length, 'clips');
 }

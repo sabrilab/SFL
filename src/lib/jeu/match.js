@@ -54,6 +54,7 @@ import { PAS, BALLON, JEU, butDe } from './sim/constantes.js';
 import { allongeBras } from './sim/gardien.js';
 import { porteur } from './sim/gestes.js';
 import { SCENARIOS } from './sim/scenarios.js';
+import { chargerMesuresUrl } from './sim/clips.js';
 import { changerHumains } from './sim/monde.js';
 import { creerManettes, EFFETS } from './entrees/manettes.js';
 
@@ -112,7 +113,10 @@ export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, 
   Object.assign(renderer.domElement.style, { display: 'block', position: 'absolute', inset: '0', width: '100%', height: '100%', touchAction: 'none' });
   conteneur.appendChild(renderer.domElement);
 
+  // les mesures des clips (sim/clips.js, mesures.pak) : avant le monde et les animateurs, en même temps que le plateau
+  const mesures = chargerMesuresUrl();
   const pl = await creerPlateau(renderer, { qualite: Math.min(cw, ch) >= 600 ? 'jeuPlein' : 'jeuTel', base: '/jeu/plateau/', largeur: W, hauteur: H });
+  await mesures;
   surProgres(0.4);
   if (pl.lyres && reduit) pl.lyres.visible = false;
   // le halo seulement sur les vraies sources (projecteurs, LED) : pas sur un col blanc ou le ballon sous les projecteurs
