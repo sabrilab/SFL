@@ -68,6 +68,7 @@ import { LOGO_BOLA } from "@/components/sfl/finitions-carte";
 import { RosaceBola } from "@/components/sfl/motif-carte";
 import { BoutonRetour } from "@/components/layout/bouton-retour";
 import { useBolaPlus, type BolaPlus } from "@/hooks/use-bola-plus";
+import { useSession } from "@/hooks/use-session";
 import { ovr } from "@/lib/sfl/engine";
 import {
   AFFICHE,
@@ -86,6 +87,7 @@ import {
   PRIX_FORMULE,
   VARIABLES_PLUS,
   diapos,
+  voitBolaPlus,
   fichierVisuel,
   sourcesVisuel,
   type Avantage,
@@ -142,6 +144,9 @@ function CestNote({ className }: { className?: string }) {
 /** L'entrée de Bola Plus sur Ma carte (profil/page.tsx). */
 export function TuileBolaPlus() {
   const { interet } = useBolaPlus();
+  const session = useSession();
+  // Les deux admins seulement, tant que Bola Plus n'est pas annoncé (voitBolaPlus, lib/sfl/bola-plus.ts).
+  if (!voitBolaPlus(session?.name)) return null;
   return (
     <Link
       href="/profil/bola-plus"

@@ -52,6 +52,18 @@
 // Pur : ni React ni réseau (tools/bola-plus-check.ts).
 
 import type { Stats } from "./engine";
+import { isAdmin } from "./admin";
+
+/**
+ * Qui voit Bola Plus en ligne (la tuile de Ma carte et /profil/bola-plus).
+ * Sabri, 16/11/2026 : « mettre le paywall sur les comptes de Ilyes et Sabri les
+ * admins pour qu'on voie ce que ça donne » : les deux admins seulement
+ * (admin.ts), aucun autre joueur. Pour l'ouvrir à tous le jour de l'annonce,
+ * c'est ici, et nulle part ailleurs.
+ */
+export function voitBolaPlus(nom: string | null | undefined): boolean {
+  return isAdmin(nom);
+}
 
 /** Le prix du mois, en centimes : 19,90 €. */
 export const MENSUEL_CENTIMES = 1990;

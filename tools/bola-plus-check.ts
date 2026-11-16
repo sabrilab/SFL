@@ -98,6 +98,7 @@ import {
   type Avantage,
   type LigneInteret,
 } from "../src/lib/sfl/bola-plus";
+import { voitBolaPlus } from "../src/lib/sfl/bola-plus";
 
 // 1 · L'offre.
 const NBSP = "\u00a0";
@@ -210,9 +211,12 @@ type Magasin = typeof import("../src/lib/sfl/bola-plus-store");
 const CHEMIN = require.resolve("../src/lib/sfl/bola-plus-store");
 const CLIENT = require.resolve("../src/lib/supabase");
 /** Le magasin chargé à neuf, comme dans un aperçu (env absent) ou en production. */
-function charger(env: string | undefined): Magasin {
+function charger(env: string | undefined, table = true): Magasin {
   if (env === undefined) delete process.env.NEXT_PUBLIC_BOLA_ENV;
   else process.env.NEXT_PUBLIC_BOLA_ENV = env;
+  // La table en base (NEXT_PUBLIC_BOLA_PLUS_TABLE) : sans elle, même la production garde le toucher sur le téléphone.
+  if (table) process.env.NEXT_PUBLIC_BOLA_PLUS_TABLE = "1";
+  else delete process.env.NEXT_PUBLIC_BOLA_PLUS_TABLE;
   delete require.cache[CHEMIN];
   // Le client de la base aussi : il relit la session du téléphone à sa création.
   delete require.cache[CLIENT];
@@ -223,6 +227,10 @@ const REFUS = "Pas enregistré. Reconnecte-toi, puis réessaie.";
 const UID = "aaaaaaaa-0000-4000-8000-000000000001";
 
 async function banc() {
+  // 0 · Qui voit Bola Plus en ligne (16/11) : Ilyes et Sabri, personne d'autre.
+  assert.ok(voitBolaPlus("Ilyes") && voitBolaPlus("Sabri"), "les deux admins voient Bola Plus");
+  for (const nom of ["Léo", "sabri", "Sidali", "", null, undefined]) assert.equal(voitBolaPlus(nom), false, `${String(nom)} ne voit pas Bola Plus`);
+
   // 4 · Dans un aperçu.
   for (const env of [undefined, "preview", "development"]) {
     stockage.clear();
@@ -271,6 +279,16 @@ async function banc() {
   await course.noterInteret("Léo", "annuel");
   await lecture;
   assert.equal(course.interetEnMemoire("Léo")?.formule, "annuel", "la lecture n'écrase pas le toucher");
+
+  // 4 bis · En production sans la table (16/11 : seuls les admins voient Bola Plus) : le toucher reste sur le téléphone, rien n'est demandé à la base.
+  stockage.clear();
+  requetes.length = 0;
+  const sansTable = charger("production", false);
+  assert.equal(sansTable.APERCU, true, "sans la table, la production reste sur le téléphone");
+  await sansTable.chargerInteret("Ilyes");
+  await sansTable.noterInteret("Ilyes", "annuel");
+  assert.equal(sansTable.interetEnMemoire("Ilyes")?.formule, "annuel");
+  assert.equal(requetes.length, 0, "sans la table, aucune requête");
 
   // 5 · En production.
   stockage.clear();

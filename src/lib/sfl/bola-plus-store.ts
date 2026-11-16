@@ -21,7 +21,15 @@ import { erreurSansTable } from "./consentement";
 import { toutesLesPages, PAGE } from "./pages";
 
 export const BOLA_PLUS_EVENT = "bola-plus";
-export const APERCU = process.env.NEXT_PUBLIC_BOLA_ENV !== "production";
+/**
+ * La table bola_plus_interets est-elle en base ? Pas encore (aucune migration
+ * sans le ok de Sabri) : tant qu'elle n'y est pas, même en ligne, où seuls les
+ * deux admins voient Bola Plus (voitBolaPlus), « Je suis intéressé » reste sur
+ * le téléphone, comme dans un aperçu, au lieu de répondre « Pas enregistré ».
+ * Le jour où la table est créée : NEXT_PUBLIC_BOLA_PLUS_TABLE=1 dans Vercel.
+ */
+const TABLE_EN_BASE = process.env.NEXT_PUBLIC_BOLA_PLUS_TABLE === "1";
+export const APERCU = process.env.NEXT_PUBLIC_BOLA_ENV !== "production" || !TABLE_EN_BASE;
 const CLE_APERCU = "bola-plus-apercu";
 const REFUS = "Pas enregistré. Reconnecte-toi, puis réessaie.";
 
