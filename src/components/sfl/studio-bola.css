@@ -3,8 +3,8 @@
    recharges), les vignettes. Couleurs de la part Bola Plus, lues dans les
    variables --bp-plus-* (PALETTE, posées par la page et sur le panneau) :
    aucune teinte écrite ici. Une vignette est l'image de son modèle, en 4:5,
-   telle qu'elle a été faite (en couleur, avec l'avatar d'Ilyes, depuis le
-   16/11) : ni recadrée en carré, ni grossie, ni teinte, ni animée ; sur son tiers bas, sombre dans
+   telle qu'elle a été faite (en couleur, avec l'avatar d'un joueur de la
+   ligue, depuis le 16/11) : ni recadrée en carré, ni grossie, ni teinte, ni animée ; sur son tiers bas, sombre dans
    l'image, le nom du modèle et son prix, sur un voile noir. Les mots de la
    légende se règlent sur la largeur de la vignette (cqw) : la même vignette
    dans le rail, dans l'éventail et en grand dans la fiche. Le rail s'accroche
@@ -200,12 +200,17 @@
    reste en 4:5, la fiche ne défile pas. La colonne étant plus étroite, ce
    que tu reçois y prend une ligne de plus sur le plus petit écran (320 ×
    568, « Convocation d'équipe ») : la marge du bas de la fiche (pb-4, 32 px
-   avant) la lui laisse. ── */
+   avant) la lui laisse. Jamais sous 176 px : sur un téléphone tenu en
+   largeur (844 × 390, 667 × 375), la borne tomberait à la taille de la
+   vignette en petit (49 px, 38 px) et le texte à un mot par ligne ; là, la
+   fiche défile. 176 px, c'est le plus grand plancher qui ne change rien en
+   hauteur, jusqu'au 320 × 568 (la borne y donne 179,6 px), et ta photo →
+   ton image y tient (148 px). ── */
 .st-fiche {
   display: flex;
   flex-direction: column;
   gap: 16px;
-  width: min(100%, (92dvh - 298px) * 0.8);
+  width: min(100%, max(176px, (92dvh - 298px) * 0.8));
   margin-inline: auto;
 }
 

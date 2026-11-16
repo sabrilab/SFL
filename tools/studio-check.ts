@@ -67,7 +67,8 @@
 //   8 · toi, dedans (16/11, bola-app#22 : « il faut bien faire comprendre que
 //       l'user pourra générer ces templates avec sa propre personne ») : le
 //       sous-titre du panneau est « Avec ta photo. 300 ⚽ = un trash talk ou
-//       six images » (SOUS_TITRE_STUDIO) ; la photo de ta carte, en pastille
+//       six images » (AVEC_TA_PHOTO, puis PHRASE_INCLUS : l'écran compose
+//       le sous-titre) ; la photo de ta carte, en pastille
 //       ronde, est en haut à gauche de chaque vignette du rail (pas sur
 //       l'éventail), et au bas de la fiche, ta photo → ton image (la photo,
 //       une flèche, la vignette en petit, sans un mot) ; cette photo vient du
@@ -77,7 +78,8 @@
 //       sans photo, ou si elle ne se charge pas, l'initiale (le repli du
 //       portrait de la carte) ; la pastille est décorative ; dans la feuille,
 //       elle est ronde, cerclée de blanc, sans teinte ; la fiche se borne
-//       aussi à cette ligne de plus.
+//       aussi à cette ligne de plus, jamais sous un plancher (un téléphone
+//       tenu en largeur) qui ne change rien en hauteur jusqu'au 320 × 568.
 //   Des mutants sont rejoués : chaque garde doit les refuser (pour la raison
 //   dite, quand elle est écrite) ; un mutant dont le texte à changer n'est
 //   plus dans la source arrête le banc (SansPrise).
@@ -96,7 +98,6 @@ import {
   PHRASE_INCLUS,
   AVEC_TA_PHOTO,
   RECHARGES_STUDIO,
-  SOUS_TITRE_STUDIO,
   TEMPLATES,
   VIGNETTE,
   ballons,
@@ -157,9 +158,10 @@ assert.throws(() => ballons(1.5));
 assert.equal(BALLONS_PAR_MOIS, 300);
 assert.equal(OFFERTS_ANNUEL, 1000);
 assert.equal(PHRASE_INCLUS, `300${NB}⚽ = un trash talk ou six images`);
-// Le sous-titre du panneau, mot pour mot (Sabri, 16/11) : « Avec ta photo. », puis la phrase calculée.
-assert.equal(SOUS_TITRE_STUDIO, `Avec ta photo. 300${NB}⚽ = un trash talk ou six images`);
-assert.equal(SOUS_TITRE_STUDIO, `${AVEC_TA_PHOTO} ${PHRASE_INCLUS}`, "le sous-titre : « Avec ta photo. », puis la phrase calculée");
+// Le sous-titre du panneau, mot pour mot (Sabri, 16/11), tel que l'écran le compose (« Avec ta photo. » sur sa ligne,
+// un espace, puis la phrase calculée : la composition elle-même est lue dans l'écran, ecranJuste).
+assert.equal(AVEC_TA_PHOTO, "Avec ta photo.");
+assert.equal(`${AVEC_TA_PHOTO} ${PHRASE_INCLUS}`, `Avec ta photo. 300${NB}⚽ = un trash talk ou six images`, "le sous-titre : « Avec ta photo. », puis la phrase calculée");
 // Les attendus, écrits à la main (prix du catalogue : trash talk 299, image la moins chère 49).
 const PHRASES: [number, string][] = [
   [49, "une image"],
@@ -508,7 +510,14 @@ const feuilleJuste = (css: string) => {
   // feuille (92dvh, FEUILLE_STUDIO), à toute hauteur d'écran : la règle est hors de tout @media (en début de ligne).
   // 298 px : le retour, les marges et les deux lignes (222 px), puis l'écart (16 px) et la ligne de ta photo, à la
   // hauteur de la vignette en petit (48 px de large en 4:5 : 60 px).
-  assert.ok(/\n\.st-fiche \{[^}]*flex-direction: column;[^}]*width: min\(100%, \(92dvh - 298px\) \* 0\.8\);[^}]*margin-inline: auto;[^}]*\}/.test(code), "la fiche se borne à ce qui tient dans la feuille, à toute hauteur d'écran");
+  const borne = /\n\.st-fiche \{[^}]*flex-direction: column;[^}]*width: min\(100%, max\((\d+)px, \(92dvh - 298px\) \* 0\.8\)\);[^}]*margin-inline: auto;[^}]*\}/.exec(code);
+  assert.ok(borne, "la fiche se borne à ce qui tient dans la feuille, à toute hauteur d'écran");
+  // Son plancher : un téléphone tenu en largeur (844 × 390) ne la réduit pas à la vignette en petit ; il ne change rien
+  // en hauteur jusqu'au plus petit écran (320 × 568 : la borne y vaut 179,6 px) ; ta photo → ton image y tient
+  // (4 + 48 + 12 + 20 + 12 + 48 + 4 = 148 px).
+  const plancher = +borne[1];
+  assert.ok(plancher <= (0.92 * 568 - 298) * 0.8, `le plancher de la fiche (${plancher} px) la ferait défiler sur un écran de 320 × 568`);
+  assert.ok(plancher >= 148, `le plancher de la fiche (${plancher} px) : ta photo → ton image n'y tient plus`);
   assert.ok(/\n\.st-ligne__image \{[^}]*width: 48px;/.test(code) && /\n\.st-ligne \{[^}]*align-items: center;/.test(code), "ta photo → ton image : la vignette en petit, 48 px de large (60 de haut), comptée dans la borne de la fiche");
   // Ni animée : rien ne bouge seul dans la feuille ; une vidéo se dit par son triangle et sa durée.
   assert.ok(!/animation\s*:|@keyframes/.test(code), "aucune animation : une vignette ne bouge pas");
@@ -576,7 +585,7 @@ const ecranJuste = (tsx: string) => {
   assert.ok(/<Legende t=\{t\} titre \/>\s*<\/div>\s*<div className="flex flex-col gap-3 px-1">\s*<p className="text-corps leading-snug text-encre-2">\{t\.recoit\}<\/p>\s*<Duree t=\{t\} grand \/>\s*<\/div>\s*<LigneToi t=\{t\} toi=\{toi\} \/>\s*<\/div>/.test(fiche) && !/aria-hidden/.test(fiche), "la feuille : ce que tu reçois et la durée, puis ta photo → ton image, dans la colonne de la vignette");
   assert.ok(/\nconst FEUILLE_STUDIO = "st-feuille max-h-\[92dvh\] overflow-y-auto /.test(tsx), "la feuille : 92dvh au plus (la borne de la fiche le recopie)");
   const panneau = bloc(tsx, "PanneauStudio");
-  // Le sous-titre (SOUS_TITRE_STUDIO) en deux lignes : « Avec ta photo. », puis la phrase des ballons ; le même texte, un espace entre les deux.
+  // Le sous-titre en deux lignes : « Avec ta photo. » (AVEC_TA_PHOTO), puis la phrase des ballons ; un espace entre les deux.
   assert.ok(/<p className="st-panneau__phrase tabular-nums">\s*<span className="st-panneau__avec">\{AVEC_TA_PHOTO\}<\/span> \{PHRASE_INCLUS\}\s*<\/p>/.test(panneau), "« Avec ta photo. » et la phrase des ballons du mois se voient");
   assert.ok(/TEMPLATES\.map\(\(t\) => \(\s*<CarteTemplate key=\{t\.id\} t=\{t\} toi=\{toi\} onOuvrir=\{\(\) => setFiche\(t\)\} \/>/.test(panneau), "le panneau : les douze templates en rail");
   assert.ok(/<RechargesStudio \/>/.test(panneau) && panneau.indexOf("<RechargesStudio />") > panneau.indexOf("TEMPLATES.map("), "les recharges sous le rail");
@@ -773,8 +782,11 @@ refuse("un voile de couleur nommée sur un template", () => feuilleJuste(feuille
 refuse("un liseré de couleur", () => feuilleJuste(mf("box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.09);", "box-shadow: inset 0 0 0 1px gold;")), /le liseré d'une vignette/);
 refuse("une teinte cachée dans une variable de la feuille", () => feuilleJuste(feuille + '\n.st-item {\n  --st-teinte: orchid;\n}\n.st-item::before {\n  content: "";\n  position: absolute;\n  inset: 0;\n  background: var(--st-teinte);\n}\n'), /aucune variable définie dans la feuille/);
 refuse("une teinte lue dans une variable d'ailleurs", () => feuilleJuste(feuille + '\n.st-item::before {\n  content: "";\n  position: absolute;\n  inset: 0;\n  background: var(--primary);\n}\n'), /une variable d'ailleurs dans la feuille/);
-refuse("la borne de la fiche remise sous un écran court seulement", () => feuilleJuste(mf("  gap: 16px;\n  width: min(100%, (92dvh - 298px) * 0.8);\n  margin-inline: auto;\n}", "  gap: 16px;\n}\n@media (max-height: 700px) {\n  .st-fiche {\n    width: min(100%, (92dvh - 298px) * 0.8);\n    margin-inline: auto;\n  }\n}")), /à toute hauteur d'écran/);
-refuse("la borne de la fiche restée à l'ancienne (sans la ligne de ta photo, la fiche défilerait)", () => feuilleJuste(mf("width: min(100%, (92dvh - 298px) * 0.8);", "width: min(100%, (92dvh - 222px) * 0.8);")), /à toute hauteur d'écran/);
+refuse("la borne de la fiche remise sous un écran court seulement", () => feuilleJuste(mf("  gap: 16px;\n  width: min(100%, max(176px, (92dvh - 298px) * 0.8));\n  margin-inline: auto;\n}", "  gap: 16px;\n}\n@media (max-height: 700px) {\n  .st-fiche {\n    width: min(100%, max(176px, (92dvh - 298px) * 0.8));\n    margin-inline: auto;\n  }\n}")), /à toute hauteur d'écran/);
+refuse("la borne de la fiche restée à l'ancienne (sans la ligne de ta photo, la fiche défilerait)", () => feuilleJuste(mf("max(176px, (92dvh - 298px) * 0.8)", "max(176px, (92dvh - 222px) * 0.8)")), /à toute hauteur d'écran/);
+refuse("la fiche sans plancher (en largeur, la vignette à la taille de la petite)", () => feuilleJuste(mf("width: min(100%, max(176px, (92dvh - 298px) * 0.8));", "width: min(100%, (92dvh - 298px) * 0.8);")), /à toute hauteur d'écran/);
+refuse("un plancher qui fait défiler la fiche sur 320 × 568", () => feuilleJuste(mf("max(176px, ", "max(200px, ")), /défiler sur un écran de 320 × 568/);
+refuse("un plancher où ta photo → ton image ne tient plus", () => feuilleJuste(mf("max(176px, ", "max(120px, ")), /n'y tient plus/);
 refuse("une légende sans plancher", () => feuilleJuste(mf("font-size: max(8.6cqw, 11px);", "font-size: 8.6cqw;")), /jamais sous 11 px/);
 // Le repli resté aux tailles d'avant (17 et 15 px) : sur un rail de 320 px, « TRASH TALK » reviendrait contre sa ligne de craie.
 refuse("le repli sans unités de conteneur resté aux tailles d'avant", () => feuilleJuste(mf("    font-size: 16px;\n", "    font-size: 17px;\n")), /17 px, pas ce que donnent 8\.6cqw/);

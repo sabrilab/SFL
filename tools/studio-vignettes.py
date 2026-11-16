@@ -1,10 +1,9 @@
 """Les vignettes de Bola Studio (public/bola-plus/studio/), faites depuis les douze images fournies.
 
 Version du 16/11/2026 (retour de Sabri sur bola-app#22 : les vignettes noir et blanc « pas
-engageantes », l'avatar d'Ilyes dessus « pour que ce soit plus compréhensible ») : douze WebP en
-couleur de 896 × 1120, du 4:5 exact, aux mêmes noms et dans le même ordre que ceux du 15/11 (dépôt
-bola-app, passation/visuels/bola-studio/ilyes/, commit ad41c96). Ilyes a donné son accord pour ces
-images le 15/11.
+engageantes », l'avatar d'un joueur dessus « pour que ce soit plus compréhensible ») : douze WebP
+en couleur de 896 × 1120, du 4:5 exact, aux mêmes noms et dans le même ordre que ceux du 15/11
+(dépôt bola-app, passation/visuels/bola-studio/, commit ad41c96).
 
   · l'original servi (« 01-ma-carte-en-vrai.webp », 896 × 1120, pour la fiche d'un modèle) : le
     fichier fourni, octet pour octet. Rien n'est recodé ;

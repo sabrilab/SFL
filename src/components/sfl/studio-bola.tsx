@@ -55,8 +55,8 @@
 //   · Toi, dedans (Sabri, 16/11, bola-app#22 : « il faut bien faire
 //     comprendre que l'user pourra générer ces templates avec sa propre
 //     personne ») : le sous-titre du panneau devient « Avec ta photo. 300 ⚽
-//     = un trash talk ou six images » (SOUS_TITRE_STUDIO), ses deux phrases
-//     sur deux lignes (« images » ne reste pas seul) ; PastilleToi, la
+//     = un trash talk ou six images » (AVEC_TA_PHOTO, puis PHRASE_INCLUS),
+//     ses deux phrases sur deux lignes (« images » ne reste pas seul) ; PastilleToi, la
 //     photo de ta carte en pastille ronde, en haut à gauche de chaque
 //     vignette du rail : c'est toi qui seras dedans ; LigneToi, au bas de la
 //     fiche d'un modèle : ta photo → ton image (la photo de ta carte, une

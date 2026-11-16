@@ -19,7 +19,7 @@
 //     ballons du mois (division entière ; « un » ou « une » selon le mot ; une
 //     quantité nulle ne s'écrit pas ; en lettres jusqu'à douze, sinon toute la
 //     phrase en chiffres) ; en tête du panneau, elle suit « Avec ta photo. »
-//     (SOUS_TITRE_STUDIO, 16/11) ;
+//     (AVEC_TA_PHOTO, 16/11), sur sa propre ligne ;
 //   · les recharges (« Bientôt ») : un prix en centimes entiers et des
 //     ballons ; le bonus est ce qu'elles donnent au-delà du taux de base
 //     (prix × BALLONS_PAR_EURO / 100) ; aucune ne donne moins que ce taux.
@@ -32,8 +32,8 @@
 // La vignette de chaque template : une vraie image (retour de Sabri du
 // 15/11/2026 sur bola-app#22, « les vraies vignettes des 12 modèles »). Le
 // 16/11, Sabri a trouvé les vignettes noir et blanc « pas engageantes » : les
-// douze ont été refaites hors de l'app, en couleur, avec l'avatar d'Ilyes
-// (son accord pour ces images date du 15/11), le tiers bas sombre et vide.
+// douze ont été refaites hors de l'app, en couleur, avec l'avatar d'un
+// joueur de la ligue, le tiers bas sombre et vide.
 // Elles sont dans public/bola-plus/studio/, numérotées dans l'ordre du
 // catalogue (« 01-ma-carte-en-vrai.webp »), en 4:5 : 896 × 1120, le fichier
 // fourni tel quel ; à côté de chacune, sa copie plus légère pour le rail
@@ -288,17 +288,16 @@ export function equivalence(budget: number, catalogue: readonly Template[] = TEM
 export const PHRASE_INCLUS = `${ballons(BALLONS_PAR_MOIS)} ⚽ = ${equivalence(BALLONS_PAR_MOIS)}`;
 
 /**
- * Le sous-titre du panneau Bola Studio : « Avec ta photo. 300 ⚽ = un trash
- * talk ou six images ». Sabri, 16/11 (bola-app#22) : « il faut bien faire
- * comprendre que l'user pourra générer ces templates avec sa propre
+ * Le début du sous-titre du panneau Bola Studio, « Avec ta photo. 300 ⚽ = un
+ * trash talk ou six images ». Sabri, 16/11 (bola-app#22) : « il faut bien
+ * faire comprendre que l'user pourra générer ces templates avec sa propre
  * personne » ; dans le panneau, la photo de ta carte est aussi sur chaque
  * vignette du rail et dans la fiche d'un modèle (studio-bola.tsx, PastilleToi).
- * L'écran pose ses deux phrases sur deux lignes (AVEC_TA_PHOTO, puis
- * PHRASE_INCLUS) : sur un téléphone, la phrase entière laissait « images »
- * seul sur la seconde.
+ * L'écran compose le sous-titre lui-même, AVEC_TA_PHOTO sur sa ligne puis
+ * PHRASE_INCLUS (sur un téléphone, la phrase entière laissait « images » seul
+ * sur la seconde) : tools/studio-check.ts lit cette composition dans l'écran.
  */
 export const AVEC_TA_PHOTO = "Avec ta photo.";
-export const SOUS_TITRE_STUDIO = `${AVEC_TA_PHOTO} ${PHRASE_INCLUS}`;
 
 /** Les ballons de chaque formule, sous son prix. */
 export const BALLONS_FORMULE = {
