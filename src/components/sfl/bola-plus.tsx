@@ -62,6 +62,7 @@ import { useEffect, useRef, useState, useSyncExternalStore, type CSSProperties, 
 import { createPortal } from "react-dom";
 import { Check, ChevronLeft, ChevronRight, MessageCircle, Sparkles, Target, User, Users } from "lucide-react";
 import { ANTON } from "@/components/sfl/actus/ecran";
+import { noterArrivee, noterCarte, noterFiche, noterTemps, partirDe } from "@/lib/sfl/bola-plus-parcours-store";
 import { FicheBolaPlus, PastilleFiche, aUneFiche, useFiche } from "@/components/sfl/bola-plus-fiches";
 import { BolaCard } from "@/components/sfl/bola-card";
 import { PlayerCard } from "@/components/sfl/player-card";
@@ -155,6 +156,7 @@ export function TuileBolaPlus() {
   return (
     <Link
       href="/profil/bola-plus"
+      onClick={() => partirDe("tuile")}
       aria-label={interet ? "Bola Plus, c'est noté" : "Bola Plus"}
       className="tuile tuile--plus col-span-2 flex min-h-[76px] items-center justify-between gap-3 px-4"
     >
@@ -671,6 +673,14 @@ export function PageBolaPlus() {
   const police = useSyncExternalStore(sansAbonnement, policeDemandee, () => POLICE_TITRES);
   // La fiche d'une carte (bola-plus-fiches.tsx, Sabri 16/11 19:33) : touchée, la carte s'ouvre en détail.
   const fiche = useFiche();
+  // Le parcours avant l'achat (bola-plus-parcours.ts) : l'arrivée, puis le temps passé, par quarts de minute visibles.
+  useEffect(() => {
+    noterArrivee();
+    const id = window.setInterval(() => {
+      if (document.visibilityState === "visible") noterTemps(15);
+    }, 15_000);
+    return () => window.clearInterval(id);
+  }, []);
   const idFiche = (d: Diapo) => ("avantage" in d ? d.avantage.id : d.id);
   const dFiche = liste.find((d) => idFiche(d) === fiche.ouverte);
   const partFiche = dFiche && "avantage" in dFiche ? dFiche.avantage.part : "plus";
@@ -686,6 +696,7 @@ export function PageBolaPlus() {
           const i = Number((e.target as HTMLElement).dataset.index);
           if (vise.current === i) vise.current = null;
           setActif(i);
+          noterCarte(i);
           setVus((v) => (v.has(i) ? v : new Set(v).add(i)));
         }
       },
@@ -734,9 +745,9 @@ export function PageBolaPlus() {
         {/* Le rail (role group des diapositives : le motif « carrousel » de l'APG) ; il prend le focus, avec son nom. */}
         <div ref={railRef} className="bp-rail" tabIndex={0} aria-label="Cartes" onKeyDown={clavier} onPointerDown={() => (vise.current = null)}>
           {liste.map((d, i) => (
-            <div key={d.id} role="group" data-index={i} data-part={partDe(d)} className="bp-diapo" aria-roledescription="diapositive" onClick={() => fiche.ouvrir(idFiche(d))} aria-label={`${i + 1} sur ${n} : ${d.nom}`}>
+            <div key={d.id} role="group" data-index={i} data-part={partDe(d)} className="bp-diapo" aria-roledescription="diapositive" onClick={() => (noterFiche(idFiche(d)), fiche.ouvrir(idFiche(d)))} aria-label={`${i + 1} sur ${n} : ${d.nom}`}>
               {rendu(d)}
-              {aUneFiche(idFiche(d)) && <PastilleFiche nom={d.nom} onOuvrir={() => fiche.ouvrir(idFiche(d))} />}
+              {aUneFiche(idFiche(d)) && <PastilleFiche nom={d.nom} onOuvrir={() => (noterFiche(idFiche(d)), fiche.ouvrir(idFiche(d)))} />}
             </div>
           ))}
         </div>

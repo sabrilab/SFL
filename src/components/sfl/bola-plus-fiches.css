@@ -1,194 +1,75 @@
-/* La fiche d'une carte de Bola Plus (bola-plus-fiches.tsx) : plein écran, sur
-   le noir de la page, déroulée comme une keynote. Les teintes viennent des
-   variables de la page (VARIABLES_PLUS, PALETTE). */
+/* Les fiches de Bola Plus (bola-plus-fiches.tsx) : la forme du panneau Bola
+   Studio (studio-bola.css : la feuille, le titre, la phrase, le rail, les
+   vignettes), et ici ce qui leur est propre : la part SFL en vert, l'image
+   large montrée entière, les étapes de « Ramène 5 », le « + » des cartes.
+   Aucune teinte écrite : les variables --bp-* posées par la page. */
 
-.bpf {
-  position: fixed;
-  inset: 0;
-  z-index: 60;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  -webkit-overflow-scrolling: touch;
-  padding: 0 20px calc(env(safe-area-inset-bottom) + 40px);
-  background: var(--bp-nuit, #0b0a12);
-  color: #fff;
-  outline: none;
-  animation: bpf-monte 380ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+/* La part SFL : la nuit verte en sombre, un papier vert pâle en clair. */
+[data-slot="sheet-content"].st-feuille.bpf-part-sfl {
+  background:
+    radial-gradient(90% 40% at 50% 0%, color-mix(in srgb, var(--bp-sfl-vif) 30%, transparent), transparent 75%),
+    var(--bp-sfl-fond);
 }
-.bpf > * {
-  max-width: 430px;
-  margin-inline: auto;
+:root:not(.dark) [data-slot="sheet-content"].st-feuille.bpf-part-sfl {
+  background:
+    radial-gradient(90% 40% at 50% 0%, color-mix(in srgb, var(--bp-sfl-vif) 16%, transparent), transparent 75%),
+    color-mix(in srgb, var(--bp-sfl-vif) 9%, #fff);
+  color: var(--bp-sfl-fond);
 }
-@keyframes bpf-monte {
-  from {
-    opacity: 0;
-    transform: translateY(24px);
-  }
-}
-
-.bpf-tete {
-  position: sticky;
-  top: 0;
-  z-index: 2;
-  display: flex;
-  justify-content: flex-end;
-  padding: calc(env(safe-area-inset-top) + 12px) 0 8px;
-  pointer-events: none;
-}
-.bpf-fermer {
-  pointer-events: auto;
-  display: grid;
-  place-items: center;
-  width: 44px;
-  height: 44px;
-  border-radius: 999px;
-  background: rgb(255 255 255 / 0.14);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-  color: #fff;
-}
-
-.bpf-grand-titre {
-  margin: 4px auto 28px;
-  font-family: var(--font-barlow), "Barlow Condensed", sans-serif;
-  font-weight: 800;
-  font-size: clamp(40px, 13vw, 56px);
-  line-height: 0.9;
-  letter-spacing: -0.01em;
-  text-transform: uppercase;
-  text-wrap: balance;
-}
-.bpf[data-part="plus"] .bpf-grand-titre {
-  color: var(--bp-plus-clair);
-}
-.bpf[data-part="sfl"] .bpf-grand-titre {
+.bpf-part-sfl .st-panneau__titre {
   color: var(--bp-sfl-clair);
 }
-
-/* Un chapitre : l'image, le titre, la ligne. */
-.bpf-chapitre {
-  margin-bottom: 56px;
-}
-.bpf-images {
-  display: grid;
-  gap: 8px;
-}
-.bpf-images--deux {
-  grid-template-columns: 1fr 1fr;
-}
-.bpf-image {
-  display: block;
-  width: 100%;
-  height: auto;
-  border-radius: 22px;
-  background: rgb(255 255 255 / 0.06);
-}
-.bpf-titre {
-  margin: 18px 0 0;
-  font-family: var(--font-barlow), "Barlow Condensed", sans-serif;
-  font-weight: 800;
-  font-size: clamp(30px, 9vw, 38px);
-  line-height: 0.92;
-  text-transform: uppercase;
-  text-wrap: balance;
-}
-.bpf-texte {
-  margin: 8px 0 0;
-  font-size: 16px;
-  line-height: 1.4;
-  color: rgb(255 255 255 / 0.7);
-  text-wrap: pretty;
+:root:not(.dark) .bpf-part-sfl .st-panneau__titre {
+  color: var(--bp-sfl-encre);
 }
 
-/* Le podium des pépites : rang à gauche, grammes à droite. */
-.bpf-liste {
-  margin: 18px 0 0;
-  padding: 0;
-  list-style: none;
-  border-top: 1px solid rgb(255 255 255 / 0.12);
-}
-.bpf-liste li {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  padding: 12px 0;
-  border-bottom: 1px solid rgb(255 255 255 / 0.12);
-}
-.bpf-liste__rang {
-  font-size: 17px;
-  font-weight: 700;
-  color: rgb(255 255 255 / 0.8);
-}
-.bpf-liste__valeur {
-  font-size: 34px;
-  line-height: 1;
-  color: var(--bp-prix);
+/* Une image plus large que la vignette (le bandeau du direct, un 16:9) :
+   entière, posée au tiers haut du noir, jamais recadrée. */
+.st-vignette__image.bpf-entiere {
+  object-fit: contain;
+  object-position: 50% 30%;
 }
 
-/* « Ramène 5 abonnés » : les étapes, numérotées. */
+/* « Ramène 5 » : une étape sans image. Le numéro en Anton (le détail de la
+   légende), les cinq ronds au milieu, sur la teinte de la part. */
 .bpf-etape {
+  position: absolute;
+  inset: 0;
   display: grid;
-  grid-template-columns: 64px 1fr;
-  gap: 4px 12px;
-  padding: 22px 0;
-  border-top: 1px solid rgb(255 255 255 / 0.12);
+  place-items: center;
+  padding-bottom: 22%;
+  background:
+    radial-gradient(80% 60% at 50% 30%, color-mix(in srgb, var(--bp-plus-vif) 55%, transparent), transparent 80%),
+    var(--bp-plus-fond);
 }
-.bpf-etape__numero {
-  font-size: 44px;
-  line-height: 0.9;
-  color: var(--bp-prix);
-}
-.bpf-etape .bpf-titre {
-  margin-top: 0;
+.bpf-part-sfl .bpf-etape {
+  background:
+    radial-gradient(80% 60% at 50% 30%, color-mix(in srgb, var(--bp-sfl-vif) 50%, transparent), transparent 80%),
+    var(--bp-sfl-fond);
 }
 .bpf-ronds {
   display: flex;
-  gap: 8px;
-  margin-top: 16px;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4cqw;
+  width: 80%;
 }
 .bpf-rond {
   display: grid;
   place-items: center;
-  width: 36px;
-  height: 36px;
+  width: 19cqw;
+  aspect-ratio: 1;
   border-radius: 999px;
-  border: 1.5px dashed rgb(255 255 255 / 0.3);
-  color: rgb(255 255 255 / 0.3);
+  color: rgb(255 255 255 / 0.5);
+  box-shadow: inset 0 0 0 1.5px rgb(255 255 255 / 0.35);
 }
 .bpf-rond[data-plein] {
-  border: 0;
-  background: var(--bp-plus-vif);
-  color: #fff;
+  color: var(--bp-plus-fond);
+  background: var(--bp-prix);
+  box-shadow: none;
 }
 
-.bpf-fin {
-  height: 24px;
-}
-
-/* L'entrée de chaque chapitre, quand il arrive à l'écran. */
-.bpf [data-entre] {
-  opacity: 0;
-  transform: translateY(28px);
-  transition:
-    opacity 600ms ease,
-    transform 700ms cubic-bezier(0.2, 0.8, 0.2, 1);
-}
-.bpf [data-entre][data-vu] {
-  opacity: 1;
-  transform: none;
-}
-.bpf [data-entre][data-vu] .bpf-rond[data-plein] {
-  animation: bpf-rond 420ms cubic-bezier(0.3, 1.4, 0.5, 1) both;
-  animation-delay: calc(200ms + var(--i) * 90ms);
-}
-@keyframes bpf-rond {
-  from {
-    transform: scale(0.4);
-    opacity: 0;
-  }
-}
-
-/* Le « + » posé sur une carte qui a une fiche. */
+/* Le « + » posé sur une carte du carrousel qui a une fiche. */
 .bpf-pastille {
   position: absolute;
   top: 14px;
@@ -208,15 +89,4 @@
   content: "";
   position: absolute;
   inset: -4px;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .bpf,
-  .bpf [data-entre],
-  .bpf .bpf-rond {
-    animation: none !important;
-    transition: none !important;
-    opacity: 1 !important;
-    transform: none !important;
-  }
 }

@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { appelant, estAdmin, serveur } from "@/lib/sfl/serveur-ligue.server";
 import { sessionPaiement, stripeBranche } from "@/lib/server/stripe.server";
 import { FORMULES, type Formule } from "@/lib/sfl/bola-plus";
+import { nettoyer } from "@/lib/sfl/bola-plus-parcours";
 
 export async function POST(req: NextRequest) {
   if (!stripeBranche()) return NextResponse.json({ error: "Le paiement n'est pas encore ouvert." }, { status: 503 });
@@ -16,7 +17,7 @@ export async function POST(req: NextRequest) {
   if (!moi) return NextResponse.json({ error: "Session requise." }, { status: 401 });
   // Pour l'instant, Bola Plus n'est visible que des admins (voitBolaPlus) : la route suit.
   if (!(await estAdmin(sb, moi.id))) return NextResponse.json({ error: "Pas encore ouvert." }, { status: 403 });
-  const corps = (await req.json().catch(() => null)) as { formule?: string } | null;
+  const corps = (await req.json().catch(() => null)) as { formule?: string; parcours?: unknown } | null;
   const formule = FORMULES.find((f) => f === corps?.formule) as Formule | undefined;
   if (!formule) return NextResponse.json({ error: "Formule inconnue." }, { status: 400 });
   const { data: profil } = await sb.from("profiles").select("name").eq("id", moi.id).maybeSingle();
@@ -27,6 +28,8 @@ export async function POST(req: NextRequest) {
       email: moi.email ?? null,
       nom: (profil as { name?: string } | null)?.name ?? "",
       origine: req.nextUrl.origin,
+      // Le parcours avant l'achat (bola-plus-parcours.ts) : des clés connues, en texte court.
+      parcours: nettoyer(corps?.parcours),
     });
     return NextResponse.json({ url });
   } catch (e) {

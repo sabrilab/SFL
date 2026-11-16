@@ -14,6 +14,7 @@ import { pct } from "@/lib/sfl/retention";
 import { Barres } from "./graphiques";
 import { Section } from "./cadre";
 import { BolaPlusStats } from "./bola-plus";
+import { VentesBolaPlus } from "./ventes-bola-plus";
 
 interface Achat {
   joueur: string;
@@ -86,6 +87,7 @@ export function Revenu({
           <span className="text-corps text-encre-3">Aucun paiement n&apos;est encore en place.</span>
         </div>
       </Section>
+      <VentesBolaPlus />
       <BolaPlusStats />
       <Section id="packs" titre="Les packs ouverts en XP" sous="La monnaie de l'app qu'on dépense déjà : le signe de ce qui se vendra.">
         {achats === "erreur" ? (

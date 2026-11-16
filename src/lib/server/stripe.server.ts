@@ -48,7 +48,7 @@ async function appel<T>(chemin: string, options: { methode?: "GET" | "POST"; cor
 }
 
 /** La page de paiement Stripe (Checkout) pour un abonnement. */
-export async function sessionPaiement(o: { formule: Formule; joueur: string; email: string | null; nom: string; origine: string }): Promise<string> {
+export async function sessionPaiement(o: { formule: Formule; joueur: string; email: string | null; nom: string; origine: string; parcours?: Record<string, string> }): Promise<string> {
   const prix = prixStripe(o.formule);
   if (!prix) throw new Error("Prix Stripe manquant.");
   const corps = new URLSearchParams({
@@ -69,6 +69,12 @@ export async function sessionPaiement(o: { formule: Formule; joueur: string; ema
     cancel_url: `${o.origine}/profil/bola-plus?paiement=annule`,
   });
   if (o.email) corps.set("customer_email", o.email);
+  // Le parcours avant l'achat (bola-plus-parcours.ts), sur la session et sur l'abonnement : l'admin le relit (ventes).
+  for (const [k, v] of Object.entries(o.parcours ?? {})) {
+    if (!/^bp_[a-z_]+$/.test(k) || !v) continue;
+    corps.set(`metadata[${k}]`, v.slice(0, 480));
+    corps.set(`subscription_data[metadata][${k}]`, v.slice(0, 480));
+  }
   const s = await appel<{ url: string }>("/checkout/sessions", { methode: "POST", corps });
   return s.url;
 }
@@ -106,4 +112,32 @@ export function signatureValide(corps: string, entete: string | null, secret: st
     const recu = Buffer.from(sig, "hex");
     return recu.length === attendu.length && timingSafeEqual(recu, attendu);
   });
+}
+
+/** Les ventes Bola Plus, pour l'admin : chaque abonnement Stripe qui porte un joueur, du plus récent au plus ancien. */
+export async function ventesBolaPlus(): Promise<import("@/lib/sfl/bola-plus-parcours").Vente[]> {
+  type Sub = { id: string; status: string; created: number; metadata?: Record<string, string>; items?: { data?: { price?: { unit_amount?: number | null } }[] } };
+  const ventes: import("@/lib/sfl/bola-plus-parcours").Vente[] = [];
+  let apres: string | null = null;
+  for (let page = 0; page < 10; page++) {
+    const q = new URLSearchParams({ status: "all", limit: "100" });
+    if (apres) q.set("starting_after", apres);
+    const r = await appel<{ data: Sub[]; has_more: boolean }>(`/subscriptions?${q}`);
+    for (const s of r.data) {
+      const m = s.metadata ?? {};
+      if (!m.joueur) continue;
+      ventes.push({
+        id: s.id,
+        nom: m.nom || "?",
+        formule: m.formule || "",
+        statut: s.status,
+        centimes: s.items?.data?.[0]?.price?.unit_amount ?? 0,
+        le: s.created * 1000,
+        meta: Object.fromEntries(Object.entries(m).filter(([k]) => k.startsWith("bp_"))),
+      });
+    }
+    if (!r.has_more || r.data.length === 0) break;
+    apres = r.data[r.data.length - 1].id;
+  }
+  return ventes.sort((a, b) => b.le - a.le);
 }

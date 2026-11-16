@@ -10,6 +10,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
 import type { Formule } from "@/lib/sfl/bola-plus";
+import { metadataIci } from "@/lib/sfl/bola-plus-parcours-store";
 
 /** Le paiement Stripe est ouvert (NEXT_PUBLIC_BOLA_PLUS_PAIEMENT=1, posé dans Vercel quand les clés y sont). */
 export const PAIEMENT_ACTIF = process.env.NEXT_PUBLIC_BOLA_PLUS_PAIEMENT === "1";
@@ -27,7 +28,7 @@ export function BoutonSAbonner({ formule }: { formule: Formule }) {
       const r = await fetch("/api/bola-plus/paiement", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${jeton}` },
-        body: JSON.stringify({ formule }),
+        body: JSON.stringify({ formule, parcours: metadataIci() }),
       });
       const json = (await r.json().catch(() => ({}))) as { url?: string; error?: string };
       if (!r.ok || !json.url) throw new Error(json.error ?? "Le paiement n'a pas pu s'ouvrir.");
