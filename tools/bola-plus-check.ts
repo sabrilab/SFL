@@ -99,6 +99,8 @@ import {
   type LigneInteret,
 } from "../src/lib/sfl/bola-plus";
 import { voitBolaPlus } from "../src/lib/sfl/bola-plus";
+import { createHmac } from "node:crypto";
+import { signatureValide } from "../src/lib/server/stripe.server";
 import { FIN_PREMIERS_JOUEURS, casesDe, resteAvant, resteCourt } from "../src/lib/sfl/compte-a-rebours";
 
 // 1 · L'offre.
@@ -228,6 +230,20 @@ const REFUS = "Pas enregistré. Reconnecte-toi, puis réessaie.";
 const UID = "aaaaaaaa-0000-4000-8000-000000000001";
 
 async function banc() {
+  // 0 ter · La signature du webhook (lib/server/stripe.server.ts) : la bonne passe, une fausse, une vieille ou un corps changé non.
+  {
+    const secret = "whsec_essai";
+    const corps = '{"type":"checkout.session.completed"}';
+    const t = 1_794_850_000;
+    const sig = createHmac("sha256", secret).update(`${t}.${corps}`).digest("hex");
+    const maintenant = t * 1000 + 10_000;
+    assert.ok(signatureValide(corps, `t=${t},v1=${sig}`, secret, maintenant), "la bonne signature passe");
+    assert.ok(signatureValide(corps, `t=${t},v1=${"0".repeat(64)},v1=${sig}`, secret, maintenant), "une des signatures suffit");
+    assert.ok(!signatureValide(corps, `t=${t},v1=${"0".repeat(64)}`, secret, maintenant), "une fausse non");
+    assert.ok(!signatureValide(corps + " ", `t=${t},v1=${sig}`, secret, maintenant), "un corps changé non");
+    assert.ok(!signatureValide(corps, `t=${t},v1=${sig}`, secret, maintenant + 600_000), "une vieille non");
+    assert.ok(!signatureValide(corps, null, secret, maintenant), "sans en-tête non");
+  }
   // 0 bis · Le compte à rebours (16/11) : dimanche 22/11 23:59:59 à Paris, soit 22:59:59 UTC.
   assert.equal(new Date(FIN_PREMIERS_JOUEURS).toISOString(), "2026-11-22T22:59:59.000Z");
   const lundi = Date.parse("2026-11-16T17:30:00+01:00");

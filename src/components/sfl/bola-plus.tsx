@@ -103,6 +103,7 @@ import { BALLONS_FORMULE } from "@/lib/sfl/studio";
 import { cn } from "@/lib/utils";
 import { MentionStudio, VisuelStudio } from "@/components/sfl/studio-bola";
 import { CompteAReboursBolaPlus } from "@/components/sfl/bola-plus-rappels";
+import { BoutonSAbonner, PAIEMENT_ACTIF } from "@/components/sfl/bola-plus-paiement";
 import "@/components/sfl/ma-carte/rubriques.css";
 import "./bola-plus.css";
 
@@ -319,6 +320,9 @@ export function OffreBolaPlus({
               Annuler
             </button>
           </div>
+        ) : PAIEMENT_ACTIF ? (
+          // Le paiement branché (bola-plus-paiement.tsx) : on s'abonne pour de bon, la formule choisie ou le mensuel.
+          <BoutonSAbonner formule={choix ?? "mensuel"} />
         ) : (
           <button type="button" onClick={interesser} disabled={occupe} className="bouton-principal h-[52px] w-full text-lecture font-bold disabled:opacity-40">
             Je suis intéressé
