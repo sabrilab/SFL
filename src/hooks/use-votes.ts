@@ -2,10 +2,13 @@
 
 // Les votes des figures de match de la saison en cours, à jour en temps réel.
 // Rien sans session serveur : la table est protégée par RLS (membres validés).
+// Tant qu'ils ne sont pas relus (useVotesPrets), mes voix données sur un autre
+// téléphone, ou avant de fermer l'app, ne sont pas encore là : l'étiquette de
+// la Map et l'encart de Ma carte n'en concluent rien (vote-du-jour.tsx).
 
 import { useEffect, useSyncExternalStore } from "react";
 import { useSession } from "@/hooks/use-session";
-import { chargerVotes, votesEnMemoire, VOTES_EVENT, type VoteFigure } from "@/lib/sfl/votes";
+import { chargerVotes, votesCharges, votesEnMemoire, VOTES_EVENT, type VoteFigure } from "@/lib/sfl/votes";
 import { supabase } from "@/lib/supabase";
 
 let seq = 0;
@@ -45,4 +48,16 @@ export function useSuiviVotes(numero: number): void {
 /** Les votes en mémoire (vide au rendu serveur). */
 export function useVotes(): VoteFigure[] {
   return useSyncExternalStore(abonner, votesEnMemoire, () => AUCUN);
+}
+
+/**
+ * Les votes de la saison sont-ils relus (chargerVotes) ? Le même magasin que
+ * useVotes : vrai dès qu'ils arrivent. Vrai aussi sans session serveur : rien
+ * ne viendra (le vote dit alors « Reconnecte-toi pour voter »). Le
+ * SeasonProvider fait le même calcul (votesPrets) pour la révélation.
+ */
+export function useVotesPrets(): boolean {
+  const session = useSession();
+  const charges = useSyncExternalStore(abonner, votesCharges, () => false);
+  return !session?.server || charges;
 }

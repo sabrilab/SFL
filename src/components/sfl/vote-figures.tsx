@@ -11,7 +11,14 @@
 // qu'à la révélation. Les voix restent cachées tant que le vote est
 // ouvert — seul le nombre de votants s'affiche — pour ne pas suivre la foule.
 // Tant que la feuille de son match n'est pas remplie, le vote est là mais
-// grisé, sans rien de touchable (feuilleRemplie, lib/sfl/votes.ts).
+// grisé, sans rien de touchable : bandeau gris « Vote à la fin du Match 1 »,
+// cartes grisées (feuilleRemplie, lib/sfl/votes.ts). Pour qui ne joue pas la
+// journée, « Le vote est réservé aux joueurs de la journée », sous un bandeau
+// gris « Vote à la fin des matchs » tant qu'aucune feuille n'est remplie, puis
+// « Vote ouvert » quand on y vote, sans lui (bandeauDuVote). Venu seulement en
+// extra time, on ne vote pas : traité comme qui ne joue pas (placeDuVotant).
+// `onVoix` : appelé quand une voix part d'ici, avant l'envoi (l'encart de Ma
+// carte y note où était le focus, vote-du-jour.tsx).
 // Règles et décompte : lib/sfl/votes.ts.
 
 import { useState } from "react";
@@ -23,13 +30,15 @@ import { useVotes } from "@/hooks/use-votes";
 import { useSession } from "@/hooks/use-session";
 import { claimVoteReward } from "@/lib/sfl/ballons";
 import { logActivity } from "@/lib/sfl/activity";
-import { findPlayerMatch, type Journee } from "@/lib/sfl/engine";
+import type { Journee } from "@/lib/sfl/engine";
 import {
   CATEGORIES_VOTE,
   LIBELLES_VOTE,
+  bandeauDuVote,
   decompterMatch,
-  feuilleRemplie,
+  etatDuVote,
   monVote,
+  placeDuVotant,
   urneDuVotant,
   voter,
   type CategorieVote,
@@ -42,7 +51,7 @@ import { libelleFinDuVote, voteOuvertA } from "@/lib/sfl/revelation";
 import { useMaintenant } from "@/hooks/use-missions";
 import { maintenant as heureDeLaLigue } from "@/lib/sfl/horloge";
 
-export function VoteFigures({ journee, me }: { journee: Journee; me: string }) {
+export function VoteFigures({ journee, me, onVoix }: { journee: Journee; me: string; onVoix?: () => void }) {
   const { saisonLue: saison, allPlayers } = useSeason();
   const maintenant = useMaintenant();
   const jusqua = libelleFinDuVote(saison, journee.j, maintenant);
@@ -50,10 +59,13 @@ export function VoteFigures({ journee, me }: { journee: Journee; me: string }) {
   const votes = useVotes();
   const [envoi, setEnvoi] = useState<CategorieVote | null>(null);
   const numero = saison.numero ?? 0;
-  const place = findPlayerMatch(journee, me);
+  // Ma place : titulaire d'un match de la journée (venu seulement en extra time, aucune).
+  const place = placeDuVotant(journee, me);
   const carte = (nom: string) => allPlayers.find((p) => p.name === nom);
-  // Le vote attend la feuille de son match : avant, grisé.
-  const ouvert = !!place && feuilleRemplie(saison, journee.j, place.match);
+  const etat = etatDuVote(saison, journee, me);
+  // Mes voix à donner : la feuille de mon match remplie. Avant, grisé.
+  const ouvert = etat === "a-moi";
+  const bandeau = bandeauDuVote(etat, !!place);
 
   async function choisir(cat: CategorieVote, candidat: string) {
     if (!place || !ouvert || envoi) return;
@@ -64,6 +76,7 @@ export function VoteFigures({ journee, me }: { journee: Journee; me: string }) {
       toast.error(`Le vote est fermé depuis ${libelleFinDuVote(saison, journee.j, t)}.`);
       return;
     }
+    onVoix?.();
     setEnvoi(cat);
     try {
       await voter({ saison: numero, j: journee.j, categorie: cat, votant: me, candidat, match_id: place.match.id });
@@ -79,14 +92,14 @@ export function VoteFigures({ journee, me }: { journee: Journee; me: string }) {
 
   return (
     <div className="flex flex-col gap-4">
-      {place && !ouvert ? (
-        <p className="rounded-2xl bg-foreground/[0.06] px-3.5 py-2.5 text-[12.5px] font-medium text-foreground/55">
-          <span className="font-bold">Vote à la fin du {place.match.label}</span>
-          {` · jusqu'à ${jusqua}`}
-        </p>
-      ) : (
+      {bandeau === "ouvert" ? (
         <p className="rounded-2xl bg-primary/10 px-3.5 py-2.5 text-[12.5px] font-medium text-primary">
           <span className="font-bold">Vote ouvert jusqu&apos;à {jusqua}</span>
+        </p>
+      ) : (
+        <p className="rounded-2xl bg-foreground/[0.06] px-3.5 py-2.5 text-[12.5px] font-medium text-foreground/55">
+          <span className="font-bold">{bandeau === "fin-de-mon-match" && place ? `Vote à la fin du ${place.match.label}` : "Vote à la fin des matchs"}</span>
+          {` · jusqu'à ${jusqua}`}
         </p>
       )}
 

@@ -23,7 +23,8 @@
 //     revenir sur ce qu'on connaît déjà) : le vote du jour dès qu'on y vote,
 //     avant tout le reste (Ilyes, 15/11 ; vote-du-jour.tsx) ; le rail des
 //     journées, collé en haut ; le jour du match, la feuille en direct (et,
-//     dessous, le vote qui attend sa feuille, grisé) ; puis, du dimanche soir
+//     dessous, le vote qui attend sa feuille, grisé : « Vote à la fin du
+//     Match 1 », ou « des matchs » pour qui ne joue pas) ; puis, du dimanche soir
 //     au mercredi, le dernier dimanche joué d'abord (sa couverture, ses
 //     vidéos, son terrain, ton dimanche, ton Flair, ses
 //     rubriques), et la semaine qui se prépare ensuite ; du jeudi au matin
@@ -1099,8 +1100,9 @@ function EpoqueEnCours({ epoques, vue, onVue, classement, exploit }: PropsEpoque
           {/* Le jour du match, la feuille qui se remplit, avant tout le reste. */}
           {/* Son lien mène à la feuille en direct (la Map), pas au récap, qui attend la révélation. */}
           <EnDirect ouvrir={() => router.push("/map")} sauf={recapDabord ? une?.j : undefined} />
-          {/* Tant que personne n'y vote (la feuille de mon match pas encore remplie), le vote
-              attend ici, grisé : la feuille en direct passe d'abord. */}
+          {/* Tant que personne n'y vote de là où je regarde (la feuille de mon match pas encore
+              remplie ; si je ne joue pas, aucune feuille remplie), le vote attend ici, grisé (son
+              bandeau gris, et mes cartes si je joue) : la feuille en direct passe d'abord. */}
           <VoteDuJour me={me} lesquels="en-attente" />
           {enSuspens.map((j) => {
             const meta = saison.journees.find((m) => m.j === j);

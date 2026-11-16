@@ -8,6 +8,15 @@
 // server », et la route tombait. Seuls chargerVotes et voter parlent à la
 // base, et seulement depuis le téléphone.
 //
+// Le vote du jour dans les trois onglets (vote-du-jour.tsx, vote-figures.tsx)
+// prend ici toutes ses décisions, en fonctions pures : où en est le vote pour
+// moi (etatDuVote, placeDuVotant), où il se pose (aPoser, votesOuvertsPour),
+// ce que dit son bandeau (bandeauDuVote), l'encart de Ma carte (etatEncart) et
+// la marque de l'étiquette de la Map (marqueDuVote). Les composants ne font
+// que les appeler : tools/vote-du-jour-check.ts les garde (contrôle du
+// 16/11/2026 : le tri vivait dans le composant, et 9 retouches sur 12 lui
+// échappaient).
+//
 // Remis le 17/10 à la demande de Sabri, partagé en base (supabase/schema.sql,
 // table votes_figures) : avant, chaque vote restait sur le téléphone de son
 // auteur et personne ne voyait celui des autres.
@@ -44,7 +53,8 @@
 //     n'élisait que le plus voté du match : à la J4, au Match 1, Noirs 1
 //     n'avait pas de Défensive, ni Blancs 1 d'Impact ;
 //   · ni un joueur venu en extra time ni une place « X1 », « X2 »… ne votent
-//     ni ne sont candidats dans le match qu'ils complètent ;
+//     ni ne sont candidats dans le match qu'ils complètent ; venu seulement en
+//     extra time, le vote ne lui est proposé nulle part (placeDuVotant) ;
 //   · entre la fin du vote et la révélation, personne ne voit les élus
 //     (titresTombes).
 //
@@ -58,7 +68,7 @@
 import { findPlayerMatch, type Journee, type JourneeMatch, type MatchTeam } from "./engine";
 import type { Saison } from "./saisie/types";
 import { jourMoisDuLibelle } from "./convocation-temps";
-import { titresTombes } from "./revelation";
+import { titresTombes, voteOuvertA } from "./revelation";
 import { supabase } from "@/lib/supabase";
 import { isPlaceExtraTime } from "./hidden";
 import { cleTitre, VOIX_MIN } from "./saisie/evolution";
@@ -258,6 +268,25 @@ export function monVote(votes: VoteFigure[], saison: number, j: number, cat: Cat
   return votes.find((v) => v.saison === saison && v.j === j && v.categorie === cat && v.votant === moi)?.candidat ?? null;
 }
 
+/** Mes deux voix (Joueur Impact et meilleur défenseur) sont-elles données dans cette journée ? */
+export function mesDeuxVoix(votes: VoteFigure[], saison: number, j: number, moi: string): boolean {
+  return CATEGORIES_VOTE.every((cat) => !!monVote(votes, saison, j, cat, moi));
+}
+
+/**
+ * Ma place dans le vote d'une journée : mon match et mes adversaires, si j'y
+ * suis titulaire. Venu en extra time compléter un autre match EN PLUS du
+ * mien, je vote dans le mien (findPlayerMatch le rend d'abord). Venu
+ * SEULEMENT en extra time, je ne vote pas : ni l'extra time ni une place X ne
+ * sont électeurs (electeursDe), ma voix ne compterait nulle part. null, comme
+ * pour qui ne joue pas la journée (contrôle du 16/11/2026 : le vote lui était
+ * proposé partout, ses deux voix enregistrées, « 0/5 ont voté »).
+ */
+export function placeDuVotant(journee: Journee, moi: string): ReturnType<typeof findPlayerMatch> {
+  const place = findPlayerMatch(journee, moi);
+  return place && place.team.players.some((p) => p.name === moi && !p.extraTime) ? place : null;
+}
+
 /** Une journée où l'on vote : MVP calculé, équipes connues. */
 export function journeeAvecVote(j: Journee): boolean {
   return !!j.mvpAuto && (j.matches?.length ?? 0) > 0;
@@ -283,16 +312,104 @@ export function feuilleRemplie(saison: Pick<Saison, "entries">, j: number, match
  *   · `en-attente` : personne n'y vote encore de là où il regarde (la feuille
  *     de son match, ou toutes s'il ne joue pas, pas encore remplie) : le bloc
  *     est grisé, ou n'a rien à proposer.
- * Un joueur venu en extra time compléter un autre match suit le sien
- * (findPlayerMatch).
+ * Un joueur venu en extra time compléter un autre match suit le sien ; venu
+ * seulement en extra time, il ne vote pas et compte comme qui ne joue pas
+ * (placeDuVotant).
  */
 export type EtatDuVote = "a-moi" | "aux-autres" | "en-attente";
 
 export function etatDuVote(saison: Pick<Saison, "entries">, journee: Journee, moi: string): EtatDuVote {
   const remplie = (m: JourneeMatch) => feuilleRemplie(saison, journee.j, m);
-  const place = findPlayerMatch(journee, moi);
+  const place = placeDuVotant(journee, moi);
   if (place) return remplie(place.match) ? "a-moi" : "en-attente";
   return (journee.matches ?? []).some(remplie) ? "aux-autres" : "en-attente";
+}
+
+/**
+ * Où se pose le vote du jour (vote-du-jour.tsx), d'après où il en est pour
+ * moi (etatDuVote) :
+ *   · `tous` : la vue Classement des Actus, dans tous les cas ;
+ *   · `a-moi` : Ma carte et la Map, seulement quand j'ai mes voix à donner ;
+ *   · `ouverts` : en tête du fil des Actus, dès qu'on y vote (moi, ou les
+ *     autres si je ne joue pas) ;
+ *   · `en-attente` : dans le fil, sous la feuille en direct, tant que
+ *     personne n'y vote de là où je regarde.
+ * `ouverts` et `en-attente` se partagent chaque état, un seul des deux : une
+ * journée n'est jamais posée deux fois dans le fil, ni oubliée
+ * (tools/vote-du-jour-check.ts).
+ */
+export type OuPoser = "tous" | "a-moi" | "ouverts" | "en-attente";
+
+const A_POSER: Record<OuPoser, (etat: EtatDuVote) => boolean> = {
+  tous: () => true,
+  "a-moi": (etat) => etat === "a-moi",
+  ouverts: (etat) => etat !== "en-attente",
+  "en-attente": (etat) => etat === "en-attente",
+};
+
+export function aPoser(ou: OuPoser, etat: EtatDuVote): boolean {
+  return A_POSER[ou](etat);
+}
+
+/**
+ * Les journées dont le vote est ouvert à l'instant `t` et qui se posent là
+ * (aPoser), pour ce joueur. Le vote fermé (passé son heure, un autre jour,
+ * une journée en suspens : voteOuvertA) ou une journée sans vote
+ * (journeeAvecVote) : rien, nulle part. `saison` et `journees` : le direct,
+ * pas la vue figée (vote-du-jour.tsx les lit dans le SeasonProvider) : la
+ * feuille remplie y ouvre le vote bien avant la révélation.
+ */
+export function votesOuvertsPour(saison: Saison, journees: Journee[], moi: string, t: Date, ou: OuPoser): Journee[] {
+  return journees.filter((j) => journeeAvecVote(j) && voteOuvertA(saison, j.j, t) && aPoser(ou, etatDuVote(saison, j, moi)));
+}
+
+/**
+ * Ce que dit le bandeau du bloc (vote-figures.tsx) : `ouvert` (« Vote ouvert
+ * jusqu'à… ») dès qu'on y vote ; sinon il attend, gris : la fin de mon match
+ * si je joue (« Vote à la fin du Match 1 »), la fin des matchs si je ne joue
+ * pas et qu'aucune feuille n'est remplie. Avant, qui ne jouait pas lisait
+ * « Vote ouvert » alors que personne ne pouvait encore voter (contrôle du
+ * 16/11/2026). `joue` : placeDuVotant m'a trouvé une place.
+ */
+export type BandeauDuVote = "ouvert" | "fin-de-mon-match" | "fin-des-matchs";
+
+export function bandeauDuVote(etat: EtatDuVote, joue: boolean): BandeauDuVote {
+  if (etat !== "en-attente") return "ouvert";
+  return joue ? "fin-de-mon-match" : "fin-des-matchs";
+}
+
+/**
+ * L'encart du vote sur Ma carte (vote-du-jour.tsx, `repliable`) :
+ *   · `ouvert` : le bloc entier et ses deux rangées de cartes, tant qu'il me
+ *     reste une voix à donner ; ailleurs que sur Ma carte, toujours ;
+ *   · `attente` : mes voix ne sont pas encore relues (votes_figures, à
+ *     l'ouverture de l'app ou sur un réseau lent) : la ligne seule, ni ouverte
+ *     ni rangée d'office. Avant, le bloc s'ouvrait comme si je n'avais pas
+ *     voté, puis se rangeait d'un coup quand mes voix arrivaient : ma carte
+ *     sautait de 460 px (contrôle du 16/11/2026) ;
+ *   · `range` : mes deux voix données, la ligne (la coche, l'heure de la fin) ;
+ *   · `rouvert` : rouverte à la main, elle le reste tant qu'on change d'avis.
+ * `vote` : mes deux voix données (mesDeuxVoix) ; connues de ce téléphone,
+ * elles suffisent, relues ou non. `prets` : les votes relus (useVotesPrets).
+ */
+export type EtatEncart = "ouvert" | "attente" | "range" | "rouvert";
+
+export function etatEncart(o: { repliable: boolean; prets: boolean; vote: boolean; rouvert: boolean }): EtatEncart {
+  if (!o.repliable) return "ouvert";
+  if (o.vote) return o.rouvert ? "rouvert" : "range";
+  return o.prets ? "ouvert" : "attente";
+}
+
+/**
+ * La marque de l'étiquette du vote sur la Map : la coche une fois mes deux
+ * voix données, le point rouge tant qu'il m'en reste à donner, et ni l'un ni
+ * l'autre tant que les votes ne sont pas relus (`prets`). Avant, l'étiquette
+ * disait « à voter » à l'ouverture de l'app, puis passait à la coche quand
+ * mes voix arrivaient (contrôle du 16/11/2026).
+ */
+export function marqueDuVote(prets: boolean, fait: boolean): "coche" | "point" | null {
+  if (fait) return "coche";
+  return prets ? "point" : null;
 }
 
 /* ------------------------------ Les élus -------------------------------- */
