@@ -36,6 +36,8 @@ import { useJoueurBola } from "@/components/sfl/player-provider";
 import { divisionsDeLaJournee, terrainsDesEquipes } from "@/lib/sfl/equipes-division";
 import { cn } from "@/lib/utils";
 import { Suspendu } from "@/components/sfl/cartons/mes-cartons";
+import { AbonnementRequis } from "@/components/sfl/bola-plus-rappels";
+import { useAbonnementRequis } from "@/hooks/use-abonnement-requis";
 
 export function PresencePanel({ compact = false }: { compact?: boolean }) {
   const session = useSession();
@@ -43,6 +45,8 @@ export function PresencePanel({ compact = false }: { compact?: boolean }) {
   const p = usePresence();
   const { saison, divisions } = useSeason();
   const bola = useJoueurBola();
+  // Après la journée gratuite du 22/11 : Bola Plus pour répondre (sfl-payant.ts).
+  const requis = useAbonnementRequis() && !p.mine;
   const [vueAdmin, setVueAdmin] = useState(false);
   // Dès la J4, chaque équipe dit sa division : « Noirs · Match 2 · D1 ».
   const divisionDe = useMemo(() => {
@@ -99,6 +103,8 @@ export function PresencePanel({ compact = false }: { compact?: boolean }) {
           donnée, elle est scellée. */}
       {bola ? null : p.suspendu ? (
         <Suspendu j={p.suspendu.j} className="mt-4" />
+      ) : requis ? (
+        <AbonnementRequis j={p.journee} className="mt-4" />
       ) : p.reponsesOuvertes ? (
         <>
           <ReponseScellee className="mt-4" mine={p.mine} onRepondre={p.answer} />

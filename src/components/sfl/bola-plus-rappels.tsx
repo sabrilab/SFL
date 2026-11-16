@@ -198,3 +198,25 @@ export function OuvertureBolaPlus() {
     </div>
   );
 }
+
+/**
+ * À la place de « Je viens », quand la journée demande un abonnement
+ * (lib/sfl/sfl-payant.ts, Sabri 16/11) : « Bola Plus · J8 », et la pastille
+ * « S'abonner » qui ouvre la page. Même place, même forme que « Suspendu ».
+ */
+export function AbonnementRequis({ j, taille = "md", className }: { j: number; taille?: "md" | "sm"; className?: string }) {
+  return (
+    <Link
+      href="/profil/bola-plus"
+      onClick={() => tic()}
+      style={COULEURS}
+      className={["bpr-requis", taille === "sm" ? "bpr-requis--sm" : "", className].filter(Boolean).join(" ")}
+    >
+      <span className="bpr-requis__texte">
+        <span className="bpr-requis__nom">Bola Plus · J{j}</span>
+        <span className="mono-label bpr-requis__sous">Pour jouer</span>
+      </span>
+      <span className="bpr-requis__action">S&apos;abonner</span>
+    </Link>
+  );
+}
