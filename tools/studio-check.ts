@@ -15,12 +15,12 @@
 //   4 · une seule source : aucun prix, aucun nombre de ballons écrit dans
 //       l'écran ; aucun paiement, aucun porte-monnaie, aucun réseau dans les
 //       fichiers du studio ; aucun prestataire nommé ;
-//   5 · les vignettes (retour du 15/11 : les vraies images des douze
-//       modèles) : douze templates, douze fichiers dans
+//   5 · les vignettes (retours du 15/11 et du 16/11 : les vraies images des
+//       douze modèles) : douze templates, douze fichiers dans
 //       public/bola-plus/studio/, dans l'ordre du catalogue (chaque fichier
-//       porte le rang et le nom de son modèle), en 4:5 (978 × 1224 : l'image
-//       fournie, sans la marge de sa capture), et pour chacun sa copie légère
-//       (« -660 », 660 × 826 : les proportions de l'original) ; du WebP,
+//       porte le rang et le nom de son modèle), en 4:5 (896 × 1120 : l'image
+//       fournie le 16/11, en couleur, avec Ilyes), et pour chacun sa copie légère
+//       (« -660 », 660 × 825 : les proportions de l'original) ; du WebP,
 //       léger ; rien d'autre dans le dossier. Et ce sont CES images :
 //       l'empreinte de chacun des vingt-quatre fichiers est écrite ici
 //       (EMPREINTES) ; deux fichiers échangés, un fichier teint, retouché ou
@@ -255,48 +255,48 @@ assert.equal(enFichier("Le but de ta journée"), "le-but-de-ta-journee");
 /** Les deux largeurs d'une vignette : l'original et sa copie légère ; le poids permis à chacune, en octets. */
 const LARGEURS_VIGNETTE = [VIGNETTE.largeur, VIGNETTE.legere] as const;
 const POIDS_VIGNETTE: Record<number, number> = { [VIGNETTE.largeur]: 150_000, [VIGNETTE.legere]: 70_000 };
-assert.deepEqual({ ...VIGNETTE }, { rapport: 5 / 4, largeur: 978, legere: 660 }, "des vignettes en 4:5 : 978 px, et 660 px pour le rail");
+assert.deepEqual({ ...VIGNETTE }, { rapport: 5 / 4, largeur: 896, legere: 660 }, "des vignettes en 4:5 : 896 px, et 660 px pour le rail");
 type Lecteur = (adresse: string) => Buffer | null;
 const surDisque: Lecteur = (adresse) => (existsSync(join(PUBLIC, adresse)) ? readFileSync(join(PUBLIC, adresse)) : null);
 /**
- * L'empreinte (sha256) de chacun des vingt-quatre fichiers : ce sont les images fournies le 15/11, chacune sous le
- * nom de son modèle, et pas seulement des fichiers du bon nom et de la bonne taille. L'original est le fichier
- * fourni, sans la marge de sa capture (deux octets de son en-tête) ; la copie légère en est tirée.
+ * L'empreinte (sha256) de chacun des vingt-quatre fichiers : ce sont les images fournies le 16/11 (en couleur, avec
+ * Ilyes), chacune sous le nom de son modèle, et pas seulement des fichiers du bon nom et de la bonne taille.
+ * L'original est le fichier fourni, octet pour octet ; la copie légère en est tirée.
  * tools/studio-vignettes.py refait les vingt-quatre et affiche ces lignes.
  */
 const EMPREINTES: Record<string, string> = {
-  "01-ma-carte-en-vrai.webp": "4c0b028bb629b601b86d5fd725d6b27dff694e5b5a9112379563ed3f057120cf",
-  "01-ma-carte-en-vrai-660.webp": "12d6c676de91d760dce602187cf3647b3f7fecfa97028f473988ecd5c0fd9a9b",
-  "02-maillot-a-ton-nom.webp": "196ce29d51f06f70576d08fb80cf5af8f64c50b2e0eaecdc702d641a2a3c91c7",
-  "02-maillot-a-ton-nom-660.webp": "af7cfacac7e96602224d75a5983be608b41cbb027596f7ba2d0c71018056c7e4",
-  "03-la-une-du-dimanche.webp": "4c4c2fdbe51345257f4dfda487ef7d13b1a24f823644774def4d3c191fc32351",
-  "03-la-une-du-dimanche-660.webp": "7148402f1d7669e9b44553866c8d54e4a54fd0f74ee9a35f80b66be01d986e6d",
-  "04-l-affiche-du-match.webp": "0e97caf1978dbff39fc8b56ef2ffdc3313dd33077069e5923c119ce0b2240410",
-  "04-l-affiche-du-match-660.webp": "a06553fd49398aa4c37d93349a40cd4d71f56562ec40f060237c02812e79b624",
-  "05-la-celebration.webp": "f7bbc4106ea4ec77e5e5ce8f193555485e3ed2fc3faa8b9a6a489c083f02063e",
-  "05-la-celebration-660.webp": "d25e0c6847aa37a7ed96211b24337241a75150ef573155e26a876d16d0ba228d",
-  "06-trash-talk.webp": "33d2566aa069cc0b3373374586e895e1866c2ca5288b963e9dbd57970919f844",
-  "06-trash-talk-660.webp": "5d39b0ae2643b0394dc27b5945b6bfa567169a9091248a956ef2ba8691313cdd",
-  "07-sorti-de-la-carte.webp": "490900a9df0a93391ca8256af3ef0019657e116cc38b16b16817950647240cd9",
-  "07-sorti-de-la-carte-660.webp": "2727e608a196a66cf662e154ea321020d62f07765a0c74877d7db8fdf789bdcd",
-  "08-option-hd.webp": "a71dd02ea90df9c6160dbe4c6a38dd1ecded057c61275d9c546d72203804534a",
-  "08-option-hd-660.webp": "7c645fdeddc96e8908e0b46fff29829386d0c8ab3ac500d77ada7402ba70a278",
-  "09-ta-saison.webp": "3955f4d7941c8fb1aa711902aa82f4d50ed1b4e3ebd18506d19e71f3fa0c9806",
-  "09-ta-saison-660.webp": "54e9ab41b9c2167895286c01476fa444f2c59d7c1016fc8cddea4d57991d14c6",
-  "10-l-entree.webp": "e61f7583a7a8b0990911406a38a9e61d2de61d545db5551655b044c20573a084",
-  "10-l-entree-660.webp": "756aff2c08a35f7bb10d663f92be271852f7dc6abf8fbb39271d444916385b79",
-  "11-le-but-de-ta-journee.webp": "7d4573641ac3b83e7fb9672d42e6f115e20d6e2077be23121d4591aa580ab85b",
-  "11-le-but-de-ta-journee-660.webp": "59c1df62c2b1908bee7ee72cd643aa9fd59a0ba8ff0d641c6396f5c4ba767a71",
-  "12-convocation-d-equipe.webp": "c14203fce8088319acfa7a3b721caf6b384b391bbe8eef4a429d492eaee865f2",
-  "12-convocation-d-equipe-660.webp": "3e2c910149eab0790e5d6782cde8593bd5fccf62ffff1841bf491f77c73eaa49",
+  "01-ma-carte-en-vrai.webp": "5387ccf3ecfa454f008a1aee12b7b12fabb3efeac14af3836507bf3ad9c41698",
+  "01-ma-carte-en-vrai-660.webp": "a04f7b61a33cb60dd089a920f18ffadc95af3be677144f2ea1c7e103cd83810f",
+  "02-maillot-a-ton-nom.webp": "c147e5f0c7db5df3c891184fd214d04ab399bb8ce7f70bc614af9f233a9b9a5f",
+  "02-maillot-a-ton-nom-660.webp": "827d1a53b87b2347ae50387573a30271c782108e95a18444e6073ecfc1114eb1",
+  "03-la-une-du-dimanche.webp": "dd024fccb004e6d4fae196469fade4adc950a24b525b116b0fa752ac45aced2f",
+  "03-la-une-du-dimanche-660.webp": "8821f8e08531e32db6f378ad966974ea88122b33de3ac327327bc7cc0ffbe83e",
+  "04-l-affiche-du-match.webp": "79b4b7ef79101129f9daf4f04338c09e169e8fe94e428b9befc6c841c49434ed",
+  "04-l-affiche-du-match-660.webp": "9d388d5e6920251b6fec242ee70fe5725cededdc557c5f289d19011359ce9722",
+  "05-la-celebration.webp": "9933579c2514863f82c220c1ce732036783491a0ccee7f55c9e747db0bdd6572",
+  "05-la-celebration-660.webp": "cf5604b210d67d3c13482ce170b3b35bdafcb2f1a61074c8470466e3b5f003c0",
+  "06-trash-talk.webp": "132117e83cf18dfb88943ae467d3afd9deac37261021b1012834834bb7ddbce3",
+  "06-trash-talk-660.webp": "7bea83110d3e5aa123dba7a9ae1e77953c60a208f0f3c7831f5ef686e244fcd0",
+  "07-sorti-de-la-carte.webp": "6ca9ad6178746c81437a0b71ea71541fb8b3738e4987e9b5f3fc1f0cf81e9120",
+  "07-sorti-de-la-carte-660.webp": "3fbbe5e55df27f8c3f387c24bdff3efb6c867ef06517d98a8fc4da84316be915",
+  "08-option-hd.webp": "7f376e925da0cce4c672f5e670e9a3b032873ca485b638067622a704252e022c",
+  "08-option-hd-660.webp": "d991d772704694e60a0f8c00adaeed30ced4c5d467d51bbd3a729d8abb6ce5a6",
+  "09-ta-saison.webp": "925d9ff613088e72cb052a8ae7c2abfa554f8038c81e05a27b0bc253c34f9a3f",
+  "09-ta-saison-660.webp": "d8ea038051da863d9ead23845ff9b63f1b49ed697db914c9e9341286c1aa4f30",
+  "10-l-entree.webp": "b83fc3173a302c74d89824fe846eaba5a782edef86e010f21a5fbf546015fabb",
+  "10-l-entree-660.webp": "3a9211cf0cc163b3f09742e72bcf4afeeb90ded9d90c68af77856b34a5f301fc",
+  "11-le-but-de-ta-journee.webp": "f63887e536b84d5bcaacb7bd79b7d530a0eb9962f746c5785ca916c84076c40a",
+  "11-le-but-de-ta-journee-660.webp": "20e6aa445162c2cc1d700f83cd80382d65bf147e9e75810a6f0b34d395ba5573",
+  "12-convocation-d-equipe.webp": "d2d870fcde65e94c985db36b81143a4293aa48ed7b60be06f5ee3bf26172c1d3",
+  "12-convocation-d-equipe-660.webp": "18033f0258a0591f2af3d05cc41c4e6b38922756ae22b4b1186a7f2a22500369",
 };
 const empreinte = (o: Buffer) => createHash("sha256").update(o).digest("hex");
 assert.equal(new Set(Object.values(EMPREINTES)).size, 24, "vingt-quatre fichiers, vingt-quatre images différentes");
 /**
  * Chaque template a sa vignette, à son rang : le fichier « NN-nom-du-modèle » (NN : sa place dans le catalogue),
  * présent à ses deux largeurs, en WebP, en 4:5, léger, et c'est l'image posée (son empreinte). L'original a la
- * taille de l'image fournie (978 × 1224 : une ligne et demie de plus que 4:5, que l'écran laisse dépasser en haut
- * et en bas) ; sa copie légère en garde les proportions (660 × 826) : dans la fiche, les deux se superposent.
+ * taille de l'image fournie (896 × 1120, du 4:5 exact) ; sa copie légère en garde les proportions (660 × 825) :
+ * dans la fiche, les deux se superposent.
  * Rend le poids total.
  */
 const vignettesJustes = (liste: readonly Template[], lireFichier: Lecteur = surDisque) => {
@@ -306,7 +306,7 @@ const vignettesJustes = (liste: readonly Template[], lireFichier: Lecteur = surD
     assert.equal(t.image, `${String(i + 1).padStart(2, "0")}-${enFichier(t.nom)}`, `${t.nom} : sa vignette, dans l'ordre du catalogue`);
     assert.equal(fichierVignette(t), `/bola-plus/studio/${t.image}.webp`, `${t.nom} : l'adresse de son image`);
     assert.equal(fichierVignette(t, VIGNETTE.legere), `/bola-plus/studio/${t.image}-${VIGNETTE.legere}.webp`, `${t.nom} : l'adresse de sa copie légère`);
-    assert.equal(sourcesVignette(t), `/bola-plus/studio/${t.image}-660.webp 660w, /bola-plus/studio/${t.image}.webp 978w`, `${t.nom} : ses deux largeurs`);
+    assert.equal(sourcesVignette(t), `/bola-plus/studio/${t.image}-660.webp 660w, /bola-plus/studio/${t.image}.webp 896w`, `${t.nom} : ses deux largeurs`);
     const proportions: number[] = [];
     for (const l of LARGEURS_VIGNETTE) {
       const adresse = fichierVignette(t, l);
@@ -748,17 +748,17 @@ const retaille = (o: Buffer, largeur: number, hauteur: number) => {
 };
 const premiere = fichierVignette(TEMPLATES[0]);
 const legere = fichierVignette(TEMPLATES[5], VIGNETTE.legere);
-assert.deepEqual(tailleWebp(retaille(surDisque(premiere)!, 978, 978)), { largeur: 978, hauteur: 978 }, "le mutant des tailles a prise");
+assert.deepEqual(tailleWebp(retaille(surDisque(premiere)!, 896, 896)), { largeur: 896, hauteur: 896 }, "le mutant des tailles a prise");
 const sauf = (adresse: string, autre: (o: Buffer) => Buffer | null): Lecteur => (a) => (a === adresse ? autre(surDisque(a)!) : surDisque(a));
 const PAS_45 = /pas du 4:5/;
 refuse("une vignette absente", () => vignettesJustes(TEMPLATES, sauf(fichierVignette(TEMPLATES[11]), () => null)), /manque/);
 refuse("une copie légère absente", () => vignettesJustes(TEMPLATES, sauf(legere, () => null)), /manque/);
-refuse("une vignette carrée (le fichier)", () => vignettesJustes(TEMPLATES, sauf(premiere, (o) => retaille(o, 978, 978))), PAS_45);
-refuse("une vignette en 3:4", () => vignettesJustes(TEMPLATES, sauf(premiere, (o) => retaille(o, 978, 1304))), PAS_45);
-refuse("une vignette en 16:9", () => vignettesJustes(TEMPLATES, sauf(premiere, (o) => retaille(o, 978, 550))), PAS_45);
-refuse("une vignette rognée de deux lignes", () => vignettesJustes(TEMPLATES, sauf(premiere, (o) => retaille(o, 978, 1222))), PAS_45);
-// Le fichier fourni tel quel (980 × 1226) : sa marge de capture, le liseré gris du bord droit, reviendrait à l'écran.
-refuse("la marge de la capture revenue (le fichier fourni tel quel)", () => vignettesJustes(TEMPLATES, sauf(premiere, (o) => retaille(o, 980, 1226))), /px de large, attendu 978/);
+refuse("une vignette carrée (le fichier)", () => vignettesJustes(TEMPLATES, sauf(premiere, (o) => retaille(o, 896, 896))), PAS_45);
+refuse("une vignette en 3:4", () => vignettesJustes(TEMPLATES, sauf(premiere, (o) => retaille(o, 896, 1195))), PAS_45);
+refuse("une vignette en 16:9", () => vignettesJustes(TEMPLATES, sauf(premiere, (o) => retaille(o, 896, 504))), PAS_45);
+refuse("une vignette rognée de deux lignes", () => vignettesJustes(TEMPLATES, sauf(premiere, (o) => retaille(o, 896, 1118))), PAS_45);
+// Un fichier à la taille de ceux du 15/11 (978 × 1224, les vignettes noir et blanc) : ce n'est plus la vignette attendue.
+refuse("une vignette à l'ancienne taille (978 × 1224)", () => vignettesJustes(TEMPLATES, sauf(premiere, (o) => retaille(o, 978, 1224))), /px de large, attendu 896/);
 refuse("une copie légère carrée", () => vignettesJustes(TEMPLATES, sauf(legere, (o) => retaille(o, 660, 660))), PAS_45);
 refuse("une copie légère qui n'a pas sa largeur", () => vignettesJustes(TEMPLATES, sauf(legere, (o) => retaille(o, 480, 600))), /px de large, attendu 660/);
 refuse("une vignette trop lourde", () => vignettesJustes(TEMPLATES, sauf(premiere, (o) => Buffer.concat([o, Buffer.alloc(200_000)]))), /octets, au plus/);

@@ -9,10 +9,11 @@
 // le studio vit DANS le carrousel, dans la part Bola Plus (violet).
 //
 //   · ImageTemplate, Legende : la vignette d'un template (retour du 15/11 :
-//     « les vraies vignettes des 12 modèles »). Son image, l'une des douze de
+//     « les vraies vignettes des 12 modèles » ; depuis le 16/11, en couleur,
+//     avec l'avatar d'Ilyes). Son image, l'une des douze de
 //     public/bola-plus/studio/, montrée telle quelle dans une boîte en 4:5
-//     (.st-vignette) : jamais recadrée en carré, ni grossie, ni teinte (du
-//     noir et blanc, par choix), ni animée. Sur son tiers bas, sombre dans
+//     (.st-vignette) : jamais recadrée en carré, ni grossie, ni teinte, ni
+//     animée. Sur son tiers bas, sombre dans
 //     l'image, la légende : le nom du modèle (la police des titres de la
 //     page) et son prix en ballons (Anton), sur un voile noir, pas une
 //     teinte. L'image est décorative (alt vide) : le nom, ce que tu reçois,
