@@ -263,10 +263,13 @@ const surDisque: Lecteur = (adresse) => (existsSync(join(PUBLIC, adresse)) ? rea
  * nom de son modèle, et pas seulement des fichiers du bon nom et de la bonne taille. L'original est le fichier
  * fourni, sans la marge de sa capture (deux octets de son en-tête) ; la copie légère en est tirée.
  * tools/studio-vignettes.py refait les vingt-quatre et affiche ces lignes.
+ * Sauf « Ma carte en vrai » : la première image montrait un joueur de football américain (épaulettes) ; régénérée
+ * le 16/11 à la demande de Sabri (Higgsfield, Nano Banana 2, 928 × 1152), mise à 978 × 1224 (Lanczos, 4 px rognés
+ * de chaque côté), WebP qualité 88 et sa copie légère à 82.
  */
 const EMPREINTES: Record<string, string> = {
-  "01-ma-carte-en-vrai.webp": "4c0b028bb629b601b86d5fd725d6b27dff694e5b5a9112379563ed3f057120cf",
-  "01-ma-carte-en-vrai-660.webp": "12d6c676de91d760dce602187cf3647b3f7fecfa97028f473988ecd5c0fd9a9b",
+  "01-ma-carte-en-vrai.webp": "2b31b73d5b0e7a87cc41c714ad7d8e8929aad110363b9c141b403c190ba6f195",
+  "01-ma-carte-en-vrai-660.webp": "386c935f21ebae0288900f686817efa4cb669597d0e4e1e131f815df7b3c0d26",
   "02-maillot-a-ton-nom.webp": "196ce29d51f06f70576d08fb80cf5af8f64c50b2e0eaecdc702d641a2a3c91c7",
   "02-maillot-a-ton-nom-660.webp": "af7cfacac7e96602224d75a5983be608b41cbb027596f7ba2d0c71018056c7e4",
   "03-la-une-du-dimanche.webp": "4c4c2fdbe51345257f4dfda487ef7d13b1a24f823644774def4d3c191fc32351",
