@@ -29,6 +29,7 @@ import { useCompteARebours } from "@/hooks/use-compte-a-rebours";
 import { casesDe, resteCourt, type Reste } from "@/lib/sfl/compte-a-rebours";
 import { PALETTE, PRIX_FORMULE, VARIABLES_PLUS, voitBolaPlus } from "@/lib/sfl/bola-plus";
 import { tic } from "@/lib/sfl/haptique";
+import { partirDe } from "@/lib/sfl/bola-plus-parcours-store";
 import { ANTON } from "@/components/sfl/actus/ecran";
 import "./bola-plus-rappels.css";
 
@@ -121,7 +122,7 @@ export function BandeauBolaPlus() {
   if (!nom || !voitBolaPlus(nom) || !reste || reste.fini || horsRappel(pathname) || range) return null;
   return (
     <div className="bpr-bandeau" style={COULEURS}>
-      <Link href="/profil/bola-plus" className="bpr-bandeau__lien" onClick={() => tic()}>
+      <Link href="/profil/bola-plus" className="bpr-bandeau__lien" onClick={() => (tic(), partirDe("bandeau"))}>
         <span className="bpr-bandeau__nom">Bola Plus</span>
         <span className="bpr-bandeau__offre">Prix premiers joueurs</span>
         <CompteARebours reste={reste} variante="ligne" className="bpr-bandeau__temps" />
@@ -186,6 +187,7 @@ export function OuvertureBolaPlus() {
           onClick={() => {
             tic();
             fermer();
+            partirDe("ecran-du-jour");
             router.push("/profil/bola-plus");
           }}
         >
@@ -208,7 +210,7 @@ export function AbonnementRequis({ j, taille = "md", className }: { j: number; t
   return (
     <Link
       href="/profil/bola-plus"
-      onClick={() => tic()}
+      onClick={() => (tic(), partirDe("convocation"))}
       style={COULEURS}
       className={["bpr-requis", taille === "sm" ? "bpr-requis--sm" : "", className].filter(Boolean).join(" ")}
     >

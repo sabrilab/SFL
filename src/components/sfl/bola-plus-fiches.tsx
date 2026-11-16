@@ -1,17 +1,23 @@
 "use client";
 
-// La fiche d'une carte de Bola Plus (lib/sfl/bola-plus-fiches.ts) : plein
-// écran, au-dessus de la barre d'onglets, déroulée comme une keynote. Chaque
-// chapitre entre quand il arrive à l'écran (en mouvement réduit, il est déjà
-// là). Le retour du téléphone (le glissé depuis le bord) la ferme, comme la
-// croix : la fiche pose une entrée dans l'historique.
+// La fiche d'une carte de Bola Plus (lib/sfl/bola-plus-fiches.ts). Depuis le
+// 16/11 20:54 (Sabri, sa capture de Bola Studio : « c'est comme ça que je
+// voulais le design des carrousels sous-jacents »), elle a la forme du
+// panneau Bola Studio (studio-bola.tsx) : une feuille du bas aux couleurs de
+// sa part (violet Bola Plus, vert SFL), le titre, une phrase, puis le rail
+// des vignettes en 4:5, au doigt, accroché carte par carte. Sur le tiers bas
+// d'une vignette, son nom et un détail ; dessous, une ligne et une mention.
+// Toucher une vignette la pousse en grand dans la même feuille (le retour en
+// haut à gauche, components/ui/sheet.tsx). Les étapes de « Ramène 5 » n'ont
+// pas d'image : leur numéro et les cinq ronds, sur la teinte de la part.
 
-import { useEffect, useRef, useState, type CSSProperties } from "react";
-import { createPortal } from "react-dom";
-import { Plus, User, X } from "lucide-react";
+import { useState, type CSSProperties } from "react";
+import { Plus, User } from "lucide-react";
 import { ANTON } from "@/components/sfl/actus/ecran";
-import { FICHES, fichierFiche, sourcesFiche, type Chapitre, type Etape, type Fiche, type ImageFiche } from "@/lib/sfl/bola-plus-fiches";
+import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
+import { FICHES, fichierFiche, sourcesFiche, type CarteFiche } from "@/lib/sfl/bola-plus-fiches";
 import { tic } from "@/lib/sfl/haptique";
+import "./studio-bola.css";
 import "./bola-plus-fiches.css";
 
 /** Cette carte a-t-elle une fiche ? */
@@ -34,154 +40,125 @@ export function PastilleFiche({ onOuvrir, nom }: { onOuvrir: () => void; nom: st
   );
 }
 
-/** Une image de la fiche, à sa taille, chargée quand elle approche. */
-function Image1({ i, seule }: { i: ImageFiche; seule: boolean }) {
-  return (
-    // eslint-disable-next-line @next/next/no-img-element -- déjà à ses deux largeurs (public/bola-plus-fiches)
-    <img
-      src={fichierFiche(i.image, 600)}
-      srcSet={sourcesFiche(i)}
-      sizes={seule ? "(max-width: 430px) 100vw, 430px" : "(max-width: 430px) 50vw, 215px"}
-      width={i.largeur}
-      height={i.hauteur}
-      alt={i.alt}
-      loading="lazy"
-      decoding="async"
-      draggable={false}
-      className="bpf-image"
-    />
-  );
-}
-
-function ChapitreFiche({ c }: { c: Chapitre }) {
-  return (
-    <section className="bpf-chapitre" data-entre="">
-      <div className={c.images.length > 1 ? "bpf-images bpf-images--deux" : "bpf-images"}>
-        {c.images.map((i) => (
-          <Image1 key={i.image + i.alt} i={i} seule={c.images.length === 1} />
-        ))}
-      </div>
-      <h3 className="bpf-titre">{c.titre}</h3>
-      {c.texte && <p className="bpf-texte">{c.texte}</p>}
-      {c.liste && (
-        <ul className="bpf-liste">
-          {c.liste.map((l) => (
-            <li key={l.gauche}>
-              <span className="bpf-liste__rang">{l.gauche}</span>
-              <span className="bpf-liste__valeur tabular-nums" style={{ fontFamily: ANTON }}>
-                {l.droite}
-              </span>
-            </li>
-          ))}
-        </ul>
-      )}
-    </section>
-  );
-}
+/** La feuille : comme celle de Bola Studio, elle défile si l'écran est court. */
+const FEUILLE = "st-feuille bpf-feuille max-h-[92dvh] overflow-y-auto rounded-t-[28px] pb-[calc(env(safe-area-inset-bottom,0px)+1.5rem)]";
 
 /** Les cinq ronds de « Ramène 5 », dont `pleins` sont remplis. */
 function Ronds({ pleins }: { pleins: number }) {
   return (
-    <div className="bpf-ronds" aria-hidden>
+    <span className="bpf-ronds" aria-hidden>
       {Array.from({ length: 5 }, (_, i) => (
-        <span key={i} className="bpf-rond" data-plein={i < pleins ? "" : undefined} style={{ ["--i" as string]: i } as CSSProperties}>
-          <User className="size-[16px]" strokeWidth={2.4} />
+        <span key={i} className="bpf-rond" data-plein={i < pleins ? "" : undefined}>
+          <User className="size-[42%]" strokeWidth={2.4} />
         </span>
       ))}
-    </div>
+    </span>
   );
 }
 
-function EtapeFiche({ e, n }: { e: Etape; n: number }) {
+/** Le visuel d'une vignette : l'image (entière sur le noir si elle est large), ou une étape et ses ronds. */
+function Visuel({ c, grand }: { c: CarteFiche; grand?: boolean }) {
+  if (!c.image) return <span className="bpf-etape">{c.pleins !== undefined && <Ronds pleins={c.pleins} />}</span>;
   return (
-    <section className="bpf-etape" data-entre="">
-      <span className="bpf-etape__numero tabular-nums" style={{ fontFamily: ANTON }}>
-        {String(n).padStart(2, "0")}
-      </span>
-      <div className="bpf-etape__corps">
-        <h3 className="bpf-titre">{e.titre}</h3>
-        <p className="bpf-texte">{e.texte}</p>
-        <Ronds pleins={e.pleins} />
-      </div>
-    </section>
+    // eslint-disable-next-line @next/next/no-img-element -- déjà à ses deux largeurs (public/bola-plus-fiches)
+    <img
+      className={`st-vignette__image${c.entiere ? " bpf-entiere" : ""}`}
+      src={fichierFiche(c.image, 600)}
+      srcSet={sourcesFiche(c)}
+      sizes={grand ? "min(406px, calc(100vw - 24px))" : "min(216px, 58vw)"}
+      width={c.largeur}
+      height={c.hauteur}
+      alt={grand ? c.alt : ""}
+      loading={grand ? "eager" : "lazy"}
+      decoding="async"
+      draggable={false}
+    />
   );
 }
 
-function Contenu({ fiche }: { fiche: Fiche }) {
-  if ("etapes" in fiche) return fiche.etapes.map((e, i) => <EtapeFiche key={e.titre} e={e} n={i + 1} />);
-  return fiche.chapitres.map((c) => <ChapitreFiche key={c.titre} c={c} />);
+/** Le tiers bas d'une vignette : le nom, et le détail en Anton. Dans la vue en grand, le nom est le titre de la feuille. */
+function Legende({ c, titre }: { c: CarteFiche; titre?: boolean }) {
+  const Nom = titre ? SheetTitle : "span";
+  return (
+    <span className="st-vignette__bas">
+      <Nom className="bp-titre st-vignette__nom">{c.nom}</Nom>
+      {c.detail && (
+        <span className="st-vignette__prix tabular-nums" style={{ fontFamily: ANTON }}>
+          {c.detail}
+        </span>
+      )}
+    </span>
+  );
 }
 
-/** La fiche ouverte, dans <body>. `part` : « plus » (violet) ou « sfl » (vert), comme la carte. */
+/** Sous la vignette : la ligne et la mention. */
+function Dessous({ c, grand }: { c: CarteFiche; grand?: boolean }) {
+  return (
+    <span className={`flex flex-col px-1 ${grand ? "gap-3" : "gap-1.5 pt-2.5"}`}>
+      <span className={grand ? "text-corps leading-snug text-encre-2" : "line-clamp-2 min-h-[2.5em] text-[13px] leading-[1.25] text-encre-2"}>{c.texte}</span>
+      {c.mention && <span className={`leading-none font-semibold text-encre-2 ${grand ? "text-corps" : "text-[13px]"}`}>{c.mention}</span>}
+    </span>
+  );
+}
+
+/** Une vignette en grand, poussée dans la feuille. */
+function EnGrand({ c, couleurs, part, onFermer }: { c: CarteFiche | null; couleurs: CSSProperties; part: string; onFermer: () => void }) {
+  return (
+    <Sheet open={!!c} onOpenChange={(o) => !o && onFermer()}>
+      <SheetContent side="bottom" className={`${FEUILLE} bpf-part-${part}`} style={couleurs}>
+        {c && (
+          <div className="mx-auto w-full max-w-[430px] px-3 pt-3 pb-8">
+            <div className="st-fiche">
+              <div className="st-vignette st-vignette--grand">
+                <Visuel c={c} grand />
+                <Legende c={c} titre />
+              </div>
+              <Dessous c={c} grand />
+            </div>
+          </div>
+        )}
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+/** La fiche ouverte. `part` : « plus » (violet) ou « sfl » (vert), comme la carte. */
 export function FicheBolaPlus({ id, part, couleurs, onFermer }: { id: string; part: string; couleurs: CSSProperties; onFermer: () => void }) {
   const fiche = FICHES[id];
-  const ref = useRef<HTMLDivElement>(null);
-  const fermer = useRef(onFermer);
-  useEffect(() => {
-    fermer.current = onFermer;
-  }, [onFermer]);
-
-  // Le retour du téléphone ferme la fiche ; la croix revient en arrière d'un pas.
-  useEffect(() => {
-    window.history.pushState({ ficheBolaPlus: id }, "");
-    const retour = () => fermer.current();
-    window.addEventListener("popstate", retour);
-    return () => window.removeEventListener("popstate", retour);
-  }, [id]);
-
-  // Les chapitres entrent à l'écran ; le fond ne défile plus.
-  useEffect(() => {
-    const boite = ref.current;
-    if (!boite) return;
-    const avant = document.documentElement.style.overflow;
-    document.documentElement.style.overflow = "hidden";
-    boite.focus({ preventScroll: true });
-    const o = new IntersectionObserver(
-      (es) => {
-        for (const e of es) if (e.isIntersecting) (e.target as HTMLElement).dataset.vu = "";
-      },
-      { root: boite, threshold: 0.18 }
-    );
-    boite.querySelectorAll("[data-entre]").forEach((el) => o.observe(el));
-    return () => {
-      o.disconnect();
-      document.documentElement.style.overflow = avant;
-    };
-  }, [id]);
-
+  const [grand, setGrand] = useState<CarteFiche | null>(null);
   if (!fiche) return null;
-  return createPortal(
-    <div
-      ref={ref}
-      className="bpf dark"
-      data-part={part}
-      style={couleurs}
-      role="dialog"
-      aria-modal="true"
-      aria-label={fiche.titre}
-      tabIndex={-1}
-      onKeyDown={(e) => {
-        if (e.key === "Escape") window.history.back();
-      }}
-    >
-      <div className="bpf-tete">
-        <button
-          type="button"
-          className="bpf-fermer"
-          aria-label="Fermer"
-          onClick={() => {
-            tic();
-            window.history.back();
-          }}
-        >
-          <X className="size-5" strokeWidth={2.4} aria-hidden />
-        </button>
-      </div>
-      <h2 className="bpf-grand-titre">{fiche.titre}</h2>
-      <Contenu fiche={fiche} />
-      <div className="bpf-fin" />
-    </div>,
-    document.body
+  return (
+    <Sheet open onOpenChange={(o) => !o && onFermer()}>
+      <SheetContent side="bottom" className={`${FEUILLE} bpf-part-${part}`} style={couleurs}>
+        <div className="st-panneau mx-auto w-full max-w-[430px]">
+          <div className="flex flex-col gap-2 px-5">
+            <SheetTitle className="bp-titre st-panneau__titre">{fiche.titre}</SheetTitle>
+            <p className="st-panneau__phrase tabular-nums">{fiche.phrase}</p>
+          </div>
+          <ul className="st-rail">
+            {fiche.cartes.map((c) => (
+              <li key={c.nom} className="st-item">
+                <button
+                  type="button"
+                  className="st-item__bouton"
+                  onClick={() => {
+                    tic();
+                    setGrand(c);
+                  }}
+                >
+                  <span className="st-vignette">
+                    <Visuel c={c} />
+                    <Legende c={c} />
+                  </span>
+                  <Dessous c={c} />
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+        <EnGrand c={grand} couleurs={couleurs} part={part} onFermer={() => setGrand(null)} />
+      </SheetContent>
+    </Sheet>
   );
 }
 
