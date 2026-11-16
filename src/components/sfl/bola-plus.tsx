@@ -63,6 +63,8 @@ import { createPortal } from "react-dom";
 import { Check, ChevronLeft, ChevronRight, MessageCircle, Sparkles, Target, User, Users } from "lucide-react";
 import { ANTON } from "@/components/sfl/actus/ecran";
 import { BolaCard } from "@/components/sfl/bola-card";
+import { PlayerCard } from "@/components/sfl/player-card";
+import { useMyPlayer } from "@/components/sfl/player-provider";
 import { SigleLigue } from "@/components/sfl/choix-ligue";
 import { LOGO_BOLA } from "@/components/sfl/finitions-carte";
 import { RosaceBola } from "@/components/sfl/motif-carte";
@@ -391,14 +393,25 @@ function DiapoOuverture() {
 /** La carte à taille 1 : 254 px de large, 1656/1024 de haut (bola-card.tsx). */
 const HAUTEUR_CARTE = 254 * (1656 / 1024);
 
-/** « Ta carte » : la vraie carte de l'app, à la place qu'elle a. */
+/**
+ * « Ta carte » : la carte du compte ouvert, telle qu'elle est sur Ma carte
+ * (sa photo, son skin, ses notes : PlayerCard), pour que ce soit la sienne
+ * (Sabri, 16/11 : « mettre la carte du user en fonction de son compte pour
+ * que ce soit plus perso »). Sans joueur à soi (compte hors de la saison),
+ * la carte « Toi » anonyme.
+ */
 function VisuelCarte() {
   const ref = useRef<HTMLDivElement>(null);
   const h = useHauteur(ref);
+  const { me, player } = useMyPlayer();
   const taille = h > 0 ? Math.max(0.5, Math.min(0.92, (h - 8) / HAUTEUR_CARTE)) : 0.8;
   return (
     <div ref={ref} className="bp-visuel-carte" aria-hidden>
-      <BolaCard name={CARTE_TOI.name} position={CARTE_TOI.position} overall={ovr(CARTE_TOI.stats)} stats={CARTE_TOI.stats} highlightStats={["DRI"]} size={taille} />
+      {player && player.name === me ? (
+        <PlayerCard player={player} size={taille} />
+      ) : (
+        <BolaCard name={CARTE_TOI.name} position={CARTE_TOI.position} overall={ovr(CARTE_TOI.stats)} stats={CARTE_TOI.stats} highlightStats={["DRI"]} size={taille} />
+      )}
     </div>
   );
 }
