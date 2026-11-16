@@ -1,0 +1,249 @@
+/* Bola Plus, les rappels (bola-plus-rappels.tsx) : le compte à rebours, le
+   bandeau au-dessus de la barre d'onglets, l'écran d'ouverture du jour. Les
+   couleurs de la part Bola Plus (violet) et du prix (lime) viennent de
+   PALETTE (lib/sfl/bola-plus.ts), posées en variables par chaque rappel. */
+
+/* Le compte à rebours, en une ligne */
+.bpr-ligne {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 700;
+  letter-spacing: -0.1px;
+  white-space: nowrap;
+}
+.bpr-point {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--bp-prix, #d9ff3f);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--bp-prix, #d9ff3f) 30%, transparent);
+  animation: bpr-pouls 1.6s ease-in-out infinite;
+}
+@keyframes bpr-pouls {
+  50% {
+    box-shadow: 0 0 0 6px color-mix(in srgb, var(--bp-prix, #d9ff3f) 0%, transparent);
+  }
+}
+
+/* En grand : quatre cases */
+.bpr-grand {
+  display: flex;
+  gap: 8px;
+}
+.bpr-case {
+  display: flex;
+  min-width: 58px;
+  flex-direction: column;
+  align-items: center;
+  padding: 8px 6px 6px;
+  border-radius: 12px;
+  background: rgb(255 255 255 / 0.08);
+  border: 1px solid rgb(255 255 255 / 0.14);
+}
+.bpr-chiffre {
+  font-size: 30px;
+  line-height: 1;
+  color: #fff;
+}
+.bpr-unite {
+  margin-top: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: rgb(255 255 255 / 0.6);
+}
+
+/* Le bandeau : une pilule violette au-dessus de la barre d'onglets */
+.bpr-bandeau {
+  position: fixed;
+  left: 50%;
+  z-index: 39;
+  bottom: calc(max(calc(env(safe-area-inset-bottom) - 4px), 14px) + 76px);
+  width: min(calc(100% - 32px), 430px);
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 6px 6px 16px;
+  border-radius: 999px;
+  background: linear-gradient(100deg, var(--bp-plus-fond), var(--bp-plus-haut));
+  color: #fff;
+  box-shadow:
+    0 10px 30px rgb(36 16 79 / 0.35),
+    inset 0 0 0 1px rgb(255 255 255 / 0.12);
+  animation: bpr-arrive 420ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+html[data-clavier] .bpr-bandeau {
+  display: none;
+}
+@keyframes bpr-arrive {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 12px);
+  }
+}
+.bpr-bandeau__lien {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  align-items: center;
+  gap: 10px;
+  min-height: 36px;
+  font-size: 14px;
+}
+.bpr-bandeau__nom {
+  font-weight: 800;
+  white-space: nowrap;
+}
+.bpr-bandeau__offre {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: rgb(255 255 255 / 0.72);
+}
+.bpr-bandeau__temps {
+  margin-left: auto;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--bp-prix);
+  color: var(--bp-nuit);
+  font-size: 13px;
+}
+.bpr-bandeau__temps .bpr-point {
+  background: var(--bp-nuit);
+  box-shadow: none;
+  animation: none;
+}
+.bpr-bandeau__fermer {
+  display: flex;
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  color: rgb(255 255 255 / 0.7);
+}
+@media (max-width: 360px) {
+  .bpr-bandeau__offre {
+    display: none;
+  }
+}
+
+/* L'écran d'ouverture du jour */
+.bpr-ouverture {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+.bpr-ouverture__fond {
+  position: absolute;
+  inset: 0;
+  background: rgb(10 10 18 / 0.6);
+  backdrop-filter: blur(6px);
+  animation: bpr-fondu 300ms ease both;
+}
+@keyframes bpr-fondu {
+  from {
+    opacity: 0;
+  }
+}
+.bpr-ouverture__fiche {
+  position: relative;
+  display: flex;
+  width: min(100%, 480px);
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 28px 20px calc(20px + env(safe-area-inset-bottom));
+  border-radius: 28px 28px 0 0;
+  background:
+    radial-gradient(120% 70% at 50% 0%, var(--bp-plus-haut), transparent 70%),
+    var(--bp-plus-fond);
+  color: #fff;
+  text-align: center;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.12);
+  animation: bpr-monte 420ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+@keyframes bpr-monte {
+  from {
+    transform: translateY(40px);
+    opacity: 0;
+  }
+}
+.bpr-ouverture__etiquette {
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: var(--bp-plus-vif);
+  font-size: 13px;
+  font-weight: 700;
+}
+.bpr-ouverture__titre {
+  font-family: var(--font-barlow), var(--font-inter), system-ui, sans-serif;
+  font-size: 34px;
+  font-weight: 800;
+  line-height: 1;
+  text-transform: uppercase;
+}
+.bpr-ouverture__prix {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 46px;
+  line-height: 1;
+  color: var(--bp-prix);
+}
+.bpr-ouverture__par,
+.bpr-ouverture__barre {
+  font-size: 16px;
+  font-weight: 600;
+  color: rgb(255 255 255 / 0.7);
+}
+.bpr-ouverture__temps {
+  margin: 4px 0 8px;
+}
+.bpr-ouverture__voir {
+  width: 100%;
+  height: 52px;
+  border-radius: 999px;
+  background: var(--bp-prix);
+  color: var(--bp-nuit);
+  font-size: 17px;
+  font-weight: 800;
+}
+.bpr-ouverture__tard {
+  height: 40px;
+  font-size: 15px;
+  font-weight: 600;
+  color: rgb(255 255 255 / 0.7);
+}
+
+/* Sur la page et la tuile : le compte à rebours suit la couleur de son support */
+.bp-ouverture .bpr-grand {
+  margin-top: 4px;
+}
+.tuile__rebours {
+  font-size: 13px;
+  color: var(--bp-plus-encre, #5b21b6);
+}
+.dark .tuile__rebours {
+  color: #c4b5fd;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bpr-point,
+  .bpr-bandeau,
+  .bpr-ouverture__fond,
+  .bpr-ouverture__fiche {
+    animation: none;
+  }
+}
+.bp-prix__rebours {
+  font-size: 13px;
+  color: var(--bp-plus-encre, #5b21b6);
+}

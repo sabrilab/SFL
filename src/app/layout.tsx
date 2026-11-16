@@ -30,6 +30,7 @@ import { NouveauxBadges } from "@/components/sfl/vitrine";
 import { InvitationCarte } from "@/components/sfl/invitation-carte";
 import { Accueil, ApresAccueil } from "@/components/sfl/accueil/accueil";
 import { PorteSfl } from "@/components/sfl/porte-sfl";
+import { BandeauBolaPlus, OuvertureBolaPlus } from "@/components/sfl/bola-plus-rappels";
 import { EssaiDesign } from "@/components/ds/essai-design";
 import { LangueDocument, SCRIPT_LANGUE } from "@/lib/i18n/langue";
 import { SCRIPT_APPARENCE, CLE_THEME } from "@/lib/sfl/apparence";
@@ -137,6 +138,11 @@ export default function RootLayout({
                   <NouvellesCartes />
                   <NouveauxBadges />
                   <InvitationCarte />
+                  {/* Bola Plus, pour Ilyes et Sabri seulement pour l'instant
+                      (voitBolaPlus) : l'écran du jour et le bandeau, avec le
+                      compte à rebours (bola-plus-rappels.tsx, 16/11). */}
+                  <OuvertureBolaPlus />
+                  <BandeauBolaPlus />
                 </ApresAccueil>
                 {/* Orbes lumineux du design de référence, derrière tout le contenu */}
                 <div className="orbs" aria-hidden>
