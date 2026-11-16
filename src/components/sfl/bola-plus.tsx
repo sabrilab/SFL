@@ -62,6 +62,7 @@ import { useEffect, useRef, useState, useSyncExternalStore, type CSSProperties, 
 import { createPortal } from "react-dom";
 import { Check, ChevronLeft, ChevronRight, MessageCircle, Sparkles, Target, User, Users } from "lucide-react";
 import { ANTON } from "@/components/sfl/actus/ecran";
+import { FicheBolaPlus, PastilleFiche, aUneFiche, useFiche } from "@/components/sfl/bola-plus-fiches";
 import { BolaCard } from "@/components/sfl/bola-card";
 import { PlayerCard } from "@/components/sfl/player-card";
 import { useMyPlayer } from "@/components/sfl/player-provider";
@@ -668,6 +669,11 @@ export function PageBolaPlus() {
   // La barre n'arrive qu'une fois la page en marche (elle est portée dans <body>).
   const pret = useSyncExternalStore(sansAbonnement, () => true, () => false);
   const police = useSyncExternalStore(sansAbonnement, policeDemandee, () => POLICE_TITRES);
+  // La fiche d'une carte (bola-plus-fiches.tsx, Sabri 16/11 19:33) : touchée, la carte s'ouvre en détail.
+  const fiche = useFiche();
+  const idFiche = (d: Diapo) => ("avantage" in d ? d.avantage.id : d.id);
+  const dFiche = liste.find((d) => idFiche(d) === fiche.ouverte);
+  const partFiche = dFiche && "avantage" in dFiche ? dFiche.avantage.part : "plus";
 
   // La carte active : celle qui occupe le rail aux trois cinquièmes au moins.
   useEffect(() => {
@@ -728,8 +734,9 @@ export function PageBolaPlus() {
         {/* Le rail (role group des diapositives : le motif « carrousel » de l'APG) ; il prend le focus, avec son nom. */}
         <div ref={railRef} className="bp-rail" tabIndex={0} aria-label="Cartes" onKeyDown={clavier} onPointerDown={() => (vise.current = null)}>
           {liste.map((d, i) => (
-            <div key={d.id} role="group" data-index={i} data-part={partDe(d)} className="bp-diapo" aria-roledescription="diapositive" aria-label={`${i + 1} sur ${n} : ${d.nom}`}>
+            <div key={d.id} role="group" data-index={i} data-part={partDe(d)} className="bp-diapo" aria-roledescription="diapositive" onClick={() => fiche.ouvrir(idFiche(d))} aria-label={`${i + 1} sur ${n} : ${d.nom}`}>
               {rendu(d)}
+              {aUneFiche(idFiche(d)) && <PastilleFiche nom={d.nom} onOuvrir={() => fiche.ouvrir(idFiche(d))} />}
             </div>
           ))}
         </div>
@@ -756,6 +763,7 @@ export function PageBolaPlus() {
         ))}
       </div>
       <div className="bp-pied" aria-hidden />
+      {pret && fiche.ouverte && <FicheBolaPlus id={fiche.ouverte} part={partFiche} couleurs={COULEURS} onFermer={fiche.fermer} />}
       {pret && (
         <BarreInteret
           note={!!plus.interet}

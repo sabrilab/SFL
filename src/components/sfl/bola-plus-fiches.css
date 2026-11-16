@@ -1,0 +1,222 @@
+/* La fiche d'une carte de Bola Plus (bola-plus-fiches.tsx) : plein écran, sur
+   le noir de la page, déroulée comme une keynote. Les teintes viennent des
+   variables de la page (VARIABLES_PLUS, PALETTE). */
+
+.bpf {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  padding: 0 20px calc(env(safe-area-inset-bottom) + 40px);
+  background: var(--bp-nuit, #0b0a12);
+  color: #fff;
+  outline: none;
+  animation: bpf-monte 380ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.bpf > * {
+  max-width: 430px;
+  margin-inline: auto;
+}
+@keyframes bpf-monte {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+}
+
+.bpf-tete {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  justify-content: flex-end;
+  padding: calc(env(safe-area-inset-top) + 12px) 0 8px;
+  pointer-events: none;
+}
+.bpf-fermer {
+  pointer-events: auto;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.14);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  color: #fff;
+}
+
+.bpf-grand-titre {
+  margin: 4px auto 28px;
+  font-family: var(--font-barlow), "Barlow Condensed", sans-serif;
+  font-weight: 800;
+  font-size: clamp(40px, 13vw, 56px);
+  line-height: 0.9;
+  letter-spacing: -0.01em;
+  text-transform: uppercase;
+  text-wrap: balance;
+}
+.bpf[data-part="plus"] .bpf-grand-titre {
+  color: var(--bp-plus-clair);
+}
+.bpf[data-part="sfl"] .bpf-grand-titre {
+  color: var(--bp-sfl-clair);
+}
+
+/* Un chapitre : l'image, le titre, la ligne. */
+.bpf-chapitre {
+  margin-bottom: 56px;
+}
+.bpf-images {
+  display: grid;
+  gap: 8px;
+}
+.bpf-images--deux {
+  grid-template-columns: 1fr 1fr;
+}
+.bpf-image {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 22px;
+  background: rgb(255 255 255 / 0.06);
+}
+.bpf-titre {
+  margin: 18px 0 0;
+  font-family: var(--font-barlow), "Barlow Condensed", sans-serif;
+  font-weight: 800;
+  font-size: clamp(30px, 9vw, 38px);
+  line-height: 0.92;
+  text-transform: uppercase;
+  text-wrap: balance;
+}
+.bpf-texte {
+  margin: 8px 0 0;
+  font-size: 16px;
+  line-height: 1.4;
+  color: rgb(255 255 255 / 0.7);
+  text-wrap: pretty;
+}
+
+/* Le podium des pépites : rang à gauche, grammes à droite. */
+.bpf-liste {
+  margin: 18px 0 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid rgb(255 255 255 / 0.12);
+}
+.bpf-liste li {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 12px 0;
+  border-bottom: 1px solid rgb(255 255 255 / 0.12);
+}
+.bpf-liste__rang {
+  font-size: 17px;
+  font-weight: 700;
+  color: rgb(255 255 255 / 0.8);
+}
+.bpf-liste__valeur {
+  font-size: 34px;
+  line-height: 1;
+  color: var(--bp-prix);
+}
+
+/* « Ramène 5 abonnés » : les étapes, numérotées. */
+.bpf-etape {
+  display: grid;
+  grid-template-columns: 64px 1fr;
+  gap: 4px 12px;
+  padding: 22px 0;
+  border-top: 1px solid rgb(255 255 255 / 0.12);
+}
+.bpf-etape__numero {
+  font-size: 44px;
+  line-height: 0.9;
+  color: var(--bp-prix);
+}
+.bpf-etape .bpf-titre {
+  margin-top: 0;
+}
+.bpf-ronds {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+}
+.bpf-rond {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  border: 1.5px dashed rgb(255 255 255 / 0.3);
+  color: rgb(255 255 255 / 0.3);
+}
+.bpf-rond[data-plein] {
+  border: 0;
+  background: var(--bp-plus-vif);
+  color: #fff;
+}
+
+.bpf-fin {
+  height: 24px;
+}
+
+/* L'entrée de chaque chapitre, quand il arrive à l'écran. */
+.bpf [data-entre] {
+  opacity: 0;
+  transform: translateY(28px);
+  transition:
+    opacity 600ms ease,
+    transform 700ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.bpf [data-entre][data-vu] {
+  opacity: 1;
+  transform: none;
+}
+.bpf [data-entre][data-vu] .bpf-rond[data-plein] {
+  animation: bpf-rond 420ms cubic-bezier(0.3, 1.4, 0.5, 1) both;
+  animation-delay: calc(200ms + var(--i) * 90ms);
+}
+@keyframes bpf-rond {
+  from {
+    transform: scale(0.4);
+    opacity: 0;
+  }
+}
+
+/* Le « + » posé sur une carte qui a une fiche. */
+.bpf-pastille {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.18);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  color: #fff;
+}
+.bpf-pastille::after {
+  content: "";
+  position: absolute;
+  inset: -4px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bpf,
+  .bpf [data-entre],
+  .bpf .bpf-rond {
+    animation: none !important;
+    transition: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+}
