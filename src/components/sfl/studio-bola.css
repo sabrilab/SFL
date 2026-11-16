@@ -1,0 +1,312 @@
+/* Bola Studio (studio-bola.tsx) dans le carrousel Bola Plus : l'éventail
+   de la carte « Ton studio », le panneau (le rail des templates, les
+   recharges), les vignettes. Couleurs de la part Bola Plus, lues dans les
+   variables --bp-plus-* (PALETTE, posées par la page et sur le panneau) :
+   aucune teinte écrite ici. Une vignette est l'image de son modèle, en 4:5,
+   telle qu'elle a été faite : ni recadrée en carré, ni grossie, ni teinte
+   (du noir et blanc, par choix), ni animée ; sur son tiers bas, sombre dans
+   l'image, le nom du modèle et son prix, sur un voile noir. Les mots de la
+   légende se règlent sur la largeur de la vignette (cqw) : la même vignette
+   dans le rail, dans l'éventail et en grand dans la fiche. Le rail s'accroche
+   carte par carte (scroll-snap) ; avec « Réduire les animations », l'appui
+   se marque d'un coup, sans transition, comme partout dans l'app (fin du
+   fichier). */
+
+/* ── Le panneau : « Bola Studio », la phrase, le rail, les recharges. ── */
+.st-panneau {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding-top: 30px;
+}
+/* La feuille du panneau et de la fiche : la nuit violette en sombre, le papier lilas en clair. */
+[data-slot="sheet-content"].st-feuille {
+  background:
+    radial-gradient(90% 40% at 50% 0%, color-mix(in srgb, var(--bp-plus-vif) 34%, transparent), transparent 75%),
+    var(--bp-plus-fond);
+  color: #fff;
+}
+:root:not(.dark) [data-slot="sheet-content"].st-feuille {
+  background:
+    radial-gradient(90% 40% at 50% 0%, color-mix(in srgb, var(--bp-plus-vif) 16%, transparent), transparent 75%),
+    var(--bp-plus-papier);
+  color: var(--bp-plus-fond);
+}
+.st-panneau__titre {
+  font-size: 34px;
+  color: var(--bp-plus-clair);
+}
+:root:not(.dark) .st-panneau__titre {
+  color: var(--bp-plus-encre);
+}
+.st-panneau__phrase {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+.st-rail {
+  display: flex;
+  gap: 12px;
+  margin: 0;
+  padding: 0 20px 4px;
+  list-style: none;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x mandatory;
+  scroll-padding-inline: 20px;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.st-rail::-webkit-scrollbar {
+  display: none;
+}
+.st-item {
+  flex: 0 0 auto;
+  width: min(216px, 58vw);
+  scroll-snap-align: start;
+}
+.st-item__bouton {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  text-align: left;
+  -webkit-tap-highlight-color: transparent;
+}
+.st-item__bouton:active .st-vignette {
+  scale: 0.98;
+}
+.st-item__bouton:focus-visible {
+  outline: 2px solid var(--foreground);
+  outline-offset: 4px;
+  border-radius: 22px;
+}
+
+/* ── Une vignette : l'image du modèle, en 4:5, et sa légende sur le tiers bas. ── */
+.st-vignette {
+  position: relative;
+  display: block;
+  aspect-ratio: 4 / 5;
+  overflow: hidden;
+  border-radius: 20px;
+  background: #000;
+  color: #fff;
+  isolation: isolate;
+  container-type: inline-size;
+  text-align: left;
+  transition: scale 0.2s ease;
+}
+/* En grand, dans la fiche. */
+.st-vignette--grand {
+  border-radius: 24px;
+}
+/* L'image remplit la boîte, qui a son rapport : rien n'est coupé (les
+   fichiers ont une ligne et demie de pixels de plus que 4:5 : trois quarts
+   de ligne dépassent en haut et en bas), rien n'est déformé. Dans la fiche,
+   deux images suivent cette même règle, l'une sur l'autre : la copie légère
+   (le rail vient de la montrer, elle est déjà là), puis l'original. La fiche
+   ne s'ouvre pas sur un cadre noir le temps qu'il arrive ; mêmes proportions,
+   même règle : rien ne bouge quand il la recouvre. */
+.st-vignette__image {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+/* Un liseré, comme les cartes du carrousel. */
+.st-vignette::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  border-radius: inherit;
+  pointer-events: none;
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.09);
+}
+/* La légende, sur le tiers bas : le nom sur sa ligne, le prix dessous, calés
+   à gauche (les mêmes lignes d'une vignette à l'autre dans le rail, et le
+   prix de la vignette qui dépasse du bord se lit déjà). Le voile noir ne
+   monte pas plus haut que ce tiers, déjà sombre dans l'image : il assure les
+   mots là où une colonne ou une ligne de craie y descend, sans teinter
+   l'image (mesuré sur les douze : sous les mots, le blanc garde un contraste
+   d'au moins 7 sur 95 % des points, 5 au pire). */
+.st-vignette__bas {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 2.4cqw;
+  min-height: 36%;
+  padding: 0 6.5cqw 6cqw;
+  background: linear-gradient(to top, rgb(0 0 0 / 0.82) 0%, rgb(0 0 0 / 0.62) 42%, rgb(0 0 0 / 0.28) 76%, transparent 100%);
+}
+/* 18,6 px dans le rail (216 px de large), 31,5 px dans la fiche : le plus
+   long des douze noms tient sur une ligne, avec de l'air à droite, et
+   « TRASH TALK » s'arrête avant la ligne de craie de son image (elle passe
+   au milieu). Jamais sous 11 px : sur un petit écran, la vignette du milieu
+   de l'éventail fait une centaine de pixels de large. */
+.st-vignette__nom {
+  font-size: max(8.6cqw, 11px);
+  color: #fff;
+  text-shadow: 0 1px 12px rgb(0 0 0 / 0.55);
+}
+.st-vignette__prix {
+  font-size: max(7.8cqw, 11px);
+  line-height: 1;
+  white-space: nowrap;
+  color: #fff;
+  text-shadow: 0 1px 12px rgb(0 0 0 / 0.55);
+}
+/* Sans les unités de conteneur (Safari d'avant iOS 16) : la légende garde
+   une taille et des marges, celles du plus étroit des rails (185,6 px de
+   large sur un écran de 320 px : les valeurs en cqw ci-dessus y donnent
+   ces pixels ; « TRASH TALK » y reste loin de sa ligne de craie). */
+@supports not (width: 1cqw) {
+  .st-vignette__bas {
+    gap: 4px;
+    padding: 0 12px 11px;
+  }
+  .st-vignette__nom {
+    font-size: 16px;
+  }
+  .st-vignette__prix {
+    font-size: 14.5px;
+  }
+}
+
+/* ── La fiche d'un modèle : la vignette en grand et, dessous, ce que tu
+   reçois et sa durée, dans une même colonne (le texte reste au bord de
+   l'image). Quand l'écran est trop court pour la vignette à pleine largeur,
+   la colonne se borne à celle qui tient dans la feuille (92dvh,
+   FEUILLE_STUDIO) une fois ôtés le retour, les marges et les deux lignes du
+   dessous (222 px) : la vignette reste en 4:5, la fiche ne défile pas. ── */
+.st-fiche {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: min(100%, (92dvh - 222px) * 0.8);
+  margin-inline: auto;
+}
+
+/* ── « Ton studio » : l'éventail, un seul bouton qui ouvre le panneau. ── */
+.st-eventail {
+  position: relative;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  min-height: 0;
+  margin: 0 -8px;
+  color: inherit;
+  -webkit-tap-highlight-color: transparent;
+}
+.st-eventail:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+  border-radius: 22px;
+}
+.st-eventail__cartes {
+  position: relative;
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+  container-type: size;
+}
+.st-eventail__place {
+  position: absolute;
+  top: 50%;
+  display: block;
+  width: min(48cqw, 72cqh * 0.8);
+  filter: drop-shadow(0 14px 22px rgb(0 0 0 / 0.42));
+  transition: scale 0.2s ease;
+}
+.st-eventail__place[data-place="0"] {
+  left: 0;
+  translate: -6% -56%;
+  rotate: -9deg;
+}
+.st-eventail__place[data-place="2"] {
+  right: 0;
+  translate: 6% -56%;
+  rotate: 9deg;
+}
+.st-eventail__place[data-place="1"] {
+  left: 50%;
+  z-index: 1;
+  width: min(66cqw, 98cqh * 0.8);
+  translate: -50% -46%;
+}
+.st-eventail:active .st-eventail__place {
+  scale: 0.98;
+}
+/* « Bola Studio » et ses douze : la pilule violette, comme l'étiquette de la part. */
+.st-eventail__nom {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 12px 0 16px;
+  border-radius: 999px;
+  font-size: 15px;
+  font-weight: 700;
+  white-space: nowrap;
+  color: #fff;
+  background: var(--bp-plus-vif);
+  box-shadow: 0 8px 20px color-mix(in srgb, var(--bp-plus-vif) 40%, transparent);
+}
+.st-eventail__nombre {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--bp-plus-fond);
+  background: #fff;
+}
+/* Sous « Ton studio » : les ballons du mois. */
+.st-mention {
+  font-size: 18px;
+  font-weight: 800;
+}
+
+/* ── Les recharges : montrées, pas encore en vente (atténuées, le texte reste lisible). ── */
+.st-panneau .st-recharge {
+  background: color-mix(in srgb, var(--bp-plus-vif) 8%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--bp-plus-vif) 22%, transparent);
+}
+.st-recharge {
+  opacity: 0.74;
+}
+/* Le ballon ⚽ d'un prix en Anton : réduit, sur la ligne de base. */
+.st-prix__ballon {
+  font-size: 0.7em;
+  vertical-align: baseline;
+}
+
+/* Écran court (375 × 667) : le panneau tient sans défiler. */
+@media (max-height: 700px) {
+  .st-panneau {
+    padding-top: 22px;
+  }
+}
+
+/* « Réduire les animations » : l'appui se marque sans transition. */
+@media (prefers-reduced-motion: reduce) {
+  .st-vignette,
+  .st-eventail__place {
+    transition: none;
+  }
+}
