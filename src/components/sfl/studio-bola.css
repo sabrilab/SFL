@@ -2,9 +2,10 @@
    de la carte « Ton studio », le panneau (le rail des templates, les
    recharges), les vignettes. Couleurs de la part Bola Plus, lues dans les
    variables --bp-plus-* (PALETTE, posées par la page et sur le panneau) :
-   aucune teinte écrite ici. Une vignette est l'image de son modèle, en 4:5,
-   telle qu'elle a été faite (en couleur, avec l'avatar d'un joueur de la
-   ligue, depuis le 16/11) : ni recadrée en carré, ni grossie, ni teinte, ni animée ; sur son tiers bas, sombre dans
+   aucune teinte écrite ici. Une vignette est l'image de son modèle, dans une
+   boîte en 4:5 (en couleur, avec l'avatar d'un joueur de la ligue, depuis le
+   16/11 ; en Seedream 5.0 Pro, en 3:4, depuis le soir) : recadrée en haut,
+   jamais en carré, ni grossie, ni teinte, ni animée ; sur son tiers bas, sombre dans
    l'image, le nom du modèle et son prix, sur un voile noir. Les mots de la
    légende se règlent sur la largeur de la vignette (cqw) : la même vignette
    dans le rail, dans l'éventail et en grand dans la fiche. Le rail s'accroche
@@ -111,8 +112,12 @@
 .st-vignette--mini {
   border-radius: 12px;
 }
-/* L'image remplit la boîte, qui a son rapport : rien n'est coupé (les
-   fichiers sont en 4:5 exact), rien n'est déformé. Dans la fiche,
+/* L'image remplit la boîte, qui a son rapport, sans être déformée. Les
+   fichiers sont en 3:4 (Seedream 5.0 Pro n'a pas de 4:5, Sabri, 16/11 à
+   19:20) : la boîte en 4:5 les recadre en haut, à 50 % 30 % (2 % de la
+   hauteur ôtés en haut, 4,5 % en bas) ; les têtes restent entières, et le
+   tiers bas sombre garde le nom et le prix. La même règle vaut dans le rail,
+   l'éventail, la fiche en grand et la vignette en petit. Dans la fiche,
    deux images suivent cette même règle, l'une sur l'autre : la copie légère
    (le rail vient de la montrer, elle est déjà là), puis l'original. La fiche
    ne s'ouvre pas sur un cadre noir le temps qu'il arrive ; mêmes proportions,
@@ -123,6 +128,7 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
+  object-position: 50% 30%;
   user-select: none;
   -webkit-user-drag: none;
 }
@@ -140,9 +146,12 @@
    à gauche (les mêmes lignes d'une vignette à l'autre dans le rail, et le
    prix de la vignette qui dépasse du bord se lit déjà). Le voile noir ne
    monte pas plus haut que ce tiers, déjà sombre dans l'image : il assure les
-   mots là où une colonne ou une ligne de craie y descend, sans teinter
-   l'image (mesuré sur les douze : sous les mots, le blanc garde un contraste
-   d'au moins 7 sur 95 % des points, 5 au pire). */
+   mots là où une colonne, la fumée ou le bord d'une carte y descend, sans
+   teinter l'image (mesuré le 16/11 au soir sur les douze en Seedream, dans
+   le rail et en grand : sous le nom et le prix, le blanc garde un contraste
+   d'au moins 7 sur 95 % des points ; au pire 4,7, quelques points sous le
+   coin de la carte de « Sorti de la carte », et 5,4 dans la fumée de
+   « L'entrée »). */
 .st-vignette__bas {
   position: absolute;
   right: 0;

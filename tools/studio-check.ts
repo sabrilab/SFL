@@ -18,16 +18,19 @@
 //   5 · les vignettes (retours du 15/11 et du 16/11 : les vraies images des
 //       douze modèles) : douze templates, douze fichiers dans
 //       public/bola-plus/studio/, dans l'ordre du catalogue (chaque fichier
-//       porte le rang et le nom de son modèle), en 4:5 (896 × 1120 : l'image
-//       fournie le 16/11, en couleur, avec Ilyes), et pour chacun sa copie légère
-//       (« -660 », 660 × 825 : les proportions de l'original) ; du WebP,
-//       léger ; rien d'autre dans le dossier. Et ce sont CES images :
+//       porte le rang et le nom de son modèle), en 3:4 (1100 × 1470 : les
+//       images fournies le 16/11 au soir, en Seedream 5.0 Pro, en couleur,
+//       réduites à la largeur de la fiche en grand sur un iPhone × 3), et pour
+//       chacun sa copie légère (« -660 », 660 × 882 : les proportions de
+//       l'original, 110:147, au pixel) ; du WebP, léger ; rien d'autre dans
+//       le dossier. Et ce sont CES images :
 //       l'empreinte de chacun des vingt-quatre fichiers est écrite ici
 //       (EMPREINTES) ; deux fichiers échangés, un fichier teint, retouché ou
 //       recodé arrêtent le banc (tools/studio-vignettes.py les refait et
 //       affiche leurs empreintes).
-//       L'écran les montre telles quelles : une boîte en 4:5 (jamais carrée),
-//       l'image ni grossie, ni déformée, ni teinte (aucune fusion, aucun
+//       L'écran les montre dans une boîte en 4:5 (jamais carrée), qui les
+//       recadre en haut (cover, object-position 50 % 30 %, rien d'autre ;
+//       Sabri, 16/11 à 19:20), l'image ni grossie, ni déformée, ni teinte (aucune fusion, aucun
 //       filtre, aucune couleur de Bola Plus dessus), ni animée ; et cela où
 //       que la règle soit écrite : les règles de la feuille qui nomment une
 //       vignette sont une liste fermée, les propriétés de sa boîte aussi,
@@ -105,6 +108,7 @@ import {
   dureeDe,
   equivalence,
   fichierVignette,
+  hauteurVignette,
   prixDe,
   prixRecharge,
   sourcesVignette,
@@ -248,7 +252,7 @@ assert.ok(!/<button|onClick|href=/.test(recharges) && /Bientôt/.test(recharges)
 assert.ok(/\{AVEC_TA_PHOTO\}<\/span> \{PHRASE_INCLUS\}/.test(ecran) && /TEMPLATES\.map\(/.test(ecran), "le rail lit la source");
 assert.ok(/const EVENTAIL = EVENTAIL_STUDIO\.map\(template\);/.test(ecran), "l'éventail lit la source");
 
-// 5 · Les vignettes : douze templates, douze images, dans l'ordre du catalogue, en 4:5.
+// 5 · Les vignettes : douze templates, douze images, dans l'ordre du catalogue, en 3:4, montrées en 4:5.
 const PUBLIC = join(__dirname, "..", "public");
 const DOSSIER_STUDIO = join(PUBLIC, "bola-plus", "studio");
 /** La taille d'un WebP, lue dans son en-tête (VP8X, VP8 ou VP8L) : sans dépendance. */
@@ -276,48 +280,53 @@ assert.equal(enFichier("Le but de ta journée"), "le-but-de-ta-journee");
 /** Les deux largeurs d'une vignette : l'original et sa copie légère ; le poids permis à chacune, en octets. */
 const LARGEURS_VIGNETTE = [VIGNETTE.largeur, VIGNETTE.legere] as const;
 const POIDS_VIGNETTE: Record<number, number> = { [VIGNETTE.largeur]: 150_000, [VIGNETTE.legere]: 70_000 };
-assert.deepEqual({ ...VIGNETTE }, { rapport: 5 / 4, largeur: 896, legere: 660 }, "des vignettes en 4:5 : 896 px, et 660 px pour le rail");
+assert.deepEqual(
+  { ...VIGNETTE },
+  { rapport: 5 / 4, fichier: { largeur: 110, hauteur: 147 }, largeur: 1100, legere: 660 },
+  "des vignettes en 4:5 à l'écran, des fichiers en 3:4 (110:147) : 1100 px, et 660 px pour le rail",
+);
+assert.deepEqual([hauteurVignette(VIGNETTE.largeur), hauteurVignette(VIGNETTE.legere)], [1470, 882], "les hauteurs des fichiers, au pixel : 1470 et 882");
 type Lecteur = (adresse: string) => Buffer | null;
 const surDisque: Lecteur = (adresse) => (existsSync(join(PUBLIC, adresse)) ? readFileSync(join(PUBLIC, adresse)) : null);
 /**
- * L'empreinte (sha256) de chacun des vingt-quatre fichiers : ce sont les images fournies le 16/11 (en couleur, avec
- * Ilyes), chacune sous le nom de son modèle, et pas seulement des fichiers du bon nom et de la bonne taille.
- * L'original est le fichier fourni, octet pour octet ; la copie légère en est tirée.
+ * L'empreinte (sha256) de chacun des vingt-quatre fichiers : ce sont les images fournies le 16/11 au soir (en
+ * couleur, Seedream 5.0 Pro), chacune sous le nom de son modèle, et pas seulement des fichiers du bon nom et de la
+ * bonne taille. L'original et sa copie légère sont tirés du fichier fourni (1320 × 1764), réduit tout entier.
  * tools/studio-vignettes.py refait les vingt-quatre et affiche ces lignes.
  */
 const EMPREINTES: Record<string, string> = {
-  "01-ma-carte-en-vrai.webp": "5387ccf3ecfa454f008a1aee12b7b12fabb3efeac14af3836507bf3ad9c41698",
-  "01-ma-carte-en-vrai-660.webp": "a04f7b61a33cb60dd089a920f18ffadc95af3be677144f2ea1c7e103cd83810f",
-  "02-maillot-a-ton-nom.webp": "c147e5f0c7db5df3c891184fd214d04ab399bb8ce7f70bc614af9f233a9b9a5f",
-  "02-maillot-a-ton-nom-660.webp": "827d1a53b87b2347ae50387573a30271c782108e95a18444e6073ecfc1114eb1",
-  "03-la-une-du-dimanche.webp": "dd024fccb004e6d4fae196469fade4adc950a24b525b116b0fa752ac45aced2f",
-  "03-la-une-du-dimanche-660.webp": "8821f8e08531e32db6f378ad966974ea88122b33de3ac327327bc7cc0ffbe83e",
-  "04-l-affiche-du-match.webp": "79b4b7ef79101129f9daf4f04338c09e169e8fe94e428b9befc6c841c49434ed",
-  "04-l-affiche-du-match-660.webp": "9d388d5e6920251b6fec242ee70fe5725cededdc557c5f289d19011359ce9722",
-  "05-la-celebration.webp": "9933579c2514863f82c220c1ce732036783491a0ccee7f55c9e747db0bdd6572",
-  "05-la-celebration-660.webp": "cf5604b210d67d3c13482ce170b3b35bdafcb2f1a61074c8470466e3b5f003c0",
-  "06-trash-talk.webp": "132117e83cf18dfb88943ae467d3afd9deac37261021b1012834834bb7ddbce3",
-  "06-trash-talk-660.webp": "7bea83110d3e5aa123dba7a9ae1e77953c60a208f0f3c7831f5ef686e244fcd0",
-  "07-sorti-de-la-carte.webp": "6ca9ad6178746c81437a0b71ea71541fb8b3738e4987e9b5f3fc1f0cf81e9120",
-  "07-sorti-de-la-carte-660.webp": "3fbbe5e55df27f8c3f387c24bdff3efb6c867ef06517d98a8fc4da84316be915",
-  "08-option-hd.webp": "7f376e925da0cce4c672f5e670e9a3b032873ca485b638067622a704252e022c",
-  "08-option-hd-660.webp": "d991d772704694e60a0f8c00adaeed30ced4c5d467d51bbd3a729d8abb6ce5a6",
-  "09-ta-saison.webp": "925d9ff613088e72cb052a8ae7c2abfa554f8038c81e05a27b0bc253c34f9a3f",
-  "09-ta-saison-660.webp": "d8ea038051da863d9ead23845ff9b63f1b49ed697db914c9e9341286c1aa4f30",
-  "10-l-entree.webp": "b83fc3173a302c74d89824fe846eaba5a782edef86e010f21a5fbf546015fabb",
-  "10-l-entree-660.webp": "3a9211cf0cc163b3f09742e72bcf4afeeb90ded9d90c68af77856b34a5f301fc",
-  "11-le-but-de-ta-journee.webp": "f63887e536b84d5bcaacb7bd79b7d530a0eb9962f746c5785ca916c84076c40a",
-  "11-le-but-de-ta-journee-660.webp": "20e6aa445162c2cc1d700f83cd80382d65bf147e9e75810a6f0b34d395ba5573",
-  "12-convocation-d-equipe.webp": "d2d870fcde65e94c985db36b81143a4293aa48ed7b60be06f5ee3bf26172c1d3",
-  "12-convocation-d-equipe-660.webp": "18033f0258a0591f2af3d05cc41c4e6b38922756ae22b4b1186a7f2a22500369",
+  "01-ma-carte-en-vrai.webp": "e0632b6bf0c4319c1c1a40218668bffc2e1ca4a5780843110a628fd3e802fd56",
+  "01-ma-carte-en-vrai-660.webp": "ce4f0323e611eb544701dcf0387bdd00e94fc5d34734c22fca48f228eecbc5ab",
+  "02-maillot-a-ton-nom.webp": "956cb8748348f2e89a8223723c1224b5e33b5c5d41ee438320f85cc8eec6519d",
+  "02-maillot-a-ton-nom-660.webp": "d8ae7a627029cc50223357ad77e70fee0c85b0f247b7306542c70e6177929e51",
+  "03-la-une-du-dimanche.webp": "bacbc5d0eaacb5503773ed17aaba878114b4c0385a8c52b127aabf58c9ea60b9",
+  "03-la-une-du-dimanche-660.webp": "d48e14291411b197da6f8354296e72608ad91a4ceed0b102f79ddbb061880aee",
+  "04-l-affiche-du-match.webp": "82cf5422346d9d65d772f767b1f0269141636569649bd581e8d5a435ff0c1055",
+  "04-l-affiche-du-match-660.webp": "442c889c0b82d33d9dea92598fc9e55eba7126f22a02321b3220fca705ef0451",
+  "05-la-celebration.webp": "807790627d5b223183cad2e56327c3d6a533b540978c90ed52541dd673167b5a",
+  "05-la-celebration-660.webp": "4bc67b0f0783762fabcafbf2a5f2a25ab7bffbba06c5461c31a40c826797f210",
+  "06-trash-talk.webp": "be2d8a0a4784429181951963565696652ea80127b676ddc157b0fa75d4b99c13",
+  "06-trash-talk-660.webp": "820301e15a2771bb4f579053a1eac32224302f2f2dd2ae852c22dd9370a01ab8",
+  "07-sorti-de-la-carte.webp": "46122debae27ad4b6bbfe79af6b9e1a30935cfcc10684d914182f6fb8e2f104d",
+  "07-sorti-de-la-carte-660.webp": "f76674500ca00d097e1d1e04a17fda292f546a6f47531c7db60ab5a5485318f2",
+  "08-option-hd.webp": "040aff32a741f62aa6106ea881464bc67e689ecf313d16c232e066d93c866c6e",
+  "08-option-hd-660.webp": "9c651fab0abc8cd19a7647e91c860504803783852ddb3218b090bbd96eec118e",
+  "09-ta-saison.webp": "735abd7ffb319d5937597bb6dd25b0afb6dc63b30d551f108799db8de7bbd944",
+  "09-ta-saison-660.webp": "f6d5fba71c7584fce0c068627daf2a896f0dd3dac2cd1afc48c49f1bd4d677bd",
+  "10-l-entree.webp": "e529c10d5ed15f3f7d32216ef72bc44d9da62c94551f3b0bf41734905ba22816",
+  "10-l-entree-660.webp": "b734763b5538585800d77354fd516210c6fa3e9840633bda468725fc47340781",
+  "11-le-but-de-ta-journee.webp": "23844d763d131ec14ff70e1489f7ad6a6b412826d8530a8fa46b4ddd9f6eb825",
+  "11-le-but-de-ta-journee-660.webp": "c4fd459bbef8d99933b039236b8956d0000466b6de00e4550b4e9f3c8ebb5bf8",
+  "12-convocation-d-equipe.webp": "0d6ed3151739074308ef803b88d847937d5d26c87e2c002085a7a80be194f2dd",
+  "12-convocation-d-equipe-660.webp": "94860f42f0b0bec6fae049901b3ba094fe3ec997104e40b7bc8bc68d2ca7fa84",
 };
 const empreinte = (o: Buffer) => createHash("sha256").update(o).digest("hex");
 assert.equal(new Set(Object.values(EMPREINTES)).size, 24, "vingt-quatre fichiers, vingt-quatre images différentes");
 /**
  * Chaque template a sa vignette, à son rang : le fichier « NN-nom-du-modèle » (NN : sa place dans le catalogue),
- * présent à ses deux largeurs, en WebP, en 4:5, léger, et c'est l'image posée (son empreinte). L'original a la
- * taille de l'image fournie (896 × 1120, du 4:5 exact) ; sa copie légère en garde les proportions (660 × 825) :
- * dans la fiche, les deux se superposent.
+ * présent à ses deux largeurs, en WebP, en 3:4, léger, et c'est l'image posée (son empreinte). L'original et sa
+ * copie légère ont les proportions de l'image fournie, au pixel (110:147 : 1100 × 1470 et 660 × 882) : dans la
+ * fiche, les deux se superposent ; l'écran les recadre en 4:5 (la feuille de style).
  * Rend le poids total.
  */
 const vignettesJustes = (liste: readonly Template[], lireFichier: Lecteur = surDisque) => {
@@ -327,7 +336,7 @@ const vignettesJustes = (liste: readonly Template[], lireFichier: Lecteur = surD
     assert.equal(t.image, `${String(i + 1).padStart(2, "0")}-${enFichier(t.nom)}`, `${t.nom} : sa vignette, dans l'ordre du catalogue`);
     assert.equal(fichierVignette(t), `/bola-plus/studio/${t.image}.webp`, `${t.nom} : l'adresse de son image`);
     assert.equal(fichierVignette(t, VIGNETTE.legere), `/bola-plus/studio/${t.image}-${VIGNETTE.legere}.webp`, `${t.nom} : l'adresse de sa copie légère`);
-    assert.equal(sourcesVignette(t), `/bola-plus/studio/${t.image}-660.webp 660w, /bola-plus/studio/${t.image}.webp 896w`, `${t.nom} : ses deux largeurs`);
+    assert.equal(sourcesVignette(t), `/bola-plus/studio/${t.image}-660.webp 660w, /bola-plus/studio/${t.image}.webp 1100w`, `${t.nom} : ses deux largeurs`);
     const proportions: number[] = [];
     for (const l of LARGEURS_VIGNETTE) {
       const adresse = fichierVignette(t, l);
@@ -335,9 +344,8 @@ const vignettesJustes = (liste: readonly Template[], lireFichier: Lecteur = surD
       assert.ok(o, `${adresse} manque`);
       const { largeur, hauteur } = tailleWebp(o);
       assert.equal(largeur, l, `${adresse} : ${largeur} px de large, attendu ${l}`);
-      // En 4:5, à moins de deux lignes près (celles que l'écran laisse dépasser en haut et en bas) ; jamais moins haut.
-      const ecart = hauteur - largeur * VIGNETTE.rapport;
-      assert.ok(ecart >= 0 && ecart < 2, `${adresse} : ${largeur} × ${hauteur}, pas du 4:5`);
+      // En 3:4, aux proportions de l'image fournie (110:147), au pixel : la boîte en 4:5 en ôte le haut et le bas.
+      assert.equal(hauteur, hauteurVignette(largeur), `${adresse} : ${largeur} × ${hauteur}, pas du 3:4 des images fournies`);
       assert.ok(o.length <= POIDS_VIGNETTE[l], `${adresse} : ${o.length} octets, au plus ${POIDS_VIGNETTE[l]}`);
       assert.equal(empreinte(o), EMPREINTES[adresse.split("/").pop()!], `${adresse} : ce n'est pas l'image posée (son empreinte a changé)`);
       proportions.push(hauteur / largeur);
@@ -431,6 +439,8 @@ const SENSIBLES = [
   ".st-item__bouton:active .st-vignette { scale: 0.98 }",
   ".st-vignette { aspect-ratio: 4 / 5 }",
   ".st-vignette__image { object-fit: cover }",
+  // Les fichiers sont en 3:4 (16/11 au soir) : la boîte en 4:5 les recadre en haut, là où sont les têtes.
+  ".st-vignette__image { object-position: 50% 30% }",
   // La photo de ta carte dans sa pastille ronde (16/11) : elle la remplit, comme sur la carte ; ce n'est pas une vignette.
   ".st-toi__image { object-fit: cover }",
   // L'ombre portée des vignettes de l'éventail : le seul filtre de la feuille, et il est noir.
@@ -462,7 +472,9 @@ const feuilleJuste = (css: string) => {
   // L'image la remplit telle quelle : ni grossie, ni déplacée, ni déformée.
   const image = regles(code, ".st-vignette__image");
   assert.ok(/object-fit: cover;/.test(image) && /inset: 0;/.test(image) && /width: 100%;/.test(image) && /height: 100%;/.test(image), "l'image remplit sa vignette sans se déformer");
-  assert.ok(!/\b(scale|transform|translate|rotate|zoom|object-position)\s*:/.test(image), "l'image n'est ni grossie ni déplacée");
+  assert.ok(!/\b(scale|transform|translate|rotate|zoom)\s*:/.test(image), "l'image n'est ni grossie ni déplacée");
+  // Recadrée en haut, à 50 % 30 %, et nulle part ailleurs (Sabri, 16/11 à 19:20) : les têtes entières, le tiers bas gardé.
+  assert.deepEqual([...image.matchAll(/object-position:\s*([^;]+);/g)].map((x) => x[1].trim()), ["50% 30%"], "l'image recadrée en haut, à 50 % 30 %");
   // Ni teinte : aucune fusion dans la feuille ; sur une vignette, ni filtre, ni opacité, ni couleur de Bola Plus.
   assert.ok(!/mix-blend-mode|background-blend-mode/.test(code), "aucune fusion : les images ne sont pas teintes");
   const vignette = regles(code, ".st-vignette");
@@ -480,7 +492,7 @@ const feuilleJuste = (css: string) => {
     for (const [prop, valeur] of r.declarations) assert.ok(BOITE[prop]?.includes(valeur), `la boîte d'une vignette : ${prop}: ${valeur} (${r.selecteur})`);
   // Son image : une seule règle, ces déclarations et rien d'autre ; son liseré : un filet blanc.
   const declarations = (sel: string) => R.filter((r) => r.selecteur === sel).map((r) => r.declarations.map((d) => d.join(": ")).sort());
-  assert.deepEqual(declarations(".st-vignette__image"), [["-webkit-user-drag: none", "height: 100%", "inset: 0", "object-fit: cover", "position: absolute", "user-select: none", "width: 100%"]], "l'image d'une vignette : une règle, rien d'autre");
+  assert.deepEqual(declarations(".st-vignette__image"), [["-webkit-user-drag: none", "height: 100%", "inset: 0", "object-fit: cover", "object-position: 50% 30%", "position: absolute", "user-select: none", "width: 100%"]], "l'image d'une vignette : une règle, rien d'autre");
   assert.deepEqual(declarations(".st-vignette::after"), [["border-radius: inherit", "box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.09)", 'content: ""', "inset: 0", "pointer-events: none", "position: absolute", "z-index: 2"]], "le liseré d'une vignette : un filet blanc, rien d'autre");
   // Ce qui peut teinter, déformer ou découper, même depuis un parent : seulement ce qui est écrit dans SENSIBLES.
   assert.deepEqual(R.flatMap((r) => r.declarations.filter(([prop]) => SENSIBLE.test(prop)).map(([prop, valeur]) => `${r.selecteur} { ${prop}: ${valeur} }`)), SENSIBLES, "ce qui peut teinter, déformer ou découper une vignette : une liste fermée");
@@ -560,10 +572,10 @@ const ecranJuste = (tsx: string) => {
   assert.equal(code.match(/<img\b/g)?.length, 3, "trois images dans l'écran : celle d'un template, la copie légère sous l'original de la fiche, la photo de ta carte");
   // Sous l'original de la fiche : la copie légère du même template, sous la même règle de style, sans rien d'autre.
   const dessous = bloc(tsx, "ImageLegere");
-  assert.ok(/<img className="st-vignette__image" src=\{fichierVignette\(t, VIGNETTE\.legere\)\} width=\{VIGNETTE\.legere\} height=\{VIGNETTE\.legere \* VIGNETTE\.rapport\} alt="" draggable=\{false\} \/>/.test(dessous) && !/srcSet|sizes|style=|aria-|role=/.test(dessous), "sous l'original de la fiche : la copie légère, telle quelle, décorative");
+  assert.ok(/<img className="st-vignette__image" src=\{fichierVignette\(t, VIGNETTE\.legere\)\} width=\{VIGNETTE\.legere\} height=\{hauteurVignette\(VIGNETTE\.legere\)\} alt="" draggable=\{false\} \/>/.test(dessous) && !/srcSet|sizes|style=|aria-|role=/.test(dessous), "sous l'original de la fiche : la copie légère, telle quelle, décorative");
   assert.ok(/\salt=""\s/.test(image) && !/aria-label|role=/.test(image), "l'image d'un template est décorative (alt vide)");
   assert.ok(/src=\{fichierVignette\(t, VIGNETTE\.legere\)\}/.test(image) && /srcSet=\{sourcesVignette\(t\)\}/.test(image) && /sizes=\{LARGEUR_CADRE\[cadre\]\}/.test(image), "l'image à ses deux largeurs, à la taille de son cadre");
-  assert.ok(/width=\{VIGNETTE\.legere\}/.test(image) && /height=\{VIGNETTE\.legere \* VIGNETTE\.rapport\}/.test(image), "l'image dit ses dimensions (4:5)");
+  assert.ok(/width=\{VIGNETTE\.legere\}/.test(image) && /height=\{hauteurVignette\(VIGNETTE\.legere\)\}/.test(image), "l'image dit les dimensions de son fichier (3:4)");
   assert.ok(/loading=\{proche \? "eager" : "lazy"\}/.test(image) && /const proche = useProche\(ref\);/.test(image), "l'image attend d'être proche pour se charger");
   assert.ok(!/style=/.test(image) && /className="st-vignette__image"/.test(image), "l'image n'a pas de style à elle");
   // La légende : le nom du modèle et son prix, écrits sur la vignette, lus par un lecteur d'écran.
@@ -702,7 +714,8 @@ refuse("la légende cachée aux lecteurs d'écran", () => ecranJuste(m('<Boite c
 refuse("une image décrite, lue en plus du nom", () => ecranJuste(m('      alt=""\n', "      alt={t.nom}\n")));
 refuse("une image chargée d'emblée, même hors de l'écran", () => ecranJuste(m('loading={proche ? "eager" : "lazy"}', 'loading="eager"')));
 refuse("une image sans ses deux largeurs", () => ecranJuste(m("      srcSet={sourcesVignette(t)}\n", "")));
-refuse("une image sans ses dimensions", () => ecranJuste(m("      width={VIGNETTE.legere}\n      height={VIGNETTE.legere * VIGNETTE.rapport}\n", "")));
+refuse("une image sans ses dimensions", () => ecranJuste(m("      width={VIGNETTE.legere}\n      height={hauteurVignette(VIGNETTE.legere)}\n", "")));
+refuse("une image qui dit les dimensions de sa boîte (4:5), pas celles de son fichier", () => ecranJuste(m("      height={hauteurVignette(VIGNETTE.legere)}\n", "      height={VIGNETTE.legere * VIGNETTE.rapport}\n")));
 refuse("une image recadrée par un style", () => ecranJuste(m('      className="st-vignette__image"\n', '      className="st-vignette__image"\n      style={{ objectPosition: "50% 30%", scale: 1.3 }}\n')));
 refuse("ce que tu reçois retiré du rail", () => ecranJuste(m('          <span className="line-clamp-2 min-h-[2.5em] text-[13px] leading-[1.25] text-encre-2">{t.recoit}</span>\n', "")));
 refuse("la durée retirée du rail", () => ecranJuste(m("          <Duree t={t} />\n", "")));
@@ -743,7 +756,9 @@ refuse("une vignette carrée", () => feuilleJuste(mf("aspect-ratio: 4 / 5;", "as
 refuse("une vignette carrée dans la fiche", () => feuilleJuste(mf("  border-radius: 24px;\n", "  border-radius: 24px;\n  aspect-ratio: 1 / 1;\n")));
 refuse("une image déformée", () => feuilleJuste(mf("object-fit: cover;", "object-fit: fill;")));
 refuse("une image grossie", () => feuilleJuste(mf("  object-fit: cover;\n", "  object-fit: cover;\n  scale: 1.2;\n")));
-refuse("une image recadrée", () => feuilleJuste(mf("  object-fit: cover;\n", "  object-fit: cover;\n  object-position: 50% 20%;\n")));
+refuse("une image recadrée ailleurs qu'en haut", () => feuilleJuste(mf("  object-position: 50% 30%;\n", "  object-position: 50% 20%;\n")));
+refuse("une image recadrée au centre (le cadrage ôté)", () => feuilleJuste(mf("  object-position: 50% 30%;\n", "")));
+refuse("un second cadrage sur l'image", () => feuilleJuste(feuille + "\n.st-vignette--grand .st-vignette__image {\n  object-position: 50% 0%;\n}\n"));
 refuse("une vignette qui bouge", () => feuilleJuste(feuille + "\n.st-vignette__image {\n  animation: st-cadrage 8s ease-in-out infinite alternate;\n}\n@keyframes st-cadrage {\n  to {\n    scale: 1.12;\n  }\n}\n"));
 refuse("un voile de couleur sous la légende", () => feuilleJuste(mf("rgb(0 0 0 / 0.82) 0%", "color-mix(in srgb, var(--bp-plus-fond) 82%, transparent) 0%")));
 refuse("une transition oubliée en mouvement réduit", () => feuilleJuste(mf("  .st-vignette,\n  .st-eventail__place {", "  .st-vignette {")));
@@ -819,18 +834,23 @@ const retaille = (o: Buffer, largeur: number, hauteur: number) => {
 };
 const premiere = fichierVignette(TEMPLATES[0]);
 const legere = fichierVignette(TEMPLATES[5], VIGNETTE.legere);
-assert.deepEqual(tailleWebp(retaille(surDisque(premiere)!, 896, 896)), { largeur: 896, hauteur: 896 }, "le mutant des tailles a prise");
+assert.deepEqual(tailleWebp(retaille(surDisque(premiere)!, 1100, 1100)), { largeur: 1100, hauteur: 1100 }, "le mutant des tailles a prise");
 const sauf = (adresse: string, autre: (o: Buffer) => Buffer | null): Lecteur => (a) => (a === adresse ? autre(surDisque(a)!) : surDisque(a));
-const PAS_45 = /pas du 4:5/;
+const PAS_34 = /pas du 3:4 des images fournies/;
 refuse("une vignette absente", () => vignettesJustes(TEMPLATES, sauf(fichierVignette(TEMPLATES[11]), () => null)), /manque/);
 refuse("une copie légère absente", () => vignettesJustes(TEMPLATES, sauf(legere, () => null)), /manque/);
-refuse("une vignette carrée (le fichier)", () => vignettesJustes(TEMPLATES, sauf(premiere, (o) => retaille(o, 896, 896))), PAS_45);
-refuse("une vignette en 3:4", () => vignettesJustes(TEMPLATES, sauf(premiere, (o) => retaille(o, 896, 1195))), PAS_45);
-refuse("une vignette en 16:9", () => vignettesJustes(TEMPLATES, sauf(premiere, (o) => retaille(o, 896, 504))), PAS_45);
-refuse("une vignette rognée de deux lignes", () => vignettesJustes(TEMPLATES, sauf(premiere, (o) => retaille(o, 896, 1118))), PAS_45);
-// Un fichier à la taille de ceux du 15/11 (978 × 1224, les vignettes noir et blanc) : ce n'est plus la vignette attendue.
-refuse("une vignette à l'ancienne taille (978 × 1224)", () => vignettesJustes(TEMPLATES, sauf(premiere, (o) => retaille(o, 978, 1224))), /px de large, attendu 896/);
-refuse("une copie légère carrée", () => vignettesJustes(TEMPLATES, sauf(legere, (o) => retaille(o, 660, 660))), PAS_45);
+refuse("une vignette carrée (le fichier)", () => vignettesJustes(TEMPLATES, sauf(premiere, (o) => retaille(o, 1100, 1100))), PAS_34);
+// Un fichier recadré en 4:5 avant d'être posé : la boîte le recadre déjà, il perdrait deux fois le haut et le bas.
+refuse("une vignette déjà recadrée en 4:5 (le fichier)", () => vignettesJustes(TEMPLATES, sauf(premiere, (o) => retaille(o, 1100, 1375))), PAS_34);
+refuse("une vignette en 3:4 arrondi (1100 × 1467)", () => vignettesJustes(TEMPLATES, sauf(premiere, (o) => retaille(o, 1100, 1467))), PAS_34);
+refuse("une vignette en 16:9", () => vignettesJustes(TEMPLATES, sauf(premiere, (o) => retaille(o, 1100, 619))), PAS_34);
+refuse("une vignette rognée de deux lignes", () => vignettesJustes(TEMPLATES, sauf(premiere, (o) => retaille(o, 1100, 1468))), PAS_34);
+// Un fichier à la taille de ceux de l'après-midi du 16/11 (896 × 1120, en 4:5) : ce n'est plus la vignette attendue.
+refuse("une vignette à l'ancienne taille (896 × 1120)", () => vignettesJustes(TEMPLATES, sauf(premiere, (o) => retaille(o, 896, 1120))), /px de large, attendu 1100/);
+// Le fichier fourni tel quel (1320 × 1764) : trop lourd pour le web, les vingt-quatre passeraient 1,5 Mo.
+refuse("le fichier fourni tel quel (1320 × 1764)", () => vignettesJustes(TEMPLATES, sauf(premiere, (o) => retaille(o, 1320, 1764))), /px de large, attendu 1100/);
+refuse("une copie légère carrée", () => vignettesJustes(TEMPLATES, sauf(legere, (o) => retaille(o, 660, 660))), PAS_34);
+refuse("une copie légère en 4:5 (660 × 825)", () => vignettesJustes(TEMPLATES, sauf(legere, (o) => retaille(o, 660, 825))), PAS_34);
 refuse("une copie légère qui n'a pas sa largeur", () => vignettesJustes(TEMPLATES, sauf(legere, (o) => retaille(o, 480, 600))), /px de large, attendu 660/);
 refuse("une vignette trop lourde", () => vignettesJustes(TEMPLATES, sauf(premiere, (o) => Buffer.concat([o, Buffer.alloc(200_000)]))), /octets, au plus/);
 refuse("un fichier qui n'est pas du WebP", () => vignettesJustes(TEMPLATES, sauf(premiere, () => Buffer.from("<svg xmlns='http://www.w3.org/2000/svg'/>".padEnd(64)))), /du WebP/);
@@ -872,4 +892,4 @@ refuse("« Avec ta photo. » collé à la phrase", () => ecranJuste(m("{AVEC_TA_
 refuse("la pastille teinte en or", () => feuilleJuste(mf("box-shadow: 0 0 0 2px #fff, ", "box-shadow: 0 0 0 2px #e0b23c, ")), /pas d'autre teinte écrite que le noir et le blanc/);
 refuse("la pastille carrée", () => dedansJuste(ecran, mf("  border-radius: 999px;\n  background: #000;", "  border-radius: 4px;\n  background: #000;")), TOI);
 
-console.log(`studio : ok (bonus des recharges : ${RECHARGES_STUDIO.map((r) => `${prixRecharge(r)} € → +${bonusDe(r)}`).join(", ")} ; ${TEMPLATES.length} vignettes en 4:5, ${Math.round(POIDS_STUDIO / 1000)} ko)`);
+console.log(`studio : ok (bonus des recharges : ${RECHARGES_STUDIO.map((r) => `${prixRecharge(r)} € → +${bonusDe(r)}`).join(", ")} ; ${TEMPLATES.length} vignettes en 3:4, montrées en 4:5, ${Math.round(POIDS_STUDIO / 1000)} ko)`);

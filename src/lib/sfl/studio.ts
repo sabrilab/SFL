@@ -33,22 +33,28 @@
 // 15/11/2026 sur bola-app#22, « les vraies vignettes des 12 modèles »). Le
 // 16/11, Sabri a trouvé les vignettes noir et blanc « pas engageantes » : les
 // douze ont été refaites hors de l'app, en couleur, avec l'avatar d'un
-// joueur de la ligue, le tiers bas sombre et vide.
+// joueur de la ligue, le tiers bas sombre et vide ; le soir même, refaites
+// en Seedream 5.0 Pro (son choix, demandes de 19:20 et 19:25), en 3:4 : le
+// modèle n'a pas de 4:5.
 // Elles sont dans public/bola-plus/studio/, numérotées dans l'ordre du
-// catalogue (« 01-ma-carte-en-vrai.webp »), en 4:5 : 896 × 1120, le fichier
-// fourni tel quel ; à côté de chacune, sa copie plus légère pour le rail
-// (« 01-ma-carte-en-vrai-660.webp », 660 × 825 : les proportions de
-// l'original, et le suffixe de largeur de public/bola-plus/). Les deux se
-// refont depuis les fichiers fournis
+// catalogue (« 01-ma-carte-en-vrai.webp »), en 3:4 (110 de large pour 147
+// de haut, les proportions des fichiers fournis) : 1100 × 1470, la largeur
+// de la fiche en grand sur un iPhone à écran × 3 ; à côté de chacune, sa
+// copie plus légère pour le rail (« 01-ma-carte-en-vrai-660.webp »,
+// 660 × 882 : les proportions de l'original, et le suffixe de largeur de
+// public/bola-plus/). Les deux se refont depuis les fichiers fournis
 // (tools/studio-vignettes.py) ; leurs empreintes sont dans
 // tools/studio-check.ts : un fichier échangé, teint ou retouché arrête le
 // banc. Chaque template porte la sienne (Template.image).
-// L'écran les montre telles quelles : en 4:5, jamais recadrées en carré, ni
-// grossies, ni teintes (leurs couleurs sont celles des images), ni animées ;
-// il écrit le nom du modèle et son prix en ballons sur leur tiers bas. Elles
-// remplacent les vignettes noir et blanc du 15/11, qui remplaçaient les
-// vignettes composées du 14/11 (un visuel de Bola Plus recadré et teint en
-// violet, la carte « Toi » posée dessus).
+// L'écran les montre dans une boîte en 4:5 : recadrées en haut (cover, à
+// 50 % 30 % : 2 % de la hauteur ôtés en haut, 4,5 % en bas, les têtes
+// entières, le tiers bas sombre gardé), jamais en carré, ni grossies, ni
+// teintes (leurs couleurs sont celles des images), ni animées ; il écrit le
+// nom du modèle et son prix en ballons sur leur tiers bas. Elles remplacent
+// les vignettes en couleur de l'après-midi du 16/11 (en 4:5), qui
+// remplaçaient les vignettes noir et blanc du 15/11, elles-mêmes à la place
+// des vignettes composées du 14/11 (un visuel de Bola Plus recadré et teint
+// en violet, la carte « Toi » posée dessus).
 // La carte « Ton studio » du carrousel Bola Plus montre trois de ces
 // templates en éventail (EVENTAIL_STUDIO) : la carte en vrai au milieu, la
 // seule entière, avec son nom et son prix ; de chaque côté, une image dont
@@ -63,11 +69,15 @@ import { montant } from "./bola-plus";
 export type Rendu = { genre: "image" } | { genre: "video"; secondes: number };
 
 /**
- * Les vignettes (public/bola-plus/studio/) : leur rapport hauteur sur largeur
- * (4:5), la largeur du fichier d'origine (l'image fournie) et celle de sa
- * copie légère.
+ * Les vignettes (public/bola-plus/studio/) : le rapport hauteur sur largeur
+ * de leur boîte à l'écran (4:5), les proportions de leurs fichiers (3:4 :
+ * 110 de large pour 147 de haut, celles des images fournies, que la boîte
+ * recadre), la largeur de l'original et celle de sa copie légère.
  */
-export const VIGNETTE = { rapport: 5 / 4, largeur: 896, legere: 660 } as const;
+export const VIGNETTE = { rapport: 5 / 4, fichier: { largeur: 110, hauteur: 147 }, largeur: 1100, legere: 660 } as const;
+
+/** La hauteur d'un fichier de vignette à cette largeur : 1470 pour l'original, 882 pour sa copie légère. */
+export const hauteurVignette = (largeur: number) => (largeur * VIGNETTE.fichier.hauteur) / VIGNETTE.fichier.largeur;
 
 export interface Template {
   id: string;

@@ -10,10 +10,11 @@
 //
 //   · ImageTemplate, Legende : la vignette d'un template (retour du 15/11 :
 //     « les vraies vignettes des 12 modèles » ; depuis le 16/11, en couleur,
-//     avec l'avatar d'Ilyes). Son image, l'une des douze de
-//     public/bola-plus/studio/, montrée telle quelle dans une boîte en 4:5
-//     (.st-vignette) : jamais recadrée en carré, ni grossie, ni teinte, ni
-//     animée. Sur son tiers bas, sombre dans
+//     avec l'avatar d'un joueur, en Seedream 5.0 Pro depuis le soir). Son
+//     image, l'une des douze de public/bola-plus/studio/ (en 3:4), montrée
+//     dans une boîte en 4:5 (.st-vignette) qui la recadre en haut (la feuille
+//     de style : cover, 50 % 30 %) : jamais en carré, ni grossie, ni teinte,
+//     ni animée. Sur son tiers bas, sombre dans
 //     l'image, la légende : le nom du modèle (la police des titres de la
 //     page) et son prix en ballons (Anton), sur un voile noir, pas une
 //     teinte. L'image est décorative (alt vide) : le nom, ce que tu reçois,
@@ -101,6 +102,7 @@ import {
   ballons,
   dureeDe,
   fichierVignette,
+  hauteurVignette,
   prixDe,
   prixRecharge,
   sourcesVignette,
@@ -137,9 +139,10 @@ type Cadre = "rail" | "page";
 const LARGEUR_CADRE: Record<Cadre, string> = { rail: "min(216px, 58vw)", page: "min(406px, calc(100vw - 24px))" };
 
 /**
- * L'image d'un template, qui remplit sa vignette (.st-vignette, en 4:5) :
- * telle quelle, ni teinte ni grossie. Décorative (alt vide) : ce qu'elle
- * montre est écrit à côté. Elle attend d'être proche pour se charger.
+ * L'image d'un template (en 3:4), qui remplit sa vignette (.st-vignette, en
+ * 4:5) recadrée en haut, ni teinte ni grossie ; elle dit les dimensions de son
+ * fichier. Décorative (alt vide) : ce qu'elle montre est écrit à côté. Elle
+ * attend d'être proche pour se charger.
  */
 function ImageTemplate({ t, cadre }: { t: Template; cadre: Cadre }) {
   const ref = useRef<HTMLImageElement>(null);
@@ -153,7 +156,7 @@ function ImageTemplate({ t, cadre }: { t: Template; cadre: Cadre }) {
       srcSet={sourcesVignette(t)}
       sizes={LARGEUR_CADRE[cadre]}
       width={VIGNETTE.legere}
-      height={VIGNETTE.legere * VIGNETTE.rapport}
+      height={hauteurVignette(VIGNETTE.legere)}
       alt=""
       loading={proche ? "eager" : "lazy"}
       decoding="async"
@@ -170,7 +173,7 @@ function ImageTemplate({ t, cadre }: { t: Template; cadre: Cadre }) {
 function ImageLegere({ t }: { t: Template }) {
   return (
     // eslint-disable-next-line @next/next/no-img-element -- la copie légère (public/bola-plus/studio), déjà chargée par le rail
-    <img className="st-vignette__image" src={fichierVignette(t, VIGNETTE.legere)} width={VIGNETTE.legere} height={VIGNETTE.legere * VIGNETTE.rapport} alt="" draggable={false} />
+    <img className="st-vignette__image" src={fichierVignette(t, VIGNETTE.legere)} width={VIGNETTE.legere} height={hauteurVignette(VIGNETTE.legere)} alt="" draggable={false} />
   );
 }
 
