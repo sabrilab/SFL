@@ -776,7 +776,8 @@ async function banc() {
     const CACHE = /(^|[\s:"])(hidden|sr-only|invisible|opacity-0)(?=[\s"])/;
     assert.ok(!CACHE.test(offre) && !CACHE.test(ouverture), "les prix se voient");
     // La vraie carte « Toi », sans photo ni nom de joueur.
-    assert.ok(/<BolaCard name=\{CARTE_TOI\.name\} /.test(carte) && CARTE_TOI.name === "Toi" && !/photo=/.test(carte), "« Ta carte » : la vraie carte « Toi », sans photo");
+    assert.ok(/<PlayerCard player=\{player\} /.test(carte) && /player\.name === me/.test(carte), "« Ta carte » : la carte du compte ouvert (16/11)");
+    assert.ok(/<BolaCard name=\{CARTE_TOI\.name\} /.test(carte) && CARTE_TOI.name === "Toi" && !/photo=/.test(carte), "sans joueur à soi : la carte « Toi », sans photo");
     // « Tes maillots » : le portant d'abord ; le visuel déposé ne le remplace qu'une fois chargé.
     assert.ok(/const \[deposeLa, setDeposeLa\] = useState\(false\);/.test(photo) && /const depose = deposeLa \? avantage\.depose : undefined;/.test(photo), "la carte montre le portant tant que le visuel déposé n'est pas chargé");
     assert.ok(/essai\.onload = \(\) => \{\s*if \(vivant && essai\.naturalWidth > 0\) setDeposeLa\(true\);/.test(photo) && !/onerror/.test(photo), "le visuel déposé ne passe devant qu'une fois chargé");
