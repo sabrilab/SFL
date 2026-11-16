@@ -102,6 +102,7 @@ import {
 import { BALLONS_FORMULE } from "@/lib/sfl/studio";
 import { cn } from "@/lib/utils";
 import { MentionStudio, VisuelStudio } from "@/components/sfl/studio-bola";
+import { CompteAReboursBolaPlus } from "@/components/sfl/bola-plus-rappels";
 import "@/components/sfl/ma-carte/rubriques.css";
 import "./bola-plus.css";
 
@@ -158,7 +159,11 @@ export function TuileBolaPlus() {
       <span className="tuile__embleme" aria-hidden>
         <EmblemeBolaPlus className="size-full" trait={0.9} fond={0.28} />
       </span>
-      <span className="text-[16px] leading-[1.15] font-bold tracking-[-0.2px] whitespace-nowrap">Bola Plus</span>
+      <span className="flex flex-col items-start gap-1">
+        <span className="text-[16px] leading-[1.15] font-bold tracking-[-0.2px] whitespace-nowrap">Bola Plus</span>
+        {/* Le compte à rebours du prix premiers joueurs (bola-plus-rappels.tsx) */}
+        <CompteAReboursBolaPlus variante="ligne" className="tuile__rebours" />
+      </span>
       {interet && <CestNote className="mono-label tuile__note" />}
     </Link>
   );
@@ -385,6 +390,7 @@ function DiapoOuverture() {
           <span className="bp-ouverture__par">/ {p.par}</span>
           <Barre somme={p.barre} />
         </p>
+        <CompteAReboursBolaPlus variante="grand" />
       </div>
     </div>
   );
@@ -586,7 +592,10 @@ function DiapoPrix({ plus, choix, onChoix, actionRef }: { plus: BolaPlus; choix:
         ))}
       </p>
       </div>
-      <Titre className="bp-etiquette-prix bp-prix__etiquette">Prix premiers joueurs</Titre>
+      <div className="flex items-center justify-between gap-2">
+        <Titre className="bp-etiquette-prix bp-prix__etiquette">Prix premiers joueurs</Titre>
+        <CompteAReboursBolaPlus variante="ligne" className="bp-prix__rebours" />
+      </div>
       <OffreBolaPlus plus={plus} choix={choix} onChoix={onChoix} actionRef={actionRef} />
     </div>
   );

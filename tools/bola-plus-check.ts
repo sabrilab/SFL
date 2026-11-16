@@ -99,6 +99,7 @@ import {
   type LigneInteret,
 } from "../src/lib/sfl/bola-plus";
 import { voitBolaPlus } from "../src/lib/sfl/bola-plus";
+import { FIN_PREMIERS_JOUEURS, casesDe, resteAvant, resteCourt } from "../src/lib/sfl/compte-a-rebours";
 
 // 1 · L'offre.
 const NBSP = "\u00a0";
@@ -227,6 +228,18 @@ const REFUS = "Pas enregistré. Reconnecte-toi, puis réessaie.";
 const UID = "aaaaaaaa-0000-4000-8000-000000000001";
 
 async function banc() {
+  // 0 bis · Le compte à rebours (16/11) : dimanche 22/11 23:59:59 à Paris, soit 22:59:59 UTC.
+  assert.equal(new Date(FIN_PREMIERS_JOUEURS).toISOString(), "2026-11-22T22:59:59.000Z");
+  const lundi = Date.parse("2026-11-16T17:30:00+01:00");
+  const r = resteAvant(FIN_PREMIERS_JOUEURS, lundi);
+  assert.deepEqual([r.jours, r.heures, r.minutes, r.secondes, r.fini, r.dernierJour], [6, 6, 29, 59, false, false]);
+  assert.equal(resteCourt(r), "6 j 06 h");
+  assert.deepEqual(casesDe(r).map((c) => c.valeur), ["06", "06", "29", "59"]);
+  const dimanche = resteAvant(FIN_PREMIERS_JOUEURS, Date.parse("2026-11-22T21:00:00+01:00"));
+  assert.ok(dimanche.dernierJour && resteCourt(dimanche) === "02 h 59 min");
+  assert.equal(resteCourt(resteAvant(FIN_PREMIERS_JOUEURS, FIN_PREMIERS_JOUEURS - 65_500)), "01 min 05 s", "arrondi vers le bas");
+  const apres = resteAvant(FIN_PREMIERS_JOUEURS, FIN_PREMIERS_JOUEURS + 1);
+  assert.ok(apres.fini && !apres.dernierJour && apres.jours === 0 && apres.secondes === 0, "après la fin : terminé, jamais négatif");
   // 0 · Qui voit Bola Plus en ligne (16/11) : Ilyes et Sabri, personne d'autre.
   assert.ok(voitBolaPlus("Ilyes") && voitBolaPlus("Sabri"), "les deux admins voient Bola Plus");
   for (const nom of ["Léo", "sabri", "Sidali", "", null, undefined]) assert.equal(voitBolaPlus(nom), false, `${String(nom)} ne voit pas Bola Plus`);
