@@ -638,6 +638,16 @@ export function aLHeure(libelle: string): string {
   return estUneHeure(libelle) ? `à ${libelle}` : libelle;
 }
 
+/**
+ * « jusqu'à 18 h » d'un seul tenant (espaces insécables) : à l'étroit, la
+ * ligne se coupe avant, jamais entre « 18 » et « h » (contrôle du 16/11/2026,
+ * le bandeau du vote à 320 px laissait « h » seul à la ligne). Une durée
+ * (« une heure après le dernier match ») se coupe normalement.
+ */
+export function jusquaInsecable(libelle: string): string {
+  return estUneHeure(libelle) ? `jusqu'à\u00a0${libelle.replace(/ /g, "\u00a0")}` : `jusqu'à ${libelle}`;
+}
+
 /** Le verdict des missions et du Flair, en court : « à 19 h », « à minuit », sinon « ce soir » ; « à rattraper » pour une journée en suspens. */
 export function verdictDeJournee(s: SaisonHeures, j: number, t: Date): string {
   const l = libelleRevelation(s, j, t);

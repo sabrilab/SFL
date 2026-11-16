@@ -8,6 +8,18 @@
 // server », et la route tombait. Seuls chargerVotes et voter parlent à la
 // base, et seulement depuis le téléphone.
 //
+// Le vote du jour dans les trois onglets (vote-du-jour.tsx, vote-figures.tsx)
+// prend ici ses décisions, en fonctions pures : où en est le vote pour moi
+// (etatDuVote, placeDuVotant), où il se pose (aPoser, votesOuvertsPour), ce
+// que dit son bandeau (bandeauDuVote), si les votes sont là pour décider
+// (votesPrets), mes deux voix à l'écran (voteFait, avec ce que ce téléphone en
+// a retenu), l'encart de Ma carte (etatEncart, estPlie, voixQuiRange), la
+// marque de l'étiquette de la Map (marqueDuVote) et « Voter » sous la feuille
+// en direct d'un match (voteSousLeMatch). tools/vote-du-jour-check.ts les
+// joue, et garde par des motifs de texte la façon dont les composants les
+// appellent (contrôles du 16/11/2026 : le tri vivait dans le composant, et 9
+// retouches sur 12 échappaient au banc).
+//
 // Remis le 17/10 à la demande de Sabri, partagé en base (supabase/schema.sql,
 // table votes_figures) : avant, chaque vote restait sur le téléphone de son
 // auteur et personne ne voyait celui des autres.
@@ -44,7 +56,8 @@
 //     n'élisait que le plus voté du match : à la J4, au Match 1, Noirs 1
 //     n'avait pas de Défensive, ni Blancs 1 d'Impact ;
 //   · ni un joueur venu en extra time ni une place « X1 », « X2 »… ne votent
-//     ni ne sont candidats dans le match qu'ils complètent ;
+//     ni ne sont candidats dans le match qu'ils complètent ; venu seulement en
+//     extra time, le vote ne lui est proposé nulle part (placeDuVotant) ;
 //   · entre la fin du vote et la révélation, personne ne voit les élus
 //     (titresTombes).
 //
@@ -58,7 +71,7 @@
 import { findPlayerMatch, type Journee, type JourneeMatch, type MatchTeam } from "./engine";
 import type { Saison } from "./saisie/types";
 import { jourMoisDuLibelle } from "./convocation-temps";
-import { titresTombes } from "./revelation";
+import { titresTombes, voteOuvertA } from "./revelation";
 import { supabase } from "@/lib/supabase";
 import { isPlaceExtraTime } from "./hidden";
 import { cleTitre, VOIX_MIN } from "./saisie/evolution";
@@ -168,7 +181,66 @@ export async function voter(v: VoteFigure): Promise<void> {
     ...cache.filter((x) => !(x.saison === v.saison && x.j === v.j && x.categorie === v.categorie && x.votant === v.votant)),
     v,
   ];
+  // Mes deux voix données d'ici : retenu pour la prochaine ouverture de l'app.
+  if (mesDeuxVoix(cache, v.saison, v.j, v.votant)) retenirVoix(cleDuVote(v.saison, v.j, v.votant), true);
   emit();
+}
+
+/**
+ * Les votes sont-ils là pour décider (useVotesPrets, et le SeasonProvider
+ * pour la révélation) ? Relus (chargerVotes), ou rien ne viendra : sans
+ * session serveur, le vote dit « Reconnecte-toi pour voter ».
+ */
+export function votesPrets(o: { server: boolean; charges: boolean }): boolean {
+  return !o.server || o.charges;
+}
+
+/* ------------------------- Ce que ce téléphone retient ------------------------- */
+// Mes deux voix données ou non, journée par journée, telles que ce téléphone
+// les a vues en dernier (relues, ou envoyées d'ici) : à l'ouverture de l'app,
+// tant que les votes ne sont pas relus, l'encart de Ma carte et l'étiquette de
+// la Map en partent (voteFait). Contrôles du 16/11/2026 : l'encart attendait
+// sur une ligne seule, puis se dépliait d'un coup (ma carte descendait de
+// 460 px), la place retrouvée au rechargement glissait de 434 px, et si la
+// lecture échouait, la ligne restait sans bouton. Les dernières journées
+// seulement (RETENUES_MAX).
+
+const CLE_RETENUES = "sfl-vote-du-jour-v1";
+export const RETENUES_MAX = 24;
+
+/** La clé d'une journée pour un joueur : « saison:j:nom ». */
+export function cleDuVote(saison: number, j: number, moi: string): string {
+  return `${saison}:${j}:${moi}`;
+}
+
+function lireRetenues(): Record<string, boolean> {
+  try {
+    const lu: unknown = JSON.parse(localStorage.getItem(CLE_RETENUES) ?? "{}");
+    return lu && typeof lu === "object" && !Array.isArray(lu) ? (lu as Record<string, boolean>) : {};
+  } catch {
+    return {};
+  }
+}
+
+/** Ce que ce téléphone a vu en dernier de mes deux voix pour cette journée (vrai : données) ; null s'il n'en sait rien. */
+export function voixRetenues(cle: string): boolean | null {
+  const v = lireRetenues()[cle];
+  return typeof v === "boolean" ? v : null;
+}
+
+/** Le retient, à la place de ce qu'il savait ; au-delà de RETENUES_MAX journées, les plus anciennes s'oublient. */
+export function retenirVoix(cle: string, fait: boolean): void {
+  try {
+    const tout = lireRetenues();
+    if (tout[cle] === fait) return;
+    delete tout[cle];
+    tout[cle] = fait;
+    const cles = Object.keys(tout);
+    for (const k of cles.slice(0, Math.max(0, cles.length - RETENUES_MAX))) delete tout[k];
+    localStorage.setItem(CLE_RETENUES, JSON.stringify(tout));
+  } catch {
+    // Stockage plein ou coupé (navigation privée) : rien de retenu, l'encart part ouvert.
+  }
 }
 
 /* ------------------------------ Le décompte ----------------------------- */
@@ -258,6 +330,25 @@ export function monVote(votes: VoteFigure[], saison: number, j: number, cat: Cat
   return votes.find((v) => v.saison === saison && v.j === j && v.categorie === cat && v.votant === moi)?.candidat ?? null;
 }
 
+/** Mes deux voix (Joueur Impact et meilleur défenseur) sont-elles données dans cette journée ? */
+export function mesDeuxVoix(votes: VoteFigure[], saison: number, j: number, moi: string): boolean {
+  return CATEGORIES_VOTE.every((cat) => !!monVote(votes, saison, j, cat, moi));
+}
+
+/**
+ * Ma place dans le vote d'une journée : mon match et mes adversaires, si j'y
+ * suis titulaire. Venu en extra time compléter un autre match EN PLUS du
+ * mien, je vote dans le mien (findPlayerMatch le rend d'abord). Venu
+ * SEULEMENT en extra time, je ne vote pas : ni l'extra time ni une place X ne
+ * sont électeurs (electeursDe), ma voix ne compterait nulle part. null, comme
+ * pour qui ne joue pas la journée (contrôle du 16/11/2026 : le vote lui était
+ * proposé partout, ses deux voix enregistrées, « 0/5 ont voté »).
+ */
+export function placeDuVotant(journee: Journee, moi: string): ReturnType<typeof findPlayerMatch> {
+  const place = findPlayerMatch(journee, moi);
+  return place && place.team.players.some((p) => p.name === moi && !p.extraTime) ? place : null;
+}
+
 /** Une journée où l'on vote : MVP calculé, équipes connues. */
 export function journeeAvecVote(j: Journee): boolean {
   return !!j.mvpAuto && (j.matches?.length ?? 0) > 0;
@@ -283,16 +374,143 @@ export function feuilleRemplie(saison: Pick<Saison, "entries">, j: number, match
  *   · `en-attente` : personne n'y vote encore de là où il regarde (la feuille
  *     de son match, ou toutes s'il ne joue pas, pas encore remplie) : le bloc
  *     est grisé, ou n'a rien à proposer.
- * Un joueur venu en extra time compléter un autre match suit le sien
- * (findPlayerMatch).
+ * Un joueur venu en extra time compléter un autre match suit le sien ; venu
+ * seulement en extra time, il ne vote pas et compte comme qui ne joue pas
+ * (placeDuVotant).
  */
 export type EtatDuVote = "a-moi" | "aux-autres" | "en-attente";
 
 export function etatDuVote(saison: Pick<Saison, "entries">, journee: Journee, moi: string): EtatDuVote {
   const remplie = (m: JourneeMatch) => feuilleRemplie(saison, journee.j, m);
-  const place = findPlayerMatch(journee, moi);
+  const place = placeDuVotant(journee, moi);
   if (place) return remplie(place.match) ? "a-moi" : "en-attente";
   return (journee.matches ?? []).some(remplie) ? "aux-autres" : "en-attente";
+}
+
+/**
+ * Où se pose le vote du jour (vote-du-jour.tsx), d'après où il en est pour
+ * moi (etatDuVote) :
+ *   · `tous` : la vue Classement des Actus, dans tous les cas ;
+ *   · `a-moi` : Ma carte et la Map, seulement tant que je peux voter (la
+ *     feuille de mon match remplie, le vote pas encore fermé) ;
+ *   · `ouverts` : en tête du fil des Actus, dès qu'on y vote (moi, ou les
+ *     autres si je ne joue pas) ;
+ *   · `en-attente` : dans le fil, sous la feuille en direct, tant que
+ *     personne n'y vote de là où je regarde.
+ * `ouverts` et `en-attente` se partagent chaque état, un seul des deux : une
+ * journée n'est jamais posée deux fois dans le fil, ni oubliée
+ * (tools/vote-du-jour-check.ts).
+ */
+export type OuPoser = "tous" | "a-moi" | "ouverts" | "en-attente";
+
+const A_POSER: Record<OuPoser, (etat: EtatDuVote) => boolean> = {
+  tous: () => true,
+  "a-moi": (etat) => etat === "a-moi",
+  ouverts: (etat) => etat !== "en-attente",
+  "en-attente": (etat) => etat === "en-attente",
+};
+
+export function aPoser(ou: OuPoser, etat: EtatDuVote): boolean {
+  return A_POSER[ou](etat);
+}
+
+/**
+ * Les journées dont le vote est ouvert à l'instant `t` et qui se posent là
+ * (aPoser), pour ce joueur. Le vote fermé (passé son heure, un autre jour,
+ * une journée en suspens : voteOuvertA) ou une journée sans vote
+ * (journeeAvecVote) : rien, nulle part. `saison` et `journees` : le direct,
+ * pas la vue figée (vote-du-jour.tsx les lit dans le SeasonProvider) : la
+ * feuille remplie y ouvre le vote bien avant la révélation.
+ */
+export function votesOuvertsPour(saison: Saison, journees: Journee[], moi: string, t: Date, ou: OuPoser): Journee[] {
+  return journees.filter((j) => journeeAvecVote(j) && voteOuvertA(saison, j.j, t) && aPoser(ou, etatDuVote(saison, j, moi)));
+}
+
+/**
+ * Ce que dit le bandeau du bloc (vote-figures.tsx) : `ouvert` (« Vote ouvert
+ * jusqu'à… ») dès qu'on y vote ; sinon il attend, gris : la fin de mon match
+ * si je joue (« Vote à la fin du Match 1 »), la fin des matchs si je ne joue
+ * pas et qu'aucune feuille n'est remplie. Avant, qui ne jouait pas lisait
+ * « Vote ouvert » alors que personne ne pouvait encore voter (contrôle du
+ * 16/11/2026). `joue` : placeDuVotant m'a trouvé une place.
+ */
+export type BandeauDuVote = "ouvert" | "fin-de-mon-match" | "fin-des-matchs";
+
+export function bandeauDuVote(etat: EtatDuVote, joue: boolean): BandeauDuVote {
+  if (etat !== "en-attente") return "ouvert";
+  return joue ? "fin-de-mon-match" : "fin-des-matchs";
+}
+
+/**
+ * Mes deux voix, à l'écran (l'encart de Ma carte, l'étiquette de la Map) :
+ * données si ce téléphone les connaît (`vote` : mesDeuxVoix, relues ou
+ * envoyées d'ici) ; tant que les votes ne sont pas relus (`prets` faux : à
+ * l'ouverture de l'app, sur un réseau lent, ou la lecture a échoué), ce qu'il
+ * en a retenu la dernière fois (`retenu` : voixRetenues ; null, il n'en sait
+ * rien : pas données). Relus, les votes font foi.
+ */
+export function voteFait(o: { prets: boolean; vote: boolean; retenu: boolean | null }): boolean {
+  if (o.vote) return true;
+  return !o.prets && o.retenu === true;
+}
+
+/**
+ * L'encart du vote sur Ma carte (vote-du-jour.tsx, `repliable`) :
+ *   · `ouvert` : le bloc entier et ses deux rangées de cartes, tant qu'il me
+ *     reste une voix à donner ; ailleurs que sur Ma carte, toujours ;
+ *   · `range` : mes deux voix données (voteFait), la ligne (la coche, l'heure
+ *     de la fin) ;
+ *   · `rouvert` : rouverte à la main, elle le reste tant qu'on change d'avis.
+ * À l'ouverture de l'app, il part de ce que ce téléphone a retenu : rangé si
+ * mes deux voix y étaient données, ouvert sinon, comme avant le contrôle du
+ * 16/11 (la ligne seule qui attendait mes voix faisait sauter la page, ou
+ * restait sans bouton si la lecture échouait). Reste un cas : mes deux voix
+ * données sur un autre téléphone, jamais vues ici ; l'encart s'ouvre, puis se
+ * range quand elles arrivent.
+ */
+export type EtatEncart = "ouvert" | "range" | "rouvert";
+
+export function etatEncart(o: { repliable: boolean; fait: boolean; rouvert: boolean }): EtatEncart {
+  if (!o.repliable || !o.fait) return "ouvert";
+  return o.rouvert ? "rouvert" : "range";
+}
+
+/** Rangé en une ligne : ses cartes ne sont plus là (et le focus qui y était passe à la ligne). */
+export function estPlie(etat: EtatEncart): boolean {
+  return etat === "range";
+}
+
+/** Ma voix pour `cat`, donnée ici, range-t-elle l'encart ? Oui si l'autre est déjà donnée. */
+export function voixQuiRange(votes: VoteFigure[], saison: number, j: number, moi: string, cat: CategorieVote): boolean {
+  return CATEGORIES_VOTE.every((c) => c === cat || !!monVote(votes, saison, j, c, moi));
+}
+
+/**
+ * La marque de l'étiquette du vote sur la Map : la coche une fois mes deux
+ * voix données (voteFait : connues de ce téléphone, ou retenues de la
+ * dernière fois), le point rouge une fois les votes relus s'il m'en reste à
+ * donner, et ni l'un ni l'autre avant. Avant, l'étiquette disait « à voter »
+ * à l'ouverture de l'app, puis passait à la coche quand mes voix arrivaient
+ * (contrôle du 16/11/2026).
+ */
+export function marqueDuVote(prets: boolean, fait: boolean): "coche" | "point" | null {
+  if (fait) return "coche";
+  return prets ? "point" : null;
+}
+
+/**
+ * « Voter » sous la feuille en direct d'un match (direct/direct-du-match.tsx,
+ * la page du lieu) : seulement pour qui y a ses voix à donner (etatDuVote
+ * `a-moi`) et dont c'est le match (placeDuVotant). Venu seulement en extra
+ * time compléter ce match, ou en plus du sien, on ne vote pas dans celui-ci
+ * (contrôle du 16/11/2026 : « Voter » lui était proposé, puis le bloc lui
+ * disait « Le vote est réservé aux joueurs de la journée » ou « Vote à la fin
+ * du Match 2 »). `equipes` : les deux équipes du match.
+ */
+export function voteSousLeMatch(saison: Pick<Saison, "entries">, journee: Journee, moi: string, equipes: readonly [string, string]): boolean {
+  if (etatDuVote(saison, journee, moi) !== "a-moi") return false;
+  const m = placeDuVotant(journee, moi)?.match;
+  return !!m && equipes.includes(m.teamA.name) && equipes.includes(m.teamB.name);
 }
 
 /* ------------------------------ Les élus -------------------------------- */

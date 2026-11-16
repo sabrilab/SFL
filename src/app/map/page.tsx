@@ -19,10 +19,11 @@
 // suspens · à rattraper » (et son motif) à la place de la feuille, des votes
 // et des divisions.
 //
-// Le vote du jour (Ilyes, 15/11/2026 ; vote-du-jour.tsx) : tant que j'ai une
-// voix à donner (la feuille de mon match remplie, le vote pas encore fermé),
-// son étiquette sous le compte des matchs, en haut à gauche ; la toucher
-// ouvre le vote dans une feuille. Le bas de l'écran reste aux matchs.
+// Le vote du jour (Ilyes, 15/11/2026 ; vote-du-jour.tsx) : tant que je peux
+// voter (la feuille de mon match remplie, le vote pas encore fermé), son
+// étiquette sous le compte des matchs, en haut à gauche, le point rouge tant
+// qu'il me reste une voix à donner, la coche ensuite ; la toucher ouvre le
+// vote dans une feuille. Le bas de l'écran reste aux matchs.
 //
 // La discussion d'un match (22/10) : sur le plan, une bulle de messages au
 // coin de son sticker, rouge avec ce que je n'ai pas lu (Sabri : « comme une
@@ -1557,10 +1558,10 @@ export default function MapPage() {
             Leaflet (z-index 400 et plus). */}
         <div className="pointer-events-none absolute inset-x-0 top-0 z-[500] h-44 bg-gradient-to-b from-[rgba(8,9,11,0.42)] to-transparent" />
 
-        {/* En haut à gauche : la commune en lettrage, le compte en étiquette et, tant que j'ai une
-            voix à donner, le vote du jour (Ilyes, 15/11 ; vote-du-jour.tsx) : dans la place que le
-            plan garde au lettrage, il ne passe ni sur le stade choisi ni sur les matchs du bas.
-            Jamais pour un joueur Bola. */}
+        {/* En haut à gauche : la commune en lettrage, le compte en étiquette et, tant que je peux
+            voter (la feuille de mon match remplie, le vote pas encore fermé), le vote du jour (Ilyes,
+            15/11 ; vote-du-jour.tsx) : dans la place que le plan garde au lettrage, il ne passe ni sur
+            le stade choisi ni sur les matchs du bas. Jamais pour un joueur Bola. */}
         <div className="pointer-events-none absolute left-5 z-[510] flex max-w-[calc(100%-8.5rem)] flex-col items-start" style={{ top: `calc(${haut} + 8px)` }}>
           <span
             key={commune}

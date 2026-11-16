@@ -16,7 +16,7 @@ import { startSaisonSync } from "@/lib/sfl/saisie/sync";
 import type { Saison } from "@/lib/sfl/saisie/types";
 import type { Journee, Player } from "@/lib/sfl/engine";
 import { isHidden, publicOnly } from "@/lib/sfl/hidden";
-import { appliquerVotes, titresFaibles, votesCharges } from "@/lib/sfl/votes";
+import { appliquerVotes, titresFaibles, votesCharges, votesPrets as votesPretsPour } from "@/lib/sfl/votes";
 import { figer, journeesComptees, prochaineTransition, voteOuvertA } from "@/lib/sfl/revelation";
 import { HORLOGE_EVENT, maintenant as heureDeLaLigue, maintenantMs, mesurerHorloge } from "@/lib/sfl/horloge";
 import { etatDivisions, type EtatDivisions } from "@/lib/sfl/divisions";
@@ -208,7 +208,7 @@ export function SeasonProvider({ children }: { children: React.ReactNode }) {
   const votes = useVotes();
   // Les votes doivent être là avant la révélation : sans eux, la journée
   // serait coupée sans ses titres, puis recoupée une seconde plus tard.
-  const votesPrets = !session?.server || votesCharges();
+  const votesPrets = votesPretsPour({ server: !!session?.server, charges: votesCharges() });
   // L'horloge : un minuteur réglé sur la prochaine fin de vote, révélation ou
   // minuit (borné entre 1 s et 5 min), et un recalcul au retour au premier
   // plan. 19 h se voit à 19 h, pas à 19 h 04. L'heure est celle du serveur

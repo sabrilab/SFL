@@ -16,7 +16,9 @@
 // La marque passe par history.pushState et replaceState, enveloppés une fois :
 // Next les appelle à chaque navigation avec un état neuf, sans ce qu'on y
 // avait mis. Les places sont gardées pour la session (sessionStorage) : une
-// mise à jour de l'app, qui recharge la page, retrouve tout.
+// mise à jour de l'app, qui recharge la page, retrouve tout. Pendant qu'une
+// page retrouve sa place, ce qui change plus haut ne doit pas être compensé
+// (placeEnPose : le vote du jour de Ma carte s'y tient).
 
 import { useEffect, useLayoutEffect, useSyncExternalStore } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
@@ -165,6 +167,15 @@ function noter(el: HTMLElement) {
 
 /** Arrête la pose en cours, quand une autre la remplace. */
 let arreter: (() => void) | null = null;
+
+/**
+ * Une page retrouve-t-elle sa place (restaurer, en cours) ? Ce qui change plus
+ * haut ne se compense pas pendant ce temps : la place gardée est celle de la
+ * page entière (le vote du jour de Ma carte, hooks/use-encart-tenu.ts).
+ */
+export function placeEnPose(): boolean {
+  return arreter !== null;
+}
 
 /**
  * Pose la page attendue à sa place, image après image, le temps que son

@@ -7,7 +7,7 @@
 // (ModeFil). Toucher une scène la rejoue ; toucher une carte l'ouvre en grand.
 
 import Link from "next/link";
-import { createContext, Fragment, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ChevronRight, MessageCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useMyPlayer } from "@/components/sfl/player-provider";
