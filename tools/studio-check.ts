@@ -63,7 +63,21 @@
 //       l'éventail et le nombre sont décoratifs) et ouvre le panneau ; sous
 //       le titre, les ballons du mois ; le panneau porte la phrase, le rail
 //       des douze et les recharges, et pousse la fiche d'un template dans la
-//       même feuille ; le panneau et la fiche reçoivent les couleurs de PALETTE.
+//       même feuille ; le panneau et la fiche reçoivent les couleurs de PALETTE ;
+//   8 · toi, dedans (16/11, bola-app#22 : « il faut bien faire comprendre que
+//       l'user pourra générer ces templates avec sa propre personne ») : le
+//       sous-titre du panneau est « Avec ta photo. 300 ⚽ = un trash talk ou
+//       six images » (SOUS_TITRE_STUDIO) ; la photo de ta carte, en pastille
+//       ronde, est en haut à gauche de chaque vignette du rail (pas sur
+//       l'éventail), et au bas de la fiche, ta photo → ton image (la photo,
+//       une flèche, la vignette en petit, sans un mot) ; cette photo vient du
+//       chemin de la carte (useMyPlayer puis usePhotoPerso, comme PlayerCard
+//       pour BolaCard) : ni usePlayerPhoto (son repli /players/… n'existe
+//       plus : une image cassée), ni une autre adresse (une requête de plus) ;
+//       sans photo, ou si elle ne se charge pas, l'initiale (le repli du
+//       portrait de la carte) ; la pastille est décorative ; dans la feuille,
+//       elle est ronde, cerclée de blanc, sans teinte ; la fiche se borne
+//       aussi à cette ligne de plus.
 //   Des mutants sont rejoués : chaque garde doit les refuser (pour la raison
 //   dite, quand elle est écrite) ; un mutant dont le texte à changer n'est
 //   plus dans la source arrête le banc (SansPrise).
@@ -80,7 +94,9 @@ import {
   MENTION_STUDIO,
   OFFERTS_ANNUEL,
   PHRASE_INCLUS,
+  AVEC_TA_PHOTO,
   RECHARGES_STUDIO,
+  SOUS_TITRE_STUDIO,
   TEMPLATES,
   VIGNETTE,
   ballons,
@@ -141,6 +157,9 @@ assert.throws(() => ballons(1.5));
 assert.equal(BALLONS_PAR_MOIS, 300);
 assert.equal(OFFERTS_ANNUEL, 1000);
 assert.equal(PHRASE_INCLUS, `300${NB}⚽ = un trash talk ou six images`);
+// Le sous-titre du panneau, mot pour mot (Sabri, 16/11) : « Avec ta photo. », puis la phrase calculée.
+assert.equal(SOUS_TITRE_STUDIO, `Avec ta photo. 300${NB}⚽ = un trash talk ou six images`);
+assert.equal(SOUS_TITRE_STUDIO, `${AVEC_TA_PHOTO} ${PHRASE_INCLUS}`, "le sous-titre : « Avec ta photo. », puis la phrase calculée");
 // Les attendus, écrits à la main (prix du catalogue : trash talk 299, image la moins chère 49).
 const PHRASES: [number, string][] = [
   [49, "une image"],
@@ -224,7 +243,7 @@ const fiche = ecran.slice(ecran.indexOf("function FicheTemplate("), ecran.indexO
 assert.ok(fiche && !/<button|onClick/.test(fiche), "la fiche d'un template : aucun bouton");
 const recharges = ecran.slice(ecran.indexOf("export function RechargesStudio("));
 assert.ok(!/<button|onClick|href=/.test(recharges) && /Bientôt/.test(recharges), "les recharges : « Bientôt », sans geste");
-assert.ok(/\{PHRASE_INCLUS\}/.test(ecran) && /TEMPLATES\.map\(/.test(ecran), "le rail lit la source");
+assert.ok(/\{AVEC_TA_PHOTO\}<\/span> \{PHRASE_INCLUS\}/.test(ecran) && /TEMPLATES\.map\(/.test(ecran), "le rail lit la source");
 assert.ok(/const EVENTAIL = EVENTAIL_STUDIO\.map\(template\);/.test(ecran), "l'éventail lit la source");
 
 // 5 · Les vignettes : douze templates, douze images, dans l'ordre du catalogue, en 4:5.
@@ -338,7 +357,8 @@ const dossierJuste = (noms: readonly string[]) => {
 };
 dossierJuste(readdirSync(DOSSIER_STUDIO));
 assert.ok(readdirSync(DOSSIER_STUDIO).every((f) => statSync(join(DOSSIER_STUDIO, f)).isFile()), "public/bola-plus/studio : des fichiers");
-// Plus aucune vignette composée : l'écran ne dessine ni carte « Toi », ni visuel de Bola Plus recadré, ni photo de joueur.
+// Plus aucune vignette composée : l'écran ne dessine ni carte « Toi », ni visuel de Bola Plus recadré, ni photo de
+// joueur dans l'image (la photo de ta carte n'est qu'en pastille, posée dessus : dedansJuste).
 const sansComposition = (tsx: string) => {
   const trouve = /BolaCard|DosCarte|CARTE_TOI|matiereDe|fichierVisuel|sourcesVisuel|photo=|username=/.exec(sansNotes(tsx));
   assert.equal(trouve, null, `l'écran du studio compose encore une vignette : ${trouve?.[0]}`);
@@ -374,6 +394,8 @@ const SELECTEURS_VIGNETTE = [
   ".st-item__bouton:active .st-vignette",
   ".st-vignette",
   ".st-vignette--grand",
+  // En petit, au bas de la fiche (ta photo → ton image, 16/11).
+  ".st-vignette--mini",
   ".st-vignette__image",
   ".st-vignette::after",
   ".st-vignette__bas",
@@ -392,7 +414,7 @@ const BOITE: Record<string, readonly string[]> = {
   display: ["block"],
   "aspect-ratio": ["4 / 5"],
   overflow: ["hidden"],
-  "border-radius": ["20px", "24px"],
+  "border-radius": ["20px", "24px", "12px"],
   background: ["#000"],
   color: ["#fff"],
   isolation: ["isolate"],
@@ -407,6 +429,8 @@ const SENSIBLES = [
   ".st-item__bouton:active .st-vignette { scale: 0.98 }",
   ".st-vignette { aspect-ratio: 4 / 5 }",
   ".st-vignette__image { object-fit: cover }",
+  // La photo de ta carte dans sa pastille ronde (16/11) : elle la remplit, comme sur la carte ; ce n'est pas une vignette.
+  ".st-toi__image { object-fit: cover }",
   // L'ombre portée des vignettes de l'éventail : le seul filtre de la feuille, et il est noir.
   ".st-eventail__place { filter: drop-shadow(0 14px 22px rgb(0 0 0 / 0.42)) }",
   '.st-eventail__place[data-place="0"] { translate: -6% -56% }',
@@ -450,7 +474,7 @@ const feuilleJuste = (css: string) => {
   // Les règles qui nomment une vignette : une liste fermée.
   assert.deepEqual(R.map((r) => r.selecteur).filter((sel) => sel.includes(".st-vignette")), SELECTEURS_VIGNETTE, "les règles de la feuille qui nomment une vignette : une liste fermée");
   // Sa boîte : des propriétés et des valeurs connues.
-  for (const r of R.filter((x) => x.selecteur.split(", ").some((sel) => /(^| )\.st-vignette(--grand)?$/.test(sel))))
+  for (const r of R.filter((x) => x.selecteur.split(", ").some((sel) => /(^| )\.st-vignette(--grand|--mini)?$/.test(sel))))
     for (const [prop, valeur] of r.declarations) assert.ok(BOITE[prop]?.includes(valeur), `la boîte d'une vignette : ${prop}: ${valeur} (${r.selecteur})`);
   // Son image : une seule règle, ces déclarations et rien d'autre ; son liseré : un filet blanc.
   const declarations = (sel: string) => R.filter((r) => r.selecteur === sel).map((r) => r.declarations.map((d) => d.join(": ")).sort());
@@ -480,9 +504,12 @@ const feuilleJuste = (css: string) => {
   assert.equal(enCqw.filter(Boolean).length, 5, "la légende : ses marges et ses tailles en cqw");
   const RAIL_ETROIT = 320 * 0.58;
   enCqw.forEach((v, i) => assert.ok(Math.abs(+repli[i + 1] - (+v! * RAIL_ETROIT) / 100) <= 0.5, `sans unités de conteneur : ${repli[i + 1]} px, pas ce que donnent ${v}cqw sur le plus étroit des rails`));
-  // La fiche : la vignette et ses deux lignes dans une colonne, bornée à ce qui tient dans la feuille (92dvh,
-  // FEUILLE_STUDIO), à toute hauteur d'écran : la règle est hors de tout @media (en début de ligne).
-  assert.ok(/\n\.st-fiche \{[^}]*flex-direction: column;[^}]*width: min\(100%, \(92dvh - 222px\) \* 0\.8\);[^}]*margin-inline: auto;[^}]*\}/.test(code), "la fiche se borne à ce qui tient dans la feuille, à toute hauteur d'écran");
+  // La fiche : la vignette, ses deux lignes et ta photo → ton image dans une colonne, bornée à ce qui tient dans la
+  // feuille (92dvh, FEUILLE_STUDIO), à toute hauteur d'écran : la règle est hors de tout @media (en début de ligne).
+  // 298 px : le retour, les marges et les deux lignes (222 px), puis l'écart (16 px) et la ligne de ta photo, à la
+  // hauteur de la vignette en petit (48 px de large en 4:5 : 60 px).
+  assert.ok(/\n\.st-fiche \{[^}]*flex-direction: column;[^}]*width: min\(100%, \(92dvh - 298px\) \* 0\.8\);[^}]*margin-inline: auto;[^}]*\}/.test(code), "la fiche se borne à ce qui tient dans la feuille, à toute hauteur d'écran");
+  assert.ok(/\n\.st-ligne__image \{[^}]*width: 48px;/.test(code) && /\n\.st-ligne \{[^}]*align-items: center;/.test(code), "ta photo → ton image : la vignette en petit, 48 px de large (60 de haut), comptée dans la borne de la fiche");
   // Ni animée : rien ne bouge seul dans la feuille ; une vidéo se dit par son triangle et sa durée.
   assert.ok(!/animation\s*:|@keyframes/.test(code), "aucune animation : une vignette ne bouge pas");
   reduitJuste(css);
@@ -514,13 +541,14 @@ const ecranJuste = (tsx: string) => {
   const tordue = CLASSE_TORDUE.exec(code);
   assert.equal(tordue, null, `une classe qui teinte, recadre ou déforme dans l'écran du studio : ${tordue?.[0]}`);
   // Les styles posés par l'écran, une liste fermée : la police des prix, les couleurs des deux feuilles. Aucun sur une vignette.
-  assert.deepEqual((code.match(/style=\{[^\n]*/g) ?? []).sort(), ["style={COULEURS_STUDIO}>", "style={COULEURS_STUDIO}>", "style={{ fontFamily: ANTON }}>"], "les styles posés par l'écran : une liste fermée");
+  // (La seconde police : l'initiale de la pastille, quand tu n'as pas de photo.)
+  assert.deepEqual((code.match(/style=\{[^\n]*/g) ?? []).sort(), ["style={COULEURS_STUDIO}>", "style={COULEURS_STUDIO}>", "style={{ fontFamily: ANTON }}>", "style={{ fontFamily: ANTON }}>"], "les styles posés par l'écran : une liste fermée");
   // Les mots écrits en dur : une liste fermée (entre deux balises ; le code entre « > » et « < » est écarté).
   const mots = [...code.matchAll(/>([^<>{}]*[A-Za-zÀ-ÿ][^<>{}]*)</g)].map((m) => m[1].trim()).filter((t) => t && !/[;()=]/.test(t)).sort();
   assert.deepEqual(mots, ["Bientôt", "Bola Studio", "Bola Studio", "Recharges"], "les mots écrits en dur dans l'écran du studio");
   // L'image d'un template : décorative, à ses deux largeurs, chargée à l'approche, sans style à elle (ni recadrage, ni grossissement).
   const image = bloc(tsx, "ImageTemplate");
-  assert.equal(code.match(/<img\b/g)?.length, 2, "deux images dans l'écran : celle d'un template, et la copie légère sous l'original de la fiche");
+  assert.equal(code.match(/<img\b/g)?.length, 3, "trois images dans l'écran : celle d'un template, la copie légère sous l'original de la fiche, la photo de ta carte");
   // Sous l'original de la fiche : la copie légère du même template, sous la même règle de style, sans rien d'autre.
   const dessous = bloc(tsx, "ImageLegere");
   assert.ok(/<img className="st-vignette__image" src=\{fichierVignette\(t, VIGNETTE\.legere\)\} width=\{VIGNETTE\.legere\} height=\{VIGNETTE\.legere \* VIGNETTE\.rapport\} alt="" draggable=\{false\} \/>/.test(dessous) && !/srcSet|sizes|style=|aria-|role=/.test(dessous), "sous l'original de la fiche : la copie légère, telle quelle, décorative");
@@ -539,21 +567,22 @@ const ecranJuste = (tsx: string) => {
   assert.ok(/\{dureeDe\(t\)\}/.test(duree) && /t\.rendu\.genre === "video" && <Play /.test(duree), "la durée d'un template, et le triangle d'une vidéo");
   const item = bloc(tsx, "CarteTemplate");
   assert.ok(!/aria-label|aria-hidden/.test(item), "le bouton d'un template se lit en entier (pas d'aria-label)");
-  assert.ok(/<span className="st-vignette">\s*<ImageTemplate t=\{t\} cadre="rail" \/>\s*<Legende t=\{t\} \/>\s*<\/span>/.test(item), "le rail : la vignette, avec le nom et le prix");
+  assert.ok(/<span className="st-vignette">\s*<ImageTemplate t=\{t\} cadre="rail" \/>\s*<Legende t=\{t\} \/>\s*<PastilleToi toi=\{toi\} \/>\s*<\/span>/.test(item), "le rail : la vignette, avec le nom et le prix, et la photo de ta carte");
   assert.ok(/\{t\.recoit\}/.test(item) && /<Duree t=\{t\} \/>/.test(item) && item.indexOf("{t.recoit}") > item.indexOf("<Legende") && item.indexOf("<Duree") > item.indexOf("{t.recoit}"), "le rail : sous la vignette, ce que tu reçois, puis la durée");
   const fiche = bloc(tsx, "FicheTemplate");
   // Une colonne (.st-fiche, bornée dans la feuille) : la vignette en grand, sa copie légère sous l'original (la fiche ne
   // s'ouvre pas sur un cadre noir le temps qu'il arrive) ; dessous, au bord de l'image, ce que tu reçois et la durée.
   assert.ok(/<div className="st-fiche">\s*<div className="st-vignette st-vignette--grand">\s*<ImageLegere t=\{t\} \/>\s*<ImageTemplate t=\{t\} cadre="page" \/>\s*<Legende t=\{t\} titre \/>\s*<\/div>/.test(fiche), "la feuille : la vignette en grand (sa copie légère sous l'original), son nom en titre, son prix");
-  assert.ok(/<Legende t=\{t\} titre \/>\s*<\/div>\s*<div className="flex flex-col gap-3 px-1">\s*<p className="text-corps leading-snug text-encre-2">\{t\.recoit\}<\/p>\s*<Duree t=\{t\} grand \/>\s*<\/div>\s*<\/div>/.test(fiche) && !/aria-hidden/.test(fiche), "la feuille : ce que tu reçois et la durée, dans la colonne de la vignette");
+  assert.ok(/<Legende t=\{t\} titre \/>\s*<\/div>\s*<div className="flex flex-col gap-3 px-1">\s*<p className="text-corps leading-snug text-encre-2">\{t\.recoit\}<\/p>\s*<Duree t=\{t\} grand \/>\s*<\/div>\s*<LigneToi t=\{t\} toi=\{toi\} \/>\s*<\/div>/.test(fiche) && !/aria-hidden/.test(fiche), "la feuille : ce que tu reçois et la durée, puis ta photo → ton image, dans la colonne de la vignette");
   assert.ok(/\nconst FEUILLE_STUDIO = "st-feuille max-h-\[92dvh\] overflow-y-auto /.test(tsx), "la feuille : 92dvh au plus (la borne de la fiche le recopie)");
   const panneau = bloc(tsx, "PanneauStudio");
-  assert.ok(/<p[^>]*>\{PHRASE_INCLUS\}<\/p>/.test(panneau), "la phrase des ballons du mois se voit");
-  assert.ok(/TEMPLATES\.map\(\(t\) => \(\s*<CarteTemplate key=\{t\.id\} t=\{t\} onOuvrir=\{\(\) => setFiche\(t\)\} \/>/.test(panneau), "le panneau : les douze templates en rail");
+  // Le sous-titre (SOUS_TITRE_STUDIO) en deux lignes : « Avec ta photo. », puis la phrase des ballons ; le même texte, un espace entre les deux.
+  assert.ok(/<p className="st-panneau__phrase tabular-nums">\s*<span className="st-panneau__avec">\{AVEC_TA_PHOTO\}<\/span> \{PHRASE_INCLUS\}\s*<\/p>/.test(panneau), "« Avec ta photo. » et la phrase des ballons du mois se voient");
+  assert.ok(/TEMPLATES\.map\(\(t\) => \(\s*<CarteTemplate key=\{t\.id\} t=\{t\} toi=\{toi\} onOuvrir=\{\(\) => setFiche\(t\)\} \/>/.test(panneau), "le panneau : les douze templates en rail");
   assert.ok(/<RechargesStudio \/>/.test(panneau) && panneau.indexOf("<RechargesStudio />") > panneau.indexOf("TEMPLATES.map("), "les recharges sous le rail");
   // La fiche est rendue dans le panneau : elle y est poussée (même fenêtre, retour en haut à gauche).
   const contenu = panneau.slice(panneau.indexOf("<SheetContent"), panneau.lastIndexOf("</SheetContent>"));
-  assert.ok(/<FicheTemplate t=\{fiche\} onFermer=\{\(\) => setFiche\(null\)\} \/>/.test(contenu), "la fiche est poussée dans le panneau");
+  assert.ok(/<FicheTemplate t=\{fiche\} toi=\{toi\} onFermer=\{\(\) => setFiche\(null\)\} \/>/.test(contenu), "la fiche est poussée dans le panneau");
   // Le panneau et la fiche, portés hors de la page, reçoivent les couleurs de Bola Plus.
   assert.ok(/<SheetContent side="bottom" className=\{FEUILLE_STUDIO\} style=\{COULEURS_STUDIO\}>/.test(panneau) && /<SheetContent side="bottom" className=\{FEUILLE_STUDIO\} style=\{COULEURS_STUDIO\}>/.test(fiche), "le panneau et la fiche ont les couleurs de Bola Plus");
   assert.ok(/const COULEURS_STUDIO = VARIABLES_PLUS as CSSProperties;/.test(tsx) && !/"--bp-/.test(sansNotes(tsx)), "le panneau pose VARIABLES_PLUS, sans recopier une variable");
@@ -585,6 +614,35 @@ const cadresJustes = (tsx: string, css: string) => {
   assert.equal(cadres[2], "min(406px, calc(100vw - 24px))", "le cadre « page » : la largeur de la fiche");
 };
 cadresJustes(ecran, feuille);
+
+// 8 · Toi, dedans (16/11) : la photo de ta carte sur chaque vignette du rail, et ta photo → ton image dans la fiche.
+const dedansJuste = (tsx: string, css: string) => {
+  const code = sansNotes(tsx);
+  // La photo : celle de ta carte, par son chemin (le joueur de Ma carte, puis la photo que PlayerCard donne à BolaCard).
+  const toi = bloc(tsx, "useToi");
+  assert.ok(/const \{ me, player \} = useMyPlayer\(\);/.test(toi) && /const nom = player\?\.name \?\? me;/.test(toi) && /return \{ nom, photo: usePhotoPerso\(nom\) \};/.test(toi), "la photo de ta carte : le joueur de Ma carte, et la photo de sa carte (usePhotoPerso)");
+  // Ni le repli de usePlayerPhoto (/players/… : plus livré, une image cassée), ni une autre adresse (une requête de plus).
+  assert.ok(!/usePlayerPhoto|photoMiniature|photoSrc|\/players\//.test(code), "la photo de ta carte : aucune autre adresse que celle de son portrait");
+  // La pastille : décorative, la photo à l'adresse du portrait (même mode CORS que BolaCard), et le repli de la carte.
+  const pastille = bloc(tsx, "PastilleToi");
+  assert.ok(/<span className="st-toi" aria-hidden>/.test(pastille), "la pastille est décorative (le sous-titre dit ce qu'elle dit)");
+  assert.ok(/<img\s+className="st-toi__image"\s+src=\{photo\}\s+crossOrigin=\{photo\.startsWith\("data:"\) \? undefined : "anonymous"\}\s+alt=""/.test(pastille), "la pastille : la photo, telle que le portrait de la carte la charge");
+  assert.ok(/onError=\{\(\) => setCassee\(photo\)\}/.test(pastille) && /const photo = toi\.photo && toi\.photo !== cassee \? toi\.photo : null;/.test(pastille), "une photo qui ne se charge pas laisse la place au repli");
+  assert.ok(/\{toi\.nom\.slice\(0, 1\)\.toUpperCase\(\)\}/.test(pastille) && /fontFamily: ANTON/.test(pastille), "sans photo : l'initiale en Anton, le repli du portrait de la carte");
+  // Où elle est : sur chaque vignette du rail ; dans la fiche, la ligne ; pas sur l'éventail.
+  assert.equal(code.match(/<PastilleToi toi=\{toi\} \/>/g)?.length, 2, "la pastille : une fois dans le rail (sur chaque vignette), une fois dans la ligne de la fiche");
+  assert.ok(/<PastilleToi /.test(bloc(tsx, "CarteTemplate")) && /<PastilleToi /.test(bloc(tsx, "LigneToi")) && !/PastilleToi|useToi/.test(bloc(tsx, "VisuelStudio")), "la pastille : dans le rail et dans la fiche, pas sur l'éventail");
+  assert.ok(/const toi = useToi\(\);/.test(bloc(tsx, "PanneauStudio")), "le panneau lit la photo de ta carte une fois, pour le rail et la fiche");
+  // Ta photo → ton image : la pastille, une flèche, la vignette en petit (sa copie légère) ; aucun mot.
+  const ligne = bloc(tsx, "LigneToi");
+  assert.ok(/<div className="st-ligne">\s*<PastilleToi toi=\{toi\} \/>\s*<ArrowRight [^>]*aria-hidden \/>\s*<span className="st-ligne__image">\s*<span className="st-vignette st-vignette--mini">\s*<ImageLegere t=\{t\} \/>\s*<\/span>\s*<\/span>\s*<\/div>/.test(ligne), "ta photo → ton image : la photo, la flèche, la vignette en petit");
+  assert.ok(!/>[^<>{}]*[A-Za-zÀ-ÿ][^<>{}]*</.test(ligne.slice(ligne.indexOf("return ("))), "ta photo → ton image : aucun mot");
+  // Dans la feuille : une pastille ronde, cerclée de blanc, sur du noir ; au rail, en haut à gauche, au-dessus de l'image.
+  const feuilleCode = sansNotes(css);
+  assert.ok(/\n\.st-toi \{[^}]*overflow: hidden;[^}]*border-radius: 999px;[^}]*background: #000;[^}]*color: #fff;[^}]*box-shadow: 0 0 0 2px #fff, /.test(feuilleCode), "la pastille : ronde, cerclée de blanc, sur du noir");
+  assert.ok(/\n\.st-item \.st-toi \{\s*position: absolute;\s*top: 10px;\s*left: 10px;\s*z-index: 1;\s*\}/.test(feuilleCode), "dans le rail : en haut à gauche de la vignette, au-dessus de l'image");
+};
+dedansJuste(ecran, feuille);
 
 // Les mutants.
 /** Un mutant dont le texte à changer n'est plus dans la source : il ne prouve rien, le banc s'arrête. */
@@ -667,7 +725,7 @@ refuse("l'éventail en deux boutons", () => ecranJuste(m('        <span classNam
 refuse("le panneau jamais ouvert", () => ecranJuste(m("onClick={() => setOuvert(true)}", "onClick={() => setOuvert(false)}")));
 refuse("les ballons du mois retirés de « Ton studio »", () => ecranJuste(m("{MENTION_STUDIO}</p>", "</p>")));
 refuse("les recharges hors du panneau", () => ecranJuste(m("          <div className=\"px-5\">\n            <RechargesStudio />\n          </div>\n", "")));
-refuse("la fiche par-dessus le panneau, hors de sa feuille", () => ecranJuste(m("        <FicheTemplate t={fiche} onFermer={() => setFiche(null)} />\n      </SheetContent>", "      </SheetContent>\n      <FicheTemplate t={fiche} onFermer={() => setFiche(null)} />")));
+refuse("la fiche par-dessus le panneau, hors de sa feuille", () => ecranJuste(m("        <FicheTemplate t={fiche} toi={toi} onFermer={() => setFiche(null)} />\n      </SheetContent>", "      </SheetContent>\n      <FicheTemplate t={fiche} toi={toi} onFermer={() => setFiche(null)} />")));
 refuse("le panneau sans les couleurs de Bola Plus", () => ecranJuste(m('<SheetContent side="bottom" className={FEUILLE_STUDIO} style={COULEURS_STUDIO}>\n        <div className="st-panneau', '<SheetContent side="bottom" className={FEUILLE_STUDIO}>\n        <div className="st-panneau')));
 refuse("une vignette teinte en violet", () => feuilleJuste(feuille + '\n.st-vignette::before {\n  content: "";\n  position: absolute;\n  inset: 0;\n  mix-blend-mode: color;\n  background: var(--bp-plus-vif);\n}\n'));
 refuse("un fond violet sous l'image", () => feuilleJuste(mf("  background: #000;\n  color: #fff;\n  isolation: isolate;", "  background: var(--bp-plus-fond);\n  color: #fff;\n  isolation: isolate;")));
@@ -715,7 +773,8 @@ refuse("un voile de couleur nommée sur un template", () => feuilleJuste(feuille
 refuse("un liseré de couleur", () => feuilleJuste(mf("box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.09);", "box-shadow: inset 0 0 0 1px gold;")), /le liseré d'une vignette/);
 refuse("une teinte cachée dans une variable de la feuille", () => feuilleJuste(feuille + '\n.st-item {\n  --st-teinte: orchid;\n}\n.st-item::before {\n  content: "";\n  position: absolute;\n  inset: 0;\n  background: var(--st-teinte);\n}\n'), /aucune variable définie dans la feuille/);
 refuse("une teinte lue dans une variable d'ailleurs", () => feuilleJuste(feuille + '\n.st-item::before {\n  content: "";\n  position: absolute;\n  inset: 0;\n  background: var(--primary);\n}\n'), /une variable d'ailleurs dans la feuille/);
-refuse("la borne de la fiche remise sous un écran court seulement", () => feuilleJuste(mf("  gap: 16px;\n  width: min(100%, (92dvh - 222px) * 0.8);\n  margin-inline: auto;\n}", "  gap: 16px;\n}\n@media (max-height: 700px) {\n  .st-fiche {\n    width: min(100%, (92dvh - 222px) * 0.8);\n    margin-inline: auto;\n  }\n}")), /à toute hauteur d'écran/);
+refuse("la borne de la fiche remise sous un écran court seulement", () => feuilleJuste(mf("  gap: 16px;\n  width: min(100%, (92dvh - 298px) * 0.8);\n  margin-inline: auto;\n}", "  gap: 16px;\n}\n@media (max-height: 700px) {\n  .st-fiche {\n    width: min(100%, (92dvh - 298px) * 0.8);\n    margin-inline: auto;\n  }\n}")), /à toute hauteur d'écran/);
+refuse("la borne de la fiche restée à l'ancienne (sans la ligne de ta photo, la fiche défilerait)", () => feuilleJuste(mf("width: min(100%, (92dvh - 298px) * 0.8);", "width: min(100%, (92dvh - 222px) * 0.8);")), /à toute hauteur d'écran/);
 refuse("une légende sans plancher", () => feuilleJuste(mf("font-size: max(8.6cqw, 11px);", "font-size: 8.6cqw;")), /jamais sous 11 px/);
 // Le repli resté aux tailles d'avant (17 et 15 px) : sur un rail de 320 px, « TRASH TALK » reviendrait contre sa ligne de craie.
 refuse("le repli sans unités de conteneur resté aux tailles d'avant", () => feuilleJuste(mf("    font-size: 16px;\n", "    font-size: 17px;\n")), /17 px, pas ce que donnent 8\.6cqw/);
@@ -784,5 +843,21 @@ refuse("le catalogue dans un autre ordre que les fichiers", () => vignettesJuste
 refuse("une vignette au nom d'un autre modèle", () => vignettesJustes(TEMPLATES.map((t, i) => (i === 7 ? { ...t, image: "08-la-camera" } : t))));
 refuse("un fichier de trop dans le dossier", () => dossierJuste([...readdirSync(DOSSIER_STUDIO), "13-bonus.webp"]));
 refuse("une copie légère de moins dans le dossier", () => dossierJuste(readdirSync(DOSSIER_STUDIO).filter((f) => f !== legere.split("/").pop())));
+
+// Toi, dedans (16/11).
+const TOI = /la photo de ta carte|la pastille|ta photo → ton image|sans photo|une photo qui ne se charge pas|le panneau lit la photo/;
+refuse("la pastille par usePlayerPhoto (sans photo, une image cassée)", () => dedansJuste(m("photo: usePhotoPerso(nom)", "photo: usePlayerPhoto(nom)"), feuille), TOI);
+refuse("la photo en miniature (une autre adresse, une requête de plus)", () => dedansJuste(m("photo: usePhotoPerso(nom)", "photo: photoMiniature(usePhotoPerso(nom) ?? \"\")"), feuille), TOI);
+refuse("la photo d'un autre que le joueur connecté", () => dedansJuste(m("const nom = player?.name ?? me;", "const nom = player?.name ?? \"Toi\";"), feuille), TOI);
+refuse("une photo cassée laissée cassée", () => dedansJuste(m("          onError={() => setCassee(photo)}\n", ""), feuille), TOI);
+refuse("sans photo, une pastille vide", () => dedansJuste(m("          {toi.nom.slice(0, 1).toUpperCase()}\n", ""), feuille), TOI);
+refuse("la pastille lue par un lecteur d'écran", () => dedansJuste(m('<span className="st-toi" aria-hidden>', '<span className="st-toi">'), feuille), TOI);
+refuse("la pastille retirée du rail", () => ecranJuste(m("          <PastilleToi toi={toi} />\n        </span>", "        </span>")), /la photo de ta carte/);
+refuse("la ligne retirée de la fiche", () => ecranJuste(m("              <LigneToi t={t} toi={toi} />\n", "")), /ta photo → ton image/);
+refuse("un mot dans ta photo → ton image", () => dedansJuste(m('      <span className="st-ligne__image">', '      <span>ton image</span>\n      <span className="st-ligne__image">'), feuille), TOI);
+refuse("le sous-titre sans « Avec ta photo. »", () => ecranJuste(m('<span className="st-panneau__avec">{AVEC_TA_PHOTO}</span> ', "")), /Avec ta photo/);
+refuse("« Avec ta photo. » collé à la phrase", () => ecranJuste(m("{AVEC_TA_PHOTO}</span> {PHRASE_INCLUS}", "{AVEC_TA_PHOTO}</span>{PHRASE_INCLUS}")), /Avec ta photo/);
+refuse("la pastille teinte en or", () => feuilleJuste(mf("box-shadow: 0 0 0 2px #fff, ", "box-shadow: 0 0 0 2px #e0b23c, ")), /pas d'autre teinte écrite que le noir et le blanc/);
+refuse("la pastille carrée", () => dedansJuste(ecran, mf("  border-radius: 999px;\n  background: #000;", "  border-radius: 4px;\n  background: #000;")), TOI);
 
 console.log(`studio : ok (bonus des recharges : ${RECHARGES_STUDIO.map((r) => `${prixRecharge(r)} € → +${bonusDe(r)}`).join(", ")} ; ${TEMPLATES.length} vignettes en 4:5, ${Math.round(POIDS_STUDIO / 1000)} ko)`);

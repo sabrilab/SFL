@@ -36,21 +36,38 @@
 //     MentionStudio : sous le titre « Ton studio », les ballons du mois
 //     (« 300 ⚽ / mois », MENTION_STUDIO) ;
 //   · PanneauStudio : une feuille du bas, aux couleurs de Bola Plus :
-//     « Bola Studio » (la police des titres du carrousel), la phrase des
-//     ballons du mois (« 300 ⚽ = un trash talk ou six images », calculée),
+//     « Bola Studio » (la police des titres du carrousel), « Avec ta photo. »
+//     et la phrase des ballons du mois (« 300 ⚽ = un trash talk ou six
+//     images », calculée),
 //     les douze templates en rail horizontal, au doigt, accroché carte par
 //     carte (scroll-snap) : la vignette avec le nom et le prix, puis ce que
 //     tu reçois et la durée. Toucher un template pousse sa fiche dans la même
 //     feuille (le retour en haut à gauche, components/ui/sheet.tsx) : la même
 //     vignette en grand, son nom en titre de la feuille, et dessous, dans la
 //     même colonne (.st-fiche, qui se borne à ce qui tient dans la feuille),
-//     ce que tu reçois et sa durée. Aucun bouton d'achat : rien ne s'achète
-//     encore. Le rail est dans une feuille, pas dans la carte : un rail
+//     ce que tu reçois et sa durée, puis ta photo → ton image (LigneToi).
+//     Aucun bouton d'achat : rien ne s'achète encore. Le rail est dans une feuille, pas dans la carte : un rail
 //     horizontal dans un carrousel horizontal se disputerait le doigt et les
 //     flèches du clavier ;
 //   · RechargesStudio : les trois recharges, au bas du panneau, marquées
 //     « Bientôt », sans geste ni focus ; leurs chiffres en Anton prennent
-//     l'espace insécable large (« 1 100 », pas « 1100 »).
+//     l'espace insécable large (« 1 100 », pas « 1100 ») ;
+//   · Toi, dedans (Sabri, 16/11, bola-app#22 : « il faut bien faire
+//     comprendre que l'user pourra générer ces templates avec sa propre
+//     personne ») : le sous-titre du panneau devient « Avec ta photo. 300 ⚽
+//     = un trash talk ou six images » (SOUS_TITRE_STUDIO), ses deux phrases
+//     sur deux lignes (« images » ne reste pas seul) ; PastilleToi, la
+//     photo de ta carte en pastille ronde, en haut à gauche de chaque
+//     vignette du rail : c'est toi qui seras dedans ; LigneToi, au bas de la
+//     fiche d'un modèle : ta photo → ton image (la photo de ta carte, une
+//     flèche, la vignette en petit), sans un mot. La photo est celle que
+//     BolaCard montre sur ta carte, par le même chemin (useToi : le joueur
+//     de Ma carte, puis usePhotoPerso, comme PlayerCard) : la même adresse,
+//     aucune requête de plus. Sans photo, ou si elle ne se charge pas,
+//     l'initiale en Anton, le repli du portrait de la carte : jamais une
+//     pastille vide. La pastille est posée sur l'image, sans la teinter ni
+//     la recadrer ; elle est décorative (le sous-titre dit ce qu'elle dit).
+//     L'éventail de « Ton studio » n'en porte pas.
 //
 // Le ballon ⚽ d'un prix en Anton (les vignettes, les recharges) est réduit à
 // 0,7 em sur la ligne de base (Prix) : l'émoji ne domine pas le chiffre.
@@ -58,19 +75,24 @@
 // Couleurs : celles de la part Bola Plus (VARIABLES_PLUS de
 // lib/sfl/bola-plus.ts, la même table que la page), posées aussi sur le
 // panneau, qui est porté hors de la page. La feuille de style n'écrit aucune
-// teinte hors du noir, du blanc et des gris. Les vignettes sont sombres
-// dans les deux modes : leur image, et dessus du blanc écrit dans la feuille
-// (aucune classe de thème). Pas de texte d'aide : des noms, des durées, des
-// prix.
+// teinte hors du noir, du blanc et des gris (ni or, ni bleu, ni rouge :
+// ces teintes sont celles des cartes MVP, Défensive et Impact). Les
+// vignettes sont sombres dans les deux modes : leur image, et dessus du
+// blanc écrit dans la feuille (aucune classe de thème) ; la pastille de ta
+// photo, cerclée de blanc, aussi. Pas de texte d'aide : des noms, des
+// durées, des prix, et « Avec ta photo. ».
 
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from "react";
-import { ChevronRight, Play } from "lucide-react";
+import { ArrowRight, ChevronRight, Play } from "lucide-react";
 import { ANTON } from "@/components/sfl/actus/ecran";
+import { useMyPlayer } from "@/components/sfl/player-provider";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
+import { usePhotoPerso } from "@/hooks/use-player-photo";
 import { VARIABLES_PLUS } from "@/lib/sfl/bola-plus";
 import {
   ESPACE_LARGE,
   EVENTAIL_STUDIO,
+  AVEC_TA_PHOTO,
   MENTION_STUDIO,
   PHRASE_INCLUS,
   RECHARGES_STUDIO,
@@ -178,6 +200,70 @@ function Legende({ t, titre }: { t: Template; titre?: boolean }) {
   );
 }
 
+/* ------------------------------ Toi, dedans ------------------------------ */
+
+/** Le joueur connecté : son nom, et la photo de sa carte (null s'il n'en a pas posé). */
+type Toi = { nom: string; photo: string | null };
+
+/**
+ * La photo de ta carte, par le chemin de ta carte : le joueur de Ma carte (useMyPlayer), et la photo que
+ * PlayerCard donne à BolaCard (usePhotoPerso, lib/sfl/photos : posée sur cet appareil, sinon celle de la
+ * ligue, déjà en cache). La même adresse que le portrait de la carte : aucune requête de plus.
+ */
+function useToi(): Toi {
+  const { me, player } = useMyPlayer();
+  const nom = player?.name ?? me;
+  return { nom, photo: usePhotoPerso(nom) };
+}
+
+/**
+ * La pastille « c'est toi qui seras dedans » : la photo de ta carte, en rond, cerclée de blanc. Sans photo,
+ * ou si elle ne se charge pas, l'initiale du nom en Anton, le repli du portrait de la carte (BolaCard) :
+ * jamais une pastille vide ni une image cassée. Décorative : le sous-titre du panneau dit ce qu'elle dit.
+ */
+function PastilleToi({ toi }: { toi: Toi }) {
+  // La photo qui n'a pas pu se charger : on n'y revient pas (une autre photo, elle, se tente).
+  const [cassee, setCassee] = useState<string | null>(null);
+  const photo = toi.photo && toi.photo !== cassee ? toi.photo : null;
+  return (
+    <span className="st-toi" aria-hidden>
+      {photo ? (
+        // eslint-disable-next-line @next/next/no-img-element -- la photo de ta carte, à l'adresse de son portrait (BolaCard)
+        <img
+          className="st-toi__image"
+          src={photo}
+          crossOrigin={photo.startsWith("data:") ? undefined : "anonymous"}
+          alt=""
+          draggable={false}
+          onError={() => setCassee(photo)}
+        />
+      ) : (
+        <span className="st-toi__initiale" style={{ fontFamily: ANTON }}>
+          {toi.nom.slice(0, 1).toUpperCase()}
+        </span>
+      )}
+    </span>
+  );
+}
+
+/**
+ * Au bas de la fiche d'un modèle : ta photo → ton image. La photo de ta carte, une flèche, et la vignette du
+ * modèle en petit (sa copie légère, que le rail vient de montrer). Aucun mot.
+ */
+function LigneToi({ t, toi }: { t: Template; toi: Toi }) {
+  return (
+    <div className="st-ligne">
+      <PastilleToi toi={toi} />
+      <ArrowRight className="size-5 shrink-0 text-encre-3" strokeWidth={2.4} aria-hidden />
+      <span className="st-ligne__image">
+        <span className="st-vignette st-vignette--mini">
+          <ImageLegere t={t} />
+        </span>
+      </span>
+    </div>
+  );
+}
+
 /* -------------------------------- Le rail -------------------------------- */
 
 /**
@@ -199,14 +285,18 @@ function Duree({ t, grand }: { t: Template; grand?: boolean }) {
   );
 }
 
-/** Un template dans le rail : sa vignette, avec son nom et son prix ; dessous, ce que tu reçois et sa durée. */
-function CarteTemplate({ t, onOuvrir }: { t: Template; onOuvrir: () => void }) {
+/**
+ * Un template dans le rail : sa vignette, avec son nom et son prix, et la photo de ta carte en haut à gauche ;
+ * dessous, ce que tu reçois et sa durée.
+ */
+function CarteTemplate({ t, toi, onOuvrir }: { t: Template; toi: Toi; onOuvrir: () => void }) {
   return (
     <li className="st-item">
       <button type="button" onClick={onOuvrir} className="st-item__bouton">
         <span className="st-vignette">
           <ImageTemplate t={t} cadre="rail" />
           <Legende t={t} />
+          <PastilleToi toi={toi} />
         </span>
         <span className="flex flex-col gap-1.5 px-1 pt-2.5">
           <span className="line-clamp-2 min-h-[2.5em] text-[13px] leading-[1.25] text-encre-2">{t.recoit}</span>
@@ -219,15 +309,15 @@ function CarteTemplate({ t, onOuvrir }: { t: Template; onOuvrir: () => void }) {
 
 /**
  * Un template en grand, dans une feuille : la même vignette, son nom en titre ; dessous, dans la même colonne,
- * ce que tu reçois et sa durée. Sous l'original, la copie légère que le rail vient de montrer : la fiche ne
- * s'ouvre pas sur un cadre noir.
+ * ce que tu reçois et sa durée, puis ta photo → ton image (LigneToi), là où viendra le bouton. Sous l'original,
+ * la copie légère que le rail vient de montrer : la fiche ne s'ouvre pas sur un cadre noir.
  */
-function FicheTemplate({ t, onFermer }: { t: Template | null; onFermer: () => void }) {
+function FicheTemplate({ t, toi, onFermer }: { t: Template | null; toi: Toi; onFermer: () => void }) {
   return (
     <Sheet open={!!t} onOpenChange={(o) => !o && onFermer()}>
       <SheetContent side="bottom" className={FEUILLE_STUDIO} style={COULEURS_STUDIO}>
         {t && (
-          <div className="mx-auto w-full max-w-[430px] px-3 pt-3 pb-8">
+          <div className="mx-auto w-full max-w-[430px] px-3 pt-3 pb-4">
             <div className="st-fiche">
               <div className="st-vignette st-vignette--grand">
                 <ImageLegere t={t} />
@@ -238,6 +328,7 @@ function FicheTemplate({ t, onFermer }: { t: Template | null; onFermer: () => vo
                 <p className="text-corps leading-snug text-encre-2">{t.recoit}</p>
                 <Duree t={t} grand />
               </div>
+              <LigneToi t={t} toi={toi} />
             </div>
           </div>
         )}
@@ -247,30 +338,34 @@ function FicheTemplate({ t, onFermer }: { t: Template | null; onFermer: () => vo
 }
 
 /**
- * Le panneau « Bola Studio » : la phrase des ballons du mois, les douze
- * templates en rail, puis les recharges. Une feuille du bas ; la fiche d'un
+ * Le panneau « Bola Studio » : « Avec ta photo. » et la phrase des ballons du
+ * mois, les douze templates en rail (la photo de ta carte sur chacun), puis
+ * les recharges. Une feuille du bas ; la fiche d'un
  * template y est poussée (components/ui/sheet.tsx).
  */
 function PanneauStudio({ ouvert, onFermer }: { ouvert: boolean; onFermer: () => void }) {
   const [fiche, setFiche] = useState<Template | null>(null);
+  const toi = useToi();
   return (
     <Sheet open={ouvert} onOpenChange={(o) => !o && onFermer()}>
       <SheetContent side="bottom" className={FEUILLE_STUDIO} style={COULEURS_STUDIO}>
         <div className="st-panneau mx-auto w-full max-w-[430px]">
           <div className="flex flex-col gap-2 px-5">
             <SheetTitle className="bp-titre st-panneau__titre">Bola Studio</SheetTitle>
-            <p className="st-panneau__phrase tabular-nums">{PHRASE_INCLUS}</p>
+            <p className="st-panneau__phrase tabular-nums">
+              <span className="st-panneau__avec">{AVEC_TA_PHOTO}</span> {PHRASE_INCLUS}
+            </p>
           </div>
           <ul className="st-rail">
             {TEMPLATES.map((t) => (
-              <CarteTemplate key={t.id} t={t} onOuvrir={() => setFiche(t)} />
+              <CarteTemplate key={t.id} t={t} toi={toi} onOuvrir={() => setFiche(t)} />
             ))}
           </ul>
           <div className="px-5">
             <RechargesStudio />
           </div>
         </div>
-        <FicheTemplate t={fiche} onFermer={() => setFiche(null)} />
+        <FicheTemplate t={fiche} toi={toi} onFermer={() => setFiche(null)} />
       </SheetContent>
     </Sheet>
   );

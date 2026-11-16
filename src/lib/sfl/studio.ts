@@ -18,7 +18,8 @@
 //     de trash talks et combien d'images les moins chères tiennent dans les
 //     ballons du mois (division entière ; « un » ou « une » selon le mot ; une
 //     quantité nulle ne s'écrit pas ; en lettres jusqu'à douze, sinon toute la
-//     phrase en chiffres) ;
+//     phrase en chiffres) ; en tête du panneau, elle suit « Avec ta photo. »
+//     (SOUS_TITRE_STUDIO, 16/11) ;
 //   · les recharges (« Bientôt ») : un prix en centimes entiers et des
 //     ballons ; le bonus est ce qu'elles donnent au-delà du taux de base
 //     (prix × BALLONS_PAR_EURO / 100) ; aucune ne donne moins que ce taux.
@@ -283,8 +284,21 @@ export function equivalence(budget: number, catalogue: readonly Template[] = TEM
   return parts.map((p) => quantite(p.n, p.mot, p.feminin, chiffres)).join(" ou ");
 }
 
-/** « 300 ⚽ = un trash talk ou six images » : en tête du panneau Bola Studio. */
+/** « 300 ⚽ = un trash talk ou six images » : ce que paient les ballons du mois. */
 export const PHRASE_INCLUS = `${ballons(BALLONS_PAR_MOIS)} ⚽ = ${equivalence(BALLONS_PAR_MOIS)}`;
+
+/**
+ * Le sous-titre du panneau Bola Studio : « Avec ta photo. 300 ⚽ = un trash
+ * talk ou six images ». Sabri, 16/11 (bola-app#22) : « il faut bien faire
+ * comprendre que l'user pourra générer ces templates avec sa propre
+ * personne » ; dans le panneau, la photo de ta carte est aussi sur chaque
+ * vignette du rail et dans la fiche d'un modèle (studio-bola.tsx, PastilleToi).
+ * L'écran pose ses deux phrases sur deux lignes (AVEC_TA_PHOTO, puis
+ * PHRASE_INCLUS) : sur un téléphone, la phrase entière laissait « images »
+ * seul sur la seconde.
+ */
+export const AVEC_TA_PHOTO = "Avec ta photo.";
+export const SOUS_TITRE_STUDIO = `${AVEC_TA_PHOTO} ${PHRASE_INCLUS}`;
 
 /** Les ballons de chaque formule, sous son prix. */
 export const BALLONS_FORMULE = {
