@@ -34,10 +34,15 @@
 // silhouettes sans visage dans le stade de colonnes de marbre, aucun joueur
 // réel, le tiers bas sombre. Elles sont dans public/bola-plus/studio/,
 // numérotées dans l'ordre du catalogue (« 01-ma-carte-en-vrai.webp »), en
-// 4:5 (980 × 1226, la taille de leur capture : une ligne de pixels de plus
-// que 4:5) ; à côté de chacune, sa copie plus légère pour le rail
-// (« 01-ma-carte-en-vrai-660.webp », 660 × 825 : le suffixe de largeur de
-// public/bola-plus/). Chaque template porte la sienne (Template.image).
+// 4:5 : 978 × 1224, le fichier fourni sans la marge de sa capture (deux
+// colonnes à droite et deux lignes en bas qui n'étaient pas l'image : un
+// liseré gris à l'écran), ôtée sans rien recoder ; à côté de chacune, sa
+// copie plus légère pour le rail (« 01-ma-carte-en-vrai-660.webp »,
+// 660 × 826 : les proportions de l'original, et le suffixe de largeur de
+// public/bola-plus/). Les deux se refont depuis les fichiers fournis
+// (tools/studio-vignettes.py) ; leurs empreintes sont dans
+// tools/studio-check.ts : un fichier échangé, teint ou retouché arrête le
+// banc. Chaque template porte la sienne (Template.image).
 // L'écran les montre telles quelles : en 4:5, jamais recadrées en carré, ni
 // grossies, ni teintes (elles sont en noir et blanc par choix), ni animées ;
 // il écrit le nom du modèle et son prix en ballons sur leur tiers bas. Elles
@@ -58,9 +63,10 @@ export type Rendu = { genre: "image" } | { genre: "video"; secondes: number };
 
 /**
  * Les vignettes (public/bola-plus/studio/) : leur rapport hauteur sur largeur
- * (4:5), la largeur du fichier d'origine et celle de sa copie légère.
+ * (4:5), la largeur du fichier d'origine (l'image fournie, sans la marge de
+ * sa capture) et celle de sa copie légère.
  */
-export const VIGNETTE = { rapport: 5 / 4, largeur: 980, legere: 660 } as const;
+export const VIGNETTE = { rapport: 5 / 4, largeur: 978, legere: 660 } as const;
 
 export interface Template {
   id: string;

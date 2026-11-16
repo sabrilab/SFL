@@ -8,8 +8,9 @@
    l'image, le nom du modèle et son prix, sur un voile noir. Les mots de la
    légende se règlent sur la largeur de la vignette (cqw) : la même vignette
    dans le rail, dans l'éventail et en grand dans la fiche. Le rail s'accroche
-   carte par carte (scroll-snap) ; avec « Réduire les animations », rien ne
-   s'enfonce sous le doigt (fin du fichier). */
+   carte par carte (scroll-snap) ; avec « Réduire les animations », l'appui
+   se marque d'un coup, sans transition, comme partout dans l'app (fin du
+   fichier). */
 
 /* ── Le panneau : « Bola Studio », la phrase, le rail, les recharges. ── */
 .st-panneau {
@@ -95,11 +96,17 @@
   text-align: left;
   transition: scale 0.2s ease;
 }
+/* En grand, dans la fiche. */
 .st-vignette--grand {
   border-radius: 24px;
 }
-/* L'image remplit la boîte, qui a son rapport : rien n'est coupé (le fichier
-   d'origine a une ligne de pixels de plus que 4:5), rien n'est déformé. */
+/* L'image remplit la boîte, qui a son rapport : rien n'est coupé (les
+   fichiers ont une ligne et demie de pixels de plus que 4:5 : trois quarts
+   de ligne dépassent en haut et en bas), rien n'est déformé. Dans la fiche,
+   deux images suivent cette même règle, l'une sur l'autre : la copie légère
+   (le rail vient de la montrer, elle est déjà là), puis l'original. La fiche
+   ne s'ouvre pas sur un cadre noir le temps qu'il arrive ; mêmes proportions,
+   même règle : rien ne bouge quand il la recouvre. */
 .st-vignette__image {
   position: absolute;
   inset: 0;
@@ -140,19 +147,52 @@
   padding: 0 6.5cqw 6cqw;
   background: linear-gradient(to top, rgb(0 0 0 / 0.82) 0%, rgb(0 0 0 / 0.62) 42%, rgb(0 0 0 / 0.28) 76%, transparent 100%);
 }
-/* 20 px dans le rail (216 px de large), 34 px dans la fiche : le plus long
-   des douze noms tient sur une ligne, avec de l'air à droite. */
+/* 18,6 px dans le rail (216 px de large), 31,5 px dans la fiche : le plus
+   long des douze noms tient sur une ligne, avec de l'air à droite, et
+   « TRASH TALK » s'arrête avant la ligne de craie de son image (elle passe
+   au milieu). Jamais sous 11 px : sur un petit écran, la vignette du milieu
+   de l'éventail fait une centaine de pixels de large. */
 .st-vignette__nom {
-  font-size: 9.2cqw;
+  font-size: max(8.6cqw, 11px);
   color: #fff;
   text-shadow: 0 1px 12px rgb(0 0 0 / 0.55);
 }
 .st-vignette__prix {
-  font-size: 8.3cqw;
+  font-size: max(7.8cqw, 11px);
   line-height: 1;
   white-space: nowrap;
   color: #fff;
   text-shadow: 0 1px 12px rgb(0 0 0 / 0.55);
+}
+/* Sans les unités de conteneur (Safari d'avant iOS 16) : la légende garde
+   une taille et des marges, celles du plus étroit des rails (185,6 px de
+   large sur un écran de 320 px : les valeurs en cqw ci-dessus y donnent
+   ces pixels ; « TRASH TALK » y reste loin de sa ligne de craie). */
+@supports not (width: 1cqw) {
+  .st-vignette__bas {
+    gap: 4px;
+    padding: 0 12px 11px;
+  }
+  .st-vignette__nom {
+    font-size: 16px;
+  }
+  .st-vignette__prix {
+    font-size: 14.5px;
+  }
+}
+
+/* ── La fiche d'un modèle : la vignette en grand et, dessous, ce que tu
+   reçois et sa durée, dans une même colonne (le texte reste au bord de
+   l'image). Quand l'écran est trop court pour la vignette à pleine largeur,
+   la colonne se borne à celle qui tient dans la feuille (92dvh,
+   FEUILLE_STUDIO) une fois ôtés le retour, les marges et les deux lignes du
+   dessous (222 px) : la vignette reste en 4:5, la fiche ne défile pas. ── */
+.st-fiche {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: min(100%, (92dvh - 222px) * 0.8);
+  margin-inline: auto;
 }
 
 /* ── « Ton studio » : l'éventail, un seul bouton qui ouvre le panneau. ── */
@@ -256,21 +296,14 @@
   vertical-align: baseline;
 }
 
-/* Écran court (375 × 667) : le panneau tient sans défiler, et la fiche d'un
-   template garde ce que tu reçois et sa durée à l'écran : la vignette,
-   toujours en 4:5, se borne à la hauteur qui reste dans la feuille (92dvh,
-   FEUILLE_STUDIO) une fois ôtés le retour, les marges et les deux lignes du
-   dessous (222 px). */
+/* Écran court (375 × 667) : le panneau tient sans défiler. */
 @media (max-height: 700px) {
   .st-panneau {
     padding-top: 22px;
   }
-  .st-vignette--grand {
-    width: min(100%, (92dvh - 222px) * 0.8);
-    margin-inline: auto;
-  }
 }
 
+/* « Réduire les animations » : l'appui se marque sans transition. */
 @media (prefers-reduced-motion: reduce) {
   .st-vignette,
   .st-eventail__place {

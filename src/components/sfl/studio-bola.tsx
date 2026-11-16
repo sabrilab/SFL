@@ -22,8 +22,10 @@
 //     dans la page (useProche observe le conteneur qui défile vraiment ; hors
 //     de portée, elle attend : loading="lazy"). Le navigateur prend la copie
 //     légère dans le rail et l'éventail, l'original dans la fiche (srcset,
-//     sizes). Une vidéo ne bouge pas : son triangle de lecture et sa durée le
-//     disent, sous la vignette ;
+//     sizes) ; la fiche pose en plus la copie légère sous l'original
+//     (ImageLegere) : elle ne s'ouvre pas sur un cadre noir le temps qu'il
+//     arrive. Une vidéo ne bouge pas : son triangle de lecture et sa durée
+//     le disent, sous la vignette ;
 //   · VisuelStudio : le visuel de la carte « Ton studio » du carrousel
 //     (bola-plus.tsx, COMPOSANTS.studio) : trois vrais templates en éventail
 //     (EVENTAIL_STUDIO), la carte en vrai au milieu, la seule entière, avec
@@ -39,10 +41,12 @@
 //     carte (scroll-snap) : la vignette avec le nom et le prix, puis ce que
 //     tu reçois et la durée. Toucher un template pousse sa fiche dans la même
 //     feuille (le retour en haut à gauche, components/ui/sheet.tsx) : la même
-//     vignette en grand, son nom en titre de la feuille. Aucun bouton
-//     d'achat : rien ne s'achète encore. Le rail est dans une feuille, pas
-//     dans la carte : un rail horizontal dans un carrousel horizontal se
-//     disputerait le doigt et les flèches du clavier ;
+//     vignette en grand, son nom en titre de la feuille, et dessous, dans la
+//     même colonne (.st-fiche, qui se borne à ce qui tient dans la feuille),
+//     ce que tu reçois et sa durée. Aucun bouton d'achat : rien ne s'achète
+//     encore. Le rail est dans une feuille, pas dans la carte : un rail
+//     horizontal dans un carrousel horizontal se disputerait le doigt et les
+//     flèches du clavier ;
 //   · RechargesStudio : les trois recharges, au bas du panneau, marquées
 //     « Bientôt », sans geste ni focus ; leurs chiffres en Anton prennent
 //     l'espace insécable large (« 1 100 », pas « 1100 »).
@@ -53,9 +57,10 @@
 // Couleurs : celles de la part Bola Plus (VARIABLES_PLUS de
 // lib/sfl/bola-plus.ts, la même table que la page), posées aussi sur le
 // panneau, qui est porté hors de la page. La feuille de style n'écrit aucune
-// teinte hors du noir, du blanc et des gris. Les vignettes sont
-// des îlots sombres (classe dark) dans les deux modes. Pas de texte d'aide :
-// des noms, des durées, des prix.
+// teinte hors du noir, du blanc et des gris. Les vignettes sont sombres
+// dans les deux modes : leur image, et dessus du blanc écrit dans la feuille
+// (aucune classe de thème). Pas de texte d'aide : des noms, des durées, des
+// prix.
 
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from "react";
 import { ChevronRight, Play } from "lucide-react";
@@ -134,6 +139,18 @@ function ImageTemplate({ t, cadre }: { t: Template; cadre: Cadre }) {
   );
 }
 
+/**
+ * Dans la fiche, sous l'original : la copie légère du même template, que le rail vient de montrer (elle est déjà
+ * chargée). La fiche ne s'ouvre pas sur un cadre noir le temps que l'original arrive ; même image, mêmes
+ * proportions, même règle de style : rien ne bouge quand il la recouvre. Décorative.
+ */
+function ImageLegere({ t }: { t: Template }) {
+  return (
+    // eslint-disable-next-line @next/next/no-img-element -- la copie légère (public/bola-plus/studio), déjà chargée par le rail
+    <img className="st-vignette__image" src={fichierVignette(t, VIGNETTE.legere)} width={VIGNETTE.legere} height={VIGNETTE.legere * VIGNETTE.rapport} alt="" draggable={false} />
+  );
+}
+
 /** Un prix en Anton : le chiffre, et le ballon ⚽ réduit sur la ligne de base. */
 function Prix({ texte, className }: { texte: string; className?: string }): ReactNode {
   const [chiffre, ...reste] = texte.split(/[\u00a0 ](?=⚽)/);
@@ -186,7 +203,7 @@ function CarteTemplate({ t, onOuvrir }: { t: Template; onOuvrir: () => void }) {
   return (
     <li className="st-item">
       <button type="button" onClick={onOuvrir} className="st-item__bouton">
-        <span className="st-vignette dark">
+        <span className="st-vignette">
           <ImageTemplate t={t} cadre="rail" />
           <Legende t={t} />
         </span>
@@ -199,20 +216,27 @@ function CarteTemplate({ t, onOuvrir }: { t: Template; onOuvrir: () => void }) {
   );
 }
 
-/** Un template en grand, dans une feuille : la même vignette, son nom en titre. */
+/**
+ * Un template en grand, dans une feuille : la même vignette, son nom en titre ; dessous, dans la même colonne,
+ * ce que tu reçois et sa durée. Sous l'original, la copie légère que le rail vient de montrer : la fiche ne
+ * s'ouvre pas sur un cadre noir.
+ */
 function FicheTemplate({ t, onFermer }: { t: Template | null; onFermer: () => void }) {
   return (
     <Sheet open={!!t} onOpenChange={(o) => !o && onFermer()}>
       <SheetContent side="bottom" className={FEUILLE_STUDIO} style={COULEURS_STUDIO}>
         {t && (
-          <div className="mx-auto flex w-full max-w-[430px] flex-col gap-4 px-3 pt-3 pb-8">
-            <div className="st-vignette st-vignette--grand dark">
-              <ImageTemplate t={t} cadre="page" />
-              <Legende t={t} titre />
-            </div>
-            <div className="flex flex-col gap-3 px-1">
-              <p className="text-corps leading-snug text-encre-2">{t.recoit}</p>
-              <Duree t={t} grand />
+          <div className="mx-auto w-full max-w-[430px] px-3 pt-3 pb-8">
+            <div className="st-fiche">
+              <div className="st-vignette st-vignette--grand">
+                <ImageLegere t={t} />
+                <ImageTemplate t={t} cadre="page" />
+                <Legende t={t} titre />
+              </div>
+              <div className="flex flex-col gap-3 px-1">
+                <p className="text-corps leading-snug text-encre-2">{t.recoit}</p>
+                <Duree t={t} grand />
+              </div>
             </div>
           </div>
         )}
@@ -270,7 +294,7 @@ export function VisuelStudio() {
         <span className="st-eventail__cartes" aria-hidden>
           {EVENTAIL.map((t, i) => (
             <span key={t.id} className="st-eventail__place" data-place={i}>
-              <span className="st-vignette dark">
+              <span className="st-vignette">
                 <ImageTemplate t={t} cadre="rail" />
                 {i === MILIEU && <Legende t={t} />}
               </span>
