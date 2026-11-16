@@ -126,6 +126,8 @@ import { VueClassements, VueMatchs } from "./vues";
 import { ChoixEpoque, useEpoques, type ChoixDEpoque, type Epoque, type Vue } from "./epoques";
 import { CarteSaison, categoriesLegendes, Compteurs, LeMur } from "./wall-of-fame";
 import { Suspendu } from "@/components/sfl/cartons/mes-cartons";
+import { AbonnementRequis } from "@/components/sfl/bola-plus-rappels";
+import { useAbonnementRequis } from "@/hooks/use-abonnement-requis";
 
 /** Les scènes d'un dimanche qui font bouger la course. */
 const SCENES: Actu["type"][] = ["titres", "mvp", "chiffre", "podium-jour", "duo", "montent", "badge", "badges", "equipe"];
@@ -599,6 +601,8 @@ function Ticker({
 
 /** La convocation du prochain dimanche, dans le fil : qui vient, et ta réponse d'un geste. */
 function Convocation({ p, className }: { p: ReturnType<typeof usePresence>; className?: string }) {
+  // Après la journée gratuite du 22/11 : Bola Plus pour répondre (sfl-payant.ts).
+  const requis = useAbonnementRequis() && !p.mine;
   const { saison, divisions } = useSeason();
   const { me } = useMyPlayer();
   // Un joueur Bola (hors de la saison) n'est pas convoqué.
@@ -653,6 +657,8 @@ function Convocation({ p, className }: { p: ReturnType<typeof usePresence>; clas
       {/* Ta réponse, d'un glissé jusqu'au bout : elle se scelle (reponse-scellee.tsx). */}
       {p.suspendu ? (
         <Suspendu j={p.suspendu.j} taille="sm" />
+      ) : requis ? (
+        <AbonnementRequis j={p.journee} taille="sm" />
       ) : (
         <ReponseScellee
           taille="sm"

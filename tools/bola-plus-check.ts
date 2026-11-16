@@ -102,6 +102,7 @@ import { voitBolaPlus } from "../src/lib/sfl/bola-plus";
 import { createHmac } from "node:crypto";
 import { signatureValide } from "../src/lib/server/stripe.server";
 import { FIN_PREMIERS_JOUEURS, casesDe, resteAvant, resteCourt } from "../src/lib/sfl/compte-a-rebours";
+import { abonnementRequis } from "../src/lib/sfl/sfl-payant";
 
 // 1 · L'offre.
 const NBSP = "\u00a0";
@@ -243,6 +244,21 @@ async function banc() {
     assert.ok(!signatureValide(corps + " ", `t=${t},v1=${sig}`, secret, maintenant), "un corps changé non");
     assert.ok(!signatureValide(corps, `t=${t},v1=${sig}`, secret, maintenant + 600_000), "une vieille non");
     assert.ok(!signatureValide(corps, null, secret, maintenant), "sans en-tête non");
+  }
+  // 0 ter · La ligue payante (Sabri 16/11) : dimanche 22/11 se joue gratuit,
+  // la journée suivante demande Bola Plus. Jamais un admin (sauf aperçu),
+  // jamais sans paiement ouvert, jamais sur un Stripe muet (abonne null).
+  {
+    const dimancheSoir = Date.parse("2026-11-22T21:00:00+01:00");
+    const lundiApres = Date.parse("2026-11-23T08:00:00+01:00");
+    const base = { nom: "Sabri", maintenant: lundiApres, paiementActif: true, abonne: false as boolean | null };
+    assert.ok(!abonnementRequis(base), "un admin n'est jamais bloqué");
+    assert.ok(abonnementRequis({ ...base, apercu: true }), "l'aperçu admin montre le verrou");
+    assert.ok(!abonnementRequis({ ...base, nom: "Abdel" }), "Bola Plus fermé aux joueurs : personne n'est bloqué");
+    assert.ok(!abonnementRequis({ ...base, nom: "Abdel", apercu: true }), "l'aperçu est réservé aux admins");
+    assert.ok(!abonnementRequis({ ...base, apercu: true, abonne: true }), "un abonné joue");
+    assert.ok(!abonnementRequis({ ...base, apercu: true, abonne: null }), "Stripe muet : on joue");
+    assert.ok(!abonnementRequis({ ...base, maintenant: dimancheSoir, paiementActif: true }) , "dimanche soir : encore gratuit");
   }
   // 0 bis · Le compte à rebours (16/11) : dimanche 22/11 23:59:59 à Paris, soit 22:59:59 UTC.
   assert.equal(new Date(FIN_PREMIERS_JOUEURS).toISOString(), "2026-11-22T22:59:59.000Z");

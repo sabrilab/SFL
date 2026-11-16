@@ -23,11 +23,14 @@ import { PointMaillot } from "@/components/sfl/point-maillot";
 import { cn } from "@/lib/utils";
 import { BoutonRetour } from "@/components/layout/bouton-retour";
 import { Suspendu } from "@/components/sfl/cartons/mes-cartons";
+import { AbonnementRequis } from "@/components/sfl/bola-plus-rappels";
+import { useAbonnementRequis } from "@/hooks/use-abonnement-requis";
 
 export default function Discussions() {
   const { saison } = useSeason();
   const { player } = useMyPlayer();
   const presence = usePresence();
+  const requis = useAbonnementRequis() && !presence.mine;
   const session = useSession();
 
   const convoc = activeConvocation(saison);
@@ -117,6 +120,11 @@ export default function Discussions() {
               // Suspendu (carton rouge, lib/sfl/cartons.ts) : pas de « Je viens ».
               <div className="px-3 pb-3">
                 <Suspendu j={presence.suspendu.j} taille="sm" />
+              </div>
+            ) : requis ? (
+              // Après la journée gratuite du 22/11 : Bola Plus pour répondre (sfl-payant.ts).
+              <div className="px-3 pb-3">
+                <AbonnementRequis j={presence.journee} taille="sm" />
               </div>
             ) : presence.reponsesOuvertes ? (
               // Une réponse, une seule : elle se scelle (reponse-scellee.tsx).
