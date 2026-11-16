@@ -173,10 +173,11 @@ function ProfilJoueurPage() {
           </Link>
         </div>
       </div>
-      {/* Le vote du jour, tant qu'il est ouvert et que j'y ai mes voix à donner :
-          sous le titre, avant ma carte (Ilyes, 15/11 ; vote-du-jour.tsx). Mes
-          deux voix données, il se range en une ligne : la carte est le sujet de
-          la page ; tant qu'elles ne sont pas relues, la ligne seule. Au-dessus
+      {/* Le vote du jour, tant que je peux voter (la feuille de mon match
+          remplie, le vote pas encore fermé) : sous le titre, avant ma carte
+          (Ilyes, 15/11 ; vote-du-jour.tsx). Mes deux voix données, il se range
+          en une ligne : la carte est le sujet de la page ; à l'ouverture de
+          l'app, il part de ce que ce téléphone a retenu de mes voix. Au-dessus
           du cadre de la 3D, dont les bords vides passent dessous. Jamais pour
           un joueur Bola. */}
       {!bola && <VoteDuJour me={player.name} lesquels="a-moi" repliable className="relative z-10 mb-[var(--fib-21)]" />}

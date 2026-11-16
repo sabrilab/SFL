@@ -13,24 +13,28 @@
 //     la vue Classement, en tête de sa colonne, sous le podium et la rangée,
 //     dans tous les cas (actus/course.tsx, actus/vues.tsx) ;
 //   · Ma carte : sous le titre, avant ma carte (app/profil/page.tsx), tant
-//     que j'ai mes voix à donner. Mes deux voix données, il se range en une
-//     ligne et rend la place à la carte, le sujet de la page ; la toucher le
-//     rouvre, pour changer d'avis. Tant que mes voix ne sont pas relues (à
-//     l'ouverture de l'app, sur un réseau lent), la ligne seule : ni ouvert ni
-//     rangé d'office. Quand il change de hauteur, lib/encart-tenu.ts décide du
-//     défilement : à l'écran, sa ligne y reste ; au-dessus de ce que je lis,
-//     ce que je lis ne bouge pas. Rangé sous le doigt, le focus passe de la
-//     carte choisie à sa ligne ;
+//     que je peux voter (la feuille de mon match remplie, le vote pas encore
+//     fermé). Mes deux voix données, il se range en une ligne et rend la
+//     place à la carte, le sujet de la page ; la toucher le rouvre, pour
+//     changer d'avis. À l'ouverture de l'app, avant que mes voix soient
+//     relues, il part de ce que ce téléphone en a retenu (rangé si elles y
+//     étaient données, ouvert sinon). Quand il change de place (rangé,
+//     déplié, paru, parti), hooks/use-encart-tenu.ts tient le défilement,
+//     pour tous les encarts de la page à la fois (lib/encart-tenu.ts) : à
+//     l'écran, il change sous mes yeux ; au-dessus de ce que je lis, ce que je
+//     lis ne bouge pas ; rangé sous ma voix, sa ligne revient sous la pile des
+//     messages. Si le focus était dans l'encart quand il se range, il passe à
+//     sa ligne ;
 //   · la Map : le plan reste au plan, et le bas de l'écran à ses matchs. Une
 //     étiquette sous le lettrage de la commune et le compte des matchs, dans
 //     la place que le plan garde déjà au lettrage (carte-map.tsx, MARGE_HAUT),
-//     ouvre le même bloc dans une feuille (VoteDuJourMap) : le point rouge
-//     tant qu'il me reste une voix à donner, la coche ensuite, ni l'un ni
-//     l'autre tant que les votes ne sont pas relus. Rien ne passe sur le stade
-//     choisi ni sur son nom : sur un téléphone bas, où le stade monte sous le
+//     ouvre le même bloc dans une feuille (VoteDuJourMap) : la coche dès que
+//     mes deux voix sont connues de ce téléphone (relues, envoyées d'ici, ou
+//     retenues de la dernière fois), le point rouge une fois les votes relus
+//     s'il m'en reste à donner, rien avant. Rien ne passe sur le stade choisi
+//     ni sur son nom : sur un téléphone bas, où le stade monte sous le
 //     lettrage, l'étiquette se réduit à « Vote » (COURT_…), et à son rond sur
-//     un écran très étroit (ROND_…) ; un écran large, même bas, la garde
-//     entière.
+//     un écran étroit (ROND_…) ; un écran large, même bas, la garde entière.
 // Hors vote, rien : votesOuvertsPour rend une liste vide et rien ne se pose.
 // Le vote se lit sur le direct (useSeason().saisonLue, journeesDirect) : la
 // feuille remplie l'ouvre bien avant la révélation (revelation.ts). L'heure
@@ -44,23 +48,36 @@
 // joueur Bola, hors de la SFL, ne le voit nulle part : ses écrans ne le posent
 // pas (app/map/page.tsx, app/profil/page.tsx).
 //
-// Toutes les décisions (où le poser, l'encart de Ma carte, la marque de la
-// Map, le défilement) sont des fonctions pures de lib/sfl/votes.ts et de
-// lib/encart-tenu.ts, gardées par tools/vote-du-jour-check.ts : ce fichier ne
-// fait que les appeler.
+// Les décisions sont des fonctions pures de lib/sfl/votes.ts (où le poser,
+// mes voix à l'écran, l'encart, la marque) et de lib/encart-tenu.ts (le
+// défilement), jouées par tools/vote-du-jour-check.ts, qui garde aussi par
+// des motifs de texte la façon dont ce fichier les appelle.
 
-import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Check, ChevronDown, Vote } from "lucide-react";
 import { useSeason } from "@/components/sfl/season-provider";
 import { VoteFigures } from "@/components/sfl/vote-figures";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
+import { rangeSousMaVoix, useEncartTenu, useTenueDesEncarts } from "@/hooks/use-encart-tenu";
 import { useIsClient } from "@/hooks/use-is-client";
 import { useMaintenant } from "@/hooks/use-missions";
 import { useVotes, useVotesPrets } from "@/hooks/use-votes";
-import { rattrapage, type Bande } from "@/lib/encart-tenu";
 import type { Journee } from "@/lib/sfl/engine";
 import { estUneHeure, libelleFinDuVote } from "@/lib/sfl/revelation";
-import { etatEncart, marqueDuVote, mesDeuxVoix, votesOuvertsPour, type OuPoser } from "@/lib/sfl/votes";
+import {
+  cleDuVote,
+  estPlie,
+  etatEncart,
+  marqueDuVote,
+  mesDeuxVoix,
+  retenirVoix,
+  voixQuiRange,
+  voixRetenues,
+  voteFait,
+  votesOuvertsPour,
+  type CategorieVote,
+  type OuPoser,
+} from "@/lib/sfl/votes";
 import { cn } from "@/lib/utils";
 
 const ENCRE = "#0A0B0D";
@@ -72,14 +89,14 @@ const BLANC = "#F4F5F2";
 // compte : elle s'arrête avant lui. 640 px de haut laissent une dizaine de
 // pixels au flottement du stade (map/animations.css, stk-flotte) ; au-delà de
 // 480 px de large (un téléphone en largeur, une fenêtre basse d'ordinateur),
-// le stade est loin, l'étiquette reste entière. Sous 340 px de large (un
-// iPhone 5 ou un SE de première génération), même « Vote » touchait la
-// pastille de date du stade : le rond seul. Le texte ôté reste aux lecteurs
-// d'écran (sr-only).
+// le stade est loin, l'étiquette reste entière. Sous 360 px de large (un
+// iPhone 5, un SE de première génération, quelques Android), même « Vote »
+// frôlait la pastille de date du stade (3 px à 341 px de large, 12 px à 360) :
+// le rond seul. Le texte ôté reste aux lecteurs d'écran (sr-only).
 const COURT_TEXTE = "[@media(max-height:640px)_and_(max-width:480px)]:sr-only";
 const COURT_MONTE = "[@media(max-height:640px)_and_(max-width:480px)]:mt-1.5";
-const ROND_TEXTE = "[@media(max-width:340px)]:sr-only";
-const ROND_SERRE = "[@media(max-width:340px)]:pr-1";
+const ROND_TEXTE = "[@media(max-width:359px)]:sr-only";
+const ROND_SERRE = "[@media(max-width:359px)]:pr-1";
 
 /** Les journées dont le vote est ouvert et qui se posent là, pour ce joueur (votesOuvertsPour). Rien au rendu serveur. */
 function useVotesOuverts(me: string, lesquels: OuPoser): Journee[] {
@@ -87,11 +104,6 @@ function useVotesOuverts(me: string, lesquels: OuPoser): Journee[] {
   const { journeesDirect: journees, saisonLue } = useSeason();
   const maintenant = useMaintenant();
   return isClient ? votesOuvertsPour(saisonLue, journees, me, maintenant, lesquels) : [];
-}
-
-/** Ce qui défile sous l'encart : #app-scroll, où défile toute l'app ; sinon la page. */
-function defilant(): HTMLElement | null {
-  return document.getElementById("app-scroll");
 }
 
 function Titre({ j, className }: { j: number; className?: string }) {
@@ -106,8 +118,9 @@ function Titre({ j, className }: { j: number; className?: string }) {
  * Le bloc : un encart de verre par journée dont le vote est ouvert.
  * `lesquels` : où il se pose (OuPoser, lib/sfl/votes.ts). `repliable` (Ma
  * carte) : mes deux voix données, l'encart se range en une ligne
- * (etatEncart). `className` : ses marges, selon la page qui le pose (le fil
- * des Actus par défaut, bord à bord sur téléphone).
+ * (etatEncart), et le défilement est tenu pour tous les encarts à la fois
+ * (useTenueDesEncarts). `className` : ses marges, selon la page qui le pose
+ * (le fil des Actus par défaut, bord à bord sur téléphone).
  */
 export function VoteDuJour({
   me,
@@ -121,6 +134,8 @@ export function VoteDuJour({
   className?: string;
 }) {
   const ouvertes = useVotesOuverts(me, lesquels);
+  // Tenu dès avant qu'un encart paraisse : le défilement d'avant est connu.
+  useTenueDesEncarts(repliable);
   return (
     <>
       {ouvertes.map((j) => (
@@ -139,89 +154,74 @@ function Encart({ journee, me, repliable, className }: { journee: Journee; me: s
   const corps = useId();
   // Rouverte à la main, la ligne le reste (changer d'avis ne la referme pas sous le doigt).
   const [rouvert, setRouvert] = useState(false);
-  const vote = mesDeuxVoix(votes, saisonLue.numero ?? 0, journee.j, me);
-  const etat = etatEncart({ repliable, prets, vote, rouvert });
-  const plie = etat === "range" || etat === "attente";
+  const numero = saisonLue.numero ?? 0;
+  const cle = cleDuVote(numero, journee.j, me);
+  // Ce que ce téléphone a retenu de mes voix à sa dernière lecture : lu à l'ouverture de l'encart.
+  const retenu = useMemo(() => voixRetenues(cle), [cle]);
+  const vote = mesDeuxVoix(votes, numero, journee.j, me);
+  const fait = voteFait({ prets, vote, retenu });
+  const etat = etatEncart({ repliable, fait, rouvert });
+  const plie = estPlie(etat);
+  useEffect(() => {
+    if (prets || vote) retenirVoix(cle, vote);
+  }, [cle, prets, vote]);
 
   const section = useRef<HTMLElement>(null);
   const ligne = useRef<HTMLButtonElement>(null);
-  // Ma voix part d'ici, le focus sur la carte choisie (au clavier, à
-  // VoiceOver) : l'encart se range et emporte la carte ; le focus passe à sa
+  useEncartTenu(section, repliable, etat);
+
+  // Le focus est-il dans l'encart ? Il en sort vraiment (un clic à côté, Tab)
+  // quand la carte qu'il quitte est encore là ; retirée de la page (l'encart se
+  // range sous elle), elle n'y est plus, et le focus y était.
+  const dedans = useRef(false);
+  useEffect(() => {
+    const s = section.current;
+    if (!s) return;
+    const entre = () => void (dedans.current = true);
+    const sort = (e: FocusEvent) => {
+      if (e.relatedTarget instanceof Node && s.contains(e.relatedTarget)) return;
+      const quitte = e.target instanceof Node ? e.target : null;
+      queueMicrotask(() => {
+        if (quitte?.isConnected && !s.contains(document.activeElement)) dedans.current = false;
+      });
+    };
+    s.addEventListener("focusin", entre);
+    s.addEventListener("focusout", sort);
+    return () => {
+      s.removeEventListener("focusin", entre);
+      s.removeEventListener("focusout", sort);
+    };
+  }, []);
+
+  // Une voix part d'ici et c'est celle qui manquait : l'encart va se ranger
+  // sous elle, le temps de l'envoi. On note si le focus était sur une de ses
+  // cartes à ce moment-là : pendant l'envoi, les cartes sont grisées et le
+  // navigateur lâche le focus avant que l'encart se range.
+  const sousMaVoix = useRef<{ focus: boolean } | null>(null);
+  const onVoix = (cat: CategorieVote) => {
+    if (!voixQuiRange(votes, numero, journee.j, me, cat)) return undefined;
+    sousMaVoix.current = { focus: !!section.current?.contains(document.activeElement) };
+    return () => void (sousMaVoix.current = null);
+  };
+
+  // Il vient de se ranger : sous ma voix, sa ligne revient sous la pile des
+  // messages (use-encart-tenu) ; le focus qui était sur une de ses cartes
+  // (ma voix donnée au clavier, ou des voix venues d'ailleurs) passe à sa
   // ligne au lieu de tomber sur la page.
-  const focusIci = useRef(false);
   const etaitPlie = useRef(plie);
   useLayoutEffect(() => {
     const vientDeSeRanger = plie && !etaitPlie.current;
     etaitPlie.current = plie;
     if (!vientDeSeRanger) return;
+    const voix = sousMaVoix.current;
+    if (voix) rangeSousMaVoix(section.current);
     const perdu = !document.activeElement || document.activeElement === document.body;
-    if (focusIci.current && perdu) ligne.current?.focus({ preventScroll: true });
-    focusIci.current = false;
+    if (perdu && (dedans.current || voix?.focus)) ligne.current?.focus({ preventScroll: true });
   }, [plie]);
-
-  // L'encart vient de changer : jusqu'à l'image suivante, le défilement relevé
-  // reste celui d'avant. Chrome rattrape l'encart dès qu'un écran lit la mise
-  // en page et en prévient par un défilement, qui arrive avant le
-  // ResizeObserver : relevé, il ferait croire que l'encart était à l'écran.
-  const fige = useRef(false);
-  useLayoutEffect(() => {
-    if (!repliable) return;
-    fige.current = true;
-    const image = requestAnimationFrame(() => void (fige.current = false));
-    return () => cancelAnimationFrame(image);
-  }, [etat, repliable]);
-
-  // L'encart change de hauteur (rangé ; déplié quand mes voix relues disent
-  // qu'il m'en reste à donner) : lib/encart-tenu.ts dit quoi faire du
-  // défilement. Mesuré au ResizeObserver, avant que l'image ne s'affiche.
-  useEffect(() => {
-    const s = section.current;
-    if (!repliable || !s || typeof ResizeObserver === "undefined") return;
-    const sc = defilant();
-    const lire = () => (sc ? sc.scrollTop : window.scrollY);
-    // L'écran utile commence sous la pile des messages de confirmation : la scroll-margin de l'encart.
-    const ecran = (): Bande => {
-      const r = sc?.getBoundingClientRect();
-      const marge = parseFloat(getComputedStyle(s).scrollMarginTop) || 0;
-      return r ? { haut: r.top + marge, bas: r.bottom } : { haut: marge, bas: window.innerHeight };
-    };
-    // Le défilement d'avant (relevé à chaque défilement, sauf juste après un
-    // changement de l'encart) et la hauteur d'avant (au dernier changement).
-    let defil = lire();
-    let hauteur = s.getBoundingClientRect().height;
-    const suivre = () => {
-      if (!fige.current) defil = lire();
-    };
-    const ro = new ResizeObserver(() => {
-      const r = s.getBoundingClientRect();
-      const avant = hauteur;
-      hauteur = r.height;
-      if (Math.abs(r.height - avant) < 1) return;
-      // Ce que le navigateur a déjà rattrapé de lui-même (Chrome : overflow-anchor ; Safari : rien) :
-      // l'encart est remis dans le repère d'avant, et seul le reste est fait.
-      const deja = defil - lire();
-      const haut = r.top - deja;
-      const geste = rattrapage({ haut, bas: haut + avant }, { haut, bas: haut + r.height }, ecran());
-      if (geste && "ramener" in geste) s.scrollIntoView({ block: "nearest" });
-      else if (geste) {
-        if (sc) sc.scrollTop = defil + geste.decaler;
-        else window.scrollTo(0, defil + geste.decaler);
-      }
-      defil = lire();
-    });
-    ro.observe(s);
-    const cible: HTMLElement | Window = sc ?? window;
-    cible.addEventListener("scroll", suivre, { passive: true });
-    return () => {
-      ro.disconnect();
-      cible.removeEventListener("scroll", suivre);
-    };
-  }, [repliable]);
 
   return (
     <section
       ref={section}
-      aria-busy={etat === "attente" || undefined}
       // Ramenée à l'écran, la ligne se pose sous la pile des messages de confirmation (en haut au
       // centre, layout.tsx) : 7 rem de marge, plus la zone sûre.
       className={cn("glass flex scroll-mt-[calc(env(safe-area-inset-top,0px)+7rem)] flex-col gap-3 rounded-[26px] p-[18px] md:max-w-[34rem]", className)}
@@ -237,44 +237,31 @@ function Encart({ journee, me, repliable, className }: { journee: Journee; me: s
               <h2 className="text-titre font-bold tracking-tight">
                 <Titre j={journee.j} />
               </h2>
-              {vote && (
-                <span className="grid size-5 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground">
-                  <Check aria-hidden className="size-3.5" />
-                </span>
-              )}
+              <span className="grid size-5 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground">
+                <Check aria-hidden className="size-3.5" />
+              </span>
             </div>
             {plie && <p className="mono-label text-encre-3">jusqu&apos;à {libelleFinDuVote(saisonLue, journee.j, maintenant)}</p>}
           </div>
-          {/* Mes voix pas encore relues : la ligne seule, rien à toucher. */}
-          {etat !== "attente" && (
-            <>
-              <ChevronDown
-                aria-hidden
-                className={cn("size-5 shrink-0 text-encre-3 transition-transform duration-300 motion-reduce:transition-none", !plie && "rotate-180")}
-                strokeWidth={1.8}
-              />
-              {/* Toute la ligne se touche, jusqu'aux bords de l'encart. */}
-              <button
-                ref={ligne}
-                type="button"
-                aria-label={`Vote du jour, J${journee.j}, voté`}
-                aria-expanded={!plie}
-                aria-controls={corps}
-                onClick={() => setRouvert((o) => !o)}
-                className="absolute -inset-[18px] rounded-[26px]"
-              />
-            </>
-          )}
+          <ChevronDown
+            aria-hidden
+            className={cn("size-5 shrink-0 text-encre-3 transition-transform duration-300 motion-reduce:transition-none", !plie && "rotate-180")}
+            strokeWidth={1.8}
+          />
+          {/* Toute la ligne se touche, jusqu'aux bords de l'encart. */}
+          <button
+            ref={ligne}
+            type="button"
+            aria-label={`Vote du jour, J${journee.j}, voté`}
+            aria-expanded={!plie}
+            aria-controls={corps}
+            onClick={() => setRouvert((o) => !o)}
+            className="absolute -inset-[18px] rounded-[26px]"
+          />
         </div>
       )}
       <div id={corps} hidden={plie}>
-        {!plie && (
-          <VoteFigures
-            journee={journee}
-            me={me}
-            onVoix={repliable ? () => void (focusIci.current = !!section.current?.contains(document.activeElement)) : undefined}
-          />
-        )}
+        {!plie && <VoteFigures journee={journee} me={me} onVoix={repliable ? onVoix : undefined} />}
       </div>
     </section>
   );
@@ -282,11 +269,12 @@ function Encart({ journee, me, repliable, className }: { journee: Journee; me: s
 
 /**
  * Sur la Map : l'étiquette du vote, sous le lettrage de la commune ; la
- * toucher ouvre le bloc dans une feuille. Sa marque (marqueDuVote) : le point
- * rouge tant qu'il me reste une voix à donner, la coche une fois les deux
- * données, ni l'un ni l'autre tant que les votes ne sont pas relus. L'heure
- * de la fin dessous, quand c'en est une (« 18 h », « minuit ») : tant que la
- * fin des matchs est inconnue, la feuille la dit en toutes lettres.
+ * toucher ouvre le bloc dans une feuille. Sa marque (marqueDuVote) : la coche
+ * dès que mes deux voix sont connues de ce téléphone (voteFait : relues,
+ * envoyées d'ici, ou retenues de la dernière fois), le point rouge une fois
+ * les votes relus s'il m'en reste à donner, rien avant. L'heure de la fin
+ * dessous, quand c'en est une (« 18 h », « minuit ») : tant que la fin des
+ * matchs est inconnue, la feuille la dit en toutes lettres.
  */
 export function VoteDuJourMap({ me }: { me: string }) {
   const ouvertes = useVotesOuverts(me, "a-moi");
@@ -295,10 +283,17 @@ export function VoteDuJourMap({ me }: { me: string }) {
   const votes = useVotes();
   const prets = useVotesPrets();
   const [ouvert, setOuvert] = useState(false);
+  const numero = saisonLue.numero ?? 0;
+  // Relues, mes voix de chaque journée sont retenues pour la prochaine ouverture de l'app.
+  useEffect(() => {
+    if (!prets) return;
+    for (const x of ouvertes) retenirVoix(cleDuVote(numero, x.j, me), mesDeuxVoix(votes, numero, x.j, me));
+  }, [prets, ouvertes, numero, me, votes]);
   const j = ouvertes[0];
   if (!j) return null;
-  const numero = saisonLue.numero ?? 0;
-  const marque = marqueDuVote(prets, ouvertes.every((x) => mesDeuxVoix(votes, numero, x.j, me)));
+  // Mes deux voix dans chaque journée : connues d'ici, sinon ce que ce téléphone en a retenu.
+  const fait = ouvertes.every((x) => voteFait({ prets, vote: mesDeuxVoix(votes, numero, x.j, me), retenu: voixRetenues(cleDuVote(numero, x.j, me)) }));
+  const marque = marqueDuVote(prets, fait);
   const jusqua = libelleFinDuVote(saisonLue, j.j, maintenant);
   return (
     <>

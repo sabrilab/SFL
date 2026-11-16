@@ -7,10 +7,11 @@
 //   · quelqu'un la tient : le score et la minute en direct, « Feuille ·
 //     Ilyes », et la feuille s'ouvre en lecture pour toute la ligue ; la
 //     mienne s'ouvre pour compter ;
-//   · scellée : le score final, et la feuille en lecture ; pour un joueur
+//   · scellée : le score final, et la feuille en lecture ; pour un titulaire
 //     du match, « Voter » tant que le vote du jour est ouvert (jusqu'à la fin
 //     du vote, revelation.ts : il s'ouvre dès que la feuille du match est
-//     remplie, votes.ts).
+//     remplie, votes.ts, voteSousLeMatch). Venu seulement en extra time le
+//     compléter, ou en plus de son match, on n'y vote pas : pas de « Voter ».
 // Rien pour un match qui n'a pas de feuille et que je ne joue pas.
 // Une journée en suspens (12/11/2026, saisie/suspens.ts) gèle la feuille :
 // pour un joueur du match, « ‖ En suspens » à la place de « Prendre la
@@ -26,7 +27,7 @@ import { useFeuillesDirect, type FeuillesDirect } from "@/hooks/use-feuilles-dir
 import { droitDePrendre, etatDeLaFeuille, joueursDuMatch, MOTS_DU_REFUS, peutPrendre, scoreDeLaFeuille, type Equipes } from "@/lib/sfl/feuille-direct";
 import { voteOuvertA } from "@/lib/sfl/revelation";
 import { maintenant as heureDeLaLigue } from "@/lib/sfl/horloge";
-import { journeeAvecVote } from "@/lib/sfl/votes";
+import { journeeAvecVote, voteSousLeMatch } from "@/lib/sfl/votes";
 import { haptique } from "@/lib/sfl/haptique";
 import { SIGNE_SUSPENS } from "@/lib/sfl/saisie/suspens";
 import { cn } from "@/lib/utils";
@@ -101,10 +102,9 @@ export function DirectDuMatch({
     );
   }
   const score = scoreDeLaFeuille(saisonLue, j, equipes, feuille.compteurs);
-  // Le vote du soir, pour qui a joué ce match.
+  // Le vote du soir, pour qui a ses voix à donner dans ce match (ni l'extra time, ni un autre match).
   const jn = journees.find((x) => x.j === j);
-  const { noirs, blancs } = joueursDuMatch(saisonLue, j, equipes);
-  const voter = etat === "scellee" && !!jn && journeeAvecVote(jn) && voteOuvertA(saisonLue, j, heureDeLaLigue()) && [...noirs, ...blancs].includes(me);
+  const voter = etat === "scellee" && !!jn && journeeAvecVote(jn) && voteOuvertA(saisonLue, j, heureDeLaLigue()) && voteSousLeMatch(saisonLue, jn, me, equipes);
   return (
     <>
       <div className="glass flex flex-col gap-3 rounded-[22px] px-4 py-3.5">

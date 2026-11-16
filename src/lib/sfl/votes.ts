@@ -9,13 +9,16 @@
 // base, et seulement depuis le téléphone.
 //
 // Le vote du jour dans les trois onglets (vote-du-jour.tsx, vote-figures.tsx)
-// prend ici toutes ses décisions, en fonctions pures : où en est le vote pour
-// moi (etatDuVote, placeDuVotant), où il se pose (aPoser, votesOuvertsPour),
-// ce que dit son bandeau (bandeauDuVote), l'encart de Ma carte (etatEncart) et
-// la marque de l'étiquette de la Map (marqueDuVote). Les composants ne font
-// que les appeler : tools/vote-du-jour-check.ts les garde (contrôle du
-// 16/11/2026 : le tri vivait dans le composant, et 9 retouches sur 12 lui
-// échappaient).
+// prend ici ses décisions, en fonctions pures : où en est le vote pour moi
+// (etatDuVote, placeDuVotant), où il se pose (aPoser, votesOuvertsPour), ce
+// que dit son bandeau (bandeauDuVote), si les votes sont là pour décider
+// (votesPrets), mes deux voix à l'écran (voteFait, avec ce que ce téléphone en
+// a retenu), l'encart de Ma carte (etatEncart, estPlie, voixQuiRange), la
+// marque de l'étiquette de la Map (marqueDuVote) et « Voter » sous la feuille
+// en direct d'un match (voteSousLeMatch). tools/vote-du-jour-check.ts les
+// joue, et garde par des motifs de texte la façon dont les composants les
+// appellent (contrôles du 16/11/2026 : le tri vivait dans le composant, et 9
+// retouches sur 12 échappaient au banc).
 //
 // Remis le 17/10 à la demande de Sabri, partagé en base (supabase/schema.sql,
 // table votes_figures) : avant, chaque vote restait sur le téléphone de son
@@ -178,7 +181,66 @@ export async function voter(v: VoteFigure): Promise<void> {
     ...cache.filter((x) => !(x.saison === v.saison && x.j === v.j && x.categorie === v.categorie && x.votant === v.votant)),
     v,
   ];
+  // Mes deux voix données d'ici : retenu pour la prochaine ouverture de l'app.
+  if (mesDeuxVoix(cache, v.saison, v.j, v.votant)) retenirVoix(cleDuVote(v.saison, v.j, v.votant), true);
   emit();
+}
+
+/**
+ * Les votes sont-ils là pour décider (useVotesPrets, et le SeasonProvider
+ * pour la révélation) ? Relus (chargerVotes), ou rien ne viendra : sans
+ * session serveur, le vote dit « Reconnecte-toi pour voter ».
+ */
+export function votesPrets(o: { server: boolean; charges: boolean }): boolean {
+  return !o.server || o.charges;
+}
+
+/* ------------------------- Ce que ce téléphone retient ------------------------- */
+// Mes deux voix données ou non, journée par journée, telles que ce téléphone
+// les a vues en dernier (relues, ou envoyées d'ici) : à l'ouverture de l'app,
+// tant que les votes ne sont pas relus, l'encart de Ma carte et l'étiquette de
+// la Map en partent (voteFait). Contrôles du 16/11/2026 : l'encart attendait
+// sur une ligne seule, puis se dépliait d'un coup (ma carte descendait de
+// 460 px), la place retrouvée au rechargement glissait de 434 px, et si la
+// lecture échouait, la ligne restait sans bouton. Les dernières journées
+// seulement (RETENUES_MAX).
+
+const CLE_RETENUES = "sfl-vote-du-jour-v1";
+export const RETENUES_MAX = 24;
+
+/** La clé d'une journée pour un joueur : « saison:j:nom ». */
+export function cleDuVote(saison: number, j: number, moi: string): string {
+  return `${saison}:${j}:${moi}`;
+}
+
+function lireRetenues(): Record<string, boolean> {
+  try {
+    const lu: unknown = JSON.parse(localStorage.getItem(CLE_RETENUES) ?? "{}");
+    return lu && typeof lu === "object" && !Array.isArray(lu) ? (lu as Record<string, boolean>) : {};
+  } catch {
+    return {};
+  }
+}
+
+/** Ce que ce téléphone a vu en dernier de mes deux voix pour cette journée (vrai : données) ; null s'il n'en sait rien. */
+export function voixRetenues(cle: string): boolean | null {
+  const v = lireRetenues()[cle];
+  return typeof v === "boolean" ? v : null;
+}
+
+/** Le retient, à la place de ce qu'il savait ; au-delà de RETENUES_MAX journées, les plus anciennes s'oublient. */
+export function retenirVoix(cle: string, fait: boolean): void {
+  try {
+    const tout = lireRetenues();
+    if (tout[cle] === fait) return;
+    delete tout[cle];
+    tout[cle] = fait;
+    const cles = Object.keys(tout);
+    for (const k of cles.slice(0, Math.max(0, cles.length - RETENUES_MAX))) delete tout[k];
+    localStorage.setItem(CLE_RETENUES, JSON.stringify(tout));
+  } catch {
+    // Stockage plein ou coupé (navigation privée) : rien de retenu, l'encart part ouvert.
+  }
 }
 
 /* ------------------------------ Le décompte ----------------------------- */
@@ -329,7 +391,8 @@ export function etatDuVote(saison: Pick<Saison, "entries">, journee: Journee, mo
  * Où se pose le vote du jour (vote-du-jour.tsx), d'après où il en est pour
  * moi (etatDuVote) :
  *   · `tous` : la vue Classement des Actus, dans tous les cas ;
- *   · `a-moi` : Ma carte et la Map, seulement quand j'ai mes voix à donner ;
+ *   · `a-moi` : Ma carte et la Map, seulement tant que je peux voter (la
+ *     feuille de mon match remplie, le vote pas encore fermé) ;
  *   · `ouverts` : en tête du fil des Actus, dès qu'on y vote (moi, ou les
  *     autres si je ne joue pas) ;
  *   · `en-attente` : dans le fil, sous la feuille en direct, tant que
@@ -379,37 +442,75 @@ export function bandeauDuVote(etat: EtatDuVote, joue: boolean): BandeauDuVote {
 }
 
 /**
+ * Mes deux voix, à l'écran (l'encart de Ma carte, l'étiquette de la Map) :
+ * données si ce téléphone les connaît (`vote` : mesDeuxVoix, relues ou
+ * envoyées d'ici) ; tant que les votes ne sont pas relus (`prets` faux : à
+ * l'ouverture de l'app, sur un réseau lent, ou la lecture a échoué), ce qu'il
+ * en a retenu la dernière fois (`retenu` : voixRetenues ; null, il n'en sait
+ * rien : pas données). Relus, les votes font foi.
+ */
+export function voteFait(o: { prets: boolean; vote: boolean; retenu: boolean | null }): boolean {
+  if (o.vote) return true;
+  return !o.prets && o.retenu === true;
+}
+
+/**
  * L'encart du vote sur Ma carte (vote-du-jour.tsx, `repliable`) :
  *   · `ouvert` : le bloc entier et ses deux rangées de cartes, tant qu'il me
  *     reste une voix à donner ; ailleurs que sur Ma carte, toujours ;
- *   · `attente` : mes voix ne sont pas encore relues (votes_figures, à
- *     l'ouverture de l'app ou sur un réseau lent) : la ligne seule, ni ouverte
- *     ni rangée d'office. Avant, le bloc s'ouvrait comme si je n'avais pas
- *     voté, puis se rangeait d'un coup quand mes voix arrivaient : ma carte
- *     sautait de 460 px (contrôle du 16/11/2026) ;
- *   · `range` : mes deux voix données, la ligne (la coche, l'heure de la fin) ;
+ *   · `range` : mes deux voix données (voteFait), la ligne (la coche, l'heure
+ *     de la fin) ;
  *   · `rouvert` : rouverte à la main, elle le reste tant qu'on change d'avis.
- * `vote` : mes deux voix données (mesDeuxVoix) ; connues de ce téléphone,
- * elles suffisent, relues ou non. `prets` : les votes relus (useVotesPrets).
+ * À l'ouverture de l'app, il part de ce que ce téléphone a retenu : rangé si
+ * mes deux voix y étaient données, ouvert sinon, comme avant le contrôle du
+ * 16/11 (la ligne seule qui attendait mes voix faisait sauter la page, ou
+ * restait sans bouton si la lecture échouait). Reste un cas : mes deux voix
+ * données sur un autre téléphone, jamais vues ici ; l'encart s'ouvre, puis se
+ * range quand elles arrivent.
  */
-export type EtatEncart = "ouvert" | "attente" | "range" | "rouvert";
+export type EtatEncart = "ouvert" | "range" | "rouvert";
 
-export function etatEncart(o: { repliable: boolean; prets: boolean; vote: boolean; rouvert: boolean }): EtatEncart {
-  if (!o.repliable) return "ouvert";
-  if (o.vote) return o.rouvert ? "rouvert" : "range";
-  return o.prets ? "ouvert" : "attente";
+export function etatEncart(o: { repliable: boolean; fait: boolean; rouvert: boolean }): EtatEncart {
+  if (!o.repliable || !o.fait) return "ouvert";
+  return o.rouvert ? "rouvert" : "range";
+}
+
+/** Rangé en une ligne : ses cartes ne sont plus là (et le focus qui y était passe à la ligne). */
+export function estPlie(etat: EtatEncart): boolean {
+  return etat === "range";
+}
+
+/** Ma voix pour `cat`, donnée ici, range-t-elle l'encart ? Oui si l'autre est déjà donnée. */
+export function voixQuiRange(votes: VoteFigure[], saison: number, j: number, moi: string, cat: CategorieVote): boolean {
+  return CATEGORIES_VOTE.every((c) => c === cat || !!monVote(votes, saison, j, c, moi));
 }
 
 /**
  * La marque de l'étiquette du vote sur la Map : la coche une fois mes deux
- * voix données, le point rouge tant qu'il m'en reste à donner, et ni l'un ni
- * l'autre tant que les votes ne sont pas relus (`prets`). Avant, l'étiquette
- * disait « à voter » à l'ouverture de l'app, puis passait à la coche quand
- * mes voix arrivaient (contrôle du 16/11/2026).
+ * voix données (voteFait : connues de ce téléphone, ou retenues de la
+ * dernière fois), le point rouge une fois les votes relus s'il m'en reste à
+ * donner, et ni l'un ni l'autre avant. Avant, l'étiquette disait « à voter »
+ * à l'ouverture de l'app, puis passait à la coche quand mes voix arrivaient
+ * (contrôle du 16/11/2026).
  */
 export function marqueDuVote(prets: boolean, fait: boolean): "coche" | "point" | null {
   if (fait) return "coche";
   return prets ? "point" : null;
+}
+
+/**
+ * « Voter » sous la feuille en direct d'un match (direct/direct-du-match.tsx,
+ * la page du lieu) : seulement pour qui y a ses voix à donner (etatDuVote
+ * `a-moi`) et dont c'est le match (placeDuVotant). Venu seulement en extra
+ * time compléter ce match, ou en plus du sien, on ne vote pas dans celui-ci
+ * (contrôle du 16/11/2026 : « Voter » lui était proposé, puis le bloc lui
+ * disait « Le vote est réservé aux joueurs de la journée » ou « Vote à la fin
+ * du Match 2 »). `equipes` : les deux équipes du match.
+ */
+export function voteSousLeMatch(saison: Pick<Saison, "entries">, journee: Journee, moi: string, equipes: readonly [string, string]): boolean {
+  if (etatDuVote(saison, journee, moi) !== "a-moi") return false;
+  const m = placeDuVotant(journee, moi)?.match;
+  return !!m && equipes.includes(m.teamA.name) && equipes.includes(m.teamB.name);
 }
 
 /* ------------------------------ Les élus -------------------------------- */

@@ -17,8 +17,10 @@
 // gris « Vote à la fin des matchs » tant qu'aucune feuille n'est remplie, puis
 // « Vote ouvert » quand on y vote, sans lui (bandeauDuVote). Venu seulement en
 // extra time, on ne vote pas : traité comme qui ne joue pas (placeDuVotant).
-// `onVoix` : appelé quand une voix part d'ici, avant l'envoi (l'encart de Ma
-// carte y note où était le focus, vote-du-jour.tsx).
+// « jusqu'à 18 h » ne se coupe jamais entre « 18 » et « h » (jusquaInsecable).
+// `onVoix` : appelé quand une voix part d'ici, avant l'envoi ; ce qu'il rend
+// est appelé à la fin de l'envoi, reçu ou refusé (l'encart de Ma carte y sait
+// que cette voix le range, vote-du-jour.tsx).
 // Règles et décompte : lib/sfl/votes.ts.
 
 import { useState } from "react";
@@ -47,11 +49,19 @@ import { cn } from "@/lib/utils";
 import { FORMAT_CARTE } from "@/components/sfl/mini-carte";
 import { Nom } from "@/components/sfl/nom";
 import { isHidden } from "@/lib/sfl/hidden";
-import { libelleFinDuVote, voteOuvertA } from "@/lib/sfl/revelation";
+import { jusquaInsecable, libelleFinDuVote, voteOuvertA } from "@/lib/sfl/revelation";
 import { useMaintenant } from "@/hooks/use-missions";
 import { maintenant as heureDeLaLigue } from "@/lib/sfl/horloge";
 
-export function VoteFigures({ journee, me, onVoix }: { journee: Journee; me: string; onVoix?: () => void }) {
+export function VoteFigures({
+  journee,
+  me,
+  onVoix,
+}: {
+  journee: Journee;
+  me: string;
+  onVoix?: (cat: CategorieVote) => (() => void) | undefined;
+}) {
   const { saisonLue: saison, allPlayers } = useSeason();
   const maintenant = useMaintenant();
   const jusqua = libelleFinDuVote(saison, journee.j, maintenant);
@@ -76,7 +86,7 @@ export function VoteFigures({ journee, me, onVoix }: { journee: Journee; me: str
       toast.error(`Le vote est fermé depuis ${libelleFinDuVote(saison, journee.j, t)}.`);
       return;
     }
-    onVoix?.();
+    const fin = onVoix?.(cat);
     setEnvoi(cat);
     try {
       await voter({ saison: numero, j: journee.j, categorie: cat, votant: me, candidat, match_id: place.match.id });
@@ -87,6 +97,7 @@ export function VoteFigures({ journee, me, onVoix }: { journee: Journee; me: str
       toast.error(e instanceof Error ? e.message : "Vote impossible pour l'instant.");
     } finally {
       setEnvoi(null);
+      fin?.();
     }
   }
 
@@ -94,12 +105,12 @@ export function VoteFigures({ journee, me, onVoix }: { journee: Journee; me: str
     <div className="flex flex-col gap-4">
       {bandeau === "ouvert" ? (
         <p className="rounded-2xl bg-primary/10 px-3.5 py-2.5 text-[12.5px] font-medium text-primary">
-          <span className="font-bold">Vote ouvert jusqu&apos;à {jusqua}</span>
+          <span className="font-bold">Vote ouvert {jusquaInsecable(jusqua)}</span>
         </p>
       ) : (
         <p className="rounded-2xl bg-foreground/[0.06] px-3.5 py-2.5 text-[12.5px] font-medium text-foreground/55">
           <span className="font-bold">{bandeau === "fin-de-mon-match" && place ? `Vote à la fin du ${place.match.label}` : "Vote à la fin des matchs"}</span>
-          {` · jusqu'à ${jusqua}`}
+          {` · ${jusquaInsecable(jusqua)}`}
         </p>
       )}
 
