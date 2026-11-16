@@ -626,6 +626,15 @@
   font-weight: 600;
   color: color-mix(in srgb, currentColor 72%, transparent);
 }
+/* Les ballons de Bola Studio (studio.ts), dans la couleur de Bola Plus. */
+.bp-formule__ballons {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--bp-plus-clair);
+}
+:root:not(.dark) .bp-formule__ballons {
+  color: var(--bp-plus-encre);
+}
 .bp-formule__rond {
   display: flex;
   flex: none;
@@ -862,8 +871,27 @@ html[data-clavier] .bp-barre {
   }
 }
 
-/* Écran court et étroit à la fois (375 × 667) : le bundle au plus serré. */
+/* Écran court et étroit à la fois (375 × 667) : le bundle au plus serré ;
+   les formules, qui portent aussi les ballons de Bola Studio (quatre lignes
+   chacune), se resserrent pour que le bundle reste entier au-dessus, à
+   une dizaine de pixels du haut de la carte (pas sur son arrondi). */
 @media (max-height: 700px) {
+  .bp-prix {
+    gap: 7px;
+  }
+  .bp-prix__haut {
+    gap: 8px;
+  }
+  .bp-formule {
+    padding: 7px 14px;
+  }
+  .bp-formule > span:first-child {
+    gap: 3px;
+  }
+  .bp-formule__sous,
+  .bp-formule__ballons {
+    line-height: 1.15;
+  }
   .bp-bundle {
     gap: 6px 4px;
   }

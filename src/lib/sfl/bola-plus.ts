@@ -34,7 +34,8 @@
 //
 // Ce que la page montre (le carrousel, bola-plus.tsx) : l'ouverture, les
 // avantages (AVANTAGES, une liste de données : un avantage de plus s'ajoute
-// ici sans toucher au carrousel ; Bola Studio y entre ainsi), « Ramène 5
+// ici sans toucher au carrousel ; Bola Studio y est entré ainsi, « Ton
+// studio », après « Bola Plus » : bola-app#22), « Ramène 5
 // abonnés » (PARRAINAGE, seulement expliqué : aucun suivi ni paiement), puis
 // « Ton prix ». Chaque avantage appartient à une part : « plus » (violet,
 // Bola Plus) ou « sfl » (vert terrain, la ligue) ; la palette (PALETTE) est
@@ -43,9 +44,14 @@
 // 13/11 01:45) : un seul fichier, public/bola-plus/maillots-portes.webp
 // (1170 px, 4:5), qui montre de vrais joueurs : il ne va jamais dans ce dépôt,
 // qui est public (.gitignore le refuse) ; absent, la carte garde le portant.
-// Les visuels générés le disent dans leur texte de remplacement.
+// Les visuels générés le disent dans leur texte de remplacement. Les
+// variables de la part Bola Plus (VARIABLES_PLUS) sont écrites ici une fois,
+// pour la page et pour Bola Studio ; la carte « Toi » (CARTE_TOI) aussi, pour
+// la page (les vignettes de Bola Studio sont des images depuis le 15/11).
 //
 // Pur : ni React ni réseau (tools/bola-plus-check.ts).
+
+import type { Stats } from "./engine";
 
 /** Le prix du mois, en centimes : 19,90 €. */
 export const MENSUEL_CENTIMES = 1990;
@@ -229,6 +235,31 @@ export const PALETTE = {
   nuit: "#0A0A12",
 } as const;
 
+/**
+ * Les couleurs de la part Bola Plus en variables CSS : posées par la page
+ * (avec la SFL, le prix et la nuit) et par le panneau Bola Studio, porté hors
+ * de la page (studio-bola.tsx). Une seule table pour les deux.
+ */
+export const VARIABLES_PLUS = {
+  "--bp-plus-fond": PALETTE.plus.fond,
+  "--bp-plus-haut": PALETTE.plus.haut,
+  "--bp-plus-vif": PALETTE.plus.vif,
+  "--bp-plus-clair": PALETTE.plus.clair,
+  "--bp-plus-encre": PALETTE.plus.encre,
+  "--bp-plus-papier": PALETTE.plus.fondClair,
+} as const;
+
+/**
+ * La carte « Toi » de la page : une carte anonyme qui a déjà joué (sans nom
+ * ni photo), celle de « Ta carte continue. ». La note se calcule (ovr,
+ * engine.ts), elle ne s'écrit pas.
+ */
+export const CARTE_TOI = {
+  name: "Toi",
+  position: "ATT",
+  stats: { VIT: 76, TIR: 76, PAS: 77, DRI: 79, DEF: 75, PHY: 77 },
+} as const satisfies { name: string; position: string; stats: Stats };
+
 /** Les teintes réservées aux cartes de joueur (finitions-carte.ts) : la page s'en tient loin. */
 export const TEINTES_RESERVEES = { mvp: "#C99733", impact: "#E0262E", defensive: "#2A6AE6" } as const;
 
@@ -268,11 +299,11 @@ export const NOM_PART: Record<Part, string> = { plus: "Bola Plus", sfl: "SFL" };
 
 /**
  * Les visuels dessinés par le code (bola-plus.tsx, COMPOSANTS) : la vraie
- * carte « Toi », la liste de Bola Plus. Bola Studio y ajoute « studio » (et
- * sa ligne dans COMPOSANTS), puis son avantage dans AVANTAGES, après
- * « bola-plus » : le carrousel, ses segments et sa palette suivent seuls.
+ * carte « Toi », la liste de Bola Plus, et « studio » : l'éventail de Bola
+ * Studio (components/sfl/studio-bola.tsx, ses templates et ses ballons dans
+ * lib/sfl/studio.ts). Le carrousel, ses segments et sa palette suivent seuls.
  */
-export type ComposantAvantage = "carte" | "bola-plus";
+export type ComposantAvantage = "carte" | "bola-plus" | "studio";
 
 /** Le visuel d'un avantage : une image de public/bola-plus/, ou un composant de l'app. */
 export type VisuelAvantage = ({ genre: "image" } & Visuel) | { genre: "composant"; composant: ComposantAvantage };
@@ -293,6 +324,7 @@ export const AFFICHE: Visuel = { image: "affiche", alt: "", teinte: "#2a2440", r
 export const AVANTAGES: readonly Avantage[] = [
   { id: "carte", part: "plus", titre: "Ta carte continue.", sous: "Tes stats te suivent.", visuel: { genre: "composant", composant: "carte" } },
   { id: "bola-plus", part: "plus", titre: "Bola Plus", visuel: { genre: "composant", composant: "bola-plus" } },
+  { id: "studio", part: "plus", titre: "Ton studio", visuel: { genre: "composant", composant: "studio" } },
   {
     id: "maillots",
     part: "sfl",
