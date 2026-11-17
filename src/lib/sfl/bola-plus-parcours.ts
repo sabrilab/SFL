@@ -22,8 +22,9 @@ export const NOM_SOURCE: Record<Source, string> = {
   convocation: "Convocation",
   direct: "Direct",
 };
-export const FICHES_SUIVIES = ["maillots", "matchs-filmes", "cadeaux", "ceremonies", "parrainage"] as const;
+export const FICHES_SUIVIES = ["bola-27", "maillots", "matchs-filmes", "cadeaux", "ceremonies", "parrainage"] as const;
 export const NOM_FICHE: Record<(typeof FICHES_SUIVIES)[number], string> = {
+  "bola-27": "Bola 27",
   maillots: "Maillots",
   "matchs-filmes": "Matchs filmés",
   cadeaux: "Cadeaux",

@@ -338,6 +338,14 @@ export const AVANTAGES: readonly Avantage[] = [
   { id: "bola-plus", part: "plus", titre: "Bola Plus", visuel: { genre: "composant", composant: "bola-plus" } },
   { id: "studio", part: "plus", titre: "Ton studio", visuel: { genre: "composant", composant: "studio" } },
   {
+    // Le jeu (Sabri, 17/11 11:36) : l'accès anticipé, ton joueur modélisé à ton image et à ton niveau.
+    id: "bola-27",
+    part: "plus",
+    titre: "Bola 27",
+    sous: "Accès anticipé au jeu.",
+    visuel: { genre: "image", image: "bola-27", alt: "Image générée : un joueur en maillot noir frappe le ballon sous un projecteur, dans l'arène du jeu Bola", teinte: "#1a1d1a", rapport: RAPPORT_CARROUSEL },
+  },
+  {
     id: "maillots",
     part: "sfl",
     titre: "Tes maillots",
