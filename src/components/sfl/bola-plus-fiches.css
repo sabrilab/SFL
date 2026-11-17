@@ -85,6 +85,10 @@
   -webkit-backdrop-filter: blur(12px);
   color: #fff;
 }
+/* Une carte du carrousel étire ses enfants (.bp-diapo > * : toute la hauteur) : le « + » garde sa taille. */
+.bp-diapo > .bpf-pastille {
+  height: 36px;
+}
 .bpf-pastille::after {
   content: "";
   position: absolute;

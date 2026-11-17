@@ -412,12 +412,26 @@
   top: 16px;
   left: 18px;
 }
-.bp-photo-carte__titre {
+/* Le titre d'une photo et, s'il y en a une, sa ligne dessous (« Bola 27 » : « Accès anticipé au jeu. »). */
+.bp-photo-carte__bas {
   position: absolute;
   z-index: 2;
   right: 20px;
   bottom: 22px;
   left: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.bp-photo-carte__sous {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1.2;
+  color: #fff;
+  text-shadow: 0 1px 12px rgb(0 0 0 / 0.5);
+}
+.bp-photo-carte__titre {
   font-size: clamp(36px, 11vw, 44px);
   text-shadow: 0 2px 18px rgb(0 0 0 / 0.35);
 }

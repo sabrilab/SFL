@@ -18,7 +18,10 @@
 //   - les matchs filmés : le kit Twitch, YouTube et Instagram de la SFL
 //     (sfl-content, reseaux/kit-chrome, décision D5 : le direct sur Twitch et
 //     YouTube en même temps) ;
-//   - les pépites et les trophées : générés (Higgsfield, 16/11), sans joueur.
+//   - les pépites et les trophées : générés (Higgsfield, 16/11), sans joueur ;
+//   - Bola 27 (Sabri, 17/11 11:36 : l'accès anticipé au jeu, un joueur à ton
+//     image et à ton niveau) : des images de ce que sera le jeu, générées
+//     (Higgsfield, 17/11) d'après l'arène du prototype ; personne de réel.
 // Rien de payant, rien d'envoyé : de la lecture.
 
 /** Une vignette d'une fiche. */
@@ -54,6 +57,18 @@ const trophee = (image: string, alt: string, nom: string, texte: string): CarteF
 const etape = (n: number, nom: string, texte: string, pleins: number): CarteFiche => ({ alt: "", nom, detail: String(n).padStart(2, "0"), texte, pleins, largeur: 4, hauteur: 5 });
 
 export const FICHES: Record<string, Fiche> = {
+  "bola-27": {
+    id: "bola-27",
+    titre: "Bola 27",
+    phrase: "Le jeu, avant tout le monde.",
+    cartes: [
+      kit("b27-terrain", "Image générée : un match à cinq contre cinq dans l'arène de Bola 27, maillots noirs contre maillots blancs", "Le jeu", "Le five de la SFL, en jeu vidéo."),
+      kit("b27-scan", "Image générée : un selfie devient une tête en 3D, puis un joueur complet en maillot noir", "À ton image", "Ton visage et ta silhouette : ton joueur est modélisé d'après toi."),
+      kit("b27-niveau", "Image générée : un joueur en 3D, maillot blanc, et sa note 77", "À ton niveau", "Ta note dans l'app devient ton niveau dans le jeu."),
+      kit("b27-dribble", "Image générée : un joueur en noir dribble un défenseur en blanc, au ras du terrain", "Dans l'arène", "Les panneaux, les maillots, le terrain du dimanche."),
+      kit("b27-but", "Image générée : un joueur en noir célèbre un but à genoux, ses coéquipiers arrivent", "Accès anticipé", "Tu y joues avant sa sortie."),
+    ],
+  },
   maillots: {
     id: "maillots",
     titre: "Tes maillots",

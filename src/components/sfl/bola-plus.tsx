@@ -541,7 +541,10 @@ function DiapoPhoto({ avantage, visuel }: { avantage: Avantage; visuel: Visuel }
         />
       )}
       <EtiquettePart part={avantage.part} className="bp-photo-carte__part" />
-      <Titre className="bp-photo-carte__titre">{avantage.titre}</Titre>
+      <div className="bp-photo-carte__bas">
+        <Titre className="bp-photo-carte__titre">{avantage.titre}</Titre>
+        {avantage.sous && <p className="bp-photo-carte__sous">{avantage.sous}</p>}
+      </div>
     </div>
   );
 }
