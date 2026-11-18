@@ -418,8 +418,10 @@ function tacle(graine: number, deFace: boolean) {
     if (act) lance = true;
     pas(m, [{ dx: 0, dz: -1, allure: 0.85, sprint: 0 }, { dx: dx / d, dz: dz / d, allure: 1, sprint: 0.4, action: act }]);
     for (const e of m.evts) {
-      if (e.type === 'tacleBalle' && balle < 0) balle = m.t; if (e.type === 'tacleJambes' && jambes < 0) jambes = m.t; if (e.type === 'chute' && e.j === 4) tombe = true;
-      if ((e.type === 'tacleBalle' || e.type === 'tacleJambes') && e.j === 6 && e.h != null) hanches.push(e.h);
+      // (bola-app#32, lot A2, point 15 : la balle au pied du porteur, prise de face, est « contrée » — tacleContre — : c'est
+      // toujours la balle touchée d'abord, l'une des trois issues du tacle ; elle compte comme balle gagnée)
+      if ((e.type === 'tacleBalle' || (e.type === 'tacleContre' && e.glisse)) && balle < 0) balle = m.t; if (e.type === 'tacleJambes' && jambes < 0) jambes = m.t; if (e.type === 'chute' && e.j === 4) tombe = true;
+      if ((e.type === 'tacleBalle' || e.type === 'tacleJambes' || (e.type === 'tacleContre' && e.glisse)) && e.j === 6 && e.h != null) hanches.push(e.h);
     }
     m.evts.length = 0;
     if (lance && t0 < 0 && t.g?.nom === 'slide') t0 = m.t;

@@ -187,7 +187,9 @@ export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, 
     const perso = await creerPersonnage({
       modele: 'footballeur', tenue: e === 0 ? 'noirs' : 'blancs', tete: null, peau: null,
       // (bola-app#26 : player2, keeper2, celeb2, les clips de tools/jeu-anims.mjs)
-      packs: role === 'G' ? ['keeper', 'keeper2', 'celeb', 'celeb2'] : ['player', 'player2', 'celeb', 'celeb2'],
+      // (bola-app#32, lot A2 : le gardien prend aussi les cycles de course du joueur, pour marcher et courir quand il sort
+      // ou revient sur sa ligne ; le paquet est déjà chargé pour les joueurs de champ ; player3 : le saut par-dessus un tacle)
+      packs: role === 'G' ? ['keeper', 'keeper2', 'player', 'celeb', 'celeb2'] : ['player', 'player2', 'player3', 'celeb', 'celeb2'],
     });
     perso.racine.traverse((o) => { o.castShadow = false; });
     surProgres(0.4 + (++charges / specs.length) * 0.55);

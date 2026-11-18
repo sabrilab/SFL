@@ -30,6 +30,7 @@ import { piedA, teteA, piedLoco, racineA, versMonde, lancerGeste, impactDe, libr
 import { predire } from './ballon.js';
 import { CLIPS, FPS_CLIPS } from './clips.js';
 import { acos, atan2, cos, hypot, sin } from './maths.js';
+import { commandeDe, gesteDe, tempsContact } from './gestes-commandes.js';
 
 const R = BALLON.R;
 /** (bola-app#26, lot 2) les gestes qui visent le but : frappe, finesse (intérieur brossé), extérieur, piqué */
@@ -305,6 +306,20 @@ export function clipControle(j, b, surface, sj, vin, possede = true) {
 }
 
 /**
+ * (bola-app#32, lot A2) La prise d'une balle libre sur ○ par un humain : un geste à voir, l'amorti du pied (trap) du côté de
+ * la balle, joué vite (0,2 s) ; il se coupe comme tout contrôle dès qu'une autre touche arrive. Lancé (plus de 3,5 m/s)
+ * la course continue, le pied va à la balle (rendu). Rien si un contrôle est déjà joué.
+ */
+export function gestePrise(m, j) {
+  const b = m.balle;
+  if (j.g || hypot(j.v.x, j.v.z) > 3.5) return;
+  const c = clipControle(j, b, 'pied', 0, 9, true);
+  if (!c) return;
+  lancerGeste(j, c.nom, { depuis: Math.max(0, c.impact - 0.08) / duree(c.nom), taux: 1.5, fin: Math.min(duree(c.nom), c.impact + 0.2), type: 'controle', donnees: { surface: 'pied', prise: true } });
+  m.ev('prise', { j: j.i, clip: c.nom });
+}
+
+/**
  * L'anticipation du contrôle : le receveur d'une passe, presque arrêté, lance son amorti avant que la balle n'arrive,
  * pour que le contact du clip tombe à son arrivée (le pied s'avance, la poitrine s'ouvre) ; la balle est prédite
  * (sans hasard) toutes les 0,05 s. S'il ne la touche pas, l'amorti finit seul et la course reprend.
@@ -394,7 +409,6 @@ const hauteurDans = (b, T) => Math.max(R, b.p.y + b.v.y * T - 0.5 * G * T * T);
  *     à la hauteur de la balle, pour les gestes aériens.
  */
 function clipFrappe(j, b, spec) {
-  const frappe = estFrappe(spec.type);
   const s = hypot(j.v.x, j.v.z);
   const fx = sin(j.cap), fz = cos(j.cap);
   const cote = (b.p.x - j.p.x) * fz - (b.p.z - j.p.z) * fx; // > 0 : à gauche
@@ -432,12 +446,36 @@ function clipFrappe(j, b, spec) {
         if (!best || err < best.err) best = { nom: n, impact: t, taux, pied, err };
       }
     }
-    if (best && best.err < 0.35) return { nom: best.nom, course: false, taux: best.taux, s, impact: best.impact, pied: best.pied, cote };
+    if (best && best.err < 0.35) return { nom: best.nom, course: false, taux: best.taux, s, impact: best.impact, depuis: 0, pied: best.pied, cote, commande: commandeDe(spec), echelle: 1 };
   }
-  let nom = course ? 'strike_run' : frappe && spec.type !== 'finesse' ? 'shoot' : 'pass';
-  if (cote > 0.08) nom += '_l';
-  const taux = clamp(impactDe(nom) / (spec.type === 'finesse' && !course ? 0.18 : 0.22), 0.8, 2.4);
-  return { nom, course, taux, s, impact: impactDe(nom), pied: CLIPS_PIED(nom), cote };
+  // (bola-app#32, lot A2) au sol : le geste de la commande (gestes-commandes.js) — son clip arrêté ou en course, au pied
+  // du côté de la balle, et son élan (la part du clip jouée avant le contact)
+  const commande = commandeDe(spec), Gc = gesteDe(commande);
+  const nom = versionPied(course ? Gc.course : Gc.arrete, cote) ?? versionPied(course ? 'strike_run' : 'pass', cote);
+  const impact = impactDe(nom);
+  const elan = course ? Gc.elanC : Gc.elanA;
+  const depuis = elan == null ? 0 : Math.max(0, impact - elan);
+  const taux = clamp((impact - depuis) / tempsContact(Gc, false), 0.8, 2.4);
+  // (arrêté, un geste « pas » fait un pas d'élan : le root motion de son clip, à l'échelle d'un départ arrêté)
+  const rm = course || (!!Gc.pas && /^strike_run/.test(nom));
+  return { nom, course: rm, taux, s, impact, depuis, pied: CLIPS_PIED(nom), cote, commande, echelle: rm ? echelleCourse(nom, depuis, impact, Math.max(s, 1.6), taux) : 1 };
+}
+
+/** (lot A2) La version du clip (base ou miroir « _l ») qui frappe du pied du côté de la balle (cote > 0 : à gauche). */
+function versionPied(base, cote) {
+  const veut = cote > 0.08 ? 'g' : 'd';
+  for (const n of [base, base + '_l']) if (CLIPS[n]?.piedImpact?.pied === veut) return n;
+  return CLIPS[base] ? base : null;
+}
+
+/**
+ * (lot A2) L'échelle du root motion d'une frappe en course : le corps garde sa vitesse pendant l'élan joué (de depuis au
+ * contact), quel que soit le rythme ; la vitesse moyenne du root motion sur ce morceau, pas sur tout le clip.
+ */
+function echelleCourse(nom, depuis, impact, s, taux) {
+  racineA(nom, depuis, f0); racineA(nom, impact, f1);
+  const v = hypot(f1.x - f0.x, f1.z - f0.z) / Math.max(0.05, impact - depuis);
+  return clamp(s / (Math.max(0.5, v) * taux), 0.6, 2.6);
 }
 
 /**
@@ -459,14 +497,17 @@ export function pasDemande(m, j) {
   // pour l'IA (la balle est tenue au point de frappe par pasFrappe) ; plus d'attente que le pied arrive
   if (b.p.y < 0.45 && b.v.y < 1.5 && aimantee(m, j)) {
     const c = clipFrappe(j, b, dm.spec);
-    // (l'IA garde le rythme de ses clips d'avant, impact à 0,22 s : ses frappes en course jouées 3 fois plus vite faisaient
-    // sauter le bras de 95° en une image dans le fondu)
-    const taux = clamp(c.impact / (dm.spec.humain ? JEU.rapide : 0.22), 0.8, 3.4);
+    // (lot A2) le rythme du geste de la commande : le contact tombe G.t après l'appui pour un humain (0,11 à 0,2 s selon
+    // l'élan du geste), 1,6 fois plus tard pour l'IA (ses frappes en course jouées 3 fois plus vite faisaient sauter le bras
+    // de 95° en une image dans le fondu) ; l'élan démarre là où le geste le veut (c.depuis)
+    const Gc = gesteDe(c.commande), aerien0 = c.depuis === 0 && AERIENS.test(c.nom);
+    const taux = clamp((c.impact - c.depuis) / (aerien0 ? (dm.spec.humain ? JEU.rapide : 0.22) : tempsContact(Gc, !!dm.spec.humain)), 0.8, 3.4);
     j.demande = null;
+    dm.spec.commande ??= c.commande;
     if (c.course) j.cap = atan2(cible.x - b.p.x, cible.z - b.p.z);
     lancerGeste(j, c.nom, {
-      taux, rm: c.course, echelle: c.course ? clamp(c.s / (2.19 * taux), 0.6, 2) : 1,
-      type: 'frappe', finApresImpact: dm.spec.humain ? 0.2 : 0.25, impact: c.impact, donnees: { spec: dm.spec, pied: c.pied, aimant: true },
+      taux, depuis: c.depuis / duree(c.nom), rm: c.course, echelle: c.course ? echelleCourse(c.nom, c.depuis, c.impact, Math.max(c.s, 1.6), taux) : 1,
+      type: 'frappe', finApresImpact: dm.spec.humain ? Gc.apres : Gc.apres * 1.2, impact: c.impact, donnees: { spec: dm.spec, pied: c.pied, aimant: true },
     });
     const aerien = AERIENS.test(c.nom) && b.p.y > 0.3;
     if (aerien) m.stats.aeriens++;
@@ -476,7 +517,7 @@ export function pasDemande(m, j) {
   // (lot 2) une balle en l'air : la reprise se cale sur l'instant où elle passe à sa portée (prédiction complète)
   if (b.p.y > 0.45 || b.v.y > 1.5) { if (reprendre(m, j, dm, cible) !== null) return; }
   const c = clipFrappe(j, b, dm.spec);
-  const T = c.impact / c.taux;
+  const T = (c.impact - c.depuis) / c.taux;
   const bx = b.p.x + b.v.x * T, bz = b.p.z + b.v.z * T;
   const hc = atan2(cible.x - bx, cible.z - bz);
   surfaceA(c.nom, c.impact, c.pied, t1);
@@ -486,9 +527,10 @@ export function pasDemande(m, j) {
   // où il sera : son élan (ou le root motion de la frappe en course)
   let ex = j.p.x + j.v.x * T, ez = j.p.z + j.v.z * T;
   if (c.course) {
-    const ech = clamp(c.s / (2.19 * c.taux), 0.6, 2);
-    racineA(c.nom, c.impact, t1);
-    versMonde(hc, t1.x * ech, t1.z * ech, t1);
+    const ech = c.echelle;
+    racineA(c.nom, c.impact, t1); const rx = t1.x, rz = t1.z;
+    racineA(c.nom, c.depuis, t1);
+    versMonde(hc, (rx - t1.x) * ech, (rz - t1.z) * ech, t1);
     ex = j.p.x + t1.x; ez = j.p.z + t1.z;
   } else { const s = c.s, fr = Math.min(T, s / CORPS.freinGeste); const L = s || 1; ex = j.p.x + (j.v.x / L) * (s * fr - 0.5 * CORPS.freinGeste * fr * fr); ez = j.p.z + (j.v.z / L) * (s * fr - 0.5 * CORPS.freinGeste * fr * fr); }
   // le point de frappe hors du terrain (balle collée à un panneau) : impossible, l'IA renonce
@@ -499,8 +541,9 @@ export function pasDemande(m, j) {
     j.demande = null;
     // la course de frappe part dans la direction de la cible : le root motion du clip suit ce cap
     if (c.course) j.cap = hc;
+    dm.spec.commande ??= c.commande;
     lancerGeste(j, c.nom, {
-      taux: c.taux, rm: c.course, echelle: c.course ? clamp(c.s / (2.19 * c.taux), 0.6, 2) : 1,
+      taux: c.taux, depuis: c.depuis / duree(c.nom), rm: c.course, echelle: c.echelle,
       type: 'frappe', finApresImpact: 0.25, impact: c.impact, donnees: { spec: dm.spec, pied: c.pied },
     });
     // (pour le banc : le geste choisi, le pied qui frappe et le côté de la balle à l'élan)
@@ -583,6 +626,7 @@ function reprendre(m, j, dm, cible) {
     if (hypot(sx - ex, sz - ez) < 0.2 + 1.1 * tc) {
       j.demande = null;
       j.cap = hc;
+      dm.spec.commande ??= commandeDe(dm.spec);
       lancerGeste(j, g.nom, { taux: g.taux, rm: false, type: 'frappe', finApresImpact: 0.25, impact: g.impact, donnees: { spec: dm.spec, pied: g.pied } });
       const aerien = AERIENS.test(g.nom);
       if (aerien) m.stats.aeriens++;
@@ -693,7 +737,7 @@ function viser(m, j, spec, provisoire) {
   const v0 = spec.type === 'lob' || spec.lobe ? 14 : spec.type === 'centre' ? 13 : vitessePasse(spec, d0);
   const t = clamp(d0 / Math.max(5, v0 * 0.85), 0.2, 2);
   out.x = o.p.x + o.v.x * t; out.z = o.p.z + o.v.z * t;
-  if (spec.type === 'profondeur') { const fwd = 4 + 6 * spec.p; out.z += sens(o.e) * fwd * 0.8; out.x += (o.v.x / (hypot(o.v.x, o.v.z) || 1)) * fwd * 0.2; }
+  if (spec.type === 'profondeur') { const fwd = 4 + 6 * (spec.p ?? 0); out.z += sens(o.e) * fwd * 0.8; out.x += (o.v.x / (hypot(o.v.x, o.v.z) || 1)) * fwd * 0.2; }
   out.x = clamp(out.x, -BX + 0.8, BX - 0.8); out.z = clamp(out.z, -BZ + 0.8, BZ - 0.8);
   out.y = 0; out.t = t;
   return out;

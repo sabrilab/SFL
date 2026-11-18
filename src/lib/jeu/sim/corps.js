@@ -156,7 +156,7 @@ const tmp = { x: 0, y: 0, z: 0 };
 export function lancerGeste(j, nom, { taux = 1, depuis = 0, rm = false, echelle = 1, type = nom, fin = null, finApresImpact = null, donnees = null, impact = null } = {}) {
   j.mode = 'geste';
   j.g = {
-    nom, type, t: depuis * duree(nom), taux, rm, echelle, cap0: j.cap, donnees,
+    nom, type, t: depuis * duree(nom), debut: depuis * duree(nom), taux, rm, echelle, cap0: j.cap, donnees,
     impact: impact ?? impactDe(nom), fait: false,
     fin: fin ?? duree(nom),
     finApresImpact, // s de jeu après l'impact où le geste rend la main (le reste des clips de passe est trop long)
@@ -222,10 +222,10 @@ export function tomber(j, genre = 'avant') {
 }
 
 /** Le relevé, selon la pose au sol du clip qui finit. */
-export function relever(j, apres) {
+export function relever(j, apres, rapide = 1) {
   const nom = RELEVES[apres] && CLIPS[RELEVES[apres]] ? RELEVES[apres] : 'getup';
   const r = RELEVE[nom];
-  lancerGeste(j, nom, { taux: r.taux, depuis: r.depuis, type: 'releve', fin: (r.fin ?? 1) * duree(nom), donnees: { debout: r.debout } });
+  lancerGeste(j, nom, { taux: r.taux * rapide, depuis: r.depuis, type: 'releve', fin: (r.fin ?? 1) * duree(nom), donnees: { debout: r.debout } });
   j.mode = 'releve';
   j.v.x = 0; j.v.z = 0;
 }
@@ -420,7 +420,10 @@ function pasGeste(j, dt) {
       j.solT += dt;
       // (la glissade du tacle : relevé dès que le corps s'arrête ; une chute : après solChute au sol)
       const arrete = hypot(j.v.x, j.v.z) < (g.type === 'tacle' ? 0.9 : 0.3);
-      if (g.type === 'tacle' ? arrete && j.solT > 0.1 : j.solT > C.solChute) relever(j, g.nom);
+      // (bola-app#32, lot A2) le tacle raté laisse le tacleur au sol un court instant (0,7 s) ; le tacle qui a pris la
+      // balle se relève vite (1,3 fois plus vite)
+      if (g.type === 'tacle') { if (arrete && j.solT > (g.donnees?.rate ? 0.7 : 0.1)) relever(j, g.nom, g.donnees?.issue ? 1.3 : 1); }
+      else if (j.solT > C.solChute) relever(j, g.nom);
     }
     return;
   }

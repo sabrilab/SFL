@@ -275,7 +275,10 @@ function deuxManettes(graine: number) {
   // appels, une-deux, pressing coordonné, gardien sur l'angle — 7c88787c avant ; les manettes ne la changent pas)
   // (bola-app#32, lot A : la physique des corps plus vive, la balle aimantée, les passes dosées, les frappes à l'appui et la
   // prise automatique changent le match de l'IA ; 98ccc5d7 aux correctifs #26, 7919334a avant)
-  const REF = '7fcad362';
+  // (bola-app#32, lot A2 : le geste de chaque commande — son clip, son élan, son rythme, 0,17 à 0,3 s pour l'IA au lieu de
+  // 0,22 s partout —, le gardien qui plonge même tard et sort dans les pieds, les trois issues du tacle glissé et sa
+  // portée selon la course, le tacle debout sans tirage au sort changent le match de l'IA ; 7fcad362 au lot A)
+  const REF = '59097628';
   verifier('IA contre IA inchangée (graine 7)', empreinte(m) === REF, `${empreinte(m)} (attendu ${REF}, celle du banc physique)`);
 }
 

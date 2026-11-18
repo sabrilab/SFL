@@ -76,7 +76,7 @@ async function paquet(nom: string) {
   return { scene: g.scene, rig: makeRig(g.scene, false), clips: g.animations };
 }
 const PAQ: Record<string, Any> = {};
-for (const n of ['player', 'player2', 'keeper', 'keeper2', 'celeb', 'celeb2']) PAQ[n] = await paquet(n);
+for (const n of ['player', 'player2', 'player3', 'keeper', 'keeper2', 'celeb', 'celeb2']) PAQ[n] = await paquet(n);
 
 /** Un joueur sans maillage : le squelette canonique, à la taille du jeu, avec les clips de ses paquets. */
 function creerPerso(gardien: boolean) {
@@ -86,7 +86,8 @@ function creerPerso(gardien: boolean) {
   const rig = makeRig(corps, false);
   const mixer = new THREE.AnimationMixer(corps);
   const actions: Record<string, Any> = {};
-  for (const p of gardien ? ['keeper', 'keeper2', 'celeb', 'celeb2'] : ['player', 'player2', 'celeb', 'celeb2']) {
+  // (bola-app#32, lot A2 : le gardien a aussi les cycles de course du joueur, comme dans la page, match.js)
+  for (const p of gardien ? ['keeper', 'keeper2', 'player', 'celeb', 'celeb2'] : ['player', 'player2', 'player3', 'celeb', 'celeb2']) {
     for (const c of PAQ[p].clips) {
       const b = bindClip(c, PAQ[p].rig, rig);
       const a = mixer.clipAction(b);
@@ -250,6 +251,9 @@ const loin = (M: Any) => poser(M.joueurs[6], 6, 12, 0);
 // (bola-app#32 : le receveur vient au-devant de la passe et court plus vite ; arrêté, stick au repos, la balle part de 3,5 m pour
 // arriver à hauteur de poitrine ; avant, elle partait de 6 m vers un joueur qui avançait à 0,6 d'allure)
 scene('poitrine', [], (M) => { loin(M); M.arrete = true; poser(M.joueurs[4], 0, 0, Math.PI); const b = M.balle; b.p.x = 0; b.p.y = 1.25; b.p.z = -3.5; b.v.x = 0; b.v.y = 2; b.v.z = 8; b.possesseur = null; b.dernier = 6; b.dernierT = M.t - 1; b.recepteur = 4; }, 2.5);
+// (bola-app#32, lot A2 : le pied levé (stall) ne venait que par hasard dans les matchs IA, que les gestes et les tacles du
+// lot ont changés ; une balle à hauteur de genou vers un joueur arrêté le joue à coup sûr)
+scene('pied-leve', [], (M) => { loin(M); M.arrete = true; poser(M.joueurs[4], 0, 0, Math.PI); const b = M.balle; b.p.x = 0.05; b.p.y = 0.55; b.p.z = -4; b.v.x = 0; b.v.y = 2.2; b.v.z = 7; b.possesseur = null; b.dernier = 6; b.dernierT = M.t - 1; b.recepteur = 4; }, 2.5);
 scene('tete', [], (M) => { loin(M); poser(M.joueurs[4], 0, 0, Math.PI); const b = M.balle; b.p.x = 0; b.p.y = 1.5; b.p.z = -5; b.v.x = 0; b.v.y = 3.0; b.v.z = 7; b.possesseur = null; b.dernier = 6; b.dernierT = M.t - 1; b.recepteur = 4; }, 2.5);
 // une volée : balle aérienne devant le joueur, frappe demandée
 scene('volee', [[0.05, { type: 'frappe', p: 0.7, x: 0.5, y: 1 }]], (M) => { loin(M); poser(M.joueurs[4], 0, -2, Math.PI); const b = M.balle; b.p.x = 0.1; b.p.y = 1.7; b.p.z = -3.3; b.v.x = 0; b.v.y = 0.8; b.v.z = 2.5; b.possesseur = 4; b.dernier = 4; b.dernierT = M.t; }, 2.5);

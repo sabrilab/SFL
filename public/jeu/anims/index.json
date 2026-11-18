@@ -888,5 +888,17 @@
    "plant": 0,
    "source": "sprint_to_backslide"
   }
+ },
+ "player3": {
+  "saut": {
+   "loop": false,
+   "dur": 0.867,
+   "move": [
+    0,
+    3.457
+   ],
+   "plant": 0,
+   "source": "jump (1)"
+  }
  }
 }

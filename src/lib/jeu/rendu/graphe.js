@@ -27,7 +27,7 @@ const clamp = (x, a, b) => (x < a ? a : x > b ? b : x);
 
 /** Les durées de fondu (s) d'une catégorie à l'autre ; « * » : toute autre. */
 export const FONDUS = {
-  loco: { geste: 0.1, chute: 0.08, tacle: 0.1, pivot: 0.1, depart: 0.12, arret: 0.15, demitour: 0.12, fete: 0.3, gardien: 0.08, '*': 0.12 },
+  loco: { geste: 0.1, chute: 0.11, tacle: 0.1, pivot: 0.1, depart: 0.12, arret: 0.15, demitour: 0.12, fete: 0.3, gardien: 0.12, '*': 0.12 },
   depart: { loco: 0.22, '*': 0.1 },
   arret: { loco: 0.25, depart: 0.15, '*': 0.1 },
   demitour: { loco: 0.2, depart: 0.15, '*': 0.1 },

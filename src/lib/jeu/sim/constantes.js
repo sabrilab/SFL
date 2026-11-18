@@ -53,7 +53,7 @@ export const CORPS = {
   trebuche: 0.65, chute: 1.0,       // seuils de déséquilibre
   solChute: 0.9,                    // s au sol après une chute, avant le relevé
   freinGlissade: 7.5,               // m/s² : le tacle glissé sur le gazon (bola-app#26 ; correctifs : 4,5 → 7,5, ~0,9 s et ~3 m au lieu de 1,3 s et 5,4 m)
-  vGlissade: [3.2, 7],                 // m/s : la vitesse de la glissade au départ (bornes)
+  vGlissade: [3.2, 7.6],               // m/s : la vitesse de la glissade au départ (bornes ; bola-app#32, lot A2 : 1,2 + 0,95 × la course, 7 avant)
   forceEpaule: 900,                 // N
   restitution: 0.15, frottementCorps: 0.3,
   hanche: 0.957,                    // m : hanche du footballeur Ch38 (clips en hanches)
@@ -129,8 +129,10 @@ export const DUELS = {
   // la protection : le porteur qui protège recule dans le défenseur collé dans son dos (N), et le déséquilibre un peu
   dos: { force: 420, des: 2.2 },     // (des : par seconde)
   // le tacle debout contré : la balle sous le pied du porteur (moins de 0,42 m), les deux pieds la touchent ensemble
-  // (bola-app#32 : la balle aimantée se tient à 0,36-0,5 m devant le pied au pas ; « sous le pied » va jusqu'à 0,52 m, avant 0,42)
-  contre: { pied: 0.52, part: 0.5 },
+  // (bola-app#32 : la balle aimantée se tient à 0,36-0,5 m devant le pied au pas ; « sous le pied » va jusqu'à 0,52 m, avant
+  // 0,42 ; lot A2, point 15 : l'issue ne se tire plus au sort (une fois sur deux avant) — le défenseur pile dans l'axe du
+  // porteur, à moins de 10° (axe : cosinus), rencontre son pied sur la balle : contrée ; un peu de côté, il la prend)
+  contre: { pied: 0.52, axe: 0.985 },
 };
 
 export const ROLES = ['G', 'D', 'L', 'R', 'A'];

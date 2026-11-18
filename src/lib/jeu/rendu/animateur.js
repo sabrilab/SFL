@@ -30,9 +30,11 @@ import * as THREE from 'three';
 import { CLIPS } from '../sim/clips.js';
 import { creerGraphe, fondu, dureeSortie, enAppui, partCycle, vitessePhase } from './graphe.js';
 import { boneKey } from '../library.js';
+import { GESTES } from '../sim/gestes-commandes.js';
 
 const LOCO = ['idle', 'jog', 'run', 'sprint', 'drib', 'back', 'strafe_l', 'strafe_r'];
-const LOCO_G = ['k_idle', 'k_side_l', 'k_side_r'];
+// (bola-app#32, lot A2) le gardien marche et court aussi : les cycles du joueur (paquet player) quand il avance ou recule
+const LOCO_G = ['k_idle', 'k_side_l', 'k_side_r', 'jog', 'run', 'back'];
 const clamp = THREE.MathUtils.clamp;
 const DEG = Math.PI / 180;
 
@@ -46,6 +48,55 @@ function ressort(etat, cle, cible, dt, w = 14) {
   for (let i = 0; i < n; i++) { v += (k * (cible - x) - c * v) * h; x += v * h; }
   etat[cle] = x; etat[cle + 'V'] = v;
   return x;
+}
+
+// (bola-app#32, lot A2) la couche « geste de commande » : la surface du pied qui frappe, en cibles au contact — l'angle du
+// pied par rapport à la direction de la frappe (lacet, + : pointe vers l'extérieur de la jambe ; l'intérieur du pied face à
+// la balle, c'est la pointe tournée de 75° vers l'extérieur) et son tangage (− : pointe vers le bas ; au repos ≈ −32°) —
+// et l'endroit du milieu du pied au contact, par rapport à la balle (recul derrière elle, décalage vers l'extérieur de la
+// jambe, hauteur). Le rendu mesure la pose du clip et tourne la hanche et le pied de ce qui manque (rendu adaptatif :
+// les clips n'ont pas tous la même pose au contact).
+const SURFACES = {
+  interieur: { lacet: 75, tangage: -30, recul: 0.13, cote: 0.05, y: 0.08 },
+  exterieur: { lacet: -35, tangage: -50, recul: 0.15, cote: -0.04, y: 0.09 },
+  coudepied: { lacet: 5, tangage: -72, recul: 0.15, cote: 0, y: 0.11 },
+  sous: { lacet: 25, tangage: -42, recul: 0.16, cote: 0, y: 0.06 },
+  dessous: { lacet: 0, tangage: -8, recul: 0.14, cote: 0, y: 0.04 },
+  pointe: { lacet: 0, tangage: -58, recul: 0.2, cote: 0, y: 0.07 },
+};
+const AERIEN = /^(head|header|volley|bicycle)/;
+const lisse = (x) => { const u = x < 0 ? 0 : x > 1 ? 1 : x; return u * u * (3 - 2 * u); };
+const angle = (a) => { let d = a; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; return d; };
+
+/**
+ * L'orientation d'un pied (repère du monde), stable même pointe tendue vers le bas : son avant horizontal (le plan qui
+ * contient le tibia et le pied, coupé par l'horizontale, du talon vers la pointe) et son tangage. genou, cheville,
+ * orteil : positions des os. Écrit out.x, out.z (avant horizontal unitaire) et rend le tangage (rad, − : pointe en bas).
+ * prec (facultatif, {x, z}) : l'orientation de l'image d'avant, tenue à jour, pour le pied tendu dans l'axe du tibia.
+ */
+const _f = new THREE.Vector3(), _s = new THREE.Vector3(), _l = new THREE.Vector3(), _h = new THREE.Vector3(), _u = new THREE.Vector3(0, 1, 0);
+export function orientationPied(genou, cheville, orteil, out, prec = null) {
+  _f.copy(orteil).sub(cheville).normalize();
+  _s.copy(cheville).sub(genou).normalize();
+  _l.crossVectors(_s, _f);
+  const n = _l.length();
+  if (n < 1e-4) { const L = Math.hypot(_f.x, _f.z) || 1; out.x = _f.x / L; out.z = _f.z / L; } else {
+    _h.crossVectors(_l.multiplyScalar(1 / n), _u);
+    const sg = _h.dot(_f) - _h.dot(_s) >= 0 ? 1 : -1;
+    const L = Math.hypot(_h.x, _h.z) || 1;
+    out.x = (sg * _h.x) / L; out.z = (sg * _h.z) / L;
+  }
+  // (le pied tendu dans l'axe du tibia — cou-de-pied — : le plan tibia-pied n'est plus défini et son sens peut basculer
+  // d'une image à l'autre ; avec prec, l'orientation de l'image d'avant, le sens est gardé et elle la reprend d'autant
+  // plus que le pied s'aligne : plus de bascule de 100° au contact)
+  if (prec && (prec.x || prec.z)) {
+    if (n < 0.5 && out.x * prec.x + out.z * prec.z < 0) { out.x = -out.x; out.z = -out.z; }
+    const w = n <= 0.15 ? 0 : n >= 0.4 ? 1 : (n - 0.15) / 0.25;
+    const x = prec.x * (1 - w) + out.x * w, z = prec.z * (1 - w) + out.z * w, L = Math.hypot(x, z) || 1;
+    out.x = x / L; out.z = z / L;
+  }
+  if (prec) { prec.x = out.x; prec.z = out.z; }
+  return Math.atan2(_f.y, Math.hypot(_f.x, _f.z));
 }
 
 const qa = new THREE.Quaternion(), qb = new THREE.Quaternion(), qc = new THREE.Quaternion();
@@ -148,20 +199,34 @@ export function creerAnimateur(perso, { gardien = false, reduit = false, versMon
   // (correctifs #26 : objets gardés d'une image à l'autre, aucune allocation par image)
   const w = {}, domT = { nom: '', u: 0, w: 0 }, retourLoco = { dom: null, s: 0 };
   function poserLoco(e, total, wLoco, dt = 0) {
-    const s = Math.hypot(e.vx, e.vz);
+    // (bola-app#32, lot A2) la vitesse qui choisit les cycles ne change pas de plus de 30 m/s² (le freinage le plus fort
+    // d'un joueur est de 16 m/s², il passe tel quel) : un choc qui casse la course en une image (5 → 1,4 m/s) ne fait plus
+    // sauter les jambes de la course au trot (86° en 1/60 s) ; la cadence, elle, suit la phase de la simulation
+    const lim = 30 * Math.max(dt, 1e-3);
+    const vx = (etat.lvx = (etat.lvx ?? e.vx) + clamp(e.vx - (etat.lvx ?? e.vx), -lim, lim));
+    const vz = (etat.lvz = (etat.lvz ?? e.vz) + clamp(e.vz - (etat.lvz ?? e.vz), -lim, lim));
+    const s = Math.hypot(vx, vz);
     if (gardien) phaseG = (phaseG + (dt * s) / foulee('k_side_l')) % 1;
     // vitesse dans le repère du joueur (x = sa gauche, z = devant)
     const c = Math.cos(e.cap), sn = Math.sin(e.cap);
-    const lx = e.vx * c - e.vz * sn, lz = e.vx * sn + e.vz * c;
+    const lx = vx * c - vz * sn, lz = vx * sn + vz * c;
     for (const n of noms) w[n] = 0;
     if (gardien) {
-      const cote = s > 0.3 ? clamp(Math.abs(lx) / s, 0, 1) : 0;
-      const k = clamp(s / 1.2, 0, 1) * cote;
-      w.k_idle = 1 - k;
+      // (bola-app#32, lot A2) de côté : les pas chassés ; vers l'avant ou l'arrière (sortie, retour sur sa ligne) : la
+      // marche puis la course du joueur, ou la course arrière ; avant, il glissait en position d'attente
+      const q2 = s > 0.3 ? lx * lx + lz * lz : 1;
+      const cote = s > 0.3 ? (lx * lx) / q2 : 0, av = s > 0.3 && lz > 0 ? (lz * lz) / q2 : 0, ar = s > 0.3 && lz < 0 ? (lz * lz) / q2 : 0;
+      const k = clamp(s / 1.2, 0, 1);
       // (le pas chassé qui va du bon côté : celui dont le root motion part vers x > 0 quand il va à sa gauche ;
       // « k_side_l », miroir de la capture, va vers sa droite)
       const versGauche = (CLIPS.k_side_r?.root?.[(CLIPS.k_side_r.n - 1) * 2] ?? 1) > 0 ? 'k_side_r' : 'k_side_l';
-      w[lx > 0 ? versGauche : versGauche === 'k_side_r' ? 'k_side_l' : 'k_side_r'] = k;
+      w[lx > 0 ? versGauche : versGauche === 'k_side_r' ? 'k_side_l' : 'k_side_r'] = k * cote;
+      const avant0 = 'jog' in w ? av : 0, arriere0 = 'back' in w ? ar : 0;
+      const run = clamp((s - 2.85) / (5.39 - 2.85), 0, 1);
+      if ('jog' in w) w.jog = k * avant0 * (1 - ('run' in w ? run : 0));
+      if ('run' in w) w.run = k * avant0 * run;
+      if ('back' in w) w.back = k * arriere0;
+      w.k_idle = 1 - k * (cote + avant0 + arriere0);
     } else {
       const fw = s > 0.05 ? Math.max(0, lz / s) : 1, bk = s > 0.05 ? Math.max(0, -lz / s) : 0;
       const lf = s > 0.05 ? Math.max(0, lx / s) : 0, rt = s > 0.05 ? Math.max(0, -lx / s) : 0;
@@ -184,7 +249,7 @@ export function creerAnimateur(perso, { gardien = false, reduit = false, versMon
       const a = actions[n], cl = CLIPS[n];
       const dur = a.getClip().duration;
       // (le gardien : ses pas chassés ont leur propre cadence, celle de leur foulée, pas celle de la course)
-      const u = n === 'idle' || n === 'k_idle' ? ((total % dur) / dur) : gardien ? (phaseG + calageG(n)) % 1 : partCycle(n, e.phase);
+      const u = n === 'idle' || n === 'k_idle' ? ((total % dur) / dur) : gardien && n.startsWith('k_') ? (phaseG + calageG(n)) % 1 : partCycle(n, e.phase);
       a.time = u * dur;
       a.setEffectiveWeight(w[n] * wLoco);
       if (w[n] > dw && cl?.appuis && n !== 'idle' && n !== 'k_idle') { dw = w[n]; domT.nom = n; domT.u = u; domT.w = w[n]; d = domT; }
@@ -248,6 +313,222 @@ export function creerAnimateur(perso, { gardien = false, reduit = false, versMon
     return Math.min(1, W);
   }
 
+  // ── (bola-app#32, lot A2) la couche « geste de commande » ──
+  const cmd = { P: null, S: null, commande: null, nom: null, pied: 1, envB: 0, envJ: 0, envS: 0, avantContact: true, precPied: [{ x: 0, z: 0 }, { x: 0, z: 0 }], diag: { hanche: 0, pied: 0, ik: 0, suivi: 0, buste: 0, roulis: 0 } };
+  /**
+   * La posture du geste en cours, ou de celui qui sort (sa couche continue pendant son fondu de sortie), et ses
+   * enveloppes : buste (monte pendant l'élan, tenu au contact, rendu), jambe (autour du contact), suivi (après). null
+   * s'il n'y a pas de geste de commande.
+   */
+  function posture(e, Wg) {
+    const G = e.geste;
+    let t, w, fait;
+    if (G && G.commande && !gardien && (G.type === 'frappe' || G.type === 'tacleDebout') && GESTES[G.commande] && G.commande !== 'acrobatique' && !AERIEN.test(G.nom)) {
+      if (cmd.nom !== G.nom || cmd.ti !== (G.impact ?? 0)) for (const q of cmd.precPied) q.x = q.z = 0;
+      cmd.P = GESTES[G.commande]; cmd.S = SURFACES[cmd.P.surface] ?? SURFACES.coudepied; cmd.commande = G.commande; cmd.nom = G.nom;
+      cmd.pied = G.pied ?? (CLIPS[G.nom]?.piedImpact?.pied === 'g' ? 0 : 1);
+      cmd.taux = Math.max(0.3, G.taux || 1); cmd.ti = G.impact ?? 0; cmd.t0 = Math.min(G.debut ?? 0, cmd.ti - 0.02);
+      t = G.t; w = Wg; fait = G.fait;
+    } else if (cmd.nom) {
+      // le geste a rendu la main : sa couche sort, la posture la suit jusqu'au bout du fondu
+      const c = couches.find((x) => x.nom === cmd.nom && x !== active);
+      if (!c || c.poids <= 0.01 || (G && G.nom !== cmd.nom)) { cmd.nom = null; return null; }
+      t = c.t; w = c.poids; fait = true;
+    } else return null;
+    const apres = (t - cmd.ti) / cmd.taux; // s de jeu depuis le contact (< 0 avant)
+    const montee = lisse((t - cmd.t0) / Math.max(0.02, cmd.ti - cmd.t0));
+    const envB = apres < 0 ? montee : apres < 0.15 ? 1 : lisse(1 - (apres - 0.15) / 0.3);
+    const envJ = apres < 0 ? lisse(1 + apres / 0.14) : apres < 0.04 ? 1 : lisse(1 - (apres - 0.04) / 0.16);
+    const envS = apres < 0 ? 0 : lisse(apres / 0.05) * lisse(1 - (apres - 0.4) / 0.2);
+    const k = clamp(w, 0, 1);
+    cmd.envB = envB * k; cmd.envJ = envJ * k; cmd.envS = envS * k; cmd.avantContact = !fait && apres < 0.02;
+    return cmd;
+  }
+  /** Le buste vers sa cible (tangage + en avant ; roulis + du côté opposé au pied qui frappe), à la part k. */
+  function busteCommande(C, k) {
+    if (!os.hips || !os.spine || !(os.spine2 || os.neck)) return;
+    const sgP = C.pied === 1 ? 1 : -1;
+    let totT = 0, totR = 0;
+    // (trois passes : le dos tourne à ses vertèbres, au-dessus des hanches, la pente mesurée des hanches au haut du dos
+    // ne suit qu'une part de la rotation ; la cible est atteinte à 1° près)
+    for (let it = 0; it < 3; it++) {
+      os.hips.getWorldPosition(va); (os.spine2 ?? os.neck).getWorldPosition(vb);
+      vb.sub(va);
+      const tg = Math.atan2(vb.dot(avant), vb.y), rl = Math.atan2(vb.dot(lateral), vb.y) * sgP;
+      const dT = clamp(C.P.buste * DEG * k + tg * (1 - k) - tg, -40 * DEG - totT, 40 * DEG - totT);
+      const dR = clamp((C.P.roulis ?? 0) * DEG * k + rl * (1 - k) - rl, -25 * DEG - totR, 25 * DEG - totR);
+      if (Math.abs(dT) < 0.004 && Math.abs(dR) < 0.004) break;
+      tournerMonde(os.spine, lateral, dT * 0.5); tournerMonde(os.spine, avant, -dR * sgP * 0.5);
+      if (os.spine1) { tournerMonde(os.spine1, lateral, dT * 0.5); tournerMonde(os.spine1, avant, -dR * sgP * 0.5); }
+      racine.updateMatrixWorld(true);
+      totT += dT; totR += dR;
+    }
+    cmd.diag.buste = totT; cmd.diag.roulis = totR;
+  }
+  const kd = new THREE.Vector3(), cote3 = new THREE.Vector3(), mil = new THREE.Vector3(), cheville = new THREE.Vector3(), orteil = new THREE.Vector3(), genou = new THREE.Vector3(), cibleJ = new THREE.Vector3(), axeP = new THREE.Vector3();
+  const avP = { x: 0, z: 0 };
+  function jambeCommande(C, e) {
+    const L = pieds[C.pied];
+    const orteilOs = C.pied === 1 ? os.righttoebase : os.lefttoebase;
+    if (!L?.haut || !L.milieu || !L.bout || !orteilOs) return;
+    const k = C.envJ * (reduit ? 0.6 : 1);
+    const sg = C.pied === 1 ? -1 : 1; // vers l'extérieur de la jambe : sa droite (−) pour la jambe droite, sa gauche (+) pour la gauche
+    // 1. le lacet du pied : la hanche tourne autour de la verticale de ce qui manque (le genou et le pied suivent)
+    L.milieu.getWorldPosition(genou); L.bout.getWorldPosition(cheville); orteilOs.getWorldPosition(orteil);
+    orientationPied(genou, cheville, orteil, avP, C.precPied[C.pied]);
+    const lacet = Math.atan2(avP.x * avant.z - avP.z * avant.x, avP.x * avant.x + avP.z * avant.z) * sg; // + : vers l'extérieur
+    const ah = clamp(angle(C.S.lacet * DEG - lacet), -80 * DEG, 80 * DEG) * k;
+    if (Math.abs(ah) > 1e-4) { tournerMonde(L.haut, haut, sg * ah); racine.updateMatrixWorld(true); }
+    cmd.diag.hanche = ah;
+    // 2. le pied sur la balle, avant le contact (le milieu du pied derrière la balle, du côté de la surface)
+    let ik = 0;
+    if (C.avantContact && e.boule && versMonde3) {
+      const bw = versMonde3(e.boule, bal);
+      kd.copy(avant); cote3.copy(lateral).multiplyScalar(sg);
+      L.bout.getWorldPosition(cheville); orteilOs.getWorldPosition(orteil);
+      mil.copy(cheville).add(orteil).multiplyScalar(0.5);
+      cibleJ.copy(bw).addScaledVector(kd, -C.S.recul).addScaledVector(cote3, C.S.cote);
+      cibleJ.y = Math.max(C.S.y, bw.y - 0.06);
+      vt.copy(cibleJ).sub(mil);
+      const Lc = vt.length();
+      if (Lc > 0.25) vt.multiplyScalar(0.25 / Lc);
+      ik = Math.min(Lc, 0.25) * k;
+      if (Lc > 0.004) { cibleJ.copy(cheville).addScaledVector(vt, k); ik2(L.haut, L.milieu, L.bout, cibleJ); racine.updateMatrixWorld(true); }
+    }
+    cmd.diag.ik = ik;
+    // 3. le tangage du pied : pointe tendue (cou-de-pied), à plat (intérieur), relevée (sous la balle)
+    L.milieu.getWorldPosition(genou); L.bout.getWorldPosition(cheville); orteilOs.getWorldPosition(orteil);
+    const tp = orientationPied(genou, cheville, orteil, avP, C.precPied[C.pied]);
+    const dp = clamp(C.S.tangage * DEG - tp, -70 * DEG, 70 * DEG) * k;
+    if (Math.abs(dp) > 1e-4) { axeP.set(avP.x, 0, avP.z).cross(haut).normalize(); tournerMonde(L.bout, axeP, dp); }
+    cmd.diag.pied = dp;
+  }
+  /** Le suivi : après le contact, le pied ne remonte pas au-dessus de P.suivi (ras de terre, piqué, passes). */
+  function suiviCommande(C) {
+    const L = pieds[C.pied];
+    let su = 0;
+    if (L?.haut && C.P.suivi != null && C.envS > 0.001) {
+      L.bout.getWorldPosition(cheville);
+      const exces = cheville.y - C.P.suivi;
+      if (exces > 0.01) {
+        su = Math.min(exces, 0.8) * C.envS;
+        cibleJ.copy(cheville); cibleJ.y -= su;
+        ik2(L.haut, L.milieu, L.bout, cibleJ); racine.updateMatrixWorld(true);
+      }
+    }
+    cmd.diag.suivi = su;
+  }
+
+  // ── (bola-app#32, lot A2) le gardien au sol ──
+  // les semelles : sur le vrai corps, le bas de la chaussure à la pose de liaison (72 sommets par pied au plus) ;
+  // sur le squelette nu des bancs, l'orteil (1,7 cm au-dessus de la semelle) ou la cheville (8 cm)
+  const semelles = [[], []];
+  let chaussures = null;
+  if (gardien) {
+    corps.traverse((o) => { if (!chaussures && o.isSkinnedMesh && /shoe|boot|crampon/i.test(o.name)) chaussures = o; });
+    if (chaussures?.geometry?.attributes?.skinIndex && chaussures.skeleton) {
+      racine.updateMatrixWorld(true);
+      const idx = chaussures.geometry.attributes.skinIndex, wt = chaussures.geometry.attributes.skinWeight;
+      const cles = chaussures.skeleton.bones.map((b) => boneKey(b.name));
+      const tous = [[], []];
+      for (let i = 0; i < idx.count; i++) {
+        let best = -1, bw = 0;
+        for (let k = 0; k < 4; k++) if (wt.getComponent(i, k) > bw) { bw = wt.getComponent(i, k); best = idx.getComponent(i, k); }
+        const c = /^left/.test(cles[best] ?? '') ? 0 : /^right/.test(cles[best] ?? '') ? 1 : -1;
+        if (c < 0) continue;
+        chaussures.getVertexPosition(i, va); va.applyMatrix4(chaussures.matrixWorld);
+        tous[c].push([i, va.x, va.y, va.z]);
+      }
+      // (le bas de la chaussure, jusqu'à 6 cm de la semelle : crampons, bout et talon, qui touchent le gazon quand le pied
+      // pointe ou se relève ; un quadrillage 8 × 3 sous le pied, et dans chaque case le sommet le plus bas, le plus en
+      // avant et le plus en arrière : 72 sommets par pied au plus, répartis sur tout le contour)
+      for (let c = 0; c < 2; c++) {
+        const lo = Math.min(...tous[c].map((x) => x[2]));
+        const bas = tous[c].filter((x) => x[2] < lo + 0.06);
+        const bx = [Math.min(...bas.map((x) => x[1])), Math.max(...bas.map((x) => x[1]))];
+        const bz = [Math.min(...bas.map((x) => x[3])), Math.max(...bas.map((x) => x[3]))];
+        const cases = new Map();
+        for (const x of bas) {
+          const kx = Math.min(2, Math.floor((3 * (x[1] - bx[0])) / (bx[1] - bx[0] + 1e-6)));
+          const kz = Math.min(7, Math.floor((8 * (x[3] - bz[0])) / (bz[1] - bz[0] + 1e-6)));
+          const k = kz * 3 + kx, b = cases.get(k);
+          if (!b) { cases.set(k, [x, x, x]); continue; }
+          if (x[2] < b[0][2]) b[0] = x;
+          if (x[3] > b[1][3]) b[1] = x;
+          if (x[3] < b[2][3]) b[2] = x;
+        }
+        const vus = new Set();
+        for (const b of cases.values()) for (const x of b) if (!vus.has(x[0])) { vus.add(x[0]); semelles[c].push(x[0]); }
+      }
+      if (!semelles[0].length || !semelles[1].length) chaussures = null;
+    } else chaussures = null;
+  }
+  const vS = new THREE.Vector3();
+  /** La hauteur (m, monde) du point le plus bas de la semelle du pied c. */
+  function semelle(c) {
+    if (chaussures) {
+      let lo = Infinity;
+      for (const i of semelles[c]) { chaussures.getVertexPosition(i, vS); vS.applyMatrix4(chaussures.matrixWorld); if (vS.y < lo) lo = vS.y; }
+      return lo;
+    }
+    const orteilC = c ? os.righttoebase : os.lefttoebase, pied = c ? os.rightfoot : os.leftfoot;
+    if (!orteilC || !pied) return 0;
+    orteilC.getWorldPosition(vS); const a = vS.y - 0.017;
+    pied.getWorldPosition(vS); return Math.min(a, vS.y - 0.08);
+  }
+  /** Le point le plus bas du corps couché (bassin, tête, mains, genoux, semelles), pour qu'il ne passe pas sous le gazon. */
+  function corpsBas(lo) {
+    let b = lo;
+    const t = (o, r) => { if (o) { o.getWorldPosition(vS); b = Math.min(b, vS.y - r); } };
+    t(os.hips, 0.12); t(os.head, 0.12); t(os.lefthand, 0.04); t(os.righthand, 0.04); t(os.leftleg, 0.06); t(os.rightleg, 0.06);
+    return b;
+  }
+  const solG = { debout: true, y: 0, sem: [0, 0], vit: [0, 0], prec: [new THREE.Vector3(), new THREE.Vector3()], diag: { debout: true, bas: 0, haut: 0, pose: 0 } };
+  function ancrerGardien(e, dt) {
+    const G = e.geste;
+    const auSol = e.mode === 'sol' || !!(G && (G.type === 'plongeon' || G.type === 'battu' || (G.type === 'arret' && /k_low|k_block|k_high|k_dive|k_miss/.test(G.nom))));
+    racine.updateMatrixWorld(true);
+    const y0 = racine.position.y;
+    const s0 = semelle(0) - y0, s1 = semelle(1) - y0, lo = Math.min(s0, s1);
+    let y;
+    if (!auSol) {
+      // (debout : la semelle la plus basse à 3 mm du gazon, sans saut : 8 cm par image au plus)
+      // (au sortir d'un plongeon, le corps a déjà sauté de couché à debout : le recalage suit tout de suite)
+      const cible = clamp(0.003 - lo, -0.3, 0.2), pas = Math.max(0.08, dt * 4.8);
+      y = solG.debout ? solG.y + clamp(cible - solG.y, -pas, pas) : cible;
+    } else y = Math.max(solG.y - dt * 0.6, clamp(0.02 - corpsBas(lo), 0, 0.4));
+    solG.y = y; solG.debout = !auSol;
+    corps.position.y = y;
+    racine.updateMatrixWorld(true);
+    solG.diag.debout = !auSol;
+  }
+  /** Debout : l'autre pied, presque posé (moins de 8 cm) et immobile (moins de 0,3 m/s), est posé sur le gazon (IK). */
+  function poserSecondPied(dt) {
+    if (!solG.debout) return;
+    const y0 = racine.position.y;
+    // (les pieds verrouillés, tirés vers leur appui, ont pu se lever : la semelle la plus basse est reposée, 6 cm au plus)
+    const r = clamp(Math.min(semelle(0), semelle(1)) - y0 - 0.003, -0.06, 0.06);
+    if (Math.abs(r) > 0.001) { corps.position.y -= r; solG.y -= r; racine.updateMatrixWorld(true); }
+    for (let c = 0; c < 2; c++) {
+      const P = pieds[c];
+      solG.sem[c] = semelle(c) - y0;
+      if (P.bout) { P.bout.getWorldPosition(vS); solG.vit[c] = dt > 0 ? Math.hypot(vS.x - solG.prec[c].x, vS.z - solG.prec[c].z) / dt : 0; solG.prec[c].copy(vS); }
+    }
+    const hi = solG.sem[0] > solG.sem[1] ? 0 : 1, lo = 1 - hi;
+    const ecart = solG.sem[hi] - Math.max(0, solG.sem[lo]);
+    let pose = 0;
+    const P = pieds[hi];
+    if (P.haut && P.milieu && P.bout && ecart > 0.004 && ecart < 0.08 && solG.vit[hi] < 0.3) {
+      P.bout.getWorldPosition(cible); cible.y -= ecart;
+      ik2(P.haut, P.milieu, P.bout, cible); racine.updateMatrixWorld(true);
+      // (le pied tourne avec la jambe pliée : son talon peut passer sous le gazon ; le pied est alors remonté d'autant)
+      const sous = semelle(hi) - y0 - Math.max(0, solG.sem[lo]);
+      if (sous < -0.002) { cible.y -= sous; ik2(P.haut, P.milieu, P.bout, cible); racine.updateMatrixWorld(true); }
+      pose = ecart;
+    }
+    solG.diag.pose = pose; solG.diag.bas = Math.min(semelle(0), semelle(1)) - y0; solG.diag.haut = Math.max(solG.sem[0], solG.sem[1]) - pose;
+  }
+
   let total = 0;
   function maj(e, dt) {
     total += dt;
@@ -302,22 +583,35 @@ export function creerAnimateur(perso, { gardien = false, reduit = false, versMon
     const uF = F?.double ? (uF0 * 2) % 1 : uF0;
     const coteF = F ? (F.double && uF0 >= 0.5 ? -F.cote : F.cote) : 0;
     const balancier = F && F.type === 'passement' ? coteF * 9 * DEG * Math.sin(Math.PI * uF) : 0;
-    const roulis = ressort(etat, 'rl', (clamp(-0.6 * Math.atan((e.aLat ?? 0) / 9.81), -16 * DEG, 16 * DEG) + appui) * amp * (1 - gesteW) + balancier * amp, dt, 9);
+    // (bola-app#32, lot A2) le tacle glissé sur la hanche : le corps roule sur la hanche de la jambe repliée (22°)
+    const hancheTacle = G && G.nom === 'slide' && G.type === 'tacle' ? 22 * DEG * clamp((G.t - 0.18) / 0.22, 0, 1) : 0;
+    const roulis = ressort(etat, 'rl', (clamp(-0.6 * Math.atan((e.aLat ?? 0) / 9.81), -16 * DEG, 16 * DEG) + appui) * amp * (1 - gesteW) + balancier * amp + hancheTacle * amp, dt, 9);
     corps.rotation.z = roulis;
     corps.rotation.x = 0;
-    // le gardien : ses captures enfoncent les orteils dans le gazon (jusqu'à 11 cm) ; le corps remonte d'autant
-    if (gardien && os.lefttoebase && os.righttoebase) {
-      racine.updateMatrixWorld(true);
-      os.lefttoebase.getWorldPosition(va); os.righttoebase.getWorldPosition(vb);
-      const bas = Math.min(va.y, vb.y) - racine.position.y;
-      corps.position.y = ressort(etat, 'pied', clamp(0.012 - bas, 0, 0.12), dt, 16);
-    }
+    // (bola-app#32, lot A2) le gardien a les pieds au sol : la semelle la plus basse posée sur le gazon (le corps monte ou
+    // descend d'autant, 8 cm/image au plus), sauf en plongeon, en parade couchée, en saut et battu (là, le corps est
+    // seulement empêché de passer sous le gazon) ; l'autre pied, s'il est presque posé et immobile, est posé aussi (IK,
+    // plus bas). Avant : seule une remontée sur les orteils enfoncés ; sur le vrai corps, les semelles flottaient de 5 à
+    // 13 cm ou s'enfonçaient de 19 cm selon les clips.
+    if (gardien) ancrerGardien(e, dt);
     racine.updateMatrixWorld(true);
     avant.set(Math.sin(e.cap), 0, Math.cos(e.cap));
     if (versMonde3) versMonde3(avant, avant);
     lateral.crossVectors(haut, avant).normalize();
     if (os.spine) tournerMonde(os.spine, lateral, tangage * 0.5);
     if (os.spine1) tournerMonde(os.spine1, lateral, tangage * 0.5);
+    // (bola-app#32, lot A2) le buste du geste de la commande : penché au-dessus de la balle (ras de terre, passe puissante),
+    // en arrière (centre, piqué, lob), sur le côté (enroulée : à l'opposé du pied qui frappe ; extérieur : de son côté) ;
+    // les bras ouverts du centre, la tête relevée de la profondeur. Monte pendant l'élan, tenu au contact, puis rendu.
+    const Cg = posture(e, gesteW);
+    if (Cg) {
+      const k = Cg.envB * amp;
+      racine.updateMatrixWorld(true);
+      busteCommande(Cg, k);
+      if (Cg.P.regard && os.head) tournerMonde(os.head, lateral, -12 * DEG * k);
+      if (Cg.P.bras) { const b = Cg.pied === 1 ? os.leftarm : os.rightarm; if (b) tournerMonde(b, avant, (Cg.pied === 1 ? 1 : -1) * Cg.P.bras * DEG * k); }
+    }
+    diag.cmd = Cg ? Cg.commande : null;
     let lacet = 0;
     if (e.regard && e.pos) {
       const a = Math.atan2(e.regard.x - e.pos.x, e.regard.z - e.pos.z) - e.cap;
@@ -369,7 +663,8 @@ export function creerAnimateur(perso, { gardien = false, reduit = false, versMon
       tmpv.copy(cible).add(off.multiplyScalar(P.mix));
       baisse = Math.max(baisse, va.distanceTo(tmpv) - P.longueur * 0.99);
     }
-    const bassin = ressort(etat, 'bas', clamp(baisse, 0, 0.06), dt, 18);
+    // (le gardien : sa hauteur est déjà celle de ses semelles, ancrerGardien ; le bassin ne descend pas en plus)
+    const bassin = gardien ? 0 : ressort(etat, 'bas', clamp(baisse, 0, 0.06), dt, 18);
     if (bassin > 1e-4) { corps.position.y -= bassin; racine.updateMatrixWorld(true); }
     for (const P of pieds) {
       if (!P.haut || !P.milieu || !P.bout || P.mix <= 0) continue;
@@ -380,6 +675,11 @@ export function creerAnimateur(perso, { gardien = false, reduit = false, versMon
       if (L > 0.002) ik2(P.haut, P.milieu, P.bout, cible.add(off.multiplyScalar(P.mix)));
     }
     diag.pose[0] = bassin;
+    if (gardien) poserSecondPied(dt);
+    // (bola-app#32, lot A2) la jambe du geste de la commande : la surface du pied (hanche ouverte pour l'intérieur, fermée
+    // pour l'extérieur, pointe tendue du cou-de-pied, relevée sous la balle), le pied qui frappe posé sur la balle au contact
+    // (IK, 25 cm au plus), et la jambe qui ne remonte pas après le contact (ras de terre, piqué, passes : suivi)
+    if (Cg && !gardien) { if (Cg.envJ > 0.001) jambeCommande(Cg, e); suiviCommande(Cg); }
     // les gestes techniques sans clip : le pied suit une courbe autour de la balle (IK, 35 cm de correction au plus)
     if (F && versMonde3 && e.boule && !gardien) {
       const bw = versMonde3(e.boule, bal);
@@ -432,6 +732,13 @@ export function creerAnimateur(perso, { gardien = false, reduit = false, versMon
         if (Lc > 0.3) vt.multiplyScalar(0.3 / Lc);
         if (Lc > 0.005) ik2(best.haut, best.milieu, best.bout, cible.add(vt.multiplyScalar(k)));
       }
+      // (bola-app#32, lot A2) le gardien debout : la jambe tendue vers la balle peut enfoncer le talon de l'autre pied
+      // ou le sien ; le corps est remonté d'autant (cette image seulement)
+      if (gardien && solG.debout) {
+        racine.updateMatrixWorld(true);
+        const sous = Math.min(semelle(0), semelle(1)) - racine.position.y;
+        if (sous < -0.003) { corps.position.y -= sous; racine.updateMatrixWorld(true); }
+      }
     }
     // les bras du gardien vers la balle
     if (gardien && e.allonge) {
@@ -461,5 +768,6 @@ export function creerAnimateur(perso, { gardien = false, reduit = false, versMon
     if (perso.majTete) perso.majTete();
   }
 
+  diag.commande = cmd.diag; diag.sol = solG.diag;
   return { maj, diag, get geste() { return active?.nom ?? null; }, get etat() { return diag.etat; } };
 }

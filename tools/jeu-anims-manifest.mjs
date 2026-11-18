@@ -55,6 +55,12 @@ export const PACKS = {
     // l'amorti de la poitrine : la cambrure de header_soccerball (bras levés, buste et tête reculés), avant la tête
     chest: O('header_soccerball', { from: 0.3, to: 0.9, hitAt: 0.45 }),
   },
+  // (bola-app#32, lot A2) le porteur qui saute par-dessus un tacle glissé : « jump (1) », un saut en course (appel à 0,1 s,
+  // pieds à 1 hanche du sol à 0,3 s, réception à 0,6–0,8 s, 3,2 hanches d'avance) ; root motion gardé hors des hanches
+  // (la simulation le lit : rm)
+  player3: {
+    saut: O('jump (1)'),
+  },
   keeper2: {
     k_catch_std: O('goalkeeper_catch (1)'),
     k_high: O('goalkeeper_catch (2)'),

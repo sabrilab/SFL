@@ -43,7 +43,7 @@ import { PAS, JEU, ROLES, ENGAGEMENT, BX, BZ, LB, butDe, sens, BALLON, TERRAIN }
 import { creerHasard } from './hasard.js';
 import { creerCorps, pasCorps, libre, lancerGeste, finirGeste, clamp, impactDe, duree } from './corps.js';
 import { creerBalle, pasBalle, antiBlocage, poserBalle } from './ballon.js';
-import { pasConduite, pasControle, demanderFrappe, pasDemande, pasFrappe, porteur, pasAnticipation, estFrappe } from './gestes.js';
+import { pasConduite, pasControle, demanderFrappe, pasDemande, pasFrappe, porteur, pasAnticipation, estFrappe, gestePrise } from './gestes.js';
 import { pasCorpsACorps, demanderTacle, pasTacle, desequilibrer, demeler, balleCorps } from './contacts.js';
 import { pasGardien, pasCorpsGardien, contactGardien, tenirBalle } from './gardien.js';
 import { pasIA, intentionVide, conduire, aller, contourner, auDevant } from './ia.js';
@@ -854,10 +854,11 @@ export function pas(m, entrees = null) {
       const p = porteur(m);
       if (entrees[e].presse && (!p || p.e !== e)) presser(m, j);
       if (p === j && !j.int.protege) conduire(m, j, j.int);
-      // (bola-app#32, lot A) ○ sur une balle libre : il va la chercher (elle vient au pied à 1,2 m, plus bas)
+      // (bola-app#32, lot A) ○ sur une balle libre : il va la chercher (elle vient au pied à 1,2 m, plus bas) ; (lot A2) il
+      // ralentit en arrivant, pour l'amorti du pied (gestes.js gestePrise)
       if (!p && j.prendreT > m.t && b.garde == null && b.p.y < 0.6) {
         const dx = b.p.x + b.v.x * 0.15 - j.p.x, dz = b.p.z + b.v.z * 0.15 - j.p.z, d = hypot(dx, dz);
-        if (d < JEU.aimant.prendre && d > 1e-6) { j.int.dx = dx / d; j.int.dz = dz / d; j.int.allure = 1; j.int.sprint = Math.max(j.int.sprint, d > 1.2 ? 0.5 : 0); }
+        if (d < JEU.aimant.prendre && d > 1e-6) { j.int.dx = dx / d; j.int.dz = dz / d; j.int.allure = clamp(d / 1.6, 0.45, 1); j.int.sprint = Math.max(j.int.sprint, d > 1.8 ? 0.5 : 0); }
       }
       // (lot A) le receveur d'une passe de son équipe vient au-devant de la balle, comme sur console, tant que le stick
       // est au repos (le joueur reprend la main en le poussant)
@@ -912,7 +913,12 @@ export function pas(m, entrees = null) {
         const d = hypot(j.p.x - b.p.x, j.p.z - b.p.z);
         if (d < bd) { bd = d; best = j; }
       }
-      if (best) { touche = pasControle(m, best, false, true); if (touche) best.prendreT = 0; }
+      if (best) {
+        // (lot A2) la prise sur ○ d'un humain se voit : l'amorti du pied (gestes.js gestePrise)
+        const priseHumaine = m.humains[best.e] && m.controle[best.e] === best.i && best.prendreT > m.t;
+        touche = pasControle(m, best, false, true);
+        if (touche) { best.prendreT = 0; if (priseHumaine) gestePrise(m, best); }
+      }
     }
     // les autres : le plus proche d'abord
     for (let n = 0; n < 2 && !touche; n++) {
