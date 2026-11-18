@@ -229,7 +229,8 @@ function scene(nom: string, actions: Array<[number, Any]>, prep: (M: Any) => voi
     const t = m.t - t0;
     let action = null;
     for (const a of actions) if (!a[1]._fait && t >= a[0]) { a[1]._fait = true; action = { ...a[1] }; delete action._fait; }
-    return [{ dx: 0, dz: -1, allure: m.joueurs[4].mode === 'loco' ? 0.6 : 0, sprint: 0, action, regard: m.balle.p }, null];
+    // (bola-app#32 : « un joueur arrêté » qui reçoit, stick au repos : M.arrete)
+    return [{ dx: 0, dz: -1, allure: m.joueurs[4].mode === 'loco' && !m.arrete ? 0.6 : 0, sprint: 0, action, regard: m.balle.p }, null];
   });
 }
 const poser = (j: Any, x: number, z: number, cap: number, vz = 0) => { j.p.x = x; j.p.z = z; j.cap = cap; j.v.x = 0; j.v.z = vz; };
@@ -246,7 +247,9 @@ for (const [nom, act] of [['feinte', { type: 'feinte', dx: 1, dz: 0 }], ['feinte
 }
 // un amorti de la poitrine et une tête debout : la balle arrive en l'air vers un joueur arrêté
 const loin = (M: Any) => poser(M.joueurs[6], 6, 12, 0);
-scene('poitrine', [], (M) => { loin(M); poser(M.joueurs[4], 0, 0, Math.PI); const b = M.balle; b.p.x = 0; b.p.y = 1.25; b.p.z = -6; b.v.x = 0; b.v.y = 2; b.v.z = 8; b.possesseur = null; b.dernier = 6; b.dernierT = M.t - 1; b.recepteur = 4; }, 2.5);
+// (bola-app#32 : le receveur vient au-devant de la passe et court plus vite ; arrêté, stick au repos, la balle part de 3,5 m pour
+// arriver à hauteur de poitrine ; avant, elle partait de 6 m vers un joueur qui avançait à 0,6 d'allure)
+scene('poitrine', [], (M) => { loin(M); M.arrete = true; poser(M.joueurs[4], 0, 0, Math.PI); const b = M.balle; b.p.x = 0; b.p.y = 1.25; b.p.z = -3.5; b.v.x = 0; b.v.y = 2; b.v.z = 8; b.possesseur = null; b.dernier = 6; b.dernierT = M.t - 1; b.recepteur = 4; }, 2.5);
 scene('tete', [], (M) => { loin(M); poser(M.joueurs[4], 0, 0, Math.PI); const b = M.balle; b.p.x = 0; b.p.y = 1.5; b.p.z = -5; b.v.x = 0; b.v.y = 3.0; b.v.z = 7; b.possesseur = null; b.dernier = 6; b.dernierT = M.t - 1; b.recepteur = 4; }, 2.5);
 // une volée : balle aérienne devant le joueur, frappe demandée
 scene('volee', [[0.05, { type: 'frappe', p: 0.7, x: 0.5, y: 1 }]], (M) => { loin(M); poser(M.joueurs[4], 0, -2, Math.PI); const b = M.balle; b.p.x = 0.1; b.p.y = 1.7; b.p.z = -3.3; b.v.x = 0; b.v.y = 0.8; b.v.z = 2.5; b.possesseur = 4; b.dernier = 4; b.dernierT = M.t; }, 2.5);
@@ -283,12 +286,19 @@ verifier('États et clips atteints', !manquent.length && !clipsManquent.length &
 if (process.env.BANC_DETAIL) console.log('  sorties', JSON.stringify(detailSorties));
   if (process.env.BANC_DETAIL) for (const [k, t] of Object.entries(glisseParEtat)) console.log('  glisse', k, t.length, (quantile(t, 0.5) * 100).toFixed(1), (quantile(t, 0.9) * 100).toFixed(1));
   const p50 = quantile(glisse, 0.5), p90 = quantile(glisse, 0.9), p99 = quantile(glisse, 0.99);
-verifier('Pieds tenus au sol', glisse.length > 5000 && p50 <= 0.03 && p90 <= 0.31, `${glisse.length} images de pied tenu ; glissement médian ${(p50 * 100).toFixed(1)} cm/s, 90e centile ${(p90 * 100).toFixed(1)} cm/s, 99e ${(p99 * 100).toFixed(0)} cm/s`);
+// (bola-app#32, lot A : « la réactivité passe avant la beauté du clip » ; les joueurs courent, freinent et tournent plus vite
+// — sprint 7,8 m/s, a_lat 18 m/s², arrêt 16 m/s² —, les cycles de course glissent un peu plus : 90e centile 34 cm/s au plus, 31
+// avant ; à resserrer par le lot A2, qui reprend les clips)
+verifier('Pieds tenus au sol', glisse.length > 5000 && p50 <= 0.03 && p90 <= 0.34, `${glisse.length} images de pied tenu ; glissement médian ${(p50 * 100).toFixed(1)} cm/s, 90e centile ${(p90 * 100).toFixed(1)} cm/s, 99e ${(p99 * 100).toFixed(0)} cm/s (bola-app#32 : 34 au plus)`);
 verifier('Fondus sans saut de pose', imagesMesurees > 2000 && sauts <= imagesMesurees * 0.004 && sautMax < 85 * Math.PI / 180, `${imagesMesurees} images en fondu ; ${sauts} au-delà de 40° par os en 1/60 s (0,4 % au plus, aucune au-delà de 85° ; borne resserrée de 90 à 85° aux correctifs) ; pire ${(sautMax * 180 / Math.PI).toFixed(0)}° (${sautOu})`);
-verifier('Sortie des gestes sur un appui', sorties >= 30 && sortiesAppui / sorties >= 0.6, `${sortiesAppui}/${sorties} sorties vers la course finissent pied d'appui posé`);
+// (bola-app#32, lot A : les gestes sont coupés dès qu'une touche arrive et les frappes partent en 0,13 à 0,22 s ; la sortie ne
+// peut plus attendre un appui : 35 % au moins, 60 % avant ; à reprendre par le lot A2 avec les nouveaux gestes)
+verifier('Sortie des gestes sur un appui', sorties >= 30 && sortiesAppui / sorties >= 0.35, `${sortiesAppui}/${sorties} sorties vers la course finissent pied d'appui posé (bola-app#32 : 35 % au moins)`);
 {
   const parS = hesitations / Math.max(1, secondesMatch);
-  verifier("Graphe sans hésitation (correctifs #26)", secondesMatch > 60 && parS <= 0.6, `${JSON.stringify(Object.entries(hesitParPaire).sort((a, b) => b[1] - a[1]).slice(0, 6))} ; ${hesitations} états tenus moins de 0,1 s en ${secondesMatch.toFixed(0)} s de jeu, ${parS.toFixed(2)} par seconde pour les 10 joueurs (0,6 au plus ; 1,8 à 2,3 avant)`);
+  // (bola-app#32, lot A : un geste coupé par la touche suivante et un demi-tour en 0,5 s font des états brefs voulus : 1,0 par
+  // seconde au plus, 0,6 avant ; l'arrêt planté avant le demi-tour est déjà le pivot, graphe.js)
+  verifier("Graphe sans hésitation (correctifs #26)", secondesMatch > 60 && parS <= 1.0, `${JSON.stringify(Object.entries(hesitParPaire).sort((a, b) => b[1] - a[1]).slice(0, 6))} ; ${hesitations} états tenus moins de 0,1 s en ${secondesMatch.toFixed(0)} s de jeu, ${parS.toFixed(2)} par seconde pour les 10 joueurs (bola-app#32 : 1,0 au plus ; 0,6 aux correctifs #26 ; 1,8 à 2,3 avant)`);
   const lignes = Object.entries(orteils).map(([k, [a, n]]) => `${k} ${(100 * a / Math.max(1, n)).toFixed(0)} % de ${n}`);
   const pire = Math.max(0, ...Object.entries(orteils).filter(([k, [, n]]) => (k === 'arret' || k === 'demitour') && n > 50).map(([, [a, n]]) => a / n));
   // (mesure seulement, pas un critère : défaut D5 du contrôle laissé ouvert ; ces clips sont joués sur place pendant

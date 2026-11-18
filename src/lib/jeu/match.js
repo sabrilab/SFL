@@ -235,6 +235,16 @@ export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, 
     return o;
   });
 
+  // (bola-app#32, lot A) la flèche discrète au sol pendant une charge : depuis le pied, vers où part la balle (la
+  // simulation publie le point visé, j.vise), plus longue avec la puissance ; blanche pour les Noirs, noire pour les Blancs
+  const fleches = [0, 1].map((e) => {
+    const forme = new THREE.Shape();
+    forme.moveTo(-0.035, 0); forme.lineTo(0.035, 0); forme.lineTo(0.035, 0.82); forme.lineTo(0.12, 0.82); forme.lineTo(0, 1); forme.lineTo(-0.12, 0.82); forme.lineTo(-0.035, 0.82); forme.closePath();
+    const g = new THREE.ShapeGeometry(forme).rotateX(Math.PI / 2);
+    const o = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ color: e === 0 ? 0xffffff : 0x0a0a0a, transparent: true, opacity: 0.85, depthWrite: false, toneMapped: false, side: THREE.DoubleSide }));
+    o.renderOrder = 3; o.visible = false; monde.add(o);
+    return o;
+  });
   const pouce = creerPouce(renderer.domElement);
   // l'écran vu de la tribune : la droite de l'écran = vers le but attaqué par les Noirs (-z), le haut = vers -x
   const ecranVersJeu = (sx, sy) => ({ x: -sy, z: -sx });
@@ -340,11 +350,15 @@ export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, 
     const j = m().joueurs[m().controle[0] ?? MOI];
     const p = porteur(m());
     if (p === j) {
+      // (bola-app#32 : la passe dosée sur le receveur, comme l'appui bref de la manette)
       const st = pouce.stick, a = Math.hypot(st.x, st.y) > 0.3, g = ecranVersJeu(st.x, st.y);
-      actionPouce = { type: 'passe', p: 0.45, dx: a ? g.x : Math.sin(j.cap), dz: a ? g.z : Math.cos(j.cap) };
+      actionPouce = { type: 'passe', p: null, commande: 'passe', dx: a ? g.x : Math.sin(j.cap), dz: a ? g.z : Math.cos(j.cap) };
       return;
     }
-    if (p && p.e !== j.e && Math.hypot(p.p.x - j.p.x, p.p.z - j.p.z) < 2.2) actionPouce = { type: 'tacle', glisse: false };
+    // (bola-app#32) une balle libre au sol, près de lui : il la prend (elle vient au pied)
+    const bl = m().balle;
+    if (!p && bl.garde == null && bl.p.y < 0.45 && Math.hypot(bl.p.x - j.p.x, bl.p.z - j.p.z) < 2.5) { actionPouce = { type: 'prendre', commande: 'prendre' }; return; }
+    if (p && p.e !== j.e && Math.hypot(p.p.x - j.p.x, p.p.z - j.p.z) < 2.2) actionPouce = { type: 'tacle', glisse: false, commande: 'recuperer' };
   };
   // le second doigt touché sans bouger : la semelle (R3)
   pouce.surSemelle = () => {
@@ -360,14 +374,14 @@ export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, 
     const ux = g.x, uz = -g.z; // uz > 0 = vers le but attaqué (la droite de l'écran), ux = en travers
     const p = porteur(m());
     if (p !== j) {
-      if (p && p.e !== j.e && Math.hypot(p.p.x - j.p.x, p.p.z - j.p.z) < 3) actionPouce = { type: 'tacle', glisse: true };
+      if (p && p.e !== j.e && Math.hypot(p.p.x - j.p.x, p.p.z - j.p.z) < 3) actionPouce = { type: 'tacle', glisse: true, commande: 'tacle' };
       return;
     }
     if (uz > 0.45) {
       // la frappe : la pente du geste choisit le côté du but ; l'erreur et la hauteur viennent de la puissance
       const f = clamp(force, 0, 1);
       const x = clamp((ux / uz) * 2.1 + j.p.x * 0.06, -PX, PX);
-      actionPouce = { type: 'frappe', p: 0.35 + f * 0.6, x };
+      actionPouce = { type: 'frappe', p: 0.35 + f * 0.6, x, commande: 'frappe' };
     } else {
       actionPouce = { type: 'roulette', dx: Math.sign(ux) || 1, dz: 0 };
     }
@@ -466,6 +480,15 @@ export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, 
       const o = jauges[e], q = M.controle[e], f = e === 0 && !manettes.equipes()[0] && clavierJoue() ? cmdClavier.p : manettes.jauge(e);
       o.visible = visibleJeu && q != null && f > 0.02;
       if (o.visible) { const I = vus[q].interp; o.position.set(I.x, 0.055, I.z); o.geometry.setDrawRange(0, 6 * Math.max(1, Math.round(48 * f))); }
+      // (lot A) la flèche de la charge
+      const fl = fleches[e], V = q != null ? M.joueurs[q].vise : null;
+      fl.visible = visibleJeu && !!V;
+      if (fl.visible) {
+        const I = vus[q].interp, dx = V.x - I.x, dz = V.z - I.z;
+        fl.position.set(I.x + Math.sin(Math.atan2(dx, dz)) * 0.45, 0.06, I.z + Math.cos(Math.atan2(dx, dz)) * 0.45);
+        fl.rotation.set(0, Math.atan2(dx, dz), 0);
+        fl.scale.setScalar(1.1 + 2.6 * Math.max(V.p, f));
+      }
     }
   }
 
@@ -546,7 +569,7 @@ export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, 
     ecrireImage(sauveR, 0);
     planR = null;
     etat.ralenti = true; etat.message = null; signaler();
-    for (const o of [anneau, anneauB, ...jauges]) o.visible = false;
+    for (const o of [anneau, anneauB, ...jauges, ...fleches]) o.visible = false;
   }
   function finirRalenti() {
     poserImage(sauveR);

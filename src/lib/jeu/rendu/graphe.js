@@ -151,6 +151,10 @@ export function creerGraphe({ gardien = false } = {}) {
     // un geste de la simulation : il commande
     if (e.geste) return rend(categorie(e.mode, e.geste.type), { nom: e.geste.nom, t: e.geste.t });
     if (gardien) return rend('loco', null);
+    // (bola-app#32, lot A) le freinage planté avant le demi-tour lancé (mode « frein », 0,1 à 0,3 s désormais) est déjà le
+    // début du pivot : le clip turn180 posé à son début (appuis écartés), puis le pivot de la simulation le joue ; avant,
+    // un bref état « course » s'intercalait entre l'arrêt et le pivot
+    if (e.mode === 'frein' && CLIPS.turn180) return rend('pivot', { nom: 'turn180', t: 0 });
     const libre = e.mode === 'loco' || e.mode === 'frein';
     // le départ : arrêté (sous 0,6 m/s), il accélère fort (sans balle : la conduite a son cycle)
     if (g.etat !== 'depart' && reposOk && libre && !e.balle && CLIPS.start && sP < 0.6 && s >= 0.6 && (e.aLong ?? 0) > 2.5) { g.dist = 0; rend('depart', null); }

@@ -28,6 +28,12 @@
 // instant libre (ou dès 60 % d'un geste coupable : roulette, feinte, semelle, contrôle), au plus tard 0,9 s après ;
 // c'est ce qui enchaîne crochet → roulette → frappe. L'IA n'a pas de file (son empreinte ne change pas).
 //
+// (bola-app#32, lot A) Les actions d'un humain portent leur `commande` (id de entrees/touches.js) et partent à
+// l'appui, chargées (gestes.js) ; ○ sur une balle libre la prend (prendre : elle vient au pied à 1,2 m) ; un second appui
+// de la frappe juste avant l'impact la rend parfaite (timing) ; un geste technique raté (deux à moins de 0,25 s, ou à
+// pleine vitesse collé à un défenseur) coûte la balle ; le receveur d'une passe de son équipe vient au-devant, même tenu
+// par un humain tant que son stick est au repos ; une balle libre lente vient au pied de l'IA la plus proche (1,2 m), et
+// une passe au pied de son receveur. L'engagement est au joueur qui engage (balle aimantée tout de suite).
 // Ordre d'un pas de jeu : main au bon joueur → intentions (humains, IA, gardiens) → gestes demandés → corps
 // (locomotion, gestes à root motion ; un demi-tour balle au pied passe par le crochet) → frappes et tacles en cours →
 // contacts entre corps → balle (conduite, contrôle, intégration, corps qui la bloquent, gardiens, but) → horloge.
@@ -40,7 +46,7 @@ import { creerBalle, pasBalle, antiBlocage, poserBalle } from './ballon.js';
 import { pasConduite, pasControle, demanderFrappe, pasDemande, pasFrappe, porteur, pasAnticipation, estFrappe } from './gestes.js';
 import { pasCorpsACorps, demanderTacle, pasTacle, desequilibrer, demeler, balleCorps } from './contacts.js';
 import { pasGardien, pasCorpsGardien, contactGardien, tenirBalle } from './gardien.js';
-import { pasIA, intentionVide, conduire, aller, contourner } from './ia.js';
+import { pasIA, intentionVide, conduire, aller, contourner, auDevant } from './ia.js';
 import { acos, atan2, cos, hypot, sin } from './maths.js';
 import { exigerMesures, CLIPS } from './clips.js';
 
@@ -98,7 +104,8 @@ export function engagement(m, e) {
   porteurE.p.x = 0; porteurE.p.z = -sens(e) * 0.4;
   const b = m.balle;
   b.p.x = 0; b.p.y = BALLON.R; b.p.z = 0; b.v.x = b.v.y = b.v.z = 0; b.w.x = b.w.y = b.w.z = 0;
-  b.garde = null; b.dernier = null; b.dernierT = -9; b.possesseur = porteurE.i; b.recepteur = null; b.tir = null;
+  // (bola-app#32 : l'engagement est à lui tout de suite, balle aimantée au pied ; avant, dernierT = −9 la laissait libre)
+  b.garde = null; b.dernier = porteurE.i; b.dernierT = m.t; b.possesseur = porteurE.i; b.recepteur = null; b.tir = null;
   for (const eq of [0, 1]) {
     if (!m.humains[eq]) { m.controle[eq] = null; continue; }
     m.controle[eq] = eq === e ? porteurE.i : m.joueurs.find((j) => j.e === eq && j.role === 'A').i;
@@ -195,12 +202,18 @@ function copierIntention(j, src) {
   it.recupere = false;
   it.regard = src.regard ?? null; it.contenir = !!src.contenir; it.protege = !!src.protege; it.charge = !!src.charge; it.vaBalle = true;
   it.tire = !!src.tire;
+  // (bola-app#32, lot A) la charge en cours : touche tenue, puissance de la jauge, appui bref, côté du but visé
+  it.tenir = !!src.tenir; it.bref = !!src.bref;
+  it.puissance = Number.isFinite(src.puissance) ? clamp(src.puissance, 0, 1) : null;
+  it.viseX = Number.isFinite(src.viseX) ? clamp(src.viseX, -2, 2) : null;
   it.action = src.action ?? null;
 }
 
 // (lot 3) les gestes du stick droit, et ce qui peut attendre en file pendant un geste
 const GESTES = new Set(['roulette', 'crochet', 'semelle', 'feinte', 'passement', 'talonnade', 'sombrero', 'petitPont', 'pousser', 'tirerArriere', 'jongle', 'feinteFrappe']);
 const COUPABLES = new Set(['roulette', 'feinte', 'semelle', 'controle', 'feinteFrappe']);
+// (bola-app#32, lot A : une touche coupe un geste coupable dès 30 % au lieu de 60 % ; la réactivité avant la beauté du clip)
+const COUPE = 0.3;
 const enFile = (a) => GESTES.has(a.type) || a.type === 'passe' || a.type === 'lob' || a.type === 'profondeur' || a.type === 'centre' || estFrappe(a.type);
 
 /** Exécute l'action demandée par l'intention (passe, frappe, tacle, gestes) ; celle d'un humain attend en file pendant un geste. */
@@ -211,7 +224,7 @@ function agir(m, j) {
   if (!a && j.file) {
     const F = j.file;
     if (m.t - F.t > 0.9) j.file = null;
-    else if (libre(j) || (j.mode === 'geste' && j.g && COUPABLES.has(j.g.type) && j.g.t >= 0.6 * j.g.fin)) {
+    else if (libre(j) || (j.mode === 'geste' && j.g && COUPABLES.has(j.g.type) && j.g.t >= COUPE * j.g.fin)) {
       if (!libre(j)) { finirGeste(j); j.recup = 0; }
       a = F.a; j.file = null;
       // (une frappe enchaînée sur un geste : frappée sur appuis, la balle est contre le pied, pas de course d'élan)
@@ -222,11 +235,23 @@ function agir(m, j) {
   if (!a) return;
   j.int.action = null;
   const p = porteur(m);
+  // (bola-app#32, lot A) une action d'humain porte sa commande (id de touches.js) et se charge : la simulation le sait
+  if (humain && a.type !== 'tacle' && !a.humain) a = { ...a, humain: true };
+  // (lot A) ○ / B sur une balle libre au sol : il va la chercher, elle vient au pied (aimantée) dans les 0,6 s
+  if (a.type === 'prendre') { j.prendreT = m.t + 0.6; m.ev('prendre', { j: j.i }); return; }
+  // (lot A, profondeur technique) le second appui de la frappe : parfait à 0,07 s de l'impact, sinon raté
+  if (a.type === 'timing') { timing(m, j); return; }
   if (a.type === 'tacle') { if ((!p || p.e !== j.e) && m.ecart?.e !== j.e) demanderTacle(m, j, !!a.glisse); return; }
   // (la feinte de frappe annule l'élan d'une frappe déjà lancée : elle ne va pas en file derrière cette frappe)
   if (a.type === 'feinteFrappe' && (j.demande || (j.g && j.g.type === 'frappe' && !j.g.fait))) { feinteFrappe(m, j); return; }
   // (un humain balle au pied, dans un geste : l'action attend son tour)
   if (humain && !libre(j) && j.mode === 'geste' && enFile(a) && (p === j || p == null)) { j.file = { a, t: m.t }; return; }
+  // (lot A, profondeur technique) un geste technique raté coûte la balle : deux gestes à moins de 0,25 s, ou un geste
+  // lancé à pleine vitesse (plus de 6,8 m/s) avec un défenseur à moins de 1,5 m
+  if (humain && GESTES.has(a.type) && a.type !== 'jongle' && a.type !== 'feinteFrappe' && p === j) {
+    if (gesteRate(m, j)) return;
+    j.gesteT = m.t;
+  }
   if (a.type === 'roulette') { roulette(m, j, a.dx ?? 1, a.dz ?? 0); return; }
   if (a.type === 'crochet') { crochet(m, j, a.dx ?? 1, a.dz ?? 0, a.court ? 70 : 100); return; }
   if (a.type === 'semelle') { semelle(m, j); return; }
@@ -247,7 +272,7 @@ function agir(m, j) {
     if (X && !X.absent) {
       const xx = X.p.x + X.v.x * 0.5, xz = X.p.z + X.v.z * 0.5, d = hypot(xx - m.balle.p.x, xz - m.balle.p.z);
       const v0 = Math.sqrt(5.5 * 5.5 + 2 * 1.35 * d);
-      a = { ...a, cible: X.i, dx: xx - j.p.x, dz: xz - j.p.z, p: clamp((v0 - 6) / 12, 0.2, 1) };
+      a = { ...a, cible: X.i, dx: xx - j.p.x, dz: xz - j.p.z, v0, p: clamp((v0 - 6) / 12, 0.2, 1) };
     }
   }
   if (demanderFrappe(m, j, a)) {
@@ -261,6 +286,37 @@ function agir(m, j) {
       m.ev('appelUneDeux', { j: j.i });
     }
   }
+}
+
+/**
+ * (bola-app#32, lot A) Le second appui de la frappe (○ / B de nouveau, juste après le relâché) : à 0,07 s de l'impact
+ * ou moins, la frappe est parfaite (gestes.js lancer : erreur divisée par 2,5) ; plus tôt, ou une fois la balle partie,
+ * rien ; trop tôt pendant l'élan (plus de 0,15 s avant), elle est ratée (erreur × 1,6). Rien ne change sans second appui.
+ */
+function timing(m, j) {
+  const g = j.g;
+  if (!g || g.type !== 'frappe' || g.fait || !estFrappe(g.donnees?.spec?.type)) return;
+  const spec = g.donnees.spec, avant = (g.impact - g.t) / g.taux;
+  if (spec.timing) return;
+  if (avant <= JEU.parfait) { spec.timing = 'parfait'; m.ev('frappeParfaite', { j: j.i }); }
+  else if (avant > 0.15) spec.timing = 'rate';
+}
+
+/** (lot A) Le geste technique raté : la balle part trop long, à 2 à 3 m, à ±40° de la course ; il ne l'a plus. */
+function gesteRate(m, j) {
+  const s = hypot(j.v.x, j.v.z);
+  let colle = false;
+  for (const o of m.joueurs) if (o.e !== j.e && !o.absent && !o.gardien && o.mode !== 'sol' && hypot(o.p.x - j.p.x, o.p.z - j.p.z) < 1.5) colle = true;
+  const spam = m.t - (j.gesteT ?? -9) < 0.25;
+  if (!spam && !(s > 6.8 && colle)) return false;
+  const b = m.balle, r = m.rng.touches;
+  const h = (s > 0.5 ? atan2(j.v.x, j.v.z) : j.cap) + (r.u() * 2 - 1) * 0.7, v = s + 3 + r.u() * 1.5;
+  b.v.x = sin(h) * v; b.v.z = cos(h) * v; b.v.y = 0;
+  b.w.z = -b.v.x / BALLON.R; b.w.x = b.v.z / BALLON.R;
+  b.possesseur = null; b.recepteur = null; b.dernier = j.i; b.dernierT = m.t;
+  j.recup = Math.max(j.recup, 0.35); j.gesteT = m.t;
+  m.ev('gesteRate', { j: j.i, spam });
+  return true;
 }
 
 /**
@@ -302,7 +358,7 @@ function crochet(m, j, dx, dz, angMax = 100, nomEv = 'crochet') {
   b.dernier = j.i; b.dernierT = m.t; b.possesseur = j.i;
   j.toucheT = m.t;
   j.v.x *= 0.55; j.v.z *= 0.55;
-  j.crochetH = h; j.crochetT = 0.32;
+  j.crochetH = h; j.crochetT = 0.32; j.horsAimant = m.t + 0.22;
   for (const o of m.joueurs) {
     if (o.e === j.e || o.gardien || o.absent) continue;
     const rx = o.p.x - j.p.x, rz = o.p.z - j.p.z, d = hypot(rx, rz);
@@ -395,7 +451,7 @@ function leverBalle(m, j) {
   const vy = 6.2 + m.rng.touches.u() * 0.4, vh = Math.max(1.8, s * 0.9 + 0.6);
   b.v.x = fx * vh; b.v.z = fz * vh; b.v.y = vy; b.w.x = b.w.y = b.w.z = 0;
   b.dernier = j.i; b.dernierT = m.t; b.possesseur = j.i;
-  j.toucheT = m.t;
+  j.toucheT = m.t; j.horsAimant = m.t + 0.3;
   // (le défenseur pris de vitesse : planté, et trop tard pour la reprendre de la tête pendant 0,6 s)
   for (const o of trompes(m, j, 3)) { o.plante = Math.max(o.plante, 0.35); o.recup = Math.max(o.recup, 0.6); }
   m.ev('sombrero', { j: j.i });
@@ -465,7 +521,7 @@ function pasJongle(m, j) {
   b.v.x = j.v.x * 0.3 + fx * 0.25 + (j.p.x + fx * 0.3 - b.p.x) * 0.8; b.v.z = j.v.z * 0.3 + fz * 0.25 + (j.p.z + fz * 0.3 - b.p.z) * 0.8;
   b.v.y = 3.4; b.w.x = b.w.y = b.w.z = 0;
   b.dernier = j.i; b.dernierT = m.t; b.possesseur = j.i;
-  j.toucheT = m.t;
+  j.toucheT = m.t; j.horsAimant = m.t + 0.3;
   m.ev('jongle', { j: j.i });
 }
 
@@ -479,6 +535,8 @@ function feinteFrappe(m, j) {
   if (g && g.type === 'frappe' && !g.fait && g.t < g.impact - 0.02) {
     // l'élan déjà lancé : il finit avant l'impact, la balle n'est pas frappée
     g.fait = true; g.type = 'feinteFrappe'; g.fin = Math.min(g.fin, g.impact - 0.02);
+    // (bola-app#32 : une frappe chargée tenue armée repart, pour finir son élan sans frapper)
+    g.gel = false; g.charge = false; j.vise = null;
   } else {
     if (!balleAuPied(m, j, 1.2)) return;
     const b = m.balle, fx = sin(j.cap), fz = cos(j.cap), s = hypot(j.v.x, j.v.z);
@@ -499,35 +557,8 @@ function feinteFrappe(m, j) {
   m.ev('feinteFrappe', { j: j.i });
 }
 
-/**
- * Le demi-tour balle au pied : un porteur lancé qui demande plus de 120° avec la balle à moins de 2,5 m va d'abord la
- * chercher (0,6 s au plus, sans freiner), puis la ramène par un crochet dès qu'elle est à 1 m (la balle part dans le
- * nouveau sens, il vire sur ses appuis), au lieu de freiner pendant qu'elle file. S'il freine quand même (balle trop
- * loin), la balle n'est plus à lui dès qu'elle est à 1,6 m : l'anneau ne ment pas.
- */
-function demiTour(m) {
-  const p = porteur(m), b = m.balle;
-  if (!p || p.gardien || !libre(p)) return;
-  const it = p.int, s = hypot(p.v.x, p.v.z);
-  const d = hypot(b.p.x - p.p.x, b.p.z - p.p.z);
-  if (p.mode === 'frein' && d > 1.6) { b.possesseur = null; return; }
-  // (un demi-tour déjà engagé : il va d'abord chercher la balle, 0,6 s au plus, puis la ramène)
-  const engage = p.demiTour != null && m.t - p.demiTour.t < 0.6;
-  if (!engage) p.demiTour = null;
-  if (p.crochetT > 0 || b.p.y > 0.4) return;
-  if (!engage) {
-    if (s < 2 || !(it.dx || it.dz) || it.allure < 0.3 || it.recupere || m.t - (p.toucheT ?? -9) < 0.2) return;
-    const c = (it.dx * p.v.x + it.dz * p.v.z) / s;
-    if (c > cos((120 * Math.PI) / 180) || d > 2.5) return;
-    p.demiTour = { t: m.t, dx: it.dx, dz: it.dz };
-  }
-  const D = p.demiTour;
-  // (la semelle tirée en arrière : la balle repart jusqu'à 170° de la course, dans le sens du stick)
-  if (d <= 1.0) { crochet(m, p, D.dx, D.dz, 170); p.demiTour = null; return; }
-  // la balle file encore devant : il la rattrape (la course continue vers elle, sans freiner)
-  const rx = b.p.x + b.v.x * 0.1 - p.p.x, rz = b.p.z + b.v.z * 0.1 - p.p.z, L = hypot(rx, rz) || 1;
-  it.dx = rx / L; it.dz = rz / L; it.allure = 1; it.sprint = Math.max(it.sprint, 0.6);
-}
+// (bola-app#32, lot A) l'ancien demi-tour balle au pied (aller chercher la balle qui file, puis un crochet de 170°) est
+// retiré : la balle aimantée (gestes.js pasConduite) tourne autour du joueur et repart dans le nouveau sens avant lui.
 
 /** Pendant la roulette, la balle suit la semelle par petites touches. */
 function pasRoulette(m, j) {
@@ -649,7 +680,13 @@ function pasArret(m) {
     const d = hypot(j.p.x - A.x, j.p.z - A.z);
     if (j.e !== A.e) {
       if (d < dist + 0.3) {
-        const q = pointRecul(m, j, A.x, A.z, dist + 0.6); aller(j, it, q.x, q.z, 5); contourner(m, j, it);
+        // (bola-app#32 : le point de recul est gardé 0,6 s ; recalculé à chaque pas, il sautait d'un côté à l'autre pour
+        // quelques millimètres et le joueur, plus vif, oscillait sur place)
+        if (!j.recul || j.recul.arret !== A || m.t > j.recul.t + 0.6) j.recul = { ...pointRecul(m, j, A.x, A.z, dist + 0.6), t: m.t, arret: A };
+        const q = j.recul; aller(j, it, q.x, q.z, 5); contourner(m, j, it);
+        // (bola-app#32 : il recule face à la balle, en pas chassés ; avec les demi-tours rapides du lot A, un recul qui
+        // hésitait enchaînait les pivots sur place, collé à 1,5 m de la balle jusqu'à la reprise forcée de 6 s)
+        it.contenir = true; it.regard = b.p;
         // (correctifs #26) collé au tireur qui vient à la balle (contre un panneau, ils se poussaient 5 s) : il
         // s'efface sur le côté de son chemin, tant que le tireur n'est pas à la balle
         const tx = A.x - T.p.x, tz = A.z - T.p.z, TL = hypot(tx, tz) || 1;
@@ -728,7 +765,11 @@ function tenirEcart(m) {
     if (j.absent || j.gardien || j.e !== E.e) continue;
     const d = hypot(j.p.x - b.p.x, j.p.z - b.p.z);
     j.int.action = null; j.int.tire = false; j.int.charge = false;
-    if (d < dist + 0.2) { const it = j.int, q = pointRecul(m, j, b.p.x, b.p.z, dist + 0.5); aller(j, it, q.x, q.z, 4); contourner(m, j, it); it.regard = b.p; it.vaBalle = false; }
+    if (d < dist + 0.2) {
+      // (bola-app#32 : même point de recul gardé 0,6 s qu'au coup franc)
+      if (!j.recul || j.recul.arret !== E || m.t > j.recul.t + 0.6) j.recul = { ...pointRecul(m, j, b.p.x, b.p.z, dist + 0.5), t: m.t, arret: E };
+      const it = j.int, q = j.recul; aller(j, it, q.x, q.z, 4); contourner(m, j, it); it.regard = b.p; it.vaBalle = false;
+    }
   }
 }
 
@@ -813,12 +854,22 @@ export function pas(m, entrees = null) {
       const p = porteur(m);
       if (entrees[e].presse && (!p || p.e !== e)) presser(m, j);
       if (p === j && !j.int.protege) conduire(m, j, j.int);
+      // (bola-app#32, lot A) ○ sur une balle libre : il va la chercher (elle vient au pied à 1,2 m, plus bas)
+      if (!p && j.prendreT > m.t && b.garde == null && b.p.y < 0.6) {
+        const dx = b.p.x + b.v.x * 0.15 - j.p.x, dz = b.p.z + b.v.z * 0.15 - j.p.z, d = hypot(dx, dz);
+        if (d < JEU.aimant.prendre && d > 1e-6) { j.int.dx = dx / d; j.int.dz = dz / d; j.int.allure = 1; j.int.sprint = Math.max(j.int.sprint, d > 1.2 ? 0.5 : 0); }
+      }
+      // (lot A) le receveur d'une passe de son équipe vient au-devant de la balle, comme sur console, tant que le stick
+      // est au repos (le joueur reprend la main en le poussant)
+      if (!p && b.recepteur === j.i && (entrees[e].allure ?? 0) < 0.25) {
+        const r = auDevant(m, j);
+        if (r) { aller(j, j.int, r.x, r.z, 7); j.int.regard = b.p; j.int.vaBalle = true; }
+      }
       j.aide = m.aides[e];
     } else { pasIA(m, j); j.aide = 0; }
   }
   if (m.ecart) tenirEcart(m);
   for (const j of m.joueurs) if (!j.absent) { agir(m, j); pasDemande(m, j); pasAnticipation(m, j); }
-  demiTour(m);
   const p = porteur(m);
   for (let i = 0; i < m.joueurs.length; i++) {
     const j = m.joueurs[i];
@@ -827,6 +878,7 @@ export function pas(m, entrees = null) {
     if (j.gardien && pasCorpsGardien(j, PAS)) { borner(j); continue; }
     pasCorps(j, PAS, p === j);
     if (j.g?.type === 'frappe') pasFrappe(m, j, PAS);
+    if (j.vise && !j.demande && !(j.g?.type === 'frappe' && !j.g.fait)) j.vise = null;
     if (j.g?.type === 'tacle' || j.g?.type === 'tacleDebout') pasTacle(m, j);
     if (j.g?.type === 'roulette') pasRoulette(m, j);
     if (j.g?.type === 'sombrero') pasSombrero(m, j);
@@ -845,8 +897,24 @@ export function pas(m, entrees = null) {
       const appui = Math.floor(a * 2) !== Math.floor(c * 2);
       pasConduite(m, q, appui);
     }
-    // les autres : le plus proche d'abord
+    // (bola-app#32, lot A) la balle libre au sol, lente (moins de 4 m/s, pas une passe en route) : elle vient au pied du
+    // joueur de l'IA le plus proche à 1,2 m (prise automatique), ou de l'humain qui a appuyé sur ○ (6 m/s au plus) ; et
+    // la passe vient au pied de son receveur, humain ou IA, qui est venu au-devant (10 m/s au plus) : elle arrive
     let touche = false;
+    if (!q && b.p.y < 0.45 && b.garde == null) {
+      const vb = hypot(b.v.x, b.v.z);
+      let best = null, bd = JEU.aimant.prise;
+      for (const j of m.joueurs) {
+        if (j.gardien || j.absent || !libre(j)) continue;
+        const hum = m.humains[j.e] && m.controle[j.e] === j.i;
+        const pourLui = b.recepteur === j.i && vb < 10;
+        if (!pourLui && (hum ? !(j.prendreT > m.t && vb < 6) : !(vb < 4 && b.recepteur == null))) continue;
+        const d = hypot(j.p.x - b.p.x, j.p.z - b.p.z);
+        if (d < bd) { bd = d; best = j; }
+      }
+      if (best) { touche = pasControle(m, best, false, true); if (touche) best.prendreT = 0; }
+    }
+    // les autres : le plus proche d'abord
     for (let n = 0; n < 2 && !touche; n++) {
       let best = null, bd = Infinity;
       for (const j of m.joueurs) {

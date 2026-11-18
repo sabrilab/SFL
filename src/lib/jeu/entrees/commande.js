@@ -12,19 +12,27 @@
 // (intentionDe les consomme). La puissance d'une passe ou d'une frappe est la durée d'appui (JEU.jauge = 0,9 s pour
 // la jauge pleine), lue au relâché.
 //
-// La disposition est celle des jeux de foot de rue console (convention de genre ; tableau complet et unique dans
-// entrees/touches.js, exporté par le banc) :
-//   stick gauche courir ; RT/R2 sprint analogique ; LT/L2 : sans stick protéger, avec le stick conduite serrée et
-//   gestes fins (attaque) ou contenir (défense)
-//   attaque : A/✕ passe (LB + : une-deux, la remise part quand LB est lâché), B/○ lobée (centre près de la ligne de
-//             but, sur un côté), Y/△ profondeur, X/□ frappe ; RB + passe = tendue ; frappe + RB = brossée, + LB =
-//             piqué, + LB + RB = à ras de terre, + LT = extérieur ; X puis A avant l'impact = feinte de frappe ;
-//             R3 cliqué = semelle ; LB + RB tenus à l'arrêt = jonglage ; LB sans la balle = changer de joueur ;
-//             stick droit = gestes techniques (entrees/geste-stick.js, relatifs au cap du joueur)
-//   défense : A/✕ maintenu pressing, X/□ tacle glissé, B/○ tacle debout (maintenu : l'épaule, et derrière le porteur
-//             le tirage de maillot), Y/△ maintenu sortie du gardien, RB/R1 maintenu pressing d'un coéquipier, LB/L1
-//             changer de joueur, stick droit poussé : prendre le joueur de ce côté
-//   (changement par rapport à #23 : en défense, B et X sont inversés, comme dans le genre)
+// (bola-app#32) Chaque touche agit à l'appui : l'action part tout de suite (l'élan de la passe ou de la frappe démarre,
+// sim/gestes.js), chargée tant que la touche est tenue (it.tenir, it.puissance : la jauge, 0,9 s pour la pleine ;
+// it.viseX : le côté du but que montre le stick) ; au relâché la balle part ; un appui de moins de 0,15 s est bref
+// (it.bref : la simulation prend la puissance juste, la passe dosée sur le receveur). Les actions portent `commande`,
+// l'id de leur ligne dans entrees/touches.js (la table unique, exportée par le banc).
+//
+// La disposition (Sabri, bola-app#32, retour du 18/11 21:19 ; le reste : la disposition standard des jeux de foot
+// console) :
+//   stick gauche courir (il dirige d'abord la balle, aimantée au pied) ; R2/RT tenu sprint, avec ou sans la balle ;
+//   L2/LT : sans stick protéger, avec le stick conduite serrée (attaque) ou contenir (défense)
+//   attaque : ✕/A passe (R1 + : puissante, L1 + : une-deux, la remise part quand L1 est lâché) ; ○/B frappe (R2 + : à ras
+//             de terre si la balle est au sol, acrobatique si elle est en l'air ; L1 + : piqué ; R1 + : enroulée ; L2 + :
+//             extérieur ; ○ puis ✕ : feinte de frappe ; ○ de nouveau juste après le relâché : frappe parfaite) ;
+//             □/X centre sur un côté, passe lobée ailleurs (L1 + : lobé, R1 + : tendu) ; △/Y profondeur (L1 + : lobée,
+//             R1 + : appuyée) ; R3 semelle ; L1 + R1 tenus à l'arrêt jongler ; stick droit gestes techniques
+//             (entrees/geste-stick.js) ; balle libre au sol : ○/B la prend (aimantée) ; L1 seul sans la balle : changer
+//             vers le joueur le plus proche du ballon
+//   défense : □/X tacle (glissé) ; ○/B récupérer du pied, sans tacler (maintenu : l'épaule, et derrière le porteur le
+//             tirage de maillot) ; ✕/A maintenu pressing ; R1/RB maintenu pressing d'un coéquipier ; △/Y maintenu
+//             sortie du gardien ; L1/LB changer vers le plus proche du ballon (R2 ne change jamais de joueur) ; stick
+//             droit poussé : prendre le joueur de ce côté
 //   Menu/Options : pause ; Vue/Share : les touches (lus par la page, pas ici)
 import { JEU, BUT_DL, butDe } from '../sim/constantes.js';
 import { creerLecteur, oublierLecteur, lireGesteStick, zoneMorte } from './geste-stick.js';
@@ -38,10 +46,39 @@ const B = { A: 0, B: 1, X: 2, Y: 3, LB: 4, RB: 5, LT: 6, RT: 7, VUE: 8, MENU: 9,
 export const BOUTONS = B;
 const APPUI = 0.5;
 
+/**
+ * (bola-app#32) La commande d'une touche de face et de ses modificateurs, en attaque : l'id de sa ligne dans
+ * entrees/touches.js (que garde la simulation, et que lit le rendu pour choisir le geste) et l'action de la simulation.
+ *   ✕ / A passe (R1 puissante, L1 une-deux) ; ○ / B frappe (R2 selon la balle : ras de terre ou acrobatique, L1 piqué,
+ *   R1 enroulée, L2 extérieur) ; □ / X centre sur un côté, passe lobée ailleurs (L1 lobé, R1 tendu) ; △ / Y profondeur
+ *   (L1 lobée, R1 appuyée).
+ */
+export function commandeDe(k, { lb = false, rb = false, r2 = false, lt = false, flanc = false } = {}) {
+  if (k === B.A) return lb ? { id: 'uneDeux', spec: { type: 'passe' } } : rb ? { id: 'passePuissante', spec: { type: 'passe', puissante: true } } : { id: 'passe', spec: { type: 'passe' } };
+  if (k === B.B) {
+    if (r2) return { id: 'ras', spec: { type: 'frappe', r2: true } };
+    if (lb) return { id: 'pique', spec: { type: 'lobFrappe' } };
+    if (rb) return { id: 'finesse', spec: { type: 'finesse' } };
+    if (lt) return { id: 'exterieur', spec: { type: 'exterieur' } };
+    return { id: 'frappe', spec: { type: 'frappe' } };
+  }
+  if (k === B.X) {
+    if (lb) return { id: 'centreLobe', spec: { type: flanc ? 'centre' : 'lob', haut: true } };
+    if (rb) return { id: 'centreTendu', spec: { type: 'centre', tendu: true } };
+    return { id: 'centre', spec: { type: flanc ? 'centre' : 'lob' } };
+  }
+  if (lb) return { id: 'profondeurLobee', spec: { type: 'profondeur', lobe: true } };
+  if (rb) return { id: 'profondeurTendue', spec: { type: 'profondeur', puissante: true } };
+  return { id: 'profondeur', spec: { type: 'profondeur' } };
+}
+const estTir = (type) => type === 'frappe' || type === 'finesse' || type === 'lobFrappe' || type === 'exterieur';
+
+
 /** Remet une intention de manette à zéro (mêmes champs que sim/ia.js intentionVide, plus ceux des humains). */
 function vide(it) {
   it.dx = 0; it.dz = 0; it.allure = 0; it.sprint = 0; it.regard = null;
   it.contenir = false; it.protege = false; it.charge = false; it.tire = false; it.presse = false; it.renfort = false; it.sortie = false;
+  it.tenir = false; it.puissance = null; it.bref = false; it.viseX = null;
   return it;
 }
 
@@ -75,7 +112,7 @@ export function intentionDe(cmd) {
 /** Oublie tout ce qui est en cours (manette débranchée, changement d'équipe, pause). */
 export function oublier(cmd) {
   vide(cmd.it); cmd.it.action = null; cmd.it.changer = null;
-  cmd.jauge = null; cmd.p = 0; cmd.attente = null; cmd.changer = null;
+  cmd.jauge = null; cmd.p = 0; cmd.attente = null; cmd.changer = null; cmd.lache = null;
   cmd.geste.actif = false; cmd.geste.fait = false;
   oublierLecteur(cmd.lecteur); cmd.r3 = null; cmd.uneDeux = null; cmd.jongle.t0 = null; cmd.frappeT = -9;
   cmd.vu = false;
@@ -133,60 +170,71 @@ export function lireManette(cmd, etat, t, M, e, versJeu) {
   const sortir = (a) => { cmd.attente = a; cmd.dernier = a; };
 
   if (attaque) {
-    // LT : sans stick, protéger la balle ; avec le stick, la conduite serrée (pas de sprint, allure tenue)
+    // L2 / LT : sans stick, protéger la balle ; avec le stick, la conduite serrée (pas de sprint, allure tenue)
     it.protege = lt && p === j && st.amp < 0.2;
     if (lt && st.amp >= 0.2) { it.allure = Math.min(it.allure, 0.6); it.sprint = 0; }
-    const lb = tenu(B.LB), rb = tenu(B.RB);
-    // la feinte de frappe : A pendant qu'on charge la frappe, ou juste après l'avoir lâchée (avant l'impact)
+    const lb = tenu(B.LB), rb = tenu(B.RB), r2 = gachette(b[B.RT] ?? 0) > 0.5;
+    const viseX = dirStick ? Math.max(-1, Math.min(1, dirStick.x)) * (BUT_DL - 0.35) : 0;
+    // (bola-app#32) une balle libre au sol, à portée de prise : ○ / B la prend (elle vient au pied)
+    // (au pied, à moins de 0,9 m, elle se frappe : ○ est alors la frappe)
+    const dLibre = j ? Math.hypot(bl.p.x - j.p.x, bl.p.z - j.p.z) : 99;
+    const libreSol = !p && bl.garde == null && bl.p.y < 0.45 && Math.abs(bl.v.y) < 1.5 && dLibre > 0.9 && dLibre < JEU.aimant.prendre;
     if (bas(B.A) && (cmd.jauge?.type === 'frappe' || (!cmd.jauge && t - cmd.frappeT < 0.35))) {
-      cmd.jauge = null; cmd.p = 0; cmd.frappeT = -9;
-      sortir({ type: 'feinteFrappe' });
-    }
-    // la jauge : un seul bouton à la fois ; la passe ou la frappe part au relâché
-    const types = [[B.A, 'passe'], [B.B, 'lob'], [B.Y, 'profondeur'], [B.X, 'frappe']];
-    if (!cmd.jauge && !cmd.attente) for (const [k, type] of types) if (bas(k)) { cmd.jauge = { bouton: k, t0: t, type, uneDeux: k === B.A && lb }; break; }
-    if (cmd.jauge) {
-      const jg = cmd.jauge;
-      cmd.p = Math.min(1, (t - jg.t0) / JEU.jauge);
-      if (haut(jg.bouton) || !tenu(jg.bouton)) {
-        const f = jg.type === 'frappe';
-        const pw = Math.max(f ? 0.2 : 0.12, cmd.p);
-        let a;
-        if (f) {
-          // le côté du but que montre le stick (repère du jeu : x en travers)
-          const x = dirStick ? Math.max(-1, Math.min(1, dirStick.x)) * (BUT_DL - 0.35) : 0;
-          if (lb && rb) a = { type: 'frappe', p: pw, x, y: 0.15, ras: true };
-          else a = { type: lb ? 'lobFrappe' : rb ? 'finesse' : lt ? 'exterieur' : 'frappe', p: pw, x };
-          cmd.frappeT = t;
-        } else {
-          let type = jg.type;
-          // le centre : B sur un côté, près de la ligne de but adverse
-          if (type === 'lob' && j && Math.abs(j.p.x) > 3.8 && Math.abs(butDe(1 - e) - j.p.z) < 10) type = 'centre';
-          const tendue = type === 'passe' && rb;
-          a = { type, p: tendue ? Math.min(1, 0.45 + 0.55 * pw) : type === 'centre' ? Math.max(0.6, pw) : pw };
-          if (dirStick) { a.dx = dirStick.x; a.dz = dirStick.z; }
-          if (type === 'passe' && jg.uneDeux && j) { a.uneDeux = 'appel'; cmd.uneDeux = { t, de: j.i }; }
-        }
+      // la feinte de frappe : ✕ / A pendant qu'on charge la frappe, ou juste après l'avoir lâchée (avant l'impact)
+      cmd.jauge = null; cmd.p = 0; cmd.frappeT = -9; cmd.lache = null;
+      sortir({ type: 'feinteFrappe', commande: 'feinteFrappe' });
+    } else if (bas(B.B) && !cmd.jauge && t - cmd.frappeT < 0.3) {
+      // (bola-app#32, profondeur technique) le second appui de la frappe, juste après le relâché : la frappe parfaite
+      // s'il tombe à 0,07 s de l'impact (sim/monde.js timing)
+      cmd.frappeT = -9;
+      sortir({ type: 'timing', commande: 'frappeParfaite' });
+    } else if (!cmd.jauge && !cmd.attente) {
+      // (bola-app#32) chaque touche agit à l'appui : l'action part tout de suite (l'élan démarre), chargée tant que la
+      // touche est tenue ; la combinaison (L1, R1, R2, L2) est lue à l'appui
+      for (const k of [B.A, B.B, B.X, B.Y]) {
+        if (!bas(k)) continue;
+        if (k === B.B && libreSol && !r2) { sortir({ type: 'prendre', commande: 'prendre' }); break; }
+        const flanc = !!j && Math.abs(j.p.x) > 3.8 && Math.abs(butDe(1 - e) - j.p.z) < 10;
+        const c = commandeDe(k, { lb, rb, r2, lt, flanc });
+        const a = { ...c.spec, commande: c.id, charge: true, p: null };
+        if (estTir(a.type)) a.x = viseX;
+        else if (dirStick) { a.dx = dirStick.x; a.dz = dirStick.z; }
+        if (c.id === 'uneDeux' && j) { a.uneDeux = 'appel'; cmd.uneDeux = { t, de: j.i }; }
+        cmd.jauge = { bouton: k, t0: t, type: estTir(a.type) ? 'frappe' : a.type, commande: c.id };
+        cmd.lache = null;
         sortir(a);
-        cmd.jauge = null; cmd.p = 0;
+        break;
       }
     }
-    // la remise du une-deux : quand LB n'est plus tenu et que le receveur (qu'on joue maintenant) a la balle
+    // la charge : la jauge monte tant que la touche est tenue ; au relâché, la puissance est figée (un appui de moins
+    // de 0,15 s est bref : la simulation prend la puissance juste)
+    if (cmd.jauge) {
+      const jg = cmd.jauge, dur = t - jg.t0;
+      cmd.p = Math.min(1, dur / JEU.jauge);
+      it.tenir = true; it.puissance = cmd.p; it.bref = false; it.viseX = viseX;
+      if (!tenu(jg.bouton)) {
+        it.tenir = false; it.bref = dur < JEU.bref;
+        cmd.lache = { t, p: cmd.p, bref: it.bref, viseX };
+        if (jg.type === 'frappe') cmd.frappeT = t;
+        cmd.jauge = null; cmd.p = 0;
+      }
+    } else if (cmd.lache && t - cmd.lache.t < 1.5) { it.tenir = false; it.puissance = cmd.lache.p; it.bref = cmd.lache.bref; it.viseX = cmd.lache.viseX; }
+    // la remise du une-deux : quand L1 n'est plus tenu et que le receveur (qu'on joue maintenant) a la balle
     const U = cmd.uneDeux;
     if (U && t - U.t > 3.5) cmd.uneDeux = null;
-    else if (U && !lb && j && p === j && j.i !== U.de && !cmd.jauge && !cmd.attente) { sortir({ type: 'passe', p: 0.5, uneDeux: 'remise' }); cmd.uneDeux = null; }
-    // LB sans la balle (balle libre près de nous) : changer de joueur
+    else if (U && !lb && j && p === j && j.i !== U.de && !cmd.jauge && !cmd.attente) { sortir({ type: 'passe', p: 0.5, uneDeux: 'remise', commande: 'uneDeux' }); cmd.uneDeux = null; }
+    // L1 / LB seul, sans la balle (balle libre près de nous) : changer vers le joueur le plus proche du ballon
     if (bas(B.LB) && p !== j && !cmd.jauge) cmd.changer = true;
-    // le jonglage : LB + RB tenus, à l'arrêt, balle au pied, sans rien d'autre
+    // le jonglage : L1 + R1 tenus, à l'arrêt, balle au pied, sans rien d'autre
     const J = cmd.jongle;
     if (lb && rb && !cmd.jauge && st.amp === 0 && p === j) {
       if (J.t0 == null) J.t0 = t;
-      if (t - J.t0 >= 0.4 && t >= J.prochain && !cmd.attente) { sortir({ type: 'jongle' }); J.prochain = t + 0.3; }
+      if (t - J.t0 >= 0.4 && t >= J.prochain && !cmd.attente) { sortir({ type: 'jongle', commande: 'jongle' }); J.prochain = t + 0.3; }
     } else J.t0 = null;
   } else {
     // en défense, une jauge ou un geste commencés en attaque sont perdus ; le une-deux, seulement si l'adversaire a la
     // balle (pendant la passe, personne ne l'a)
-    cmd.jauge = null; cmd.p = 0; cmd.r3 = null;
+    cmd.jauge = null; cmd.p = 0; cmd.r3 = null; cmd.lache = null;
     if (p && p.e !== e) cmd.uneDeux = null;
     oublierLecteur(cmd.lecteur);
     it.contenir = lt;
@@ -195,10 +243,10 @@ export function lireManette(cmd, etat, t, M, e, versJeu) {
     it.tire = tenu(B.B);
     it.sortie = tenu(B.Y);
     it.renfort = tenu(B.RB);
-    if (bas(B.X)) sortir({ type: 'tacle', glisse: true });
+    if (bas(B.X)) sortir({ type: 'tacle', glisse: true, commande: 'tacle' });
     // (correctifs #26 : collé dans le dos du porteur, B ne tacle pas : tenu, c'est le tirage de maillot ; avant, le
     // premier appui partait toujours en tacle debout et le tirage n'arrivait jamais à la manette)
-    else if (bas(B.B) && !dansLeDos(j, p)) sortir({ type: 'tacle', glisse: false });
+    else if (bas(B.B) && !dansLeDos(j, p)) sortir({ type: 'tacle', glisse: false, commande: 'recuperer' });
     if (bas(B.LB)) cmd.changer = true;
   }
 

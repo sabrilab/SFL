@@ -125,28 +125,31 @@ function appui(P: Any, bouton: number, n: number, autres?: (e: Any[]) => void) {
 }
 
 // ── passes et frappes à la puissance d'appui ──
+// (bola-app#32 : l'action part à l'appui, chargée ; la puissance est celle du relâché, lue par la simulation à
+// l'impact : on la lit dans l'événement « passe » / « frappe » ; la frappe est sur B / ○, la combinaison lue à l'appui)
 {
   const P = partie(5);
   const vus: Any[] = P.actions;
   appui(P, K.A, 12); // 0,2 s
-  const passe = vus.find((a) => a.type === 'passe');
   P.images(90);
+  const evP = P.evts.find((e: Any) => e.type === 'passe');
   engagement(P.m, 0); P.m.phase = 'jeu';
-  vus.length = 0;
-  appui(P, K.X, 27); // 0,45 s
-  const frappe = vus.find((a) => a.type === 'frappe');
+  vus.length = 0; P.evts.length = 0;
+  appui(P, K.B, 27); // 0,45 s
   P.images(30);
-  verifier('passe à l\'appui', !!passe && Math.abs(passe.p - 12 / 60 / 0.9) < 0.04 && P.evts.some((e: Any) => e.type === 'passe'), `0,2 s → p = ${f2(passe?.p ?? -1)}, passe jouée : ${P.evts.some((e: Any) => e.type === 'passe')}`);
-  verifier('frappe à l\'appui', !!frappe && Math.abs(frappe.p - 0.5) < 0.04 && P.evts.some((e: Any) => e.type === 'frappe'), `0,45 s → p = ${f2(frappe?.p ?? -1)}, frappe partie : ${P.evts.some((e: Any) => e.type === 'frappe')}`);
-  // lobée, profondeur, finesse, frappe lobée, passe tendue : le bon type
+  const evF = P.evts.find((e: Any) => e.type === 'frappe');
+  verifier('passe à l\'appui', !!evP && Math.abs(evP.p - 12 / 60 / 0.9) < 0.04, `0,2 s → p = ${f2(evP?.p ?? -1)}, passe jouée : ${!!evP}`);
+  verifier('frappe à l\'appui (B / ○)', !!evF && Math.abs(evF.p - 0.5) < 0.04, `0,45 s → p = ${f2(evF?.p ?? -1)}, frappe partie : ${!!evF}`);
+  // la commande à l'appui : centre (passe lobée au milieu), profondeur, enroulée, piqué, puissante, extérieur, R2 + ○
   const types: string[] = [];
-  for (const [b, mod] of [[K.B, -1], [K.Y, -1], [K.X, K.RB], [K.X, K.LB], [K.A, K.RB]] as [number, number][]) {
+  for (const [b, mod] of [[K.X, -1], [K.Y, -1], [K.B, K.RB], [K.B, K.LB], [K.A, K.RB], [K.B, K.LT], [K.B, K.RT]] as [number, number][]) {
     engagement(P.m, 0); P.m.phase = 'jeu'; vus.length = 0;
     appui(P, b, 20, (e) => { if (mod >= 0) e[0].b[mod] = 1; });
-    types.push(vus[0] ? `${vus[0].type}${vus[0].p > 0.6 ? '+' : ''}` : 'rien');
+    types.push(vus[0] ? `${vus[0].commande}:${vus[0].type}` : 'rien');
     P.images(60);
   }
-  verifier('lobée, profondeur, finesse, frappe lobée, tendue', types.join(',') === 'lob,profondeur,finesse,lobFrappe,passe+', types.join(', '));
+  const attendu = 'centre:lob,profondeur:profondeur,finesse:finesse,pique:lobFrappe,passePuissante:passe,exterieur:exterieur,ras:frappe';
+  verifier('commandes à l\'appui (□, △, R1 + ○, L1 + ○, R1 + ✕, L2 + ○, R2 + ○)', types.join(',') === attendu, types.join(', '));
 }
 
 // ── stick droit : crochet, roulette ; R3 : semelle ──
@@ -199,11 +202,15 @@ function appui(P: Any, bouton: number, n: number, autres?: (e: Any[]) => void) {
   const d1 = Math.hypot((q.p?.x ?? q.p.x) - j().p.x, (q.p?.z ?? q.p.z) - j().p.z);
   verifier('pressing, renfort, sortie', d1 < d0 && renfort && sortie, `distance au porteur ${f2(d0)} → ${f2(d1)} m ; renfort ${renfort} ; sortie ${sortie}`);
   P.images(2, (e) => { e[0].b.fill(0); });
+  // (bola-app#32 : l'IA joue plus vite, la balle a souvent changé de pied pendant le pressing ; on remet les Blancs au
+  // coup d'envoi, le joueur tenu à 1,6 m du porteur, pour essayer le tacle en défense)
+  engagement(P.m, 1); P.m.phase = 'jeu';
+  { const pb = porteur(P.m), jj = j(); if (pb) { jj.p.x = pb.p.x; jj.p.z = pb.p.z - 1.6; jj.cap = 0; jj.v.x = 0; jj.v.z = 0; } }
   const avant = j();
   // (bola-app#26, lot 3 : la disposition du genre, X / □ tacle glissé, B / ○ tacle debout)
   P.images(2, (e) => { e[0].b[K.X] = 1; });
   const glisse = avant.g?.type === 'tacle' || P.evts.some((e: Any) => e.type === 'tacleBalle' || e.type === 'tacleJambes');
-  verifier('tacle glissé (X)', glisse, `geste ${avant.g?.type ?? 'aucun'}`);
+  verifier('tacle glissé (X)', glisse, `geste ${avant.g?.type ?? 'aucun'} ; porteur ${porteur(P.m)?.i ?? '-'} (${porteur(P.m)?.e ?? '-'}), joueur ${avant.i}, mode ${avant.mode}, attaque ${(Cmd as Any).enAttaque(P.m, 0)}, dernière ${JSON.stringify(P.cmds[0].dernier)}`);
 }
 
 // ── deux manettes, un match entier, reproductible ──
@@ -266,7 +273,9 @@ function deuxManettes(graine: number) {
   // relevés, contrôles anticipés, plongeons bas, IA qui glisse moins souvent — d3f4e37b avant ; re-bénie par le lot 2 :
   // duels (tirage, poussée de dos, tacle contré), fautes et avantage, effet au pied, contrôle raté, centres et reprises,
   // appels, une-deux, pressing coordonné, gardien sur l'angle — 7c88787c avant ; les manettes ne la changent pas)
-  const REF = '98ccc5d7'; // (correctifs #26 : l'IA sort des coins, ciseau et tacle glissé corrigés, pouce levé seulement debout, coup franc à côté du joueur au sol ; 7919334a avant)
+  // (bola-app#32, lot A : la physique des corps plus vive, la balle aimantée, les passes dosées, les frappes à l'appui et la
+  // prise automatique changent le match de l'IA ; 98ccc5d7 aux correctifs #26, 7919334a avant)
+  const REF = '7fcad362';
   verifier('IA contre IA inchangée (graine 7)', empreinte(m) === REF, `${empreinte(m)} (attendu ${REF}, celle du banc physique)`);
 }
 
@@ -361,7 +370,8 @@ const { TOUCHES, touchesMarkdown }: Any = Tch;
 // ── le tableau des touches, ligne par ligne, à la manette et au clavier ──
 type Image = { b?: string[]; ls?: [number, number]; rs?: [number, number] };
 const BTN: Record<string, number> = { A: K.A, B: K.B, X: K.X, Y: K.Y, LB: K.LB, RB: K.RB, LT: K.LT, RT: K.RT, R3: K.R3 };
-const TOUCHE: Record<string, string> = { A: 'd', B: 's', X: ' ', Y: 'f', LB: 'q', RB: 'r', LT: 'c', RT: 'shift', R3: 'u' };
+// (bola-app#32 : Espace = B / ○, S = X / □)
+const TOUCHE: Record<string, string> = { A: 'd', B: ' ', X: 's', Y: 'f', LB: 'q', RB: 'r', LT: 'c', RT: 'shift', R3: 'u' };
 /** n images identiques. */
 const tenir = (n: number, im: Image = {}): Image[] => Array.from({ length: n }, () => im);
 /** Les touches tenues qui font cette image au clavier (I J K L relatives au joueur de cap « cap »). */
@@ -382,7 +392,7 @@ function touchesDe(im: Image, cap: number | null) {
   return s;
 }
 // le monde d'une ligne : le n° 10 Noir (4) balle au pied, face au but attaqué (−z), et ce qu'il faut autour
-type Situation = { libre?: boolean; x?: number; z?: number; cap?: number; v?: number; adv?: [number, number, number][]; fixe?: boolean; defense?: boolean; partenaire?: [number, number, number] };
+type Situation = { libre?: boolean | number; air?: boolean; x?: number; z?: number; cap?: number; v?: number; adv?: [number, number, number][]; fixe?: boolean; defense?: boolean; partenaire?: [number, number, number] };
 function monde(S: Situation) {
   const m: Any = creerMonde({ graine: 3, humains: [true, false], aides: [0.5, 0], presents: [0, 4, 5, ...(S.adv ?? []).map((a) => a[0]), ...(S.partenaire ? [S.partenaire[0]] : []), ...(S.defense ? [9] : [])] });
   demarrer(m, { intro: false });
@@ -401,7 +411,9 @@ function monde(S: Situation) {
     b.v.x = j.v.x; b.v.y = 0; b.v.z = j.v.z; b.w.x = b.w.y = b.w.z = 0;
     b.possesseur = 4; b.dernier = 4; b.dernierT = m.t;
     // (la balle libre à 2,5 m devant lui : il n'est pas porteur)
-    if (S.libre) { b.p.x = j.p.x + 2.5; b.possesseur = null; b.dernier = null; }
+    if (S.libre) { b.p.x = j.p.x + (typeof S.libre === 'number' ? S.libre : 2.5); b.possesseur = null; b.dernier = null; }
+    // (bola-app#32 : la balle en l'air devant lui, qui retombe : R2 + ○ y est acrobatique)
+    if (S.air) { b.p.y = 1.0; b.v.y = 0.5; }
   }
   b.garde = null; b.tir = null; b.recepteur = null;
   if (S.fixe !== false) m.controleFixe = [4, null];
@@ -454,20 +466,27 @@ const appuyer = (bt: string[], n = 15, ls?: [number, number]): Image[] => [...te
 // (le n° 10 regarde −z, la droite de l'écran : devant lui = stick à droite, sa gauche = le haut de l'écran)
 const AV: [number, number] = [1, 0], AR: [number, number] = [-1, 0], GA: [number, number] = [0, 1];
 const ESSAIS: Record<string, { S: Situation; suite: Image[]; ev?: string | ((r: Any) => boolean); verif?: (a: Any) => boolean; apres?: number }> = {
-  passe: { S: { partenaire: [3, 0, -2] }, suite: appuyer(['A']), ev: 'passe' },
-  tendue: { S: { partenaire: [3, 0, -2] }, suite: appuyer(['A', 'RB']), ev: 'passe', verif: (a) => a.p > 0.45 },
+  // (bola-app#32 : la disposition de Sabri ; « ev » prouve le geste dans la simulation, « verif » la commande)
+  passe: { S: { partenaire: [3, 0, -2] }, suite: appuyer(['A']), ev: 'passe', verif: (a) => a.commande === 'passe' },
+  passePuissante: { S: { partenaire: [3, 0, -2] }, suite: appuyer(['A', 'RB']), ev: 'passe', verif: (a) => a.puissante === true && a.commande === 'passePuissante' },
   uneDeux: { S: { partenaire: [3, -1, -4], fixe: false }, suite: [...tenir(12, { b: ['LB', 'A'] }), ...tenir(40, { b: ['LB'] })], ev: (r) => r.evts.some((e: Any) => e.type === 'appelUneDeux') && r.actions.some((a: Any) => a.uneDeux === 'remise'), apres: 200 },
-  lob: { S: { partenaire: [3, 0, -8] }, suite: appuyer(['B']), ev: 'passe' },
-  centre: { S: { x: 6.5, z: -9, cap: Math.PI * 1.5, partenaire: [3, 0, -11] }, suite: appuyer(['B']), ev: 'passe' },
+  frappe: { S: {}, suite: appuyer(['B'], 25), ev: 'frappe', verif: (a) => a.commande === 'frappe' },
+  finesse: { S: {}, suite: appuyer(['B', 'RB'], 25), ev: 'frappe' },
+  pique: { S: {}, suite: appuyer(['B', 'LB'], 25), ev: 'frappe' },
+  ras: { S: {}, suite: appuyer(['B', 'RT'], 25), ev: (r) => r.evts.some((e: Any) => e.type === 'elan' && e.commande === 'ras') && r.evts.some((e: Any) => e.type === 'frappe'), verif: (a) => a.r2 === true },
+  acrobatique: { S: { air: true }, suite: appuyer(['B', 'RT'], 6), ev: (r) => r.evts.some((e: Any) => e.type === 'elan' && e.commande === 'acrobatique'), verif: (a) => a.r2 === true },
+  exterieur: { S: {}, suite: appuyer(['B', 'LT'], 25), ev: 'frappe' },
+  feinteFrappe: { S: {}, suite: [...tenir(12, { b: ['B'] }), ...tenir(3, { b: ['B', 'A'] }), ...tenir(3)], ev: (r) => r.evts.some((e: Any) => e.type === 'feinteFrappe') && !r.evts.some((e: Any) => e.type === 'frappe') },
+  frappeParfaite: { S: {}, suite: [...tenir(4, { b: ['B'] }), ...tenir(1), ...tenir(2, { b: ['B'] })], ev: (r) => r.evts.some((e: Any) => e.type === 'frappeParfaite') && r.evts.some((e: Any) => e.type === 'frappe') },
+  centre: { S: { x: 6.5, z: -9, cap: Math.PI * 1.5, partenaire: [3, 0, -11] }, suite: appuyer(['X']), ev: 'passe' },
+  centreLobe: { S: { x: 6.5, z: -9, cap: Math.PI * 1.5, partenaire: [3, 0, -11] }, suite: appuyer(['X', 'LB']), ev: 'passe', verif: (a) => a.haut === true },
+  centreTendu: { S: { x: 6.5, z: -9, cap: Math.PI * 1.5, partenaire: [3, 0, -11] }, suite: appuyer(['X', 'RB']), ev: 'passe', verif: (a) => a.tendu === true },
   profondeur: { S: { partenaire: [3, 0, -2] }, suite: appuyer(['Y']), ev: 'passe' },
-  frappe: { S: {}, suite: appuyer(['X'], 25), ev: 'frappe' },
-  finesse: { S: {}, suite: appuyer(['X', 'RB'], 25), ev: 'frappe' },
-  exterieur: { S: {}, suite: appuyer(['X', 'LT'], 25), ev: 'frappe' },
-  pique: { S: {}, suite: appuyer(['X', 'LB'], 25), ev: 'frappe' },
-  ras: { S: {}, suite: appuyer(['X', 'LB', 'RB'], 25), ev: 'frappe', verif: (a) => a.y === 0.15 },
-  feinteFrappe: { S: {}, suite: [...tenir(12, { b: ['X'] }), ...tenir(3, { b: ['X', 'A'] }), ...tenir(3)], ev: (r) => r.evts.some((e: Any) => e.type === 'feinteFrappe') && !r.evts.some((e: Any) => e.type === 'frappe') },
+  profondeurLobee: { S: { partenaire: [3, 0, -2] }, suite: appuyer(['Y', 'LB']), ev: 'passe', verif: (a) => a.lobe === true },
+  profondeurTendue: { S: { partenaire: [3, 0, -2] }, suite: appuyer(['Y', 'RB']), ev: 'passe', verif: (a) => a.puissante === true },
   semelle: { S: COURSE, suite: [...tenir(3, { b: ['R3'], ls: AV }), ...tenir(3, { ls: AV })], ev: 'semelle' },
   jongle: { S: {}, suite: tenir(110, { b: ['LB', 'RB'] }), ev: (r) => r.evts.filter((e: Any) => e.type === 'jongle').length >= 2 },
+  prendre: { S: { fixe: true, libre: 1.6 }, suite: appuyer(['B'], 3), ev: (r) => r.evts.some((e: Any) => e.type === 'prendre') && r.evts.some((e: Any) => e.type === 'controle' && e.j === 4) },
   changerA: { S: { fixe: false, libre: true, partenaire: [3, -3, 2] }, suite: [], ev: 'changer' },
   crochet: { S: COURSE, suite: sec(GA), ev: 'crochet' },
   crochetCourt: { S: COURSE, suite: sec(GA, ['LT']), ev: 'crochet', verif: (a) => a.court === true },
@@ -480,8 +499,9 @@ const ESSAIS: Record<string, { S: Situation; suite: Image[]; ev?: string | ((r: 
   pousser: { S: COURSE, suite: sec(AV), ev: 'pousser' },
   petitPont: { S: { adv: [[7, 0, 3.0]] }, suite: sec(AV), ev: 'petitPont' },
   sombrero: { S: {}, suite: [...tenir(3, { b: ['R3'] }), ...tenir(5, { b: ['R3'], rs: AV }), ...tenir(10, { b: ['R3'] }), ...tenir(3)], ev: 'sombrero', apres: 120 },
-  tacle: { S: { defense: true }, suite: appuyer(['B'], 3), ev: (r) => r.gestes.includes('tacleDebout') && !r.gestes.includes('tacle') },
-  tacleGlisse: { S: { defense: true }, suite: appuyer(['X'], 3), ev: (r) => r.gestes.includes('tacle') && !r.gestes.includes('tacleDebout') },
+  // (défense : □ / X tacle glissé, ○ / B récupérer du pied, debout)
+  tacle: { S: { defense: true }, suite: appuyer(['X'], 3), ev: (r) => r.gestes.includes('tacle') && !r.gestes.includes('tacleDebout') },
+  recuperer: { S: { defense: true }, suite: appuyer(['B'], 3), ev: (r) => r.gestes.includes('tacleDebout') && !r.gestes.includes('tacle') },
   changer: { S: { defense: true, fixe: false, partenaire: [3, 3, 0] }, suite: appuyer(['LB'], 3), ev: 'changer' },
   choisir: { S: { defense: true, fixe: false, partenaire: [3, 3, 0] }, suite: [...tenir(4, { rs: [0, -1] }), ...tenir(3)], ev: 'changer' },
 };
@@ -514,6 +534,107 @@ ESSAIS.changerA.suite = appuyer(['LB'], 3);
   verifier('tableau à la manette (Xbox et PlayStation : mêmes boutons standard)', ratesPad.length === 0, ratesPad.length ? ratesPad.join(' ; ') : `${lignes.length} lignes, chaque geste par sa combinaison`);
   verifier('tableau au clavier', ratesClavier.length === 0, ratesClavier.length ? ratesClavier.join(' ; ') : `${lignes.length} lignes`);
   verifier('mêmes intentions manette et clavier', ecarts.length === 0, ecarts.length ? ecarts.join(' ; ') : 'mêmes actions, dans le même ordre, sur chaque ligne');
+}
+
+// ── (bola-app#32, lot A) réactivité, balle aimantée, passes qui arrivent, L1, R2, charge ──
+{
+  /** Une manette sur un monde de situation, image par image (1/60 s, deux pas) ; f(e, k) règle l'image k. */
+  const rejouer = (S: Situation, n: number, f: (e: Any, k: number, m: Any) => void, apresImage?: (m: Any, k: number) => void) => {
+    const m = monde(S), c = creerCommande(), e = pad();
+    let t = 0;
+    const evts: Any[] = [];
+    lireManette(c, e, t, m, 0, versJeu); t += 1 / 60;
+    for (let k = 0; k < n; k++) {
+      e.b.fill(0); e.ax.fill(0);
+      f(e, k, m);
+      lireManette(c, e, t, m, 0, versJeu);
+      for (let s2 = 0; s2 < 2; s2++) { pas(m, [intentionDe(c), null]); for (const ev of m.evts) evts.push({ ...ev, k }); m.evts.length = 0; }
+      apresImage?.(m, k);
+      t += 1 / 60;
+    }
+    return { m, evts, c };
+  };
+  // (le stick d'écran qui va vers (gx, gz) du jeu : versJeu(sx, sy) = (−sy, −sx))
+  const stick = (e: Any, gx: number, gz: number) => { e.ax[0] = -gz; e.ax[1] = gx; };
+  const res: string[] = [];
+  let ok = true;
+  // 1. l'appui répond à l'image suivante, un appui bref part tout de suite (passe et frappe)
+  for (const [nom, bt, S] of [['passe', K.A, { partenaire: [3, 0, -4] }], ['frappe', K.B, {}]] as [string, number, Situation][]) {
+    let rep = -1, dep = -1;
+    const r0 = rejouer(S, 40, (e, k) => { if (k >= 1 && k < 7) e.b[bt] = 1; }, (m, k) => {
+      const j = m.joueurs[4];
+      if (rep < 0 && j.g && k >= 1) rep = k - 1;
+    });
+    const ev0 = r0.evts.find((x: Any) => (x.type === 'passe' || x.type === 'frappe') && x.j === 4);
+    dep = ev0 ? ev0.k - 1 : -1;
+    const bon = rep >= 0 && rep <= 1 && dep >= 0 && dep <= 12;
+    ok &&= bon; res.push(`${nom} : élan ${rep} image(s) après l'appui, balle partie ${dep} images après (appui de 0,1 s)`);
+  }
+  // 2. la charge : un appui bref → la puissance juste ; tenu 0,6 s → l'élan est tenu armé, la flèche publiée, p ≈ 0,67
+  {
+    const bref = rejouer({ partenaire: [3, 0, -6] }, 50, (e, k) => { if (k >= 1 && k < 5) e.b[K.A] = 1; });
+    const pb = bref.evts.find((x: Any) => x.type === 'passe');
+    let gel = 0, fleche = 0;
+    const long = rejouer({ partenaire: [3, 0, -6] }, 90, (e, k) => { if (k >= 1 && k < 37) e.b[K.A] = 1; }, (m) => { const j = m.joueurs[4]; if (j.g?.gel) gel++; if (j.vise) fleche++; });
+    const pl = long.evts.find((x: Any) => x.type === 'passe');
+    const bon = !!pb && pb.p == null && !!pl && Math.abs(pl.p - 36 / 60 / 0.9) < 0.05 && gel > 15 && fleche > 15 && pl.k <= 40;
+    ok &&= bon; res.push(`charge : appui bref p ${pb?.p ?? 'juste'}, tenu 0,6 s p ${pl ? f2(pl.p) : '—'} (élan tenu armé ${gel} images, flèche ${fleche} images, balle partie ${pl ? pl.k - 36 : '—'} images après le relâché)`);
+  }
+  // 3. trop chargée (1 s), la frappe passe au-dessus de la barre ; à moitié, elle reste sous la barre
+  {
+    const haut = (n: number) => { let y = NaN; rejouer({ z: 0 }, 160, (e, k) => { if (k >= 1 && k < 1 + n) e.b[K.B] = 1; }, (m) => { const b = m.balle; if (Number.isNaN(y) && b.p.z <= -14.9 && b.tir) y = b.p.y; }); return y; };
+    const y1 = haut(60), y5 = haut(27);
+    const bon = y1 > 2.05 && !(y5 > 2.05);
+    ok &&= bon; res.push(`frappe trop chargée : à la ligne à ${f2(y1)} m (au-dessus de 2 m), à moitié ${Number.isNaN(y5) ? 'arrêtée avant' : f2(y5) + ' m'}`);
+  }
+  // 4. arrêt net, virage serré, demi-tour immédiat, balle au pied et gardée
+  {
+    const lance = (k: number) => k < 150;
+    const sit: Situation = { z: 10, cap: Math.PI };
+    let tStop = -1;
+    const a = rejouer(sit, 220, (e, k) => { if (lance(k)) { stick(e, 0, -1); e.b[K.RT] = 1; } }, (m, k) => { const j = m.joueurs[4]; if (!lance(k) && tStop < 0 && Math.hypot(j.v.x, j.v.z) < 0.3) tStop = (k - 150) / 60; });
+    const ja = a.m.joueurs[4], dA = Math.hypot(a.m.balle.p.x - ja.p.x, a.m.balle.p.z - ja.p.z);
+    let tRep = -1;
+    const d = rejouer(sit, 240, (e, k) => { stick(e, 0, lance(k) ? -1 : 1); e.b[K.RT] = 1; }, (m, k) => { const j = m.joueurs[4]; if (!lance(k) && tRep < 0 && j.v.z > 2) tRep = (k - 150) / 60; });
+    const jd = d.m.joueurs[4];
+    let tVir = -1;
+    const v = rejouer(sit, 220, (e, k) => { if (lance(k)) stick(e, 0, -1); else stick(e, 1, 0); e.b[K.RT] = 1; }, (m, k) => { const j = m.joueurs[4], s3 = Math.hypot(j.v.x, j.v.z); if (!lance(k) && tVir < 0 && s3 > 1 && Math.abs(Math.atan2(j.v.x, j.v.z) - Math.PI / 2) < 0.26) tVir = (k - 150) / 60; });
+    const jv = v.m.joueurs[4];
+    const garde = (r: Any, j: Any) => porteur(r.m) === j && Math.hypot(r.m.balle.p.x - j.p.x, r.m.balle.p.z - j.p.z) < 1.2;
+    const bon = tStop >= 0 && tStop <= 0.6 && dA < 0.8 && garde(a, ja) && tRep >= 0 && tRep <= 0.6 && garde(d, jd) && tVir >= 0 && tVir <= 0.65 && garde(v, jv);
+    ok &&= bon; res.push(`balle au pied lancé : arrêt ${f2(tStop)} s (balle à ${f2(dA)} m), demi-tour reparti en ${f2(tRep)} s, virage 90° en ${f2(tVir)} s ; balle gardée ${garde(a, ja)}/${garde(d, jd)}/${garde(v, jv)}`);
+  }
+  // 5. la passe arrive : couloir libre, 6 à 11 m, quatre angles ; le receveur (Noir n° 3) la contrôle
+  {
+    let arrive = 0, n = 0;
+    for (const [x, z] of [[0, -6], [4, -6], [-5, -4], [6, 1], [-7, 0], [3, -10], [0, -11], [-4, -9]] as [number, number][]) {
+      n++;
+      const r = rejouer({ partenaire: [3, x, 4 + z] }, 150, (e, k, m) => { const j = m.joueurs[4], o = m.joueurs[3]; if (k >= 1 && k < 5) { e.b[K.A] = 1; const L = Math.hypot(o.p.x - j.p.x, o.p.z - j.p.z) || 1; stick(e, (o.p.x - j.p.x) / L, (o.p.z - j.p.z) / L); } });
+      if (r.evts.some((ev: Any) => ev.type === 'controle' && ev.j === 3)) arrive++;
+    }
+    const bon = arrive >= n - 1;
+    ok &&= bon; res.push(`passes qui arrivent (couloir libre) : ${arrive}/${n}`);
+  }
+  // 6. L1 seul, sans la balle : le joueur le plus proche du ballon ; R2 tenu ne change pas de joueur et fait sprinter
+  {
+    const r = rejouer({ defense: true, fixe: false, partenaire: [3, 0.5, 2.4] }, 6, (e, k) => { if (k === 1) e.b[K.LB] = 1; });
+    const c1 = r.m.controle[0];
+    // (R2 tapé quatre fois en défense : le même joueur tenu qu'avec rien ; R2 tenu, sans la balle : le sprint)
+    const r2 = rejouer({ defense: true, fixe: false, partenaire: [3, 0.5, 2.4] }, 30, (e, k) => { if (k % 6 < 2) e.b[K.RT] = 1; });
+    const r0b = rejouer({ defense: true, fixe: false, partenaire: [3, 0.5, 2.4] }, 30, () => {});
+    const c2 = r2.m.controle[0], c0 = r0b.m.controle[0];
+    const rs = rejouer({ libre: 9 }, 90, (e) => { e.b[K.RT] = 1; stick(e, 0, -1); });
+    const v2 = Math.hypot(rs.m.joueurs[4].v.x, rs.m.joueurs[4].v.z);
+    const bon = c1 === 3 && c2 === c0 && v2 > 6.5;
+    ok &&= bon; res.push(`L1 : contrôle → ${c1} (le plus proche du ballon : 3) ; R2 tapé : contrôle ${c2} (sans R2 : ${c0}) ; R2 tenu sans la balle : ${f2(v2)} m/s`);
+  }
+  // 7. un geste raté coûte la balle : deux gestes du stick droit à moins de 0,25 s
+  {
+    const r = rejouer({ v: 4.2 }, 60, (e, k) => { stick(e, 0, -1); if (k >= 2 && k < 5) e.ax[3] = -1; if (k >= 9 && k < 12) e.ax[3] = 1; });
+    const rate = r.evts.some((x: Any) => x.type === 'gesteRate');
+    ok &&= rate; res.push(`geste raté (deux gestes à 0,12 s) : ${rate ? 'balle perdue' : 'RIEN'}`);
+  }
+  verifier('lot A : réactivité, balle aimantée, passes, L1, R2, charge', ok, res.join(' ; '));
 }
 
 // ── I J K L : relatives au joueur (I = pousser devant lui, quel que soit son cap) ──
@@ -566,7 +687,7 @@ ESSAIS.changerA.suite = appuyer(['LB'], 3);
   const suite: Image[] = [
     ...sec(GA).map((im) => ({ ...im, ls: AV })),
     ...[AR, [-0.7071, 0.7071], GA, [0.7071, 0.7071], AV].flatMap((d) => tenir(2, { rs: d as [number, number], ls: AV })),
-    ...tenir(10, { b: ['X'], ls: AV }), ...tenir(2, { ls: AV }),
+    ...tenir(10, { b: ['B'], ls: AV }), ...tenir(2, { ls: AV }),
   ];
   const r = jouerSuite(COURSE, suite, 'pad', 120);
   const t = (ty: string) => r.evts.find((e: Any) => e.type === ty && e.j === 4)?.t;
@@ -576,16 +697,17 @@ ESSAIS.changerA.suite = appuyer(['LB'], 3);
   verifier('enchaînement crochet → roulette → frappe', ok, `crochet ${f(t0)} s, roulette ${f(t1)} s, élan de la frappe ${f(te)} s (${t0 != null && te != null ? (te - t0).toFixed(2) : '—'} s, seuil 1,2), balle frappée ${f(t2)} s (seuil 1,5) ; la frappe a attendu en file : ${r.evts.some((e: Any) => e.type === 'enchaine')}`);
 }
 
-// ── (correctifs) la feinte de frappe « X puis A » quand A arrive juste APRÈS le relâché de X (16 à 200 ms) :
-// l'élan de la frappe est annulé, la balle n'est pas frappée (le A ne va pas en file derrière la frappe) ──
+// ── (correctifs) la feinte de frappe « ○ puis ✕ » (bola-app#32 : ○ / B ; tenue, la frappe chargée attend armée, la
+// feinte la coupe tant qu'elle n'est pas partie ; juste après le relâché, 1 image, aussi : l'impact tombe 0,05 s après) ──
 {
   const rates: string[] = [];
-  for (const d of [1, 3, 8, 12]) {
-    const r = jouerSuite({}, [...tenir(25, { b: ['X'] }), ...tenir(d), ...tenir(2, { b: ['A'] })], 'pad', 60);
+  for (const [n, d] of [[25, -10], [25, -3], [25, 0], [25, 1]] as [number, number][]) {
+    const suite = d < 0 ? [...tenir(n + d, { b: ['B'] }), ...tenir(2, { b: ['B', 'A'] }), ...tenir(3)] : [...tenir(n, { b: ['B'] }), ...tenir(d), ...tenir(2, { b: ['A'] })];
+    const r = jouerSuite({}, suite, 'pad', 60);
     const fr = r.evts.some((e: Any) => e.type === 'frappe'), ff = r.evts.some((e: Any) => e.type === 'feinteFrappe');
-    if (fr || !ff) rates.push(`A ${d} image(s) après : frappe ${fr}, feinte ${ff}`);
+    if (fr || !ff) rates.push(`A ${d} image(s) ${d < 0 ? 'avant' : 'après'} le relâché : frappe ${fr}, feinte ${ff}`);
   }
-  verifier('feinte de frappe après le relâché de X', rates.length === 0, rates.length ? rates.join(' ; ') : 'A 1, 3, 8, 12 images après le relâché : feinte, aucune frappe');
+  verifier('feinte de frappe (○ puis ✕)', rates.length === 0, rates.length ? rates.join(' ; ') : 'A pendant la charge (10 et 3 images avant le relâché), au relâché, 1 image après : feinte, aucune frappe');
 }
 
 // ── (correctifs #26) B tenu dans le dos d'un porteur qui court : le tirage de maillot, pas un tacle debout ──

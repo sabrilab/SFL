@@ -13,9 +13,9 @@
 // la ligne de passe la plus dangereuse, le couvreur entre la balle et le but, et un second presseur sur un mauvais
 // contrôle, un porteur dos au but ou contre un panneau) ; le défenseur collé dans le dos du porteur le tient parfois
 // par le maillot (faute s'il insiste). Les décisions collectives tirent dans leur propre flux (« collectif »).
-import { PAS, CORPS as C, FORMATION, LB, BX, BZ, BUT_DL, butDe, sens } from './constantes.js';
+import { PAS, CORPS as C, FORMATION, LB, BX, BZ, BUT_DL, JEU, butDe, sens } from './constantes.js';
 import { clamp, libre } from './corps.js';
-import { porteur, choisirPartenaire, adversaireProche } from './gestes.js';
+import { porteur, choisirPartenaire, adversaireProche, aimantee } from './gestes.js';
 import { predire } from './ballon.js';
 import { cos, hypot, sin } from './maths.js';
 
@@ -114,10 +114,11 @@ export function pasIA(m, j) {
     }
     if (nousAvons && j.i !== R.chasseur) ({ cx, cz, vmax } = attaque(m, j, it, cx, cz, vmax, p));
   } else if (b.recepteur === j.i) {
-    // une passe arrive : à sa rencontre
+    // une passe arrive : à sa rencontre (bola-app#32, lot A : au-devant, au premier point de sa course qu'il atteint
+    // avant elle ; avant : la balle dans 0,3 s)
     cx = b.p.x + b.v.x * 0.3; cz = b.p.z + b.v.z * 0.3; vmax = 6; it.vaBalle = true;
-    const r = rdv(m, j);
-    if (r) { cx = r.x; cz = r.z; vmax = 6.6; }
+    const r = auDevant(m, j);
+    if (r) { cx = r.x; cz = r.z; vmax = 7; }
   } else if (nousAvons) ({ cx, cz, vmax } = attaque(m, j, it, cx, cz, vmax, p));
   // (le chasseur va jusqu'au panneau : une balle collée au panneau du fond se joue aussi)
   const bord = it.vaBalle ? 0.38 : 0.5;
@@ -180,6 +181,27 @@ function rdv(m, j) {
 }
 
 /**
+ * (bola-app#32, lot A) Au-devant de la passe : le premier point de la course prédite de la balle au sol (roulement
+ * JEU.passeRoule) que le receveur atteint avant elle, en 0,05 à 2,5 s ; une balle en l'air : son point de chute à
+ * hauteur de tête (rdv). null si la balle ne roule plus vers lui.
+ */
+export function auDevant(m, j) {
+  const b = m.balle;
+  if (b.garde != null) return null;
+  if (b.p.y > 0.6 || b.v.y > 2) return rdv(m, j);
+  const v = hypot(b.v.x, b.v.z);
+  if (v < 0.6) return { x: b.p.x, z: b.p.z };
+  const ux = b.v.x / v, uz = b.v.z / v, a = JEU.passeRoule;
+  let x = b.p.x, z = b.p.z;
+  for (let t = 0.05; t <= 2.5; t += 0.05) {
+    const vt = Math.max(0, v - a * t), dist = (v * v - vt * vt) / (2 * a);
+    x = clamp(b.p.x + ux * dist, -BX + 0.4, BX - 0.4); z = clamp(b.p.z + uz * dist, -BZ + 0.4, BZ - 0.4);
+    if (tempsArrivee(j, x, z) <= t || vt === 0) break;
+  }
+  return { x, z };
+}
+
+/**
  * La remise du une-deux (bola-app#26, lot 2) : le receveur d'une passe dont le passeur est reparti dans l'espace décide
  * une fois (75 %) s'il la lui remet ; puis, dès que le passeur est à sa hauteur ou devant et le couloir libre, il la
  * remet : en une touche si la balle arrive encore (unTouche), sinon après son contrôle (2 s au plus). Renvoie null
@@ -196,7 +218,9 @@ function remise(m, j, it, unTouche) {
     const rx = j.p.x - b.p.x, rz = j.p.z - b.p.z, d = hypot(rx, rz);
     if (d > 3 || b.p.y > 0.4 || (rx * b.v.x + rz * b.v.z) < 0.5 * d) return false;
   }
-  const t = 0.5, xx = X.p.x + X.v.x * t, xz = X.p.z + X.v.z * t;
+  // (bola-app#32, lot A : le passeur court plus vite ; la remise vise où il sera quand elle arrive, et non 0,5 s devant)
+  let t = 0.5, xx = X.p.x + X.v.x * t, xz = X.p.z + X.v.z * t;
+  for (let k = 0; k < 3; k++) { const dd = hypot(xx - b.p.x, xz - b.p.z); t = clamp(dd / 6.5, 0.4, 1.3); xx = X.p.x + X.v.x * t; xz = X.p.z + X.v.z * t; }
   const aHauteur = (xz - j.p.z) * sens(j.e) > (unTouche ? -2.5 : -1.0);
   if (!aHauteur || !couloirLibre(m, j.e, b.p.x, b.p.z, xx, xz, 1.0)) {
     // (le mur attend : balle au pied, il ne file pas vers le but, il temporise)
@@ -205,7 +229,7 @@ function remise(m, j, it, unTouche) {
   }
   // (la remise part devant le passeur lancé, assez forte pour qu'il la reprenne dans sa course : 5,5 m/s à l'arrivée)
   const d = hypot(xx - b.p.x, xz - b.p.z), v0 = Math.sqrt(5.5 * 5.5 + 2 * 1.35 * d);
-  it.action = { type: 'passe', p: clamp((v0 - 6) / 12, 0.2, 1), cible: X.i, dx: xx - j.p.x, dz: xz - j.p.z };
+  it.action = { type: 'passe', p: clamp((v0 - 6) / 12, 0.2, 1), v0, cible: X.i, dx: xx - j.p.x, dz: xz - j.p.z };
   X.uneDeux = null; j.remiseOui = false; j.decision = 0.5;
   return true;
 }
@@ -268,10 +292,11 @@ function porteurIA(m, j, it) {
     if (cible) {
       const d = hypot(cible.p.x - j.p.x, cible.p.z - j.p.z);
       const prof = rng.u() < 0.25;
-      // la force qu'il faut pour que la passe arrive à 6 m/s (roulement 1,08 m/s² et l'air ; lot 2 : 4,5 m/s se faisait couper)
-      const v0 = Math.sqrt(6 * 6 + 2 * 1.35 * d);
+      // la force qu'il faut pour que la passe arrive à 6 m/s (roulement 1,08 m/s² et l'air ; lot 2 : 4,5 m/s se faisait couper ;
+      // bola-app#32, lot A : 7,5 m/s, le rythme plus nerveux, et la vitesse donnée telle quelle, v0)
+      const v0 = Math.sqrt(JEU.passeArrivee * JEU.passeArrivee + 2 * JEU.passeRoule * d);
       const lob = d > 14 && rng.u() < 0.4;
-      it.action = { type: lob ? 'lob' : prof ? 'profondeur' : 'passe', p: clamp((v0 - 6) / 12, 0.05, 1), cible: cible.i, dx: cible.p.x - j.p.x, dz: cible.p.z - j.p.z };
+      it.action = { type: lob ? 'lob' : prof ? 'profondeur' : 'passe', p: clamp((v0 - 6) / 12, 0.05, 1), v0, cible: cible.i, dx: cible.p.x - j.p.x, dz: cible.p.z - j.p.z };
       // (bola-app#26, lot 2) le une-deux : après une passe courte, le passeur repart dans l'espace, devant, du côté
       // opposé au défenseur le plus proche, pour la redemander
       if (!lob && j.role !== 'D' && d < 10 && (j.p.z - butDe(j.e)) * sens(j.e) > LB * 0.6 && col.u() < 0.5) {
@@ -482,6 +507,8 @@ export function conduire(m, j, it) {
   if (!(it.dx || it.dz)) return;
   const rx = b.p.x - j.p.x, rz = b.p.z - j.p.z, d = hypot(rx, rz);
   if (d > 5) return;
+  // (bola-app#32, lot A) la balle aimantée suit le joueur : il n'a plus à courir après elle
+  if (aimantee(m, j)) return;
   // la balle est restée à côté de lui ou derrière (il l'a dépassée) : il ralentit et revient dessus, au lieu de
   // l'abandonner en continuant tout droit
   const al0 = d > 1e-6 ? (rx * it.dx + rz * it.dz) / d : 1;

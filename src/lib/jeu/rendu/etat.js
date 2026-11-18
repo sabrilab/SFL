@@ -20,6 +20,9 @@ export function etatAnim(M, j, I, porteur, balle, cache) {
   if (g && GESTES.has(j.mode)) {
     const G = (cache.g ??= {});
     G.nom = g.nom; G.t = g.t; G.type = g.type; G.taux = g.taux; G.surface = g.donnees?.surface ?? null; G.impact = g.impact;
+    // (bola-app#32) la commande jouée (id de la ligne de entrees/touches.js : passe, passePuissante, frappe, finesse, piqué…)
+    // et l'élan tenu armé d'une charge : le rendu choisit le geste par la commande (lot A2)
+    G.commande = g.donnees?.spec?.commande ?? null; G.gel = !!g.gel;
     e.geste = G;
   } else e.geste = null;
   e.appui = j.appuiT != null && M.t - j.appuiT < 0.35 ? Object.assign((cache.appui ??= {}), { x: j.appuiX, z: j.appuiZ, f: j.appuiF, age: M.t - j.appuiT }) : null;

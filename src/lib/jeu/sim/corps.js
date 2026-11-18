@@ -3,10 +3,11 @@
 // La simulation décide des positions et des vitesses ; l'animation suit (rendu/animateur.js). Chaque joueur reçoit à
 // chaque pas une intention (sim/commandes.js : direction, allure, sprint, regard, contenir, protéger…), la même pour le
 // pouce, la manette et l'IA, et ce fichier la change en mouvement avec les limites d'un vrai corps :
-//   · accélération a(v) = a0 (1 − v / 1,08 v_cible) : 0 → 7 m/s en 2,5 s environ ;
-//   · virage : la direction de la course tourne d'au plus ω = min(9 ; a_lat / v) rad/s, donc un rayon v² / a_lat
-//     (0,5 m à 2 m/s, 6,5 m à 7 m/s) ; au-delà de 45° d'écart, le joueur ralentit, au-delà de 90° il freine sur ses
-//     appuis ; un demi-tour (plus de 150°) lancé passe par le freinage puis le pivot (turn180) ;
+//   · accélération a(v) = a0 (1 − v / 1,08 v_cible) : 0 → 7 m/s en 1,7 s environ (bola-app#32, « du peps » ; 2,5 s avant) ;
+//   · virage : la direction de la course tourne d'au plus ω = min(16 ; a_lat / v) rad/s, donc un rayon v² / a_lat
+//     (0,2 m à 2 m/s, 2,7 m à 7 m/s ; bola-app#32, a_lat 18 m/s² au lieu de 7,5) ; au-delà de 45° d'écart, le joueur
+//     ralentit, au-delà de 90° il freine sur ses appuis (16 m/s²) ; un demi-tour (plus de 150°) lancé passe par un
+//     freinage court puis le pivot (turn180 joué 2,2 fois, reparti à 4,2 m/s) ; le stick lâché, il s'arrête net (16 m/s²) ;
 //   · orientation (cap) séparée de la vitesse : en contenant ou en protégeant, le joueur fait face au porteur ou dos
 //     à l'adversaire et se déplace en pas chassés ou en arrière (3 m/s au plus) ;
 //   · gestes à root motion (tacle, chute, roulette, frappe en course, relances du gardien) : la vitesse EST la courbe
@@ -287,8 +288,9 @@ export function pasCorps(j, dt, balle) {
       if (s <= C.pivotEntree) {
         j.v.x = sin(h) * s; j.v.z = cos(h) * s;
         j.cap = h;
-        // (joué 1,3 fois plus vite que la capture : sa mise en garde, jambes écartées, ne dure plus 0,4 s)
-        const g = lancerGeste(j, 'turn180', { taux: 1.3, type: 'pivot', donnees: { s0: s, h0: h, cible: j.cible } });
+        // (joué 1,3 fois plus vite que la capture : sa mise en garde, jambes écartées, ne dure plus 0,4 s ; bola-app#32 :
+        // 2,2 fois, le demi-tour lancé se fait en 0,3 s sur l'appui au lieu de 0,52 s)
+        const g = lancerGeste(j, 'turn180', { taux: C.pivotTaux, type: 'pivot', donnees: { s0: s, h0: h, cible: j.cible } });
         j.mode = 'pivot';
         g.cap0 = h;
       } else { j.v.x = sin(h) * s; j.v.z = cos(h) * s; j.cap = h; }
@@ -359,8 +361,10 @@ function pasGeste(j, dt) {
   const g = j.g;
   if (!g) { j.mode = 'loco'; return; }
   g.age += dt;
-  g.t += dt * g.taux;
-  if (g.rm) {
+  // (bola-app#32, lot A) une frappe chargée tenue armée (gestes.js pasFrappe, g.gel) : le clip ne bouge plus, le corps
+  // se plante sur ses appuis (pas de root motion)
+  if (!g.gel) g.t += dt * g.taux;
+  if (g.rm && !g.gel) {
     vitesseRacine(g.nom, g.t, tmp);
     versMonde(g.cap0, tmp.x * g.taux * g.echelle, tmp.z * g.taux * g.echelle, tmp);
     j.v.x = tmp.x; j.v.z = tmp.z;
@@ -397,11 +401,13 @@ function pasGeste(j, dt) {
     const lacet = c?.turn ? echantillon(c.turn, c.turn.length, 1, 0, u * duree(g.nom), duree(g.nom)) : -Math.PI * u;
     j.cap = enrouler(g.cap0 + lacet);
     if (u < 0.45) { const s = s0 * (1 - u / 0.45); j.v.x = sin(h0) * s; j.v.z = cos(h0) * s; }
-    else { const s = 2.5 * ((u - 0.45) / 0.55); j.v.x = sin(j.cap) * s; j.v.z = cos(j.cap) * s; }
+    else { const s = C.pivotSortie * ((u - 0.45) / 0.55); j.v.x = sin(j.cap) * s; j.v.z = cos(j.cap) * s; }
   } else {
-    // geste sur place (passe arrêtée, frappe arrêtée, contrôle) : le joueur s'arrête sur ses appuis
+    // geste sur place (passe arrêtée, frappe arrêtée, contrôle) : le joueur s'arrête sur ses appuis (bola-app#32 : son
+    // propre freinage, freinGeste ; une frappe chargée tenue armée freine plus fort, elle se plante)
     const s = hypot(j.v.x, j.v.z);
-    if (s > 0) { const ns = Math.max(0, s - C.freinPlante * dt); j.v.x *= ns / s; j.v.z *= ns / s; }
+    const fg = g.charge ? C.freinPlante : C.freinGeste;
+    if (s > 0) { const ns = Math.max(0, s - fg * dt); j.v.x *= ns / s; j.v.z *= ns / s; }
   }
   // fin du geste
   const fini = g.t >= g.fin - 1e-6 || (g.finApresImpact != null && g.fait && g.age >= g.impactAge + g.finApresImpact);

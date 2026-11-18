@@ -171,7 +171,8 @@ const lancerA = (j: Any, v: number) => { j.int.dx = 0; j.int.dz = 1; j.int.allur
 {
   const j = corpsSeul();
   const t = lancerA(j, 7);
-  verifier('Accélération 0 → 7 m/s', t >= 2.2 && t <= 3.0, `${f2(t)} s`);
+  // (bola-app#32 : « du peps, comme des sportifs de haut niveau » ; avant 2,2 à 3 s, désormais 1,2 à 2 s)
+  verifier('Accélération 0 → 7 m/s', t >= 1.2 && t <= 2.0, `${f2(t)} s (bola-app#32 : 1,2 à 2 s)`);
 }
 {
   const j = corpsSeul(); lancerA(j, 7);
@@ -179,7 +180,9 @@ const lancerA = (j: Any, v: number) => { j.int.dx = 0; j.int.dz = 1; j.int.allur
   const z0 = j.p.z; let zMax = z0, t = 0, pivot = false;
   j.int.dz = -1;
   while (j.v.z > -2 && t < 5) { pasCorps(j, PAS, false); t += PAS; zMax = Math.max(zMax, j.p.z); if (j.mode === 'pivot') pivot = true; }
-  verifier('Demi-tour à 7 m/s', t >= 0.9 && zMax - z0 >= 2.5 && pivot, `${f2(t)} s jusqu'à repartir à 2 m/s, ${f2(zMax - z0)} m de freinage, pivot ${pivot}`);
+  // (bola-app#32 : « demi-tour immédiat, sans boucle ni ralentissement mou » ; avant : au moins 0,9 s et 2,5 m de freinage,
+  // désormais au plus 0,7 s et 2,2 m, toujours par le pivot sur appuis)
+  verifier('Demi-tour à 7 m/s', t <= 0.7 && zMax - z0 <= 2.2 && pivot, `${f2(t)} s jusqu'à repartir à 2 m/s, ${f2(zMax - z0)} m de freinage, pivot ${pivot} (bola-app#32 : 0,7 s et 2,2 m au plus)`);
 }
 {
   const j = corpsSeul(); lancerA(j, 7);
@@ -193,7 +196,8 @@ const lancerA = (j: Any, v: number) => { j.int.dx = 0; j.int.dz = 1; j.int.allur
     const om = Math.abs(h - h0) / PAS; h0 = h;
     if (s > 6.9 && om > 1e-3) { omMax = Math.max(omMax, om); rMin = Math.min(rMin, s / om); if (om > (CORPS.aLat / s) * 1.01) depasse++; }
   }
-  verifier('Virage plein stick à 7 m/s', rMin >= 6 && depasse === 0, `rayon mini ${f2(rMin)} m, lacet max ${f2(omMax)} rad/s, ${depasse} pas au-delà de a_lat / v`);
+  // (bola-app#32 : « virages serrés » ; avant, rayon d'au moins 6 m à 7 m/s ; désormais 2 à 4 m, toujours borné par a_lat / v)
+  verifier('Virage plein stick à 7 m/s', rMin >= 2 && rMin <= 4 && depasse === 0, `rayon mini ${f2(rMin)} m, lacet max ${f2(omMax)} rad/s, ${depasse} pas au-delà de a_lat / v (bola-app#32 : rayon de 2 à 4 m)`);
 }
 
 // ─────────────────────────── la conduite ───────────────────────────
@@ -234,7 +238,9 @@ function sceneConduite(graine: number, defenseur: boolean) {
     for (const l of s.split('\n')) if (re.test(l) && !/engagement|b\.p\.x = 0; b\.p\.y = BALLON\.R; b\.p\.z = 0/.test(l)) fautifs.push(`${f}: ${l.trim()}`);
   }
   const dm = moy(dist);
-  verifier('Conduite en sprint', dm > 1.0 && pertes > 0 && fautifs.length === 0, `balle à ${f2(dm)} m en moyenne (médiane ${f2(med(dist))}), ${pertes}/20 balles perdues sous pression, ${fautifs.length} affectation(s) de position hors ballon.js${fautifs.length ? ' : ' + fautifs.join(' | ') : ''}`);
+  // (bola-app#32 : la balle aimantée reste au pied en sprint, « elle suit le joueur au lieu de partir devant » ; avant, à plus
+  // d'un mètre devant ; désormais entre 0,5 et 1 m ; un défenseur sur la route la prend encore, au tacle)
+  verifier('Conduite en sprint', dm >= 0.5 && dm <= 1.0 && pertes > 0 && fautifs.length === 0, `balle à ${f2(dm)} m en moyenne (médiane ${f2(med(dist))}), ${pertes}/20 balles perdues sous pression, ${fautifs.length} affectation(s) de position hors ballon.js${fautifs.length ? ' : ' + fautifs.join(' | ') : ''} (bola-app#32 : 0,5 à 1 m)`);
 }
 
 // ─────────────────────────── le contrôle orienté ───────────────────────────
@@ -554,26 +560,28 @@ function tacle(graine: number, deFace: boolean) {
   verifier('Chute bornée', n >= 25 && pireExces <= 1e-9 && reaccel === 0, `${n} chutes ; vitesse au plus ${pireExces <= 0 ? 'sous' : 'AU-DESSUS de'} celle d'avant le contact + 1 m/s (écart ${f2(pireExces)}) ; réaccélérations au sol ${reaccel}`);
 }
 {
-  // le demi-tour balle au pied : stick retourné à 6 m/s, la balle à moins de 1,5 m : il la garde (crochet) ; et la
-  // touche part du pied prévu
-  let garde = 0, n = 0;
-  const distPied: number[] = [];
+  // le demi-tour balle au pied : stick retourné en pleine course (bola-app#32 : la balle aimantée tourne autour de lui et
+  // repart dans le nouveau sens avant lui ; avant, un crochet de 170° et des touches du pied prévu) : il la garde dans
+  // 80 % des cas au moins, elle n'est jamais à plus de 1,2 m de lui pendant le demi-tour, et il est reparti en moins d'1 s
+  let garde = 0, n = 0, dMax = 0;
+  const reparti: number[] = [];
   for (let g = 1; g <= 20; g++) {
     const m: Any = sceneConduite(g, false);
-    m.journal = (type: string, i: number) => { if (type === 'touche' && i === 4) distPied.push(Gst.piedProche(m.joueurs[4], m.balle, true).d); };
-    let crochet = false;
+    let tR = -1;
     for (let i = 0; i < 360; i++) {
       const retourne = i > 150;
       pas(m, [{ dx: 0, dz: retourne ? 1 : -1, allure: 1, sprint: retourne ? 0.3 : 1 }, null]);
-      for (const e of m.evts) if (e.type === 'crochet') crochet = true;
       m.evts.length = 0;
+      const j = m.joueurs[4], b = m.balle;
+      if (retourne && i < 300) dMax = Math.max(dMax, Math.hypot(b.p.x - j.p.x, b.p.z - j.p.z));
+      if (retourne && tR < 0 && j.v.z > 2) tR = (i - 150) * PAS;
     }
     n++;
+    if (tR >= 0) reparti.push(tR);
     const j = m.joueurs[4], b = m.balle;
-    if (crochet && porteur(m) === j && Math.hypot(b.p.x - j.p.x, b.p.z - j.p.z) < 2.5 && j.v.z > 0.5) garde++;
+    if (porteur(m) === j && Math.hypot(b.p.x - j.p.x, b.p.z - j.p.z) < 1.2 && j.v.z > 0.5) garde++;
   }
-  const pmax = Math.max(...distPied);
-  verifier('Demi-tour balle au pied', garde / n >= 0.8 && pmax <= Cst.JEU.porteeTouche + 1e-9, `${garde}/${n} demi-tours gardent la balle (crochet) ; ${distPied.length} touches de conduite, pied prévu à ${f2(med(distPied))} m en médiane, ${f2(pmax)} m au plus`);
+  verifier('Demi-tour balle au pied', garde / n >= 0.8 && dMax <= 1.2 && reparti.length === n && Math.max(...reparti) < 1.0, `${garde}/${n} demi-tours gardent la balle (aimantée), à ${f2(dMax)} m au plus pendant le demi-tour, reparti à 2 m/s en ${f2(med(reparti))} s (médiane), ${f2(Math.max(...reparti))} s au plus`);
 }
 {
   // la passe lobée : 13 m, un adversaire à 3 m sur la ligne ; elle passe au-dessus (sommet ≥ 2,5 m, angle ≥ 40°)
@@ -1015,7 +1023,9 @@ const balleA = (m: Any, x: number, z: number, vx = 0, vz = 0, pos: number | null
         poser(p, 0.5, -1 + g * 0.3, dos ? Math.PI : 0); balleA(m, 0.5, -1 + g * 0.3 + (dos ? -0.4 : 0.4), 0, 0, 9);
         poser(m.joueurs[8], 4.5, 2.5, 0);
         poser(m.joueurs[1], 0, 9, Math.PI); poser(m.joueurs[2], -2, 3.5, Math.PI); poser(m.joueurs[3], 2.5, 4.5, Math.PI); poser(m.joueurs[4], 0, 3, Math.PI);
-        for (let i = 0; i < 300; i++) { pas(m, [null, { dx: 0, dz: 0, allure: 0, protege: false }]); m.balle.dernierT = m.t; }
+        // (bola-app#32 : le chasseur, plus vif, arrive au porteur planté et le tacle avant 2,5 s ; on mesure ici les places
+        // du pressing, pas le tacle : les Noirs ne tentent pas de tacle pendant la scène, j.essai tenu haut)
+        for (let i = 0; i < 300; i++) { for (const o of m.joueurs) if (o.e === 0) o.essai = 9; pas(m, [null, { dx: 0, dz: 0, allure: 0, protege: false }]); m.balle.dernierT = m.t; }
         const Rr = m._roles?.[0];
         if (!Rr) continue;
         const J = (i: number | null) => (i != null ? m.joueurs[i] : null);
