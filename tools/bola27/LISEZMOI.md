@@ -5,8 +5,8 @@ Une adresse publique du **jeu seul**, qu'on ouvre sans compte Vercel ni compte B
 est l'entrée : un site statique, **sans Next, sans Supabase, sans connexion, sans le reste de l'app, sans données ni photo
 d'un vrai joueur**. Il s'ouvre directement sur l'écran du jeu (« Jouer », et l'écran Manettes dès qu'une manette est vue).
 
-État au 18/11 : construit et vérifié **en local seulement**. Aucun projet Vercel n'est créé, rien n'est publié : la
-création du projet et la mise en ligne attendent le feu vert de l'utilisateur, donné directement dans la session.
+État au 18/11 : en ligne sur **https://bola27.vercel.app**, projet Vercel `bola27` créé par l'agent de production après
+le feu vert de l'utilisateur donné dans sa session (« Ok pour bola 27 », 18/11, 21:55 UTC).
 
 ## Où vit le code
 
@@ -75,42 +75,39 @@ erreur. Le relevé des requêtes est écrit à côté (`reseau-portrait.json`, `
 logiciel : compter quelques minutes. Si le Chromium attendu par Playwright manque, il prend celui déjà installé
 (`PLAYWRIGHT_BROWSERS_PATH`) ou celui de `--chromium <chemin>` ; rien n'est téléchargé.
 
-## Le futur projet Vercel « bola27 » (non créé)
+## Le projet Vercel « bola27 »
 
-À créer par l'agent de production **seulement avec le feu vert de l'utilisateur dans la session**, sans toucher au
-projet `sfl`.
+Créé le 18/11/2026 dans l'équipe de `sfl`, à part : **aucun réglage du projet `sfl` n'a été touché**.
 
 | Réglage | Valeur |
 |---|---|
-| Nom du projet | `bola27`, d'où `bola27.vercel.app` (s'il est pris : `bola27-jeu`, puis `bola-27`, et le dire) |
-| Dépôt Git | `sabrilab/SFL` |
+| Nom du projet | `bola27` (`prj_W1sBpaNbUQeVnKoJIZqugxImwC3P`), d'où `bola27.vercel.app` |
+| Dépôt Git | **aucun lien automatique** : le projet ne construit que quand on le lui demande (voir « Redéployer »), donc rien ne se déclenche quand on pousse une autre branche de `sabrilab/SFL` |
+| Source d'un déploiement | une branche et un commit de `sabrilab/SFL`, donnés à chaque déploiement |
 | Root Directory | **`tools/bola27`** |
-| Inclure les fichiers hors du Root Directory à la construction | **activé** (réglage par défaut ; indispensable : la page et le moteur sont dans `src/`) |
+| Fichiers hors du Root Directory | **inclus** (indispensable : la page et le moteur sont dans `src/`) |
 | Framework Preset | Other |
-| Install Command | `cd ../.. && npm ci` (dans `vercel.json`) |
-| Build Command | `node construire.mjs --sortie sortie` (dans `vercel.json`) |
-| Output Directory | `sortie` (dans `vercel.json`) |
-| Ignored Build Step | dans `vercel.json` (`ignoreCommand`) : ne reconstruit que si le jeu, sa page, sa feuille, `public/jeu`, le lockfile ou ce dossier changent |
+| Node | 22.x |
+| Install Command | `cd ../.. && npm ci` (aussi dans `vercel.json`) |
+| Build Command | `node construire.mjs --sortie sortie` (aussi dans `vercel.json`) |
+| Output Directory | `sortie` (aussi dans `vercel.json`) |
 | Variables d'environnement | **aucune** (surtout pas celles de `sfl` : ni Supabase, ni base) |
-| Deployment Protection | voir plus bas |
+| Deployment Protection | **désactivée sur ce seul projet** (Vercel Authentication et mot de passe : off), pour que le lien s'ouvre chez n'importe qui |
 
 Pourquoi la racine du projet est `tools/bola27` et non celle du dépôt : à la racine, Vercel lirait le `vercel.json` de
 l'app (ses tâches planifiées, qui viseraient `/api/…` sur bola27), et un projet « Other » sans commande lancerait
 `npm run build`, donc le `prebuild` qui écrit dans la base de production. Ici, `tools/bola27/vercel.json` fixe tout,
-dans le code. À vérifier au premier déploiement (le cloud de l'agent ne peut pas l'essayer sans créer le projet) : que
-`cd ../.. && npm ci` trouve bien la racine du dépôt.
-
-**Protection.** Avec la protection standard de Vercel (« toutes sauf les domaines de production »), l'adresse de
-production du projet, `bola27.vercel.app`, est en principe ouverte à tous, et seules les adresses de déploiement et
-d'aperçu demandent une connexion. Ouvrir `https://bola27.vercel.app` dans une fenêtre privée : si une connexion Vercel
-est demandée, passer « Vercel Authentication » à Disabled **sur ce seul projet**.
+dans le code. (Le `vercel.json` n'a pas d'`ignoreCommand` : Vercel refuse plus de 256 caractères, et sans lien Git
+il ne servirait à rien.)
 
 ## Redéployer (à chaque rendu du jeu, bola-app#32 et suivants)
 
 1. En local, sur la branche du rendu : `node tools/bola27/construire.mjs`, `servir.mjs`, `verifier.mjs` : vert.
-2. Pousser la branche : Vercel construit un aperçu de `bola27` (si le jeu a changé).
-3. Le passer en production : « Promote to Production » sur ce déploiement dans le tableau de bord du projet `bola27`
-   (ou régler la branche de production de `bola27` sur la branche du jeu à montrer).
+2. Pousser la branche sur `sabrilab/SFL`.
+3. Créer un déploiement de production du projet `bola27` depuis cette branche et ce commit : outil Vercel
+   `create_deployment` avec `project: prj_W1sBpaNbUQeVnKoJIZqugxImwC3P`, `target: production` et
+   `gitSource: { type: github, org: sabrilab, repo: SFL, ref: <branche>, sha: <commit> }`, ou, avec la CLI connectée,
+   `vercel deploy --prod` depuis `tools/bola27` lié au projet `bola27`.
 4. Vérifier l'adresse en ligne :
    ```bash
    curl -s https://bola27.vercel.app/version.json     # le commit attendu
