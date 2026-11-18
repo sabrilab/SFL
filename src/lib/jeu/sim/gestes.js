@@ -25,7 +25,7 @@
 //     et le contrôleur lancé trébuche sous 0,15. Un joueur qui a demandé une frappe ne contrôle pas la balle aérienne
 //     qui arrive : il la reprend de volée ou de la tête. Les deux dernières passes sont gardées (m.passes) : la
 //     remise du receveur au passeur, reprise par lui, est un une-deux (m.stats.uneDeux).
-import { PAS, G, BALLON, JEU, CORPS, BUT_DL, BUT_H, butDe, sens, LB, BX, BZ } from './constantes.js';
+import { PAS, G, BALLON, JEU, CORPS, BUT_DL, BUT_H, butDe, sens, LB, BX, BZ, ELAN } from './constantes.js';
 import { piedA, teteA, piedLoco, racineA, versMonde, lancerGeste, impactDe, libre, clamp, enrouler, duree, trebucher } from './corps.js';
 import { predire } from './ballon.js';
 import { CLIPS, FPS_CLIPS } from './clips.js';
@@ -742,6 +742,9 @@ function lancer(m, j, spec, cible, effleure, pied = 1, nom = '') {
     const tete = /^head/.test(nom), volee = /^(volley|bicycle|shoot2)/.test(nom) && b.p.y > 0.3;
     let v0 = finesse ? JEU.finesseV0[0] + JEU.finesseV0[1] * p : ext ? JEU.exterieurV0[0] + JEU.exterieurV0[1] * p : JEU.frappeV0[0] + JEU.frappeV0[1] * p;
     if (tete) v0 = 8 + 7 * p; else if (volee) v0 *= 0.85;
+    // (l'élan) la frappe surpuissante : armée à fond, deux crans de jauge ; elle part plus vite et plus droite
+    const sur = ELAN.actif && !tete && spec.type !== 'lobFrappe' && p >= ELAN.frappe.seuil && (m.elan?.[j.e] ?? 0) >= ELAN.frappe.cout;
+    if (sur) { v0 = Math.min(BALLON.vMax, v0 * ELAN.frappe.v); m.elan[j.e] -= ELAN.frappe.cout; m.ev('surpuissance', { j: j.i, e: j.e }); }
     const cx = cible.x;
     let wy = 0;
     if (brosse) {
@@ -755,6 +758,7 @@ function lancer(m, j, spec, cible, effleure, pied = 1, nom = '') {
     let sig = (0.6 + 5 * p * p + 4 * pr + 3 * (s / CORPS.vSprint) + 4 * (Math.min(angleCorps, Math.PI / 2) / (Math.PI / 2))) * DEG;
     if (finesse) sig *= 0.5; else if (ext) sig *= 0.8;
     if (tete) sig += 3 * DEG; else if (volee) sig += 4 * DEG;
+    if (sur) sig *= ELAN.frappe.erreur;
     sig *= 1 - 0.3 * aide;
     const bruitH = rng.normal() * sig;
     h = atan2(cx - b.p.x, cible.z - b.p.z);

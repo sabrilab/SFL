@@ -61,5 +61,7 @@ export function creerHasard(graine) {
     // une-deux, pressing) : des flux à part, pour ne pas décaler les tirages des autres
     duels: creerFlux(graine, 'duels'),
     collectif: creerFlux(graine, 'collectif'),
+    // l'élan (percées de l'IA) : un flux à part
+    elan: creerFlux(graine, 'elan'),
   };
 }

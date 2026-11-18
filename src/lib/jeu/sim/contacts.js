@@ -217,8 +217,9 @@ function pasPaires(m, dt) {
     // (entre coéquipiers, on s'évite : moitié moins)
     const f = A.e === B.e ? 0.5 : 1;
     const dva = jn * ia, dvb = jn * ib;
-    if (dva > 1.4) desequilibrer(m, A, (f * (dva - 1.4)) / (2 * C.impDes), { x: -nx, z: -nz });
-    if (dvb > 1.4) desequilibrer(m, B, (f * (dvb - 1.4)) / (2 * C.impDes), { x: nx, z: nz });
+    // (un joueur lancé dans sa percée tient debout : sim/monde.js, percee)
+    if (dva > 1.4 && !(A.percee > 0)) desequilibrer(m, A, (f * (dva - 1.4)) / (2 * C.impDes), { x: -nx, z: -nz });
+    if (dvb > 1.4 && !(B.percee > 0)) desequilibrer(m, B, (f * (dvb - 1.4)) / (2 * C.impDes), { x: nx, z: nz });
     if (jn * Math.max(ia, ib) > 1.2) m.ev('choc', { a: A.i, b: B.i, force: jn });
   }
 }

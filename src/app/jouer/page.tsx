@@ -48,6 +48,7 @@ type Etat = {
   pause: boolean;
   manettes: boolean;
   ralenti: boolean;
+  elan: [number, number];
 };
 type Match = {
   demarrer: () => void;
@@ -169,6 +170,27 @@ export default function JouerPage() {
             <span className="border-l border-white/15 py-1.5 pl-3 pr-3.5 text-[18px] tabular-nums text-white/80">{chrono(etat.reste)}</span>
           </div>
         )}
+        {/* l'élan : trois crans par équipe sous le tableau (Noirs à gauche, Blancs à droite), qui se remplissent vers
+            l'extérieur ; un cran plein est blanc, deux crans pleins : la frappe surpuissante est prête */}
+        {etat && enJeu && !etat.ralenti && etat.elan && (
+          <div className="absolute left-1/2 top-[calc(env(safe-area-inset-top)+52px)] flex -translate-x-1/2 items-center gap-3">
+            {[0, 1].map((e) => (
+              <div key={e} className={cn("flex gap-[3px]", e === 0 && "flex-row-reverse")}>
+                {[0, 1, 2].map((n) => {
+                  const f = Math.max(0, Math.min(1, etat.elan[e] * 3 - n));
+                  return (
+                    <span key={n} className={cn("relative h-[5px] w-[22px] overflow-hidden rounded-full bg-black/55", etat.elan[e] * 3 >= 2 && n < 2 && "jeu-elan-pret")}>
+                      <span
+                        className={cn("absolute inset-y-0 bg-white transition-[width] duration-150", e === 0 ? "right-0" : "left-0", f < 1 && "opacity-45")}
+                        style={{ width: `${f * 100}%` }}
+                      />
+                    </span>
+                  );
+                })}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* le mot du résultat, en haut (correctifs #26 : au milieu, à 64 %, il couvrait le buteur qui célèbre au plan
@@ -279,6 +301,7 @@ export default function JouerPage() {
         @keyframes jeu-mot { from { transform: scale(.6); opacity: 0 } to { transform: none; opacity: 1 } }
         .jeu-fantome { animation: jeu-fantome 2.2s ease-in-out infinite; }
         .jeu-bande { animation: jeu-bande .35s ease-out both; }
+        .jeu-elan-pret { box-shadow: 0 0 8px rgba(255,255,255,.75); }
         @keyframes jeu-bande { from { transform: scaleY(0) } to { transform: none } }
         @keyframes jeu-fantome {
           0% { transform: translate(0, 0); opacity: 0 }

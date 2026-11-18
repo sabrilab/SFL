@@ -33,7 +33,7 @@
 // contacts entre corps → balle (conduite, contrôle, intégration, corps qui la bloquent, gardiens, but) → horloge.
 // Pendant le but et la fin, les corps se démêlent aussi. Une intention NaN ou infinie est remise à zéro à l'entrée. Le monde publie la liste des événements du pas (ev) pour le rendu, le son et
 // les vibrations ; la simulation n'en dépend pas.
-import { PAS, JEU, ROLES, ENGAGEMENT, BX, BZ, LB, butDe, sens, BALLON, TERRAIN } from './constantes.js';
+import { PAS, JEU, ROLES, ENGAGEMENT, BX, BZ, LB, butDe, sens, BALLON, TERRAIN, ELAN } from './constantes.js';
 import { creerHasard } from './hasard.js';
 import { creerCorps, pasCorps, libre, lancerGeste, finirGeste, clamp, impactDe, duree } from './corps.js';
 import { creerBalle, pasBalle, antiBlocage, poserBalle } from './ballon.js';
@@ -76,20 +76,97 @@ export function creerMonde({ graine = 1, duree = JEU.duree, humains = [true, fal
     avantage: null,           // une faute notée : l'arbitre regarde l'avantage (pasAvantage)
     arret: null,              // un coup franc : la balle posée, les adversaires à 3 m (pasArret)
     passes: [],               // les deux dernières passes { de, a, t } (une-deux)
+    elan: [0, 0],             // la jauge d'élan de chaque équipe, de 0 à 1 (constantes.js, ELAN)
+    elanGesteT: [-9, -9],     // le dernier geste technique qui a rapporté de l'élan (un geste toutes les 1,5 s au plus)
     _p0: { x: 0, y: 0, z: 0 },
     _phases: new Float64Array(joueurs.length),
   };
   // (banc et scènes : les joueurs absents ne jouent pas, ne touchent rien et ne gênent personne)
   if (presents) for (const j of joueurs) j.absent = !presents.includes(j.i);
-  m.ev = (type, donnees) => { m.evts.push({ type, t: m.t, ...donnees }); if (type === 'chute') m.stats.chutes++; journal?.(type, donnees); };
+  m.ev = (type, donnees) => { m.evts.push({ type, t: m.t, ...donnees }); if (type === 'chute') m.stats.chutes++; if (ELAN.actif) gainElan(m, type, donnees); journal?.(type, donnees); };
   engagement(m, 0);
   return m;
+}
+
+// ─────────────────────────────────────────────── l'élan ───────────────────────────────────────────────
+const GESTES_ELAN = new Set(['roulette', 'semelle', 'talonnade', 'sombrero', 'petitPont']);
+/** Ce qu'un événement de la simulation rapporte à la jauge d'élan d'une équipe (constantes.js, ELAN.gains). */
+function gainElan(m, type, d) {
+  const G = ELAN.gains, eq = (i) => m.joueurs[i].e;
+  const plus = (e, x) => { m.elan[e] = Math.min(1, m.elan[e] + x); };
+  if (type === 'controle') { if (d.possede && !d.rate) plus(eq(d.j), G.controle * (0.5 + (d.q ?? 0.5))); }
+  else if (type === 'tacleBalle') plus(eq(d.j), G.vol);
+  else if (type === 'epaule') plus(eq(d.gagnant), G.epaule);
+  else if (type === 'arret' || type === 'parade' || type === 'capte') plus(eq(d.j), G.arret);
+  else if (type === 'contre') plus(eq(d.j), G.contre);
+  else if (type === 'uneDeux') plus(eq(d.j), G.uneDeux);
+  else if (type === 'charge') plus(eq(d.j), G.charge);
+  else if (type === 'but') plus(1 - d.e, G.butEncaisse);
+  else if (GESTES_ELAN.has(type)) { const e = eq(d.j); if (m.t - m.elanGesteT[e] > 1.5) { m.elanGesteT[e] = m.t; plus(e, G.geste); } }
+}
+
+/**
+ * La percée (un cran d'élan) : une poussée franche dans l'axe de la course (ou du cap, à l'arrêt), 0,32 s. Sans la
+ * balle, elle emporte celle du porteur qu'elle percute (pasCharges) ; balle au pied, elle sert à se dégager.
+ */
+function percee(m, j) {
+  const P = ELAN.percee;
+  if (!ELAN.actif || m.elan[j.e] < P.cout || !libre(j) || j.gardien || j.percee > 0 || m.t < (j.perceeT ?? -9)) return false;
+  const balle = porteur(m) === j;
+  const it = j.int, s = hypot(j.v.x, j.v.z), L = hypot(it.dx, it.dz);
+  let ux, uz;
+  if (L > 0.3) { ux = it.dx / L; uz = it.dz / L; } else if (s > 0.8) { ux = j.v.x / s; uz = j.v.z / s; } else { ux = sin(j.cap); uz = cos(j.cap); }
+  // (un demi-tour ne se fait pas d'une poussée : la percée part dans l'axe de la course si l'écart dépasse 100°)
+  if (s > 2 && (ux * j.v.x + uz * j.v.z) / s < -0.17) { ux = j.v.x / s; uz = j.v.z / s; }
+  const v = Math.max(s, (balle ? P.vBalle : P.v) * 0.8);
+  j.v.x = ux * v; j.v.z = uz * v;
+  j.percee = P.duree; j.perceeT = m.t + P.duree + P.repos; j.perceeTouche = false;
+  m.elan[j.e] -= P.cout;
+  m.ev('percee', { j: j.i, e: j.e, balle });
+  return true;
+}
+
+/** Un joueur lancé dans sa percée percute le porteur adverse : la balle part devant lui, le porteur est bousculé. */
+function pasCharges(m) {
+  const b = m.balle, P = ELAN.percee;
+  if (b.garde != null) return;
+  for (const j of m.joueurs) {
+    if (!(j.percee > 0) || j.perceeTouche || j.absent) continue;
+    const p = porteur(m);
+    if (!p || p.e === j.e || p.gardien || p.percee > 0 || p.intouchable > 0) continue;
+    if (hypot(p.p.x - j.p.x, p.p.z - j.p.z) > P.portee || b.p.y > 0.6) continue;
+    const s = hypot(j.v.x, j.v.z) || 1, ux = j.v.x / s, uz = j.v.z / s;
+    j.perceeTouche = true;
+    b.v.x = ux * P.balle; b.v.z = uz * P.balle; b.v.y = 0.3;
+    b.dernier = j.i; b.dernierT = m.t; b.possesseur = null; b.recepteur = null; b.tir = null;
+    desequilibrer(m, p, P.desequilibre, { x: ux, z: uz });
+    m.stats.vols++;
+    m.ev('charge', { j: j.i, o: p.i, x: p.p.x, z: p.p.z });
+  }
+}
+
+/** L'IA et la percée : pour fondre sur le porteur qu'elle chasse, ou pour se dégager d'un défenseur collé. */
+function perceeIA(m, j) {
+  if (!ELAN.actif || m.elan[j.e] < 0.5 || j.gardien || !libre(j)) return;
+  const s = hypot(j.v.x, j.v.z);
+  if (s < 3.5) return;
+  const p = porteur(m);
+  let veut = false;
+  if (p && p.e !== j.e && !p.gardien) {
+    const dx = p.p.x - j.p.x, dz = p.p.z - j.p.z, d = hypot(dx, dz);
+    veut = d > 1.6 && d < 3.6 && (j.v.x * dx + j.v.z * dz) / (d * s) > 0.9;
+  } else if (p === j) {
+    let pres = Infinity;
+    for (const o of m.joueurs) if (o.e !== j.e && !o.gardien && !o.absent) pres = Math.min(pres, hypot(o.p.x - j.p.x, o.p.z - j.p.z));
+    veut = pres < 2 && j.v.z * sens(j.e) > 2.5 && Math.abs(butDe(1 - j.e) - j.p.z) > 6;
+  }
+  if (veut && m.rng.elan.u() < 1.2 * PAS) percee(m, j);
 }
 
 /** Place les deux équipes pour un engagement ; l'équipe e engage. */
 export function engagement(m, e) {
   for (const j of m.joueurs) {
-    j.v.x = 0; j.v.z = 0; j.mode = 'loco'; j.g = null; j.d = 0; j.recup = 0; j.plante = 0; j.decision = 0.3; j.essai = 0.6;
+    j.v.x = 0; j.v.z = 0; j.mode = 'loco'; j.g = null; j.d = 0; j.recup = 0; j.plante = 0; j.decision = 0.3; j.essai = 0.6; j.percee = 0; j.perceeT = -9;
     j.cap = sens(j.e) < 0 ? Math.PI : 0;
     if (j.gardien) { j.p.x = 0; j.p.z = butDe(j.e) - Math.sign(butDe(j.e)) * 0.7; }
     else { const [x, f] = ENGAGEMENT[j.role]; j.p.x = x; j.p.z = sens(j.e) * f * LB; }
@@ -110,6 +187,7 @@ export function engagement(m, e) {
 /** Démarre le match (après l'écran d'attente) ; sans intro : le coup d'envoi tout de suite. */
 export function demarrer(m, { intro = true, reduit = false } = {}) {
   m.score[0] = 0; m.score[1] = 0; m.reste = m.duree; m.buteur = null;
+  m.elan[0] = 0; m.elan[1] = 0;
   engagement(m, 0);
   m.phase = intro ? 'intro' : 'jeu';
   m.phaseT = intro ? (reduit ? 0.3 : JEU.intro) : 0;
@@ -223,6 +301,7 @@ function agir(m, j) {
   j.int.action = null;
   const p = porteur(m);
   if (a.type === 'tacle') { if ((!p || p.e !== j.e) && m.ecart?.e !== j.e) demanderTacle(m, j, !!a.glisse); return; }
+  if (a.type === 'percee') { percee(m, j); return; }
   // (la feinte de frappe annule l'élan d'une frappe déjà lancée : elle ne va pas en file derrière cette frappe)
   if (a.type === 'feinteFrappe' && (j.demande || (j.g && j.g.type === 'frappe' && !j.g.fait))) { feinteFrappe(m, j); return; }
   // (un humain balle au pied, dans un geste : l'action attend son tour)
@@ -814,8 +893,10 @@ export function pas(m, entrees = null) {
       if (entrees[e].presse && (!p || p.e !== e)) presser(m, j);
       if (p === j && !j.int.protege) conduire(m, j, j.int);
       j.aide = m.aides[e];
-    } else { pasIA(m, j); j.aide = 0; }
+    } else { pasIA(m, j); j.aide = 0; perceeIA(m, j); }
   }
+  if (ELAN.actif) for (const e of [0, 1]) m.elan[e] = Math.min(1, m.elan[e] + ELAN.parSeconde * PAS);
+  for (const j of m.joueurs) j.elan = ELAN.actif ? m.elan[j.e] : 0;
   if (m.ecart) tenirEcart(m);
   for (const j of m.joueurs) if (!j.absent) { agir(m, j); pasDemande(m, j); pasAnticipation(m, j); }
   demiTour(m);
@@ -832,6 +913,8 @@ export function pas(m, entrees = null) {
     if (j.g?.type === 'sombrero') pasSombrero(m, j);
     if (j.g?.type === 'jongle') pasJongle(m, j);
   }
+  // (avant le corps à corps : la percée emporte la balle, elle ne finit pas en simple collision)
+  if (ELAN.actif) pasCharges(m);
   pasCorpsACorps(m, PAS);
   for (const j of m.joueurs) if (!j.absent) borner(j);
 

@@ -95,6 +95,9 @@ export const EFFETS = {
   tacle: () => ({ duree: 90, fort: 0.35, faible: 0.6 }),
   epaule: () => ({ duree: 60, fort: 0.3, faible: 0.2 }),
   poteau: () => ({ duree: 140, fort: 0.4, faible: 0.8 }),
+  surpuissance: () => ({ duree: 260, fort: 1, faible: 0.8 }),
+  percee: () => ({ duree: 110, fort: 0.25, faible: 0.7 }),
+  charge: () => ({ duree: 180, fort: 0.9, faible: 0.6 }),
   but: () => ({ duree: 120, fort: 0.7, faible: 0.7, puis: { pause: 80, duree: 260, fort: 0.7, faible: 0.7 } }),
 };
 

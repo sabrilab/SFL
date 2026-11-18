@@ -46,6 +46,9 @@ export function planSons(evts, M, out = []) {
       case 'tacleBalle': case 'tacleJambes': out.push({ s: 'tacle', g: 0.55, pan: panDe(bz) }); break;
       case 'chute': out.push({ s: 'chute', g: 0.45, pan: panDe(bz) }); break;
       case 'arret': case 'capte': out.push({ s: 'controle', g: 0.55, pan: panDe(bz) }); break;
+      // l'élan : la frappe surpuissante claque en plus de sa frappe, la charge cogne
+      case 'surpuissance': out.push({ s: 'panneau', g: 0.9, pan: panDe(bz) }); break;
+      case 'charge': out.push({ s: 'tacle', g: 0.85, pan: panDe(bz) }); out.push({ s: 'chute', g: 0.5, pan: panDe(bz) }); break;
       case 'but': out.push({ s: 'clameur', g: 1, pan: 0 }); break;
       case 'engagement': out.push({ s: 'sifflet', g: 0.5, n: 1, pan: 0 }); break;
       case 'coupFranc': out.push({ s: 'sifflet', g: 0.55, n: 1, pan: 0 }); break;

@@ -106,6 +106,21 @@ export const JEU = {
   coupFranc: { pause: 1.2, distance: 3, garde: 2.5 }, // s de pause balle posée ; m des adversaires ; s au plus pour les tenir à distance
 };
 
+// ── l'élan (Sabri, 17-18/11/2026 : « le gameplay du jeu est celui ressenti de super pouvoirs », « comme si c'était un jeu
+// de combat, sauf que c'est du foot », « faire sentir la férocité, la nervosité ») ──
+// Une jauge par équipe, de 0 à 1, en trois crans. Elle monte avec le jeu engagé (gains ci-dessous, par événement de la
+// simulation) et un peu avec le temps ; elle relève la vitesse de pointe de toute l'équipe ; elle se dépense : un cran
+// pour une percée (L3 / stick gauche cliqué), deux crans pour une frappe surpuissante (frappe armée à 85 % au moins).
+// RÈGLE BOLA À FAIRE VALIDER PAR SABRI. actif: false = le jeu d'avant (aucune jauge, aucun pouvoir).
+export const ELAN = {
+  actif: true,
+  parSeconde: 0.012,                // la jauge monte seule : pleine en 83 s sans rien faire
+  gains: { controle: 0.04, vol: 0.16, epaule: 0.10, arret: 0.10, contre: 0.06, geste: 0.10, uneDeux: 0.10, butEncaisse: 0.30, charge: 0.08 },
+  vitesse: 0.09,                    // part de vitesse de pointe en plus, jauge pleine (7,4 → 8,1 m/s)
+  percee: { cout: 1 / 3, duree: 0.32, v: 10.2, vBalle: 8.6, portee: 1.05, desequilibre: 0.8, balle: 6.5, repos: 0.9 },
+  frappe: { cout: 2 / 3, seuil: 0.85, v: 1.26, erreur: 0.5 }, // la frappe surpuissante : 26 % plus vite, deux fois plus droite
+};
+
 // ── les duels (bola-app#26, lot 2) ──
 export const DUELS = {
   // le tirage de maillot : un défenseur collé derrière le porteur (moins de 0,75 m entre les centres) qui le tient

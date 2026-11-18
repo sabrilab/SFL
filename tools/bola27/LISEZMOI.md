@@ -121,3 +121,17 @@ il ne servirait à rien.)
   téléphone, sur l'adresse en ligne.
 - Les manettes : le site les lit comme l'app (Gamepad API) ; non essayé avec une vraie manette dans le cloud.
 - Le jeu ne garde rien et n'envoie rien : pas de score enregistré, pas de compte.
+
+## L'élan (18/11/2026)
+
+Demande de Sabri (« des super pouvoirs… un jeu de combat, mais version foot », puis « on commande ici sur Bola27 ») : le
+système d'élan écrit d'abord dans `sabrilab/bola-game` est reporté dans le moteur du jeu. **RÈGLE BOLA À FAIRE VALIDER PAR
+SABRI** ; tout se règle dans `src/lib/jeu/sim/constantes.js` (`ELAN`, et `ELAN.actif = false` l'éteint entièrement).
+
+- Une jauge par équipe, en trois crans, sous le tableau. Elle monte avec le jeu : contrôles propres, balles reprises,
+  duels gagnés, arrêts, gestes techniques, une-deux, but encaissé.
+- **La percée** (un cran) : L3, ou V au clavier. Une poussée franche ; sans la balle, elle emporte celle du porteur percuté.
+- **La frappe surpuissante** (deux crans) : une frappe armée à fond. Plus rapide, plus précise.
+- À l'écran : une onde blanche au sol, le sillage de la balle, un temps très court de jeu ralenti, la manette qui vibre.
+  La caméra ne bouge pas.
+- L'IA s'en sert aussi. L'empreinte IA contre IA (graine 7) est passée de `98ccc5d7` à `bac69fd2`.

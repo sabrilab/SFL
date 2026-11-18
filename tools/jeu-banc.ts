@@ -1332,12 +1332,13 @@ const balleA = (m: Any, x: number, z: number, vx = 0, vz = 0, pos: number | null
     const choix: string[] = [];
     scene('centre', 2, (m) => { for (const e of m.evts) if (e.type === 'elan' && e.j === 7) choix.push(e.nom); });
     let fins = 0, solOk = 0;
-    for (let g = 1; g <= 12; g++) {
+    // (30 matchs depuis l'élan : les ciseaux sont rares, 2 en 30 matchs IA, et il en faut au moins un à juger ; 12 avant)
+    for (let g = 1; g <= 30; g++) {
       const prev: string[] = [];
       matchIA(g, 150, (m: Any) => { for (const j of m.joueurs) { const k = j.mode + ':' + (j.g?.nom ?? ''); if (/^geste:(volley|bicycle)/.test(prev[j.i] ?? '') && !k.startsWith('geste:')) { fins++; if (j.mode === 'sol') solOk++; } prev[j.i] = k; } });
     }
     verifier('Ciseau : seulement pour frapper, et suivi du relevé', !choix.includes('volley') && choix.length > 0 && fins > 0 && solOk === fins,
-      `dégagement du défenseur (scène centre) : ${choix.join(', ') || 'aucun'} ; 12 matchs : ${solOk}/${fins} ciseaux ou retournés finis au sol puis relevés`);
+      `dégagement du défenseur (scène centre) : ${choix.join(', ') || 'aucun'} ; 30 matchs : ${solOk}/${fins} ciseaux ou retournés finis au sol puis relevés`);
   }
 }
 

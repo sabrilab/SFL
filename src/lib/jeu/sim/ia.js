@@ -13,7 +13,7 @@
 // la ligne de passe la plus dangereuse, le couvreur entre la balle et le but, et un second presseur sur un mauvais
 // contrôle, un porteur dos au but ou contre un panneau) ; le défenseur collé dans le dos du porteur le tient parfois
 // par le maillot (faute s'il insiste). Les décisions collectives tirent dans leur propre flux (« collectif »).
-import { PAS, CORPS as C, FORMATION, LB, BX, BZ, BUT_DL, butDe, sens } from './constantes.js';
+import { PAS, CORPS as C, FORMATION, LB, BX, BZ, BUT_DL, butDe, sens, ELAN } from './constantes.js';
 import { clamp, libre } from './corps.js';
 import { porteur, choisirPartenaire, adversaireProche } from './gestes.js';
 import { predire } from './ballon.js';
@@ -255,6 +255,8 @@ function porteurIA(m, j, it) {
     const u = rng.u();
     const type = u < 0.13 ? 'finesse' : u < 0.2 ? 'exterieur' : 'frappe';
     it.action = { type, p: 0.45 + rng.u() * 0.4, x, y: 0.3 + rng.u() * 1.1 };
+    // (l'élan) deux crans de jauge : l'IA arme sa frappe à fond, elle part surpuissante
+    if (ELAN.actif && type !== 'exterieur' && m.elan[j.e] >= ELAN.frappe.cout) it.action.p = 0.9;
     return;
   }
   // (bola-app#26, lot 2) le centre : sur un côté, près de la ligne de but, un coéquipier au point de penalty

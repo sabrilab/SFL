@@ -75,7 +75,7 @@ import { creerClavier, creerEtatClavier, etatDepuisTouches } from './entrees/cla
 import { creerLecteur, oublierLecteur, lireGesteStick } from './entrees/geste-stick.js';
 import { creerCameraTele, majCameraTele, poserFoyer, duelPresDuBut } from './rendu/camera.js';
 import { creerTampon, enregistrer, lireTampon, creerRalenti, armerRalenti, suivreRalenti, lancerRalenti, simGelee, passerRalenti, avancerRalenti, cameraPlan, viderTampon } from './rendu/ralenti.js';
-import { creerOmbres, creerMarques, creerFilet } from './rendu/effets.js';
+import { creerOmbres, creerMarques, creerFilet, creerImpacts } from './rendu/effets.js';
 import { creerSon, planSons, niveauFoule } from './rendu/son.js';
 import { POLICE_SCORE, POLICES } from './police.js';
 
@@ -204,6 +204,7 @@ export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, 
   const ombres = creerOmbres(monde, vus.length);
   const marques = creerMarques(monde);
   const filet = creerFilet(pl.scene, versMonde);
+  const impacts = creerImpacts(monde);
   const son = creerSon({ reduit });
   const sons = [];
   // (leurs programmes liés au chargement, pas à la première image du match)
@@ -264,7 +265,7 @@ export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, 
   // banc d'essai : l'IA joue aussi les Noirs (auto), le rendu peut être coupé ; pas = secondes de simulation par image
   // (ralenti : le ralenti du but aussi quand l'IA joue seule, pour le banc ; il ne l'est pas d'ordinaire)
   const banc = { auto: false, rendu: true, pas: 0, stats: monde0.stats, ralenti: false };
-  const etat = { phase: 'attente', noirs: 0, blancs: 0, reste: duree, message: null, buteur: null, pause: false, manettes: false, ralenti: false };
+  const etat = { phase: 'attente', noirs: 0, blancs: 0, reste: duree, message: null, buteur: null, pause: false, manettes: false, ralenti: false, elan: [0, 0] };
   const MOI = 4; // l'attaquant des Noirs
   const signaler = () => surEtat({ ...etat });
   let ralenti = 1, ralentiFin = 0;
@@ -400,6 +401,11 @@ export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, 
           secouer(e.e, EFFETS.but(), [30, 40, 60]);
           break;
         case 'engagement': etat.message = null; etat.buteur = null; break;
+        // l'élan (sim/constantes.js, ELAN) : l'impact se lit au sol, sur la balle, dans la manette et dans un temps
+        // très court de jeu ralenti ; la caméra, elle, ne bouge pas
+        case 'surpuissance': { const J = M.joueurs[e.j]; impacts.onde(M.t, J.p.x, J.p.z, 1); impacts.sillage(M.t); if (!reduit && !banc.auto) { ralenti = 0.22; ralentiFin = 0.16; } secouer(e.e, EFFETS.surpuissance(), [40, 30, 40]); break; }
+        case 'percee': { const J = M.joueurs[e.j]; impacts.onde(M.t, J.p.x, J.p.z, 0.3); secouer(e.e, EFFETS.percee(), 16); break; }
+        case 'charge': { impacts.onde(M.t, e.x, e.z, 0.75); if (!reduit && !banc.auto) { ralenti = 0.3; ralentiFin = 0.12; } secouer(eqDe(e.j), EFFETS.charge(), 30); if (joue(e.o)) secouer(eqDe(e.o), EFFETS.chute(), 22); break; }
         case 'balleChoc':
           // le filet se gonfle vers l'extérieur du but (du centre du but vers le choc), de la force du choc
           if (e.genre === 'filet' && filet && Math.abs(e.z) > 14.5) { const s = Math.sign(e.z); const dx = e.x, dy = e.y - 1, dz = e.z - s * 15.45, l = Math.hypot(dx, dy, dz) || 1; filet.choc(e.t, e.x, e.y, e.z, dx / l, dy / l, dz / l, e.f); }
@@ -418,8 +424,12 @@ export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, 
     if (changePhase && M.phase === 'fin') { manettes.mode('repos'); pause = false; etat.pause = false; }
     etat.phase = M.phase; etat.noirs = M.score[0]; etat.blancs = M.score[1]; etat.reste = Math.max(0, M.reste);
     if (M.phase !== 'but') { etat.message = null; if (M.phase !== 'fin') etat.buteur = null; }
+    // l'élan : au vingt-quatrième près (un cran = 8), pour ne signaler que ce qui se voit
+    const e0 = Math.round((M.elan?.[0] ?? 0) * 24) / 24, e1 = Math.round((M.elan?.[1] ?? 0) * 24) / 24;
+    const changeElan = e0 !== etat.elan[0] || e1 !== etat.elan[1];
+    if (changeElan) etat.elan = [e0, e1];
     const s = Math.ceil(etat.reste);
-    if (changePhase || s !== derniereSeconde) { derniereSeconde = s; signaler(); }
+    if (changePhase || changeElan || s !== derniereSeconde) { derniereSeconde = s; signaler(); }
   }
 
   // ── le rendu d'un état (interpolé) ──
@@ -454,6 +464,7 @@ export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, 
     }
     if (dt > 0) marques.maj(M.t, ombres.bassins, appuis);
     filet?.temps(M.t);
+    impacts.maj(M.t, bInterp);
     if (dt > 0) enregistrerImage(M);
     // l'anneau sous le joueur que tu joues
     const visibleJeu = !banc.auto && (M.phase === 'jeu' || M.phase === 'engagement');
@@ -674,7 +685,7 @@ export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, 
     banc.stats = monde0.stats;
     ralenti = 1; ralentiFin = 0; cam.buteur = null; scene = null;
     if (simGelee(RL)) finirRalenti();
-    RL.etat = 'direct'; viderTampon(tampon); marques.vider(); filet?.vider();
+    RL.etat = 'direct'; viderTampon(tampon); marques.vider(); filet?.vider(); impacts.vider();
     return monde0;
   }
 
@@ -741,7 +752,7 @@ export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, 
       cancelAnimationFrame(raf);
       removeEventListener('keydown', clavierPause);
       removeEventListener('keydown', clavierRalenti);
-      son.detruire(); ombres.liberer(); marques.liberer(); filet?.liberer();
+      son.detruire(); ombres.liberer(); marques.liberer(); filet?.liberer(); impacts.liberer();
       ro.disconnect();
       pouce.detruire();
       clavier.detruire();

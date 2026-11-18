@@ -18,7 +18,7 @@
 //     y cale les clips de course ; piedLoco donne, à cette phase, où est chaque pied (la touche de balle et le
 //     contrôle se mesurent depuis lui).
 // Pas fixe (constantes.js, PAS), aucune allocation par pas, rien de three.
-import { CORPS as C, DUELS } from './constantes.js';
+import { CORPS as C, DUELS, ELAN } from './constantes.js';
 import { CLIPS, FPS_CLIPS } from './clips.js';
 import { atan2, cos, exp, hypot, sin } from './maths.js';
 
@@ -248,8 +248,12 @@ export function trebucher(j) {
 }
 
 function vitesseVoulue(j, it, balle) {
-  let v = it.allure * C.vTrot + it.sprint * (C.vSprint - C.vTrot);
-  if (balle) v = Math.min(v * C.balleV, C.vSprintBalle);
+  // (l'élan de l'équipe relève la pointe de vitesse : j.elan, posé par le monde à chaque pas)
+  const ke = 1 + ELAN.vitesse * (j.elan ?? 0);
+  let v = (it.allure * C.vTrot + it.sprint * (C.vSprint - C.vTrot)) * ke;
+  if (balle) v = Math.min(v * C.balleV, C.vSprintBalle * ke);
+  // (la percée : la pointe monte d'un coup, le temps de la poussée)
+  if (j.percee > 0) v = Math.max(v, balle ? ELAN.percee.vBalle : ELAN.percee.v);
   if (it.contenir) v = Math.min(v, C.vChasse);
   if (it.protege) v = Math.min(v, C.vProtege);
   if (j.plante > 0) v = Math.min(v, 0.6);
@@ -269,6 +273,7 @@ export function pasCorps(j, dt, balle) {
   j.plante = Math.max(0, j.plante - dt);
   j.intouchable = Math.max(0, j.intouchable - dt);
   j.crochetT = Math.max(0, (j.crochetT ?? 0) - dt);
+  if (j.percee > 0) j.percee = Math.max(0, j.percee - dt);
   if (j.tireF > 0) { j.tireF = Math.max(0, j.tireF - dt); if (j.tireF === 0) j.tirePar = null; }
   if (j.leve > 0) j.leve = Math.max(0, j.leve - dt); // (lot 2) vient de se relever : il se dégage seul des autres
   j.d = Math.max(0, j.d - C.retourDes * dt);

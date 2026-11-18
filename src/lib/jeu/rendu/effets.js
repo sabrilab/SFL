@@ -212,6 +212,59 @@ export function creerMarques(parent) {
   };
 }
 
+// ─────────────────────────── les impacts de l'élan ───────────────────────────
+// L'ÉLAN (creerImpacts) : une onde blanche au sol qui s'ouvre et s'efface (départ d'une percée, charge qui emporte la
+// balle, frappe surpuissante), et le sillage de la balle surpuissante (des points blancs qui s'éteignent derrière elle).
+// La caméra ne bouge pas pour autant : l'impact est porté par le terrain, la balle, la manette et le son.
+export const IMPACTS = { ondes: 6, vie: 0.45, points: 18, viePoint: 0.32, sillage: 0.9 };
+/** Le rayon (m) et l'opacité d'une onde d'âge a (s), de force f (0..1). Pur. */
+export function ondeImpact(a, f, I = IMPACTS) {
+  const u = clamp(a / I.vie, 0, 1), k = 1 - (1 - u) * (1 - u) * (1 - u);
+  return { r: 0.35 + (1.3 + 1.9 * f) * k, o: (0.35 + 0.5 * f) * (1 - u) * (1 - u) };
+}
+export function creerImpacts(parent) {
+  const I = IMPACTS;
+  const gOnde = new THREE.RingGeometry(0.93, 1, 64).rotateX(-Math.PI / 2);
+  const ondes = Array.from({ length: I.ondes }, () => {
+    const o = new THREE.Mesh(gOnde, new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, depthWrite: false }));
+    o.visible = false; o.renderOrder = 2; o.position.y = 0.045; parent.add(o);
+    return { o, t0: -9, f: 0 };
+  });
+  const gPoint = new THREE.SphereGeometry(0.1, 10, 8);
+  const points = Array.from({ length: I.points }, () => {
+    const o = new THREE.Mesh(gPoint, new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, depthWrite: false }));
+    o.visible = false; parent.add(o);
+    return { o, t0: -9 };
+  });
+  let prochaine = 0, prochain = 0, sillageFin = -9, dernierPoint = -9;
+  return {
+    /** une onde au sol en (x, z), à l'heure de jeu t, de force f (0..1) */
+    onde(t, x, z, f = 0.6) { const O = ondes[prochaine]; prochaine = (prochaine + 1) % ondes.length; O.t0 = t; O.f = f; O.o.position.x = x; O.o.position.z = z; },
+    /** la balle laisse un sillage jusqu'à t + IMPACTS.sillage */
+    sillage(t) { sillageFin = t + I.sillage; },
+    /** une image : l'heure de jeu, la balle telle qu'elle est montrée */
+    maj(t, b) {
+      if (t < dernierPoint - 1) { sillageFin = -9; dernierPoint = -9; for (const O of ondes) O.t0 = -9; for (const P of points) P.t0 = -9; } // (un nouveau match)
+      for (const O of ondes) {
+        const a = t - O.t0, vu = a >= 0 && a < I.vie;
+        O.o.visible = vu;
+        if (vu) { const w = ondeImpact(a, O.f); O.o.scale.set(w.r, 1, w.r); O.o.material.opacity = w.o; }
+      }
+      if (t < sillageFin && t - dernierPoint >= 1 / 70) {
+        const P = points[prochain]; prochain = (prochain + 1) % points.length;
+        P.t0 = t; P.o.position.set(b.x, b.y, b.z); dernierPoint = t;
+      }
+      for (const P of points) {
+        const a = t - P.t0, vu = a >= 0 && a < I.viePoint;
+        P.o.visible = vu;
+        if (vu) { const u = 1 - a / I.viePoint; P.o.material.opacity = 0.55 * u * u; P.o.scale.setScalar(0.35 + 0.65 * u); }
+      }
+    },
+    vider() { sillageFin = -9; for (const O of ondes) { O.t0 = -9; O.o.visible = false; } for (const P of points) { P.t0 = -9; P.o.visible = false; } },
+    liberer() { gOnde.dispose(); gPoint.dispose(); for (const O of ondes) { O.o.material.dispose(); O.o.removeFromParent(); } for (const P of points) { P.o.material.dispose(); P.o.removeFromParent(); } },
+  };
+}
+
 // ─────────────────────────── le filet qui bouge ───────────────────────────
 /** Découpe chaque triangle en 4^n (milieux des côtés) : positions, uv et normales interpolées (en flottants), géométrie sans index. */
 export function decouper(geo, n) {

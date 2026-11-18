@@ -225,6 +225,9 @@ export function lireManette(cmd, etat, t, M, e, versJeu) {
     } else if (rs.amp < 0.3) ge.actif = false;
   }
 
+  // L3 (stick gauche cliqué) : la percée, en attaque comme en défense (un cran d'élan ; sim/monde.js, percee)
+  if (bas(B.L3) && j && !cmd.attente) sortir({ type: 'percee' });
+
   for (let i = 0; i < 17; i++) prec[i] = b[i] ?? 0;
   return it;
 }

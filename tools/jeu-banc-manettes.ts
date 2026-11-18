@@ -266,7 +266,8 @@ function deuxManettes(graine: number) {
   // relevés, contrôles anticipés, plongeons bas, IA qui glisse moins souvent — d3f4e37b avant ; re-bénie par le lot 2 :
   // duels (tirage, poussée de dos, tacle contré), fautes et avantage, effet au pied, contrôle raté, centres et reprises,
   // appels, une-deux, pressing coordonné, gardien sur l'angle — 7c88787c avant ; les manettes ne la changent pas)
-  const REF = '98ccc5d7'; // (correctifs #26 : l'IA sort des coins, ciseau et tacle glissé corrigés, pouce levé seulement debout, coup franc à côté du joueur au sol ; 7919334a avant)
+  // (re-bénie par l'élan : jauge, percée, frappe surpuissante — 98ccc5d7 avant)
+  const REF = 'bac69fd2'; // (avant l'élan : correctifs #26 : l'IA sort des coins, ciseau et tacle glissé corrigés, pouce levé seulement debout, coup franc à côté du joueur au sol ; 7919334a avant)
   verifier('IA contre IA inchangée (graine 7)', empreinte(m) === REF, `${empreinte(m)} (attendu ${REF}, celle du banc physique)`);
 }
 
@@ -360,8 +361,8 @@ const { TOUCHES, touchesMarkdown }: Any = Tch;
 
 // ── le tableau des touches, ligne par ligne, à la manette et au clavier ──
 type Image = { b?: string[]; ls?: [number, number]; rs?: [number, number] };
-const BTN: Record<string, number> = { A: K.A, B: K.B, X: K.X, Y: K.Y, LB: K.LB, RB: K.RB, LT: K.LT, RT: K.RT, R3: K.R3 };
-const TOUCHE: Record<string, string> = { A: 'd', B: 's', X: ' ', Y: 'f', LB: 'q', RB: 'r', LT: 'c', RT: 'shift', R3: 'u' };
+const BTN: Record<string, number> = { A: K.A, B: K.B, X: K.X, Y: K.Y, LB: K.LB, RB: K.RB, LT: K.LT, RT: K.RT, L3: K.L3, R3: K.R3 };
+const TOUCHE: Record<string, string> = { A: 'd', B: 's', X: ' ', Y: 'f', LB: 'q', RB: 'r', LT: 'c', RT: 'shift', L3: 'v', R3: 'u' };
 /** n images identiques. */
 const tenir = (n: number, im: Image = {}): Image[] => Array.from({ length: n }, () => im);
 /** Les touches tenues qui font cette image au clavier (I J K L relatives au joueur de cap « cap »). */
@@ -382,7 +383,7 @@ function touchesDe(im: Image, cap: number | null) {
   return s;
 }
 // le monde d'une ligne : le n° 10 Noir (4) balle au pied, face au but attaqué (−z), et ce qu'il faut autour
-type Situation = { libre?: boolean; x?: number; z?: number; cap?: number; v?: number; adv?: [number, number, number][]; fixe?: boolean; defense?: boolean; partenaire?: [number, number, number] };
+type Situation = { libre?: boolean; x?: number; z?: number; cap?: number; v?: number; adv?: [number, number, number][]; fixe?: boolean; defense?: boolean; elan?: number; partenaire?: [number, number, number] };
 function monde(S: Situation) {
   const m: Any = creerMonde({ graine: 3, humains: [true, false], aides: [0.5, 0], presents: [0, 4, 5, ...(S.adv ?? []).map((a) => a[0]), ...(S.partenaire ? [S.partenaire[0]] : []), ...(S.defense ? [9] : [])] });
   demarrer(m, { intro: false });
@@ -404,6 +405,7 @@ function monde(S: Situation) {
     if (S.libre) { b.p.x = j.p.x + 2.5; b.possesseur = null; b.dernier = null; }
   }
   b.garde = null; b.tir = null; b.recepteur = null;
+  if (S.elan) m.elan[0] = S.elan;
   if (S.fixe !== false) m.controleFixe = [4, null];
   m.controle[0] = 4;
   return m;
@@ -480,6 +482,9 @@ const ESSAIS: Record<string, { S: Situation; suite: Image[]; ev?: string | ((r: 
   pousser: { S: COURSE, suite: sec(AV), ev: 'pousser' },
   petitPont: { S: { adv: [[7, 0, 3.0]] }, suite: sec(AV), ev: 'petitPont' },
   sombrero: { S: {}, suite: [...tenir(3, { b: ['R3'] }), ...tenir(5, { b: ['R3'], rs: AV }), ...tenir(10, { b: ['R3'] }), ...tenir(3)], ev: 'sombrero', apres: 120 },
+  // (l'élan : la jauge est remplie avant l'essai ; en défense, la percée emporte la balle du porteur)
+  percee: { S: { ...COURSE, elan: 1 }, suite: appuyer(['L3'], 3, AV), ev: 'percee' },
+  perceeD: { S: { defense: true, elan: 1 }, suite: appuyer(['L3'], 3, AV), ev: (r) => r.evts.some((e: Any) => e.type === 'percee') && r.evts.some((e: Any) => e.type === 'charge') },
   tacle: { S: { defense: true }, suite: appuyer(['B'], 3), ev: (r) => r.gestes.includes('tacleDebout') && !r.gestes.includes('tacle') },
   tacleGlisse: { S: { defense: true }, suite: appuyer(['X'], 3), ev: (r) => r.gestes.includes('tacle') && !r.gestes.includes('tacleDebout') },
   changer: { S: { defense: true, fixe: false, partenaire: [3, 3, 0] }, suite: appuyer(['LB'], 3), ev: 'changer' },

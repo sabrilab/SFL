@@ -17,7 +17,7 @@
 // second doigt posé dans le bas de l'écran est le stick droit (mêmes motifs) et, touché sans bouger, R3.
 
 export const BOUTONS_CLAVIER = {
-  A: 'D', B: 'S', X: 'Espace', Y: 'F', LB: 'Q', RB: 'R', LT: 'C', RT: 'Maj', R3: 'U', RS: 'I J K L', LS: 'flèches', MENU: 'Échap',
+  A: 'D', B: 'S', X: 'Espace', Y: 'F', LB: 'Q', RB: 'R', LT: 'C', RT: 'Maj', L3: 'V', R3: 'U', RS: 'I J K L', LS: 'flèches', MENU: 'Échap',
 };
 
 export const TOUCHES = [
@@ -40,6 +40,8 @@ export const TOUCHES = [
   { id: 'feinteFrappe', partie: 'attaque', action: 'Feinte de frappe', xbox: 'X puis A', ps: '□ puis ✕', clavier: 'Espace puis D', pouce: '—', attendu: 'feinteFrappe' },
   { id: 'semelle', partie: 'attaque', action: 'Semelle', xbox: 'R3', ps: 'R3', clavier: 'U', pouce: 'toucher à deux doigts', attendu: 'semelle' },
   { id: 'jongle', partie: 'attaque', action: 'Jongler', xbox: 'LB + RB tenus', ps: 'L1 + R1 tenus', clavier: 'Q + R tenus', pouce: '—', attendu: 'jongle' },
+  { id: 'percee', partie: 'attaque', action: 'Percée (un cran d\'élan)', xbox: 'L3', ps: 'L3', clavier: 'V', pouce: '—', attendu: 'percee' },
+  { id: 'surpuissance', partie: 'attaque', action: 'Frappe surpuissante (deux crans)', xbox: 'X tenu à fond', ps: '□ tenu à fond', clavier: 'Espace tenu à fond', pouce: '—', attendu: null },
   { id: 'changerA', partie: 'attaque', action: 'Changer (balle libre)', xbox: 'LB', ps: 'L1', clavier: 'Q', pouce: 'automatique', attendu: 'changer' },
   // ── gestes au stick droit (balle au pied) ──
   { id: 'crochet', partie: 'gestes', action: 'Crochet', xbox: 'RS ←/→', ps: 'RS ←/→', clavier: 'J / L', pouce: '2e doigt ←/→', attendu: 'crochet' },
@@ -61,6 +63,7 @@ export const TOUCHES = [
   { id: 'epaule', partie: 'defense', action: 'Épaule, tirage', xbox: 'B tenu', ps: '○ tenu', clavier: 'S tenu', pouce: '—', attendu: null },
   { id: 'tacleGlisse', partie: 'defense', action: 'Tacle glissé', xbox: 'X', ps: '□', clavier: 'Espace', pouce: 'coup sec', attendu: 'tacle' },
   { id: 'sortie', partie: 'defense', action: 'Sortie du gardien', xbox: 'Y tenu', ps: '△ tenu', clavier: 'F tenu', pouce: '—', attendu: null },
+  { id: 'perceeD', partie: 'defense', action: 'Percée sur le porteur', xbox: 'L3', ps: 'L3', clavier: 'V', pouce: '—', attendu: 'percee' },
   { id: 'changer', partie: 'defense', action: 'Changer de joueur', xbox: 'LB', ps: 'L1', clavier: 'Q', pouce: 'automatique', attendu: 'changer' },
   { id: 'choisir', partie: 'defense', action: 'Prendre celui de ce côté', xbox: 'RS', ps: 'RS', clavier: 'I J K L', pouce: '—', attendu: 'changer' },
   // ── le jeu ──
