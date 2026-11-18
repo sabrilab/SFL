@@ -265,7 +265,11 @@ export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, 
   // banc d'essai : l'IA joue aussi les Noirs (auto), le rendu peut être coupé ; pas = secondes de simulation par image
   // (ralenti : le ralenti du but aussi quand l'IA joue seule, pour le banc ; il ne l'est pas d'ordinaire)
   const banc = { auto: false, rendu: true, pas: 0, stats: monde0.stats, ralenti: false };
-  const etat = { phase: 'attente', noirs: 0, blancs: 0, reste: duree, message: null, buteur: null, pause: false, manettes: false, ralenti: false, elan: [0, 0] };
+  const etat = { phase: 'attente', noirs: 0, blancs: 0, reste: duree, message: null, buteur: null, pause: false, manettes: false, ralenti: false, elan: [0, 0], fiche: null };
+  // la fiche de fin : ce que chaque équipe a fait, compté par la vue sur les événements (la simulation n'en sait rien)
+  const fait = { balle: [0, 0], frappes: [0, 0], reprises: [0, 0], arrets: [0, 0] };
+  let faitPas = null;
+  const viderCompte = () => { for (const k in fait) { fait[k][0] = 0; fait[k][1] = 0; } etat.fiche = null; };
   const MOI = 4; // l'attaquant des Noirs
   const signaler = () => surEtat({ ...etat });
   let ralenti = 1, ralentiFin = 0;
@@ -384,9 +388,10 @@ export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, 
     const joue = (i) => i != null && M.controle[M.joueurs[i]?.e] === i;
     for (const e of M.evts) {
       switch (e.type) {
-        case 'frappe': secouer(eqDe(e.j), EFFETS.frappe(e.p ?? 0.5), 18); break;
+        case 'frappe': if (eqDe(e.j) != null) fait.frappes[eqDe(e.j)]++; secouer(eqDe(e.j), EFFETS.frappe(e.p ?? 0.5), 18); break;
         case 'passe': if (!eq[eqDe(e.j)]) secouer(eqDe(e.j), null, 8); break;
-        case 'tacleBalle': case 'tacleJambes': secouer(eqDe(e.j), EFFETS.tacle(), 14); break;
+        case 'arret': case 'parade': case 'capte': if (eqDe(e.j) != null) fait.arrets[eqDe(e.j)]++; break;
+        case 'tacleBalle': case 'tacleJambes': if (e.type === 'tacleBalle' && eqDe(e.j) != null) fait.reprises[eqDe(e.j)]++; secouer(eqDe(e.j), EFFETS.tacle(), 14); break;
         case 'chute': if (joue(e.j)) secouer(eqDe(e.j), EFFETS.chute(), 22); break;
         case 'epaule': for (const i of [e.a, e.b]) if (joue(i) && eq[eqDe(i)]) manettes.vibrer(eqDe(i), EFFETS.epaule()); break;
         case 'poteau': if (!banc.auto) { for (const k of [0, 1]) if (eq[k]) manettes.vibrer(k, EFFETS.poteau()); if (!eq[0] && M.humains[0]) vibrer(12); } break;
@@ -405,7 +410,7 @@ export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, 
         // très court de jeu ralenti ; la caméra, elle, ne bouge pas
         case 'surpuissance': { const J = M.joueurs[e.j]; impacts.onde(M.t, J.p.x, J.p.z, 1); impacts.sillage(M.t); if (!reduit && !banc.auto) { ralenti = 0.22; ralentiFin = 0.16; } secouer(e.e, EFFETS.surpuissance(), [40, 30, 40]); break; }
         case 'percee': { const J = M.joueurs[e.j]; impacts.onde(M.t, J.p.x, J.p.z, 0.3); secouer(e.e, EFFETS.percee(), 16); break; }
-        case 'charge': { impacts.onde(M.t, e.x, e.z, 0.75); if (!reduit && !banc.auto) { ralenti = 0.3; ralentiFin = 0.12; } secouer(eqDe(e.j), EFFETS.charge(), 30); if (joue(e.o)) secouer(eqDe(e.o), EFFETS.chute(), 22); break; }
+        case 'charge': { if (eqDe(e.j) != null) fait.reprises[eqDe(e.j)]++; impacts.onde(M.t, e.x, e.z, 0.75); if (!reduit && !banc.auto) { ralenti = 0.3; ralentiFin = 0.12; } secouer(eqDe(e.j), EFFETS.charge(), 30); if (joue(e.o)) secouer(eqDe(e.o), EFFETS.chute(), 22); break; }
         case 'balleChoc':
           // le filet se gonfle vers l'extérieur du but (du centre du but vers le choc), de la force du choc
           if (e.genre === 'filet' && filet && Math.abs(e.z) > 14.5) { const s = Math.sign(e.z); const dx = e.x, dy = e.y - 1, dz = e.z - s * 15.45, l = Math.hypot(dx, dy, dz) || 1; filet.choc(e.t, e.x, e.y, e.z, dx / l, dy / l, dz / l, e.f); }
@@ -421,6 +426,14 @@ export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, 
   function majEtat() {
     const M = m();
     const changePhase = etat.phase !== M.phase;
+    // la possession : les pas de jeu où une équipe porte la balle
+    if (M.phase === 'jeu' && M.pas !== faitPas) { const q = porteur(M); if (q) fait.balle[q.e] += Math.max(0, M.pas - (faitPas ?? M.pas - 1)); }
+    faitPas = M.pas;
+    if (changePhase && (etat.phase === 'attente' || etat.phase === 'fin')) viderCompte();
+    if (changePhase && M.phase === 'fin') {
+      const tot = fait.balle[0] + fait.balle[1], pn = tot ? Math.round((100 * fait.balle[0]) / tot) : 50;
+      etat.fiche = { possession: [pn, 100 - pn], frappes: [...fait.frappes], reprises: [...fait.reprises], arrets: [...fait.arrets] };
+    }
     if (changePhase && M.phase === 'fin') { manettes.mode('repos'); pause = false; etat.pause = false; }
     etat.phase = M.phase; etat.noirs = M.score[0]; etat.blancs = M.score[1]; etat.reste = Math.max(0, M.reste);
     if (M.phase !== 'but') { etat.message = null; if (M.phase !== 'fin') etat.buteur = null; }

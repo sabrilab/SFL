@@ -49,6 +49,7 @@ type Etat = {
   manettes: boolean;
   ralenti: boolean;
   elan: [number, number];
+  fiche: null | { possession: [number, number]; frappes: [number, number]; reprises: [number, number]; arrets: [number, number] };
 };
 type Match = {
   demarrer: () => void;
@@ -206,6 +207,14 @@ export default function JouerPage() {
         </div>
       )}
 
+      {/* l'avant-match : les deux équipes face à face, deux volets (noir, blanc) qui s'ouvrent sur le terrain */}
+      {phase === "intro" && !reduit && (
+        <div className="pointer-events-none absolute inset-0 overflow-hidden">
+          <div className={cn("jeu-volet-g absolute inset-y-0 left-0 flex w-1/2 items-center justify-end bg-black pr-[7%] text-[clamp(40px,9vw,96px)] leading-none tracking-tight text-white", CLASSE_SCORE)}>NOIRS</div>
+          <div className={cn("jeu-volet-d absolute inset-y-0 right-0 flex w-1/2 items-center justify-start bg-white pl-[7%] text-[clamp(40px,9vw,96px)] leading-none tracking-tight text-black", CLASSE_SCORE)}>BLANCS</div>
+        </div>
+      )}
+
       {/* le ralenti du but (bola-app#26, lot 4) : deux bandes noires, comme un replay de télé ; un toucher le passe */}
       {etat?.ralenti && (
         <div
@@ -271,6 +280,34 @@ export default function JouerPage() {
               <span className={cn(etat.blancs < etat.noirs && "text-white/40")}>{etat.blancs}</span>
             </div>
           )}
+          {/* la fiche de fin : les Noirs à gauche, les Blancs à droite, une ligne par chiffre */}
+          {phase === "fin" && etat?.fiche && (
+            <div className="w-full max-w-[320px] overflow-hidden rounded-2xl bg-black/55 px-5 py-3 backdrop-blur">
+              {(
+                [
+                  ["Possession", etat.fiche.possession, "%"],
+                  ["Frappes", etat.fiche.frappes, ""],
+                  ["Balles reprises", etat.fiche.reprises, ""],
+                  ["Arrêts", etat.fiche.arrets, ""],
+                ] as [string, [number, number], string][]
+              ).map(([nom, v, u], n) => {
+                const tot = v[0] + v[1];
+                return (
+                  <div key={nom} className="jeu-ligne py-[7px]" style={{ animationDelay: `${0.15 + n * 0.09}s` }}>
+                    <div className="flex items-baseline justify-between text-[15px] tabular-nums">
+                      <span className={cn("w-12 text-left font-bold", v[0] < v[1] && "text-white/45")}>{v[0]}{u}</span>
+                      <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-white/55">{nom}</span>
+                      <span className={cn("w-12 text-right font-bold", v[1] < v[0] && "text-white/45")}>{v[1]}{u}</span>
+                    </div>
+                    <div className="mt-[5px] flex h-[3px] gap-[3px]">
+                      <span className="rounded-full bg-white/25" style={{ flexGrow: tot ? v[0] : 1 }}><span className={cn("block h-full rounded-full bg-white", v[0] < v[1] && "opacity-50")} /></span>
+                      <span className="rounded-full bg-white/25" style={{ flexGrow: tot ? v[1] : 1 }}><span className={cn("block h-full rounded-full bg-white", v[1] < v[0] && "opacity-50")} /></span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
           {magasin && pret && !erreur && <ManettesVues magasin={magasin} />}
           {erreur ? (
             <p className="text-center text-[15px] text-white/70">{erreur}</p>
@@ -301,6 +338,12 @@ export default function JouerPage() {
         @keyframes jeu-mot { from { transform: scale(.6); opacity: 0 } to { transform: none; opacity: 1 } }
         .jeu-fantome { animation: jeu-fantome 2.2s ease-in-out infinite; }
         .jeu-bande { animation: jeu-bande .35s ease-out both; }
+        .jeu-volet-g { animation: jeu-volet-g 1.5s cubic-bezier(.7,0,.2,1) both; }
+        .jeu-volet-d { animation: jeu-volet-d 1.5s cubic-bezier(.7,0,.2,1) both; }
+        @keyframes jeu-volet-g { 0% { transform: translateX(-100%) } 18%, 62% { transform: none } 100% { transform: translateX(-101%) } }
+        @keyframes jeu-volet-d { 0% { transform: translateX(100%) } 18%, 62% { transform: none } 100% { transform: translateX(101%) } }
+        .jeu-ligne { animation: jeu-ligne .4s ease-out both; }
+        @keyframes jeu-ligne { from { transform: translateY(8px); opacity: 0 } to { transform: none; opacity: 1 } }
         .jeu-elan-pret { box-shadow: 0 0 8px rgba(255,255,255,.75); }
         @keyframes jeu-bande { from { transform: scaleY(0) } to { transform: none } }
         @keyframes jeu-fantome {
@@ -310,7 +353,7 @@ export default function JouerPage() {
           62% { transform: translate(110px, 0); opacity: 0 }
           100% { opacity: 0 }
         }
-        @media (prefers-reduced-motion: reduce) { .jeu-mot, .jeu-fantome, .jeu-bande { animation: none } }
+        @media (prefers-reduced-motion: reduce) { .jeu-mot, .jeu-fantome, .jeu-bande, .jeu-ligne { animation: none } }
       `}</style>
     </div>
   );

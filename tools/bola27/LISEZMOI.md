@@ -135,3 +135,11 @@ SABRI** ; tout se règle dans `src/lib/jeu/sim/constantes.js` (`ELAN`, et `ELAN.
 - À l'écran : une onde blanche au sol, le sillage de la balle, un temps très court de jeu ralenti, la manette qui vibre.
   La caméra ne bouge pas.
 - L'IA s'en sert aussi. L'empreinte IA contre IA (graine 7) est passée de `98ccc5d7` à `bac69fd2`.
+
+## L'habillage (19/11/2026)
+
+- **Avant-match** : pendant l'intro, deux volets (noir « NOIRS », blanc « BLANCS ») se ferment puis s'ouvrent sur le terrain
+  (`page.tsx`, `.jeu-volet-g`, `.jeu-volet-d` ; rien en mouvement réduit).
+- **Fiche de fin** : sous le score final, possession, frappes, balles reprises, arrêts, Noirs à gauche et Blancs à droite.
+  La vue les compte sur les événements du match (`match.js`, `fait`, `etat.fiche`) : la simulation n'est pas touchée.
+- Pas de mi-temps dans Bola 27 (une seule période de 150 s) : rien à y habiller.
