@@ -195,7 +195,9 @@ function Panneau({ info, onBasculer }: { info: InfoPanneau; onBasculer: () => vo
         <Rangees vues={c.lignes.slice(Math.ceil(c.lignes.length / 2))} appareil={info.appareil} className="landscape:hidden" />
         <Rangees vues={c.lignes} appareil={info.appareil} className="portrait:hidden" />
       </div>
-      {c.pied.length > 0 && <Rangees vues={c.pied} appareil={info.appareil} className="mt-1.5 border-t border-white/15 pt-1.5 portrait:hidden" />}
+      {/* (en paysage, au pouce, pas de pied : le panneau lui-même se touche pour se masquer, et il doit finir au-dessus de la
+          zone du pouce, les 45 % du bas) */}
+      {c.pied.length > 0 && info.appareil !== "pouce" && <Rangees vues={c.pied} appareil={info.appareil} className="mt-1.5 border-t border-white/15 pt-1.5 portrait:hidden" />}
     </div>
   );
 }
