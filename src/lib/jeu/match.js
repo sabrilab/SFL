@@ -78,6 +78,7 @@ import { creerTampon, enregistrer, lireTampon, creerRalenti, armerRalenti, suivr
 import { creerOmbres, creerMarques, creerFilet } from './rendu/effets.js';
 import { creerSon, planSons, niveauFoule } from './rendu/son.js';
 import { POLICE_SCORE, POLICES } from './police.js';
+import { PLANS, STYLES } from './sim/tactique.js';
 
 const R = BALLON.R;
 const PX = DIM.Tl / 2 - R;
@@ -270,13 +271,20 @@ export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, 
   // ── la simulation ──
   const params = typeof location !== 'undefined' ? new URLSearchParams(location.search) : null;
   let graine = Number(params?.get('graine')) || ((Date.now() >>> 0) % 100000) + 1;
-  let monde0 = creerMonde({ graine, duree, humains: [true, false], aides: [1, 0] });
+  // (bola-app#32, lot B) chaque équipe de l'IA a son plan et son style, tirés de la graine (sim/tactique.js) ; le banc
+  // d'essai (?banc) garde le plan par défaut, pour que la même graine donne la même empreinte qu'au banc node
+  const tactiquesTirees = params?.has('banc') ? null : 'graine';
+  let monde0 = creerMonde({ graine, duree, humains: [true, false], aides: [1, 0], tactiques: tactiquesTirees });
   let boucleSim = creerBoucle(monde0);
   const m = () => boucleSim.m;
   // banc d'essai : l'IA joue aussi les Noirs (auto), le rendu peut être coupé ; pas = secondes de simulation par image
   // (ralenti : le ralenti du but aussi quand l'IA joue seule, pour le banc ; il ne l'est pas d'ordinaire)
   const banc = { auto: false, rendu: true, pas: 0, stats: monde0.stats, ralenti: false };
-  const etat = { phase: 'attente', noirs: 0, blancs: 0, reste: duree, message: null, buteur: null, pause: false, manettes: false, ralenti: false };
+  // (bola-app#32, lot B) demo : « IA contre IA », l'IA joue les deux équipes (son, ralentis et caméra de la télé gardés) ;
+  // une manette, une touche du clavier ou un toucher reprend la main ; tactique : le court libellé du plan d'une équipe
+  // quand il change (la croix d'un humain, ou l'IA qui s'adapte au score et au temps), et ceux de l'IA au coup d'envoi
+  const etat = { phase: 'attente', noirs: 0, blancs: 0, reste: duree, message: null, buteur: null, pause: false, manettes: false, ralenti: false, demo: false, tactique: null };
+  let demo = false, demoDepuis = 0, demoDepuisS = null, demoClavier = 0, demoFin = 0, numTactique = 0, tBoucle = 0;
   const MOI = 4; // l'attaquant des Noirs
   const signaler = () => surEtat({ ...etat });
   let ralenti = 1, ralentiFin = 0;
@@ -331,7 +339,7 @@ export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, 
   }
   function lireEntrees() {
     if (scene) return scene.entrees(m());
-    if (banc.auto || m().phase !== 'jeu') { entrees[0] = null; entrees[1] = null; return entrees; }
+    if (banc.auto || demo || m().phase !== 'jeu') { entrees[0] = null; entrees[1] = null; return entrees; }
     const eq = manettes.equipes();
     entrees[0] = eq[0] ? manettes.intention(0) : clavierJoue() ? intentionDe(cmdClavier) : pouceJoue() ? lireEntree() : null;
     entrees[1] = eq[1] ? manettes.intention(1) : null;
@@ -342,6 +350,7 @@ export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, 
   function majHumains() {
     const M = m();
     if (banc.auto || scene) return;
+    if (demo) { if (M.humains[0] || M.humains[1]) changerHumains(M, [false, false], [0, 0]); return; }
     const eq = manettes.equipes();
     humainsVoulus[0] = !!eq[0] || clavierJoue() || pouceJoue(); humainsVoulus[1] = !!eq[1];
     aidesVoulues[0] = eq[0] ? 0.5 : 1; aidesVoulues[1] = eq[1] ? 0.5 : 0;
@@ -392,7 +401,7 @@ export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, 
   // ── les événements de la simulation → vibrations, tableau, ralenti ──
   function evenements() {
     const M = m();
-    const eq = banc.auto || scene ? [null, null] : manettes.equipes();
+    const eq = banc.auto || scene || demo ? [null, null] : manettes.equipes();
     // une vibration pour l'équipe e : sa manette, ou le téléphone si c'est le pouce qui joue les Noirs
     const secouer = (e, ef, ms) => { if (banc.auto || e == null) return; if (eq[e]) manettes.vibrer(e, ef); else if (e === 0 && M.humains[0]) vibrer(ms); };
     const eqDe = (i) => (i != null ? M.joueurs[i]?.e : null);
@@ -416,6 +425,8 @@ export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, 
           secouer(e.e, EFFETS.but(), [30, 40, 60]);
           break;
         case 'engagement': etat.message = null; etat.buteur = null; break;
+        // (bola-app#32, lot B) le plan d'une équipe change : son court libellé (la page l'affiche un instant)
+        case 'tactique': if (!e.meme || !e.auto) { etat.tactique = libelleTactique([e.e], ++numTactique); signaler(); } break;
         case 'balleChoc':
           // le filet se gonfle vers l'extérieur du but (du centre du but vers le choc), de la force du choc
           if (e.genre === 'filet' && filet && Math.abs(e.z) > 14.5) { const s = Math.sign(e.z); const dx = e.x, dy = e.y - 1, dz = e.z - s * 15.45, l = Math.hypot(dx, dy, dz) || 1; filet.choc(e.t, e.x, e.y, e.z, dx / l, dy / l, dz / l, e.f); }
@@ -431,12 +442,43 @@ export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, 
   function majEtat() {
     const M = m();
     const changePhase = etat.phase !== M.phase;
-    if (changePhase && M.phase === 'fin') { manettes.mode('repos'); pause = false; etat.pause = false; }
+    if (changePhase && M.phase === 'fin') { manettes.mode('repos'); pause = false; etat.pause = false; if (demo) demoFin = performance.now(); }
+    // (lot B) en « IA contre IA », un nouveau match part 8 s après la fin (le mode démonstration d'un stream)
+    if (demo && M.phase === 'fin' && demoFin && performance.now() - demoFin > 8000) { demoFin = 0; lancerDemo(); return; }
     etat.phase = M.phase; etat.noirs = M.score[0]; etat.blancs = M.score[1]; etat.reste = Math.max(0, M.reste);
     if (M.phase !== 'but') { etat.message = null; if (M.phase !== 'fin') etat.buteur = null; }
     const s = Math.ceil(etat.reste);
     if (changePhase || s !== derniereSeconde) { derniereSeconde = s; signaler(); }
   }
+
+  /** (lot B) Le libellé des plans des équipes données : [{ e, plan, nom, style }], numéroté pour que la page le relance. */
+  function libelleTactique(equipes, n) {
+    const M = m();
+    return { n, lignes: equipes.map((e) => { const T = M.tactique[e]; return { e, plan: T.plan, nom: PLANS[T.plan]?.nom ?? T.plan, style: STYLES[T.style]?.nom ?? T.style }; }) };
+  }
+
+  // ── (bola-app#32, lot B) « IA contre IA » ──
+  function entrerDemo() {
+    demo = true; etat.demo = true; demoDepuis = performance.now(); demoDepuisS = tBoucle; demoClavier = clavier.vu; demoFin = 0;
+    oublier(cmdClavier); oublierLecteur(lecteurPouce);
+    changerHumains(m(), [false, false], [0, 0]);
+  }
+  function quitterDemo() {
+    if (!demo) return;
+    demo = false; etat.demo = false; demoFin = 0;
+    majHumains(); signaler();
+  }
+  /** Une manette, une touche ou un toucher reprend la main (0,4 s après l'entrée : le geste qui l'a lancée ne compte pas). */
+  function surveillerDemo(tS) {
+    tBoucle = tS;
+    if (!demo) return;
+    if (demoDepuisS == null) demoDepuisS = tS;
+    if (performance.now() - demoDepuis < 400) return;
+    if (manettes.activite() > demoDepuisS + 0.4) { quitterDemo(); return; }
+    if (clavier.vu > demoClavier && clavier.vu > demoDepuis + 400) quitterDemo();
+  }
+  const toucherDemo = () => { if (demo && performance.now() - demoDepuis > 400) quitterDemo(); };
+  renderer.domElement.addEventListener('pointerdown', toucherDemo);
 
   // ── le rendu d'un état (interpolé) ──
   const sautes = new Uint8Array(10);
@@ -640,6 +682,7 @@ export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, 
     const dtReel = Math.min(0.25, horloge.getDelta());
     // les manettes : une lecture par image, avant les pas ; puis qui joue quelle équipe
     manettes.lire(ms / 1000, m());
+    surveillerDemo(ms / 1000);
     lireClavier(ms / 1000);
     majHumains();
     // plus aucune manette d'équipe branchée (batterie, câble) : la pause qu'elle avait mise se lève d'elle-même
@@ -694,7 +737,7 @@ export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, 
   /** Un nouveau monde (graine), avec ou sans humain (banc.auto). */
   function nouveauMonde(g = graine, { auto = banc.auto, presents = null } = {}) {
     graine = g;
-    monde0 = creerMonde({ graine: g, duree, humains: auto ? [false, false] : [true, false], aides: auto ? [0, 0] : [1, 0], presents });
+    monde0 = creerMonde({ graine: g, duree, humains: auto ? [false, false] : [true, false], aides: auto ? [0, 0] : [1, 0], presents, tactiques: banc.auto || presents ? null : tactiquesTirees });
     boucleSim = creerBoucle(monde0);
     banc.stats = monde0.stats;
     ralenti = 1; ralentiFin = 0; cam.buteur = null; scene = null;
@@ -703,10 +746,35 @@ export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, 
     return monde0;
   }
 
+  /** (lot B) « IA contre IA » depuis l'écran d'attente ou la fin : un nouveau match où l'IA joue les deux équipes. */
+  function lancerDemo() {
+    nouveauMonde(graine + 1, { auto: true });
+    manettes.mode('match');
+    avecManettes = !!(manettes.equipes()[0] || manettes.equipes()[1]);
+    etat.manettes = avecManettes;
+    pouce.utilise = false; pause = false; etat.pause = false;
+    clavier.utilise = false;
+    entrerDemo();
+    demarrerMonde(m(), { intro: true, reduit });
+    etat.message = null; etat.buteur = null; derniereSeconde = -1;
+    etat.tactique = libelleTactique([0, 1], ++numTactique);
+    majEtat(); signaler();
+  }
+
   return {
+    /** (bola-app#32, lot B) « IA contre IA » : depuis l'attente ou la fin, un nouveau match ; en pause, l'IA prend les deux
+     *  équipes du match en cours (et la pause se lève). Une manette, une touche ou un toucher reprend la main. */
+    demo() {
+      if (m().phase === 'attente' || m().phase === 'fin') { lancerDemo(); return; }
+      entrerDemo(); poserPause(false);
+      etat.tactique = libelleTactique([0, 1], ++numTactique); signaler();
+    },
+    /** (lot B) reprendre la main pendant « IA contre IA » (le bouton de la pause) */
+    reprendreMain() { quitterDemo(); poserPause(false); },
     /** Le match : avec les manettes rangées dans l'écran Manettes (s'il y en a), sinon au pouce. */
     demarrer() {
       if (m().phase !== 'attente') nouveauMonde(graine + 1);
+      demo = false; etat.demo = false; demoFin = 0;
       manettes.mode('match');
       avecManettes = !!(manettes.equipes()[0] || manettes.equipes()[1]);
       etat.manettes = avecManettes;
@@ -715,6 +783,9 @@ export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, 
       majHumains();
       demarrerMonde(m(), { intro: true, reduit });
       etat.message = null; etat.buteur = null; derniereSeconde = -1;
+      // (lot B) au coup d'envoi, le plan de chaque équipe de l'IA (celui de l'humain se choisit à la croix)
+      const ia = [0, 1].filter((e) => !m().humains[e]);
+      etat.tactique = ia.length ? libelleTactique(ia, ++numTactique) : null;
       majEtat(); signaler();
     },
     /** L'écran Manettes ouvert (salon) ou fermé (repos) ; abonner / instantane pour l'écran (manettes.tsx). */
@@ -728,6 +799,7 @@ export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, 
     _test: {
       etat, banc, anneau, anneauB, pouce, manettes, clavier, cmdClavier,
       get pause() { return pause; },
+      get demo() { return demo; },
       get monde() { return m(); },
       get joueurs() { return m().joueurs; },
       get b() { return m().balle; },
@@ -761,11 +833,14 @@ export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, 
       },
       /** un plan fixe (repère du jeu) pour les captures ; camera(null) rend la caméra de la télé */
       camera: (pos, regard) => { cam.fixe = pos ? { pos, regard } : null; },
+      /** (bola-app#32, lot B) un point du jeu (x, y, z) à l'écran (px CSS du conteneur), pour annoter les captures */
+      projeter: (x, y, z) => { const v = versMonde({ x, y, z }, new THREE.Vector3()).project(camera); return { x: ((v.x + 1) / 2) * cw, y: ((1 - v.y) / 2) * ch, devant: v.z < 1 }; },
     },
     detruire() {
       cancelAnimationFrame(raf);
       removeEventListener('keydown', clavierPause);
       removeEventListener('keydown', clavierRalenti);
+      renderer.domElement.removeEventListener('pointerdown', toucherDemo);
       son.detruire(); ombres.liberer(); marques.liberer(); filet?.liberer();
       ro.disconnect();
       pouce.detruire();

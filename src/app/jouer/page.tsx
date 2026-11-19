@@ -24,6 +24,10 @@
 // met en pause (deux barres au milieu, sans texte ; Échap ou P au clavier ; un toucher sur le voile reprend). Sur
 // l'écran d'attente, une manette branchée apparaît tout de suite en petit au-dessus de « Jouer ». (bola-app#26, lot 3)
 // L'écran Manettes ouvre le schéma des touches (./touches.tsx ; Vue / Share sur la manette aussi).
+// (bola-app#32, lot B) « IA contre IA » : sous « Jouer » avant le match (et après), et dans la pause ; l'IA joue les deux
+// équipes (le mode démonstration d'un stream : un nouveau match repart seul après la fin) ; une manette, une touche ou
+// un toucher reprend la main. Le plan d'une équipe (pressing, équilibre, bloc bas : la croix de la manette, 1 2 3 au
+// clavier ; l'IA qui s'adapte au score et au temps) s'affiche un instant sous le score, en un court libellé noir et blanc.
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
@@ -48,6 +52,8 @@ type Etat = {
   pause: boolean;
   manettes: boolean;
   ralenti: boolean;
+  demo: boolean;
+  tactique: { n: number; lignes: { e: number; plan: string; nom: string; style: string }[] } | null;
 };
 type Match = {
   demarrer: () => void;
@@ -55,6 +61,8 @@ type Match = {
   salon: (ouvert: boolean) => void;
   reprendre: () => void;
   passer: () => void;
+  demo: () => void;
+  reprendreMain: () => void;
   manettes: MagasinManettes & { reconnues: () => number };
 };
 
@@ -171,6 +179,31 @@ export default function JouerPage() {
         )}
       </div>
 
+      {/* (bola-app#32, lot B) le plan d'une équipe, un instant sous le score ; « IA contre IA » tant que l'IA joue seule */}
+      {etat && enJeu && !etat.ralenti && (etat.tactique || etat.demo) && (
+        <div
+          className="pointer-events-none absolute inset-x-0 flex flex-col items-center gap-1.5"
+          style={{ top: "calc(env(safe-area-inset-top) + 52px)" }}
+        >
+          {etat.demo && <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/60">IA contre IA</span>}
+          {etat.tactique && (
+            <div key={etat.tactique.n} className="jeu-tactique flex gap-1.5">
+              {etat.tactique.lignes.map((l) => (
+                <span
+                  key={l.e}
+                  className={cn(
+                    "rounded-full px-2.5 py-1 text-[12px] font-semibold leading-none",
+                    l.e === 0 ? "border border-white/70 bg-black text-white" : "bg-white text-black",
+                  )}
+                >
+                  {l.e === 0 ? "Noirs" : "Blancs"} · {l.nom}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* le mot du résultat, en haut (correctifs #26 : au milieu, à 64 %, il couvrait le buteur qui célèbre au plan
           rapproché) */}
       {etat?.message && (
@@ -199,7 +232,7 @@ export default function JouerPage() {
       )}
 
       {/* le pouce fantôme : le geste, tant qu'on n'a pas touché */}
-      {phase === "jeu" && !touche && !etat?.manettes && !etat?.pause && (
+      {phase === "jeu" && !touche && !etat?.manettes && !etat?.pause && !etat?.demo && (
         <div className="pointer-events-none absolute bottom-[14%] left-[38%] -translate-x-1/2">
           <div className="jeu-fantome h-10 w-10 rounded-full bg-white/80 shadow-[0_2px_14px_rgba(0,0,0,.4)]" />
         </div>
@@ -219,6 +252,19 @@ export default function JouerPage() {
             <span className="h-14 w-4 rounded-sm bg-white" />
             <span className="h-14 w-4 rounded-sm bg-white" />
           </div>
+          {/* (lot B) l'IA prend les deux équipes, ou on reprend la main */}
+          <button
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              if (etat.demo) match.current?.reprendreMain();
+              else match.current?.demo();
+            }}
+            className="absolute inset-x-0 mx-auto h-11 w-full max-w-[240px] rounded-full border border-white/70 text-[15px] font-semibold text-white"
+            style={{ bottom: "calc(env(safe-area-inset-bottom) + 28px)" }}
+          >
+            {etat.demo ? "Reprendre la main" : "IA contre IA"}
+          </button>
         </div>
       )}
 
@@ -266,6 +312,20 @@ export default function JouerPage() {
               {!pret ? `${Math.round(progres * 100)} %` : phase === "fin" ? "Rejouer" : "Jouer"}
             </button>
           )}
+          {/* (bola-app#32, lot B) l'IA joue les deux équipes : pour montrer le jeu, et le regarder jouer */}
+          {pret && !erreur && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setSalon(false);
+                setTouches(null);
+                match.current?.demo();
+              }}
+              className="h-11 w-full max-w-[320px] rounded-full border border-white/60 text-[15px] font-semibold text-white"
+            >
+              IA contre IA
+            </button>
+          )}
           {isAdmin(me) && phase === "attente" && (
             <Link href="/jouer/studio" className="text-[13px] font-semibold uppercase tracking-[0.18em] text-white/50">
               Studio
@@ -279,6 +339,8 @@ export default function JouerPage() {
         @keyframes jeu-mot { from { transform: scale(.6); opacity: 0 } to { transform: none; opacity: 1 } }
         .jeu-fantome { animation: jeu-fantome 2.2s ease-in-out infinite; }
         .jeu-bande { animation: jeu-bande .35s ease-out both; }
+        .jeu-tactique { animation: jeu-tactique 2.8s ease-out both; }
+        @keyframes jeu-tactique { 0% { opacity: 0; transform: translateY(-4px) } 10% { opacity: 1; transform: none } 80% { opacity: 1 } 100% { opacity: 0 } }
         @keyframes jeu-bande { from { transform: scaleY(0) } to { transform: none } }
         @keyframes jeu-fantome {
           0% { transform: translate(0, 0); opacity: 0 }
@@ -287,7 +349,8 @@ export default function JouerPage() {
           62% { transform: translate(110px, 0); opacity: 0 }
           100% { opacity: 0 }
         }
-        @media (prefers-reduced-motion: reduce) { .jeu-mot, .jeu-fantome, .jeu-bande { animation: none } }
+        @media (prefers-reduced-motion: reduce) { .jeu-mot, .jeu-fantome, .jeu-bande { animation: none } .jeu-tactique { animation: jeu-tactique-r 2.8s step-end both } }
+        @keyframes jeu-tactique-r { 0% { opacity: 1 } 100% { opacity: 0 } }
       `}</style>
     </div>
   );

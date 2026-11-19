@@ -33,6 +33,7 @@
 //             tirage de maillot) ; ✕/A maintenu pressing ; R1/RB maintenu pressing d'un coéquipier ; △/Y maintenu
 //             sortie du gardien ; L1/LB changer vers le plus proche du ballon (R2 ne change jamais de joueur) ; stick
 //             droit poussé : prendre le joueur de ce côté
+//   la croix (bola-app#32, lot B) : ↑ pressing haut, ↓ bloc bas, ← / → équilibre (le plan de l'équipe, sim/tactique.js)
 //   Menu/Options : pause ; Vue/Share : les touches (lus par la page, pas ici)
 import { JEU, BUT_DL, butDe } from '../sim/constantes.js';
 import { creerLecteur, oublierLecteur, lireGesteStick, zoneMorte } from './geste-stick.js';
@@ -97,22 +98,24 @@ export function creerCommande() {
     jongle: { t0: null, prochain: 0 },
     attente: null,          // l'action qui partira au prochain pas
     changer: null,
+    tactique: null,         // (bola-app#32, lot B) le plan choisi à la croix, pour le prochain pas
     dernier: null,          // la dernière action sortie (pour le banc et l'écran)
   };
 }
 
-/** L'action et le changement de joueur ne valent que pour un pas. */
+/** L'action, le changement de joueur et le choix de tactique ne valent que pour un pas. */
 export function intentionDe(cmd) {
   const it = cmd.it;
   it.action = cmd.attente; cmd.attente = null;
   it.changer = cmd.changer; cmd.changer = null;
+  it.tactique = cmd.tactique; cmd.tactique = null;
   return it;
 }
 
 /** Oublie tout ce qui est en cours (manette débranchée, changement d'équipe, pause). */
 export function oublier(cmd) {
   vide(cmd.it); cmd.it.action = null; cmd.it.changer = null;
-  cmd.jauge = null; cmd.p = 0; cmd.attente = null; cmd.changer = null; cmd.lache = null;
+  cmd.jauge = null; cmd.p = 0; cmd.attente = null; cmd.changer = null; cmd.lache = null; cmd.tactique = null;
   cmd.geste.actif = false; cmd.geste.fait = false;
   oublierLecteur(cmd.lecteur); cmd.r3 = null; cmd.uneDeux = null; cmd.jongle.t0 = null; cmd.frappeT = -9;
   cmd.vu = false;
@@ -151,12 +154,14 @@ export function lireManette(cmd, etat, t, M, e, versJeu) {
   const bl = M.balle;
   it.regard = bl.p;
 
-  // stick gauche (et la croix, en secours : pleine allure)
+  // stick gauche (bola-app#32, lot B : la croix ne sert plus de stick de secours, elle choisit la tactique)
   let sx = ax[0] ?? 0, sy = -(ax[1] ?? 0);
-  const cx = (tenu(B.DROITE) ? 1 : 0) - (tenu(B.GAUCHE) ? 1 : 0), cy = (tenu(B.HAUT) ? 1 : 0) - (tenu(B.BAS) ? 1 : 0);
-  let st = zoneMorte(sx, sy);
-  if (!st.amp && (cx || cy)) { const L = Math.hypot(cx, cy); st = { x: cx / L, y: cy / L, amp: 1 }; }
+  const st = zoneMorte(sx, sy);
   sx = st.x; sy = st.y;
+  // (lot B) la croix : ↑ pressing haut, ↓ bloc bas, ← ou → équilibre (au clavier : 1, 2, 3) ; en attaque comme en défense
+  if (bas(B.HAUT)) cmd.tactique = 'pressing';
+  else if (bas(B.BAS)) cmd.tactique = 'blocBas';
+  else if (bas(B.GAUCHE) || bas(B.DROITE)) cmd.tactique = 'equilibre';
   if (st.amp > 0) {
     const g = versJeu(sx, sy);
     it.dx = g.x; it.dz = g.z; it.allure = st.amp;

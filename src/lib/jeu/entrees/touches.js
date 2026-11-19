@@ -21,7 +21,7 @@
 // appui bref part tout de suite.
 //
 // Le clavier : flèches = stick gauche, Maj = R2, D = ✕, Espace (ou E) = ○, S = □, F = △, Q = L1, R = R1, C = L2,
-// U = R3, I J K L = stick droit, relatives au joueur comme les gestes (I devant lui, K derrière, J sa gauche, L sa
+// U = R3, 1 2 3 = la croix (la tactique : pressing haut, équilibre, bloc bas), I J K L = stick droit, relatives au joueur comme les gestes (I devant lui, K derrière, J sa gauche, L sa
 // droite ; deux touches enchaînées font un quart de cercle, trois un demi-cercle), Échap ou P = pause. (Ni Ctrl ni Alt :
 // Ctrl + W ferme l'onglet, Alt ouvre le menu.) D et Espace gardent la passe et la frappe de #27 ; en défense, S tacle et
 // Espace récupère (#27 : Espace tacle glissé, S tacle debout).
@@ -30,7 +30,7 @@
 // l'écran est le stick droit (mêmes motifs) et, touché sans bouger, R3.
 
 export const BOUTONS_CLAVIER = {
-  A: 'D', B: 'Espace', X: 'S', Y: 'F', LB: 'Q', RB: 'R', LT: 'C', RT: 'Maj', R3: 'U', RS: 'I J K L', LS: 'flèches', MENU: 'Échap',
+  A: 'D', B: 'Espace', X: 'S', Y: 'F', LB: 'Q', RB: 'R', LT: 'C', RT: 'Maj', R3: 'U', RS: 'I J K L', LS: 'flèches', MENU: 'Échap', CROIX: '1 2 3',
 };
 
 export const TOUCHES = [
@@ -86,6 +86,10 @@ export const TOUCHES = [
   { id: 'sortie', partie: 'defense', action: 'Sortie du gardien', xbox: 'Y tenu', ps: '△ tenu', clavier: 'F tenu', pouce: '—', attendu: null, geste: 'sortie du gardien, bras ouverts' },
   { id: 'choisir', partie: 'defense', action: 'Prendre celui de ce côté', xbox: 'RS', ps: 'RS', clavier: 'I J K L', pouce: '—', attendu: 'changer', geste: null },
   // ── le jeu ──
+  // (bola-app#32, lot B) la tactique de l'équipe, à la croix (sim/tactique.js) : un court libellé noir et blanc la montre
+  { id: 'tactiquePressing', partie: 'jeu', action: 'Tactique : pressing haut', xbox: 'croix ↑', ps: 'croix ↑', clavier: '1', pouce: '—', attendu: 'tactique', geste: null },
+  { id: 'tactiqueEquilibre', partie: 'jeu', action: 'Tactique : équilibre', xbox: 'croix ← / →', ps: 'croix ← / →', clavier: '2', pouce: '—', attendu: 'tactique', geste: null },
+  { id: 'tactiqueBlocBas', partie: 'jeu', action: 'Tactique : bloc bas', xbox: 'croix ↓', ps: 'croix ↓', clavier: '3', pouce: '—', attendu: 'tactique', geste: null },
   { id: 'pause', partie: 'jeu', action: 'Pause', xbox: 'Menu', ps: 'Options', clavier: 'Échap', pouce: 'toucher le voile', attendu: null, geste: null },
   { id: 'touches', partie: 'jeu', action: 'Les touches', xbox: 'Vue', ps: 'Share', clavier: '—', pouce: '—', attendu: null, geste: null },
 ];

@@ -13,9 +13,29 @@
 // la ligne de passe la plus dangereuse, le couvreur entre la balle et le but, et un second presseur sur un mauvais
 // contrôle, un porteur dos au but ou contre un panneau) ; le défenseur collé dans le dos du porteur le tient parfois
 // par le maillot (faute s'il insiste). Les décisions collectives tirent dans leur propre flux (« collectif »).
-import { PAS, CORPS as C, FORMATION, LB, BX, BZ, BUT_DL, JEU, butDe, sens } from './constantes.js';
+//
+// (bola-app#32, lot B : placements de foot à 5, tactiques ; principes du futsal et sources dans le compte rendu de #32)
+//   · plus de formation fixe : en attaque, chaque joueur tient un POSTE du losange 1-2-1 (sim/tactique.js : fixo derrière
+//     la balle, ala côté balle le long du panneau, ala côté faible, pivot devant), qui suit la balle et TOURNE (le
+//     porteur tient le sien, les autres prennent les postes restants au plus court) ; les appels se cherchent autour du
+//     poste ; le pivot ou l'ala côté faible part dans le dos du dernier défenseur quand le porteur peut la donner ; sur un
+//     côté près du but, ils attaquent le second poteau et le point de pénalty ;
+//   · en défense, un bloc de zone en losange (defenseEquipe) qui coulisse avec la balle, à la hauteur du plan (pressing
+//     haut, équilibre, bloc bas), avec le presseur (qui attend en haut du bloc hors de sa zone de sortie), le couvreur,
+//     la ligne de passe coupée et le second presseur sur déclencheur (rolesDefense) ; celui qui ne peut pas couper une
+//     passe va presser le receveur à la réception ;
+//   · les transitions : après la perte, le repli au sprint derrière la balle (en la contournant) ; après la
+//     récupération, les appels au sprint ;
+//   · pas de ruée : sans rôle sur la balle, personne ne vient à moins de 7 m d'elle (ANNEAU) ; le couvreur et celui qui
+//     coupe la ligne de passe se tiennent à 6 m du porteur hors du pressing haut ;
+//   · le porteur choisit sur des critères (decider : chance de but, progression, démarquage, couloir, espace devant) et
+//     utilise les commandes de la table (piqué, enroulée, ras de terre, passe puissante, profondeur lobée, centre lobé,
+//     centre tendu) ; la variété vient d'un bruit borné à graine ;
+//   · le tacle à bon escient (point 15) : pas en série, la récupération au pied de face, le glissé de côté (tacleIA).
+import { PAS, CORPS as C, LB, BX, BZ, BUT_DL, JEU, butDe, sens } from './constantes.js';
+import { av, zDe, planDe, styleDe, phaseDe, cibleAttaque, chanceBut } from './tactique.js';
 import { clamp, libre } from './corps.js';
-import { porteur, choisirPartenaire, adversaireProche, aimantee } from './gestes.js';
+import { porteur, adversaireProche, aimantee } from './gestes.js';
 import { predire } from './ballon.js';
 import { cos, hypot, sin } from './maths.js';
 
@@ -80,46 +100,106 @@ export function pasIA(m, j) {
 
   if (p === j) { porteurIA(m, j, it); return; }
 
-  // le placement de base, poussé vers l'avant quand l'équipe a la balle, attiré par la balle
-  const fBalle = b.p.z / (sens(j.e) * LB);
-  const [bx, bf] = FORMATION[j.role];
-  const pousse = notre === true ? 0.32 : notre === false ? -0.12 : 0.05;
-  let cx = bx + b.p.x * 0.35;
-  let cz = sens(j.e) * clamp(bf + pousse + fBalle * 0.42, -0.9, 0.85) * LB;
-  let vmax = 5.2;
   // (bola-app#26, lot 2) notre attaque : la balle à nous, ou notre passe en l'air
   const nousAvons = notre === true || (!p && b.garde == null && b.recepteur != null && m.joueurs[b.recepteur].e === j.e);
+  // (bola-app#32, lot B) la place de base : le poste d'attaque du losange (sim/tactique.js : fixo, alas, pivot, qui
+  // tournent) quand l'équipe a la balle, ou l'a eue en dernier (balle libre) ; la place du bloc de zone sinon
+  const enAttaqueE = nousAvons || (notre == null && b.recepteur == null && m.possession?.e === j.e);
+  const phase = phaseDe(m, j.e), plan = planDe(m, j.e);
+  let cx, cz, vmax = 5.4;
+  if (enAttaqueE) { const c = cibleAttaque(m, j, p, (j._cible ??= { x: 0, z: 0 })); cx = c.x; cz = c.z; j.intention = 'poste'; }
+  else {
+    const D = defenseEquipe(m, j.e, p, notre);
+    const c = D.poste[j.i];
+    if (c) { cx = c.x; cz = c.z; j.intention = c.nom; vmax = hypot(c.x - j.p.x, c.z - j.p.z) > 4 ? 6.4 : 5.4; }
+    else { cx = j.p.x; cz = j.p.z; }
+  }
   if (notre !== true && b.garde == null) {
     const R = rolesDefense(m, j.e, p, notre);
-    if (j.i === R.chasseur) {
+    if (j.i === R.chasseur && R.attente) {
+      // (lot B) hors de sa zone de sortie (le plan), le presseur attend en haut du bloc, sur la ligne balle → but : il
+      // cadre le porteur, il ne court pas après lui
+      cx = R.attente.x; cz = R.attente.z; vmax = 6.2; j.intention = 'cadre';
+      if (p && hypot(p.p.x - j.p.x, p.p.z - j.p.z) < 4.5 && hypot(p.v.x, p.v.z) < 3) { it.contenir = true; it.regard = p.p; }
+    } else if (j.i === R.chasseur) {
       const t = Math.min(0.7, hypot(b.p.x - j.p.x, b.p.z - j.p.z) / 6.5);
       cx = b.p.x + b.v.x * t; cz = b.p.z + b.v.z * t;
-      vmax = 6.6; it.vaBalle = true;
+      vmax = notre === false ? plan.vPresse : 6.6; it.vaBalle = true; j.intention = notre === false ? 'presse' : 'balle';
+      // (lot B) près du porteur, il vient se placer côté balle, devant elle (la balle entre lui et le porteur) : c'est de
+      // là qu'on la récupère du pied
+      if (p && notre === false && hypot(p.p.x - j.p.x, p.p.z - j.p.z) < 4) {
+        const ux = b.p.x - p.p.x, uz = b.p.z - p.p.z, L = hypot(ux, uz);
+        if (L > 0.15) { cx = b.p.x + (ux / L) * 0.55 + b.v.x * 0.15; cz = b.p.z + (uz / L) * 0.55 + b.v.z * 0.15; }
+      }
       const r = rdv(m, j);
       if (r) { cx = r.x; cz = r.z; }
+      // (lot B) une passe adverse en route : il ne court après la balle que s'il peut la couper ; sinon il va presser le
+      // receveur à la réception, côté but (il arrive avec la balle, pas derrière elle)
+      const R2 = b.recepteur != null ? m.joueurs[b.recepteur] : null;
+      if (!r && R2 && R2.e !== j.e && !p) {
+        const c = couper(m, j);
+        if (c) { cx = c.x; cz = c.z; j.intention = 'coupe'; }
+        else { const zg = butDe(j.e), L = hypot(-R2.p.x, zg - R2.p.z) || 1; cx = R2.p.x - (R2.p.x / L) * 1.4; cz = R2.p.z + ((zg - R2.p.z) / L) * 1.4; it.vaBalle = false; j.intention = 'presse'; }
+      }
       // (la remise du une-deux en une touche, si la passe est pour lui)
       if (j.i === b.recepteur && !j.demande) remise(m, j, it, true);
     } else if (j.i === R.couvreur && notre === false) {
       // la couverture : entre la balle et son but, à une marge qui grandit avec la vitesse du porteur, face à lui
-      cx = R.cov.x; cz = R.cov.z;
-      if (hypot(b.p.x - j.p.x, b.p.z - j.p.z) < 5) { it.contenir = true; it.regard = b.p; }
+      cx = R.cov.x; cz = R.cov.z; j.intention = 'couvre';
+      // (lot B : en pas chassés seulement tout près, ou face à un porteur lent ; sinon il recule en courant pour tenir sa
+      // distance de couverture)
+      const dB = hypot(b.p.x - j.p.x, b.p.z - j.p.z), sp = p ? hypot(p.v.x, p.v.z) : 0;
+      if (dB < 3 || (dB < 5 && sp < 3)) { it.contenir = true; it.regard = b.p; }
     } else if (j.i === R.double && p) {
-      // le pressing à deux (mauvais contrôle, dos au but, contre un panneau) : il ferme le côté du milieu
-      cx = p.p.x + R.ferme.x * 0.85; cz = p.p.z + R.ferme.z * 0.85; vmax = 6.4;
+      // le pressing à deux (mauvais contrôle, dos au but, contre un panneau ; en pressing haut, une passe en retrait) :
+      // il ferme le côté du milieu
+      cx = p.p.x + R.ferme.x * 0.85; cz = p.p.z + R.ferme.z * 0.85; vmax = 6.4; j.intention = 'double';
       it.regard = p.p;
       if (hypot(p.p.x - j.p.x, p.p.z - j.p.z) < 1.2) it.charge = true;
     } else if (j.i === R.ligne && notre === false) {
       // il coupe la ligne de passe la plus dangereuse
-      cx = R.lane.x; cz = R.lane.z; vmax = 5.8; it.regard = b.p;
+      cx = R.lane.x; cz = R.lane.z; vmax = 5.8; it.regard = b.p; j.intention = 'ligne';
     }
     if (nousAvons && j.i !== R.chasseur) ({ cx, cz, vmax } = attaque(m, j, it, cx, cz, vmax, p));
   } else if (b.recepteur === j.i) {
     // une passe arrive : à sa rencontre (bola-app#32, lot A : au-devant, au premier point de sa course qu'il atteint
     // avant elle ; avant : la balle dans 0,3 s)
-    cx = b.p.x + b.v.x * 0.3; cz = b.p.z + b.v.z * 0.3; vmax = 6; it.vaBalle = true;
+    cx = b.p.x + b.v.x * 0.3; cz = b.p.z + b.v.z * 0.3; vmax = 6; it.vaBalle = true; j.intention = 'recoit';
     const r = auDevant(m, j);
     if (r) { cx = r.x; cz = r.z; vmax = 7; }
   } else if (nousAvons) ({ cx, cz, vmax } = attaque(m, j, it, cx, cz, vmax, p));
+  // (lot B) la transition défensive : celui qui est devant la balle rentre au sprint derrière elle (le repli), en la
+  // contournant (il ne repasse pas sur le porteur : si sa course passe à moins de 5,5 m de la balle, il fait le tour à
+  // 7,5 m de côté)
+  const q = p ?? b;
+  if (!nousAvons && phase === 'transDef' && !it.vaBalle && j.intention !== 'cadre' && j.intention !== 'couvre' && j.intention !== 'double') {
+    const aB = av(j.e, q.p.z);
+    // (en équilibre et en bloc bas, celui dont la place est à plus de 4 m derrière lui rentre aussi au sprint)
+    if (av(j.e, j.p.z) <= aB - 1 && plan.id !== 'pressing' && av(j.e, j.p.z) - av(j.e, cz) > 4) { vmax = Math.max(vmax, 7.2); j.intention = 'repli'; }
+    else if (av(j.e, j.p.z) > aB - 1) {
+      vmax = Math.max(vmax, 7.4); j.intention = 'repli';
+      if (distSegment(q.p.x, q.p.z, j.p.x, j.p.z, cx, cz) < 5.5) { cx = clamp(q.p.x + (j.p.x >= q.p.x ? 1 : -1) * 7.5, -BX + 1, BX - 1); cz = q.p.z + (butDe(j.e) - q.p.z) * 0.25; }
+    }
+  }
+  // (lot B) pas de ruée : sans rôle sur la balle (presseur, couvreur, second presseur, receveur, une-deux), on ne vient
+  // pas à moins de 7 m d'elle (ANNEAU) ; la place visée est repoussée hors de ce rond
+  const surBalle = it.vaBalle || j.intention === 'couvre' || j.intention === 'double' || j.intention === 'cadre' || j.intention === 'uneDeux' || j.intention === 'ligne' || j.intention === 'poteau' || j.intention === 'penalty';
+  if (!surBalle) {
+    const rx = cx - q.p.x, rz = cz - q.p.z, d = hypot(rx, rz);
+    // (déjà dans le rond : il en sort vite, en visant plus loin que son bord, sans ralentir avant d'en être sorti)
+    const dedans = hypot(j.p.x - q.p.x, j.p.z - q.p.z) < ANNEAU;
+    if (d < ANNEAU || (dedans && d < ANNEAU + 2)) {
+      if (dedans) vmax = Math.max(vmax, 7);
+      const r0 = dedans ? ANNEAU + 2 : ANNEAU;
+      const ux = d > 0.3 ? rx / d : (j.p.x - q.p.x) / (hypot(j.p.x - q.p.x, j.p.z - q.p.z) || 1), uz = d > 0.3 ? rz / d : (j.p.z - q.p.z) / (hypot(j.p.x - q.p.x, j.p.z - q.p.z) || 1);
+      cx = q.p.x + ux * r0; cz = q.p.z + uz * r0;
+      // (contre un panneau ou une ligne de but, le rond se contourne de côté)
+      if (Math.abs(cz) > BZ - 1 || Math.abs(cx) > BX - 1) {
+        const sx = (j.p.x >= q.p.x ? 1 : -1) * (Math.abs(q.p.x) > BX - ANNEAU - 1 ? -Math.sign(q.p.x) * (j.p.x >= q.p.x ? 1 : -1) : 1);
+        cx = q.p.x + sx * r0; cz = q.p.z;
+      }
+    }
+  }
   // (le chasseur va jusqu'au panneau : une balle collée au panneau du fond se joue aussi)
   const bord = it.vaBalle ? 0.38 : 0.5;
   cx = clamp(cx, -BX + bord, BX - bord); cz = clamp(cz, -BZ + bord + 0.1 * (bord === 0.5 ? 1 : 0), BZ - bord - 0.1 * (bord === 0.5 ? 1 : 0));
@@ -134,27 +214,7 @@ export function pasIA(m, j) {
   // (bola-app#26, lot 2) une balle aérienne qui arrive à sa portée : reprise de volée ou de la tête, ou dégagement
   reprise(m, j, it, notre);
   // le tacle, sur le porteur d'en face
-  if (p && p.e !== j.e && j.essai <= 0) {
-    const d = hypot(p.p.x - j.p.x, p.p.z - j.p.z);
-    const db = hypot(b.p.x - j.p.x, b.p.z - j.p.z);
-    if (d < 2.4) {
-      j.essai = 0.7;
-      // (correctifs #26) un porteur coincé dans un coin, presque à l'arrêt : on va au contact franchement
-      const coince = hypot(p.v.x, p.v.z) < 1.2 && (Math.abs(p.p.x) > BX - 2.5 || Math.abs(p.p.z) > LB - 0.5) && Math.abs(p.p.z) > LB - 3;
-      const ch = (m.controle[p.e] === p.i ? 0.3 : 0.2) * (coince ? 2.5 : 1);
-      // le tacle debout : la balle devant lui, pas derrière les jambes du porteur
-      const devant = (b.p.x - j.p.x) * sin(j.cap) + (b.p.z - j.p.z) * cos(j.cap) > 0.3;
-      // (bola-app#26, lot 2) collé dans le dos du porteur, la balle hors d'atteinte : il le tient par le maillot
-      const s = hypot(p.v.x, p.v.z), fx = s > 0.8 ? p.v.x / s : sin(p.cap), fz = s > 0.8 ? p.v.z / s : cos(p.cap);
-      const derriere = ((j.p.x - p.p.x) * fx + (j.p.z - p.p.z) * fz) < -0.35 * d;
-      // (une balle protégée derrière le porteur : le tacle debout passe par ses jambes et le déséquilibre)
-      if (db < 1.1 && (devant || d < 0.8) && rng.u() < (devant ? ch : ch * 0.3)) it.action = { type: 'tacle', glisse: false };
-      // (bola-app#26 : le vrai tacle glissé porte plus loin, pieds devant ; l'IA le tente moins souvent)
-      else if (db < 2.2 && db > 1.2 && rng.u() < ch * 0.25) it.action = { type: 'tacle', glisse: true };
-      else if (d < 1.0 && rng.u() < 0.3) it.charge = true;
-      if (!it.action && derriere && d < 0.95 && !devant && m.rng.duels.u() < 0.14) j.tireJusque = m.t + 0.45 + m.rng.duels.u() * 0.7;
-    }
-  }
+  if (p && p.e !== j.e && j.essai <= 0) tacleIA(m, j, it, p);
   if (p && p.e !== j.e && m.t < (j.tireJusque ?? -9)) {
     // il tient : il colle au dos du porteur
     it.tire = true;
@@ -163,6 +223,137 @@ export function pasIA(m, j) {
     if (L > 0.05) { it.dx = tx / L; it.dz = tz / L; it.allure = 1; it.sprint = Math.max(it.sprint, clamp(L, 0, 1) * 0.6); }
     it.vaBalle = false;
   } else if (!p || p.e === j.e) j.tireJusque = -9;
+}
+
+/**
+ * (lot B) Le rond de la balle : sans rôle sur elle, on reste à 7 m (la distance de soutien du futsal, à l'échelle du
+ * terrain de 30 × 20 m). Réglé au banc (reprise du lot B) : à 6 m, 3,26 joueurs de champ à moins de 5 m de la balle
+ * et trois d'une même équipe 31 % du temps ; à 7 m, avec la couverture et la ligne à 6 m et le repli élargi, 2,86 et
+ * 21 % (avant le lot B : 3,11 et 19 %).
+ */
+const ANNEAU = 7.0;
+
+/**
+ * (bola-app#32, lot B ; point 15 : « l'IA tacle à bon escient ») Le tacle de l'IA sur le porteur d'en face, à moins de
+ * 2,4 m : pas de tacles en série (le tacleur attend 2,5 s après un glissé, 0,7 s après un tacle debout ; son équipe 0,7 s
+ * entre deux tentatives) ; le porteur de face → la récupération au pied (tacle debout), jamais le glissé ; le glissé
+ * seulement de côté ou de dos, la balle à 1,2-2,2 m, et jamais dans sa propre surface (le coup franc y serait trop cher).
+ * La part de hasard est celle d'avant (le flux « ia »), sur ces seules situations.
+ */
+function tacleIA(m, j, it, p) {
+  const b = m.balle, rng = m.rng.ia;
+  const d = hypot(p.p.x - j.p.x, p.p.z - j.p.z);
+  if (d >= 2.4) return;
+  const T = (m._tacleT ??= [-9, -9]);
+  if (m.t - T[j.e] < 0.7) return;
+  const db = hypot(b.p.x - j.p.x, b.p.z - j.p.z);
+  // (correctifs #26) un porteur coincé dans un coin, presque à l'arrêt : on va au contact franchement
+  const coince = hypot(p.v.x, p.v.z) < 1.2 && (Math.abs(p.p.x) > BX - 2.5 || Math.abs(p.p.z) > LB - 0.5) && Math.abs(p.p.z) > LB - 3;
+  const ch = (m.controle[p.e] === p.i ? 0.3 : 0.2) * (coince ? 2.5 : 1);
+  // le tacle debout : la balle devant lui, pas derrière les jambes du porteur
+  const devant = (b.p.x - j.p.x) * sin(j.cap) + (b.p.z - j.p.z) * cos(j.cap) > 0.3;
+  // la course (ou le cap) du porteur, et d'où vient le défenseur : de face, de côté, de dos
+  const s = hypot(p.v.x, p.v.z), fx = s > 0.8 ? p.v.x / s : sin(p.cap), fz = s > 0.8 ? p.v.z / s : cos(p.cap);
+  const vers = ((j.p.x - p.p.x) * fx + (j.p.z - p.p.z) * fz) / (d || 1);
+  const deFace = vers > 0.5, derriere = vers < -0.35;
+  const surface = hypot(p.p.x, p.p.z - butDe(j.e)) < 7;
+  // (une balle protégée derrière le porteur : le tacle debout passe par ses jambes et le déséquilibre)
+  // (lot B : la récupération au pied seulement quand la balle est entre lui et le porteur, plus près de lui que le
+  // porteur ; de face, il la tente plus volontiers ; la balle derrière les jambes du porteur, presque jamais)
+  const entre = db < d - 0.1;
+  const debout = db < 1.1 && devant && entre, jambes = db < 1.1 && d < 0.8 && !entre, glisse = !deFace && !surface && db < 2.2 && db > 1.2;
+  // (lot B : le délai de 0,7 s ne court qu'après une vraie occasion ; avant, il partait dès 2,4 m et le porteur lancé
+  // passait avant la suivante)
+  if (debout || jambes || glisse || d < 1.0) j.essai = 0.7;
+  if (debout && rng.u() < ch * (deFace ? 2 : 1.2)) { it.action = { type: 'tacle', glisse: false }; T[j.e] = m.t; }
+  else if (jambes && rng.u() < ch * 0.12) { it.action = { type: 'tacle', glisse: false }; T[j.e] = m.t; }
+  // (bola-app#26 : le vrai tacle glissé porte plus loin, pieds devant ; lot B : jamais de face, ni dans sa surface)
+  else if (glisse && rng.u() < ch * 0.3) { it.action = { type: 'tacle', glisse: true }; T[j.e] = m.t; j.essai = 2.5; }
+  else if (d < 1.0 && rng.u() < 0.3) it.charge = true;
+  // (bola-app#26, lot 2) collé dans le dos du porteur, la balle hors d'atteinte : il le tient par le maillot
+  if (!it.action && derriere && d < 0.95 && !devant && m.rng.duels.u() < 0.14) j.tireJusque = m.t + 0.45 + m.rng.duels.u() * 0.7;
+}
+
+/**
+ * (bola-app#32, lot B) Le bloc de zone de l'équipe e quand elle défend, une fois par pas : quatre places en losange qui
+ * coulissent avec la balle (haut : sur la ligne balle → but, au plus haut du bloc ; couverture côté balle, 3 m plus bas ;
+ * côté faible, à 3,2 m de l'axe de la balle ; bas : le dernier, devant le but), à la hauteur du plan (sim/tactique.js),
+ * resserrées dans la largeur du plan. Le joueur côté faible prend l'attaquant qui entre dans sa zone (côté but). Les
+ * joueurs de l'IA qui n'ont pas de rôle (presseur, couvreur, ligne, second presseur : rolesDefense) prennent les places
+ * restantes, au plus court ; le gardien adverse qui tient la balle n'est pas pressé.
+ */
+function defenseEquipe(m, e, p, notre) {
+  m._bloc ??= [{ pas: -1, poste: {} }, { pas: -1, poste: {} }];
+  const D = m._bloc[e];
+  if (D.pas === m.pas) return D;
+  D.pas = m.pas;
+  const b = m.balle, plan = planDe(m, e);
+  const q = p ?? (b.garde != null ? m.joueurs[b.garde] : null);
+  const xB = q ? q.p.x : b.p.x, aB = av(e, q ? q.p.z : b.p.z);
+  const s = xB > 0.8 ? 1 : xB < -0.8 ? -1 : (D.s ?? 1);
+  D.s = s;
+  const L = plan.largeur / 2;
+  const aHaut = Math.min(aB - 1.8, plan.haut);
+  const tH = clamp((aB - aHaut) / (aB + LB || 1), 0.05, 0.95);
+  const zg = butDe(e);
+  const places = [
+    { nom: 'haut', x: xB + (0 - xB) * tH, z: zDe(e, aHaut) },
+    { nom: 'couverture', x: clamp(xB * 0.55, xB - L, xB + L), z: zDe(e, Math.max(-13, Math.min(aB - 5.5, aHaut - 3))) },
+    { nom: 'faible', x: clamp(xB * 0.25 - s * 3.2, xB - L, xB + L), z: zDe(e, Math.max(-13, Math.min(aB - 5, aHaut - 3.5))) },
+    { nom: 'bas', x: clamp(xB * 0.2, -3, 3), z: zDe(e, Math.max(-13, Math.min(aB - 7.5, plan.bas))) },
+  ];
+  // (la zone côté faible : un attaquant qui y entre, plus bas qu'elle, est pris côté but)
+  const F = places[2];
+  let menace = null, am = Infinity;
+  for (const o of m.joueurs) {
+    if (o.absent || o.e === e || o.gardien || o === q) continue;
+    const ao = av(e, o.p.z);
+    // (en pressing haut, il ne descend pas sous le dernier défenseur : le pivot adverse resté au fond est à celui-ci)
+    if (o.p.x * s < 1 && ao < av(e, F.z) + 2 && ao < am && (plan.id !== 'pressing' || ao > plan.bas - 1)) { am = ao; menace = o; }
+  }
+  if (menace) { F.x = menace.p.x * 0.75; F.z = menace.p.z + (zg - menace.p.z) * 0.12; }
+  D.places = places;
+  // qui prend quoi : les rôles d'abord (balle en jeu), puis les places libres au plus court
+  const humain = m.controle[e];
+  const ia = [];
+  for (const o of m.joueurs) if (o.e === e && !o.gardien && !o.absent && o.i !== humain) ia.push(o);
+  const pris = new Set(), libres = [];
+  D.poste = {};
+  if (b.garde == null && notre !== true) {
+    const R = rolesDefense(m, e, p, notre);
+    if (R.chasseur != null) pris.add('haut');
+    if (R.couvreur != null && notre === false) pris.add('couverture');
+    if (R.double != null) pris.add('haut');
+    for (const o of ia) if (o.i !== R.chasseur && !(o.i === R.couvreur && notre === false) && o.i !== R.double && !(o.i === R.ligne && notre === false)) libres.push(o);
+    // (celui qui coupe la ligne de passe tient la place la plus proche de son point)
+    if (R.ligne != null && notre === false && R.lane) {
+      let bk = null, bd = Infinity;
+      for (const P of places) { if (pris.has(P.nom)) continue; const dd = hypot(P.x - R.lane.x, P.z - R.lane.z); if (dd < bd) { bd = dd; bk = P.nom; } }
+      if (bk) pris.add(bk);
+    }
+  } else libres.push(...ia);
+  const restes = places.filter((P) => !pris.has(P.nom));
+  // (au plus court, une place chacun ; celui qui la tenait déjà garde 1,5 m d'avance : pas de va-et-vient)
+  const avant = D.de ?? {};
+  D.de = {};
+  const ordre = libres.slice().sort((a, c) => a.i - c.i);
+  const occupe = new Set();
+  for (let n = 0; n < ordre.length; n++) {
+    let best = null, bj = null, bd = Infinity;
+    for (const o of ordre) {
+      if (D.de[o.i]) continue;
+      for (const P of restes) {
+        if (occupe.has(P.nom)) continue;
+        const dd = hypot(P.x - o.p.x, P.z - o.p.z) - (avant[o.i] === P.nom ? 1.5 : 0);
+        if (dd < bd) { bd = dd; best = P; bj = o; }
+      }
+    }
+    if (!best) break;
+    occupe.add(best.nom); D.de[bj.i] = best.nom; D.poste[bj.i] = best;
+  }
+  // (sans place libre, il double la couverture, côté faible)
+  for (const o of ordre) if (!D.poste[o.i]) D.poste[o.i] = places[2];
+  return D;
 }
 
 /**
@@ -202,6 +393,26 @@ export function auDevant(m, j) {
 }
 
 /**
+ * (bola-app#32, lot B) Couper une passe adverse au sol : le premier point de sa course (roulement JEU.passeRoule) que le
+ * défenseur atteint 0,15 s avant elle, avant les deux derniers mètres (le receveur la contrôle) ; null s'il n'y en a pas.
+ */
+function couper(m, j) {
+  const b = m.balle, R2 = m.joueurs[b.recepteur];
+  if (b.p.y > 0.6 || b.v.y > 2) return null;
+  const v = hypot(b.v.x, b.v.z);
+  if (v < 1) return null;
+  const ux = b.v.x / v, uz = b.v.z / v, a = JEU.passeRoule;
+  const dR = hypot(R2.p.x - b.p.x, R2.p.z - b.p.z);
+  for (let t = 0.05; t <= 2; t += 0.05) {
+    const vt = Math.max(0, v - a * t), dist = (v * v - vt * vt) / (2 * a);
+    if (dist > dR - 2 || vt === 0) break;
+    const x = b.p.x + ux * dist, z = b.p.z + uz * dist;
+    if (tempsArrivee(j, x, z) <= t - 0.15) return { x, z };
+  }
+  return null;
+}
+
+/**
  * La remise du une-deux (bola-app#26, lot 2) : le receveur d'une passe dont le passeur est reparti dans l'espace décide
  * une fois (75 %) s'il la lui remet ; puis, dès que le passeur est à sa hauteur ou devant et le couloir libre, il la
  * remet : en une touche si la balle arrive encore (unTouche), sinon après son contrôle (2 s au plus). Renvoie null
@@ -234,9 +445,13 @@ function remise(m, j, it, unTouche) {
   return true;
 }
 
-/** Le porteur de l'IA : vers le but en évitant le plus proche ; frappe, passe, centre, remise du une-deux. */
+/**
+ * Le porteur de l'IA : il conduit vers le but en évitant le plus proche (ou protège), joue la remise du une-deux, et,
+ * toutes les 0,16 à 0,38 s (plus vite sous pression), choisit (bola-app#32, lot B : decider) entre frappe, passe (au
+ * sol, profondeur, lobée, puissante, centre), conduite et dribble, sur des critères — plus de tirage au sort nu.
+ */
 function porteurIA(m, j, it) {
-  const rng = m.rng.ia, col = m.rng.collectif;
+  const rng = m.rng.ia;
   const zb = butDe(1 - j.e);
   let cx = clamp(-j.p.x * 0.2, -3, 3), cz = zb;
   const { o: proche, d: dp } = adversaireProche(m, j);
@@ -259,66 +474,184 @@ function porteurIA(m, j, it) {
     if (coin) { const tx = cx - j.p.x, tz = cz - j.p.z, T = hypot(tx, tz) || 1; ax = ax * 0.35 + tx / T; az = az * 0.35 + tz / T; L = hypot(ax, az) || 1; ax /= L; az /= L; }
     it.dx = ax; it.dz = az; it.allure = 0.8; if (j.protegeT > 2.4) j.protegeT = 0;
   }
-  // (bola-app#26, lot 2) la remise du une-deux : le passeur est reparti dans l'espace, le couloir est libre → remise
-  // en une touche, tout de suite (une fois par passe reçue)
   // (bola-app#26, lot 2) la remise du une-deux, en deux touches (en une, elle part avant le contrôle : pasIA)
   const r = remise(m, j, it, false);
   if (r !== null) return;
+  // (lot B) le tireur d'un coup franc a levé la tête pendant que la balle était posée : il la joue de là, sans la
+  // conduire d'abord (la balle qui quitte son point lève la garde des 3 m, monde.js tenirEcart, et l'adversaire la
+  // reprenait avant qu'il l'ait jouée)
+  const tireur = !!m.ecart && m.ecart.e !== j.e && m.ecart.tireur === j.i;
+  if (tireur) { it.dx = 0; it.dz = 0; it.allure = 0; it.protege = false; j.porteurT = -9; }
+  // (lot B) le temps de lever la tête : 0,3 s après la prise de balle (0,12 s sous pression), avant le premier choix
+  if (m.t - (j.porteurVu ?? -9) > 0.1 && !tireur) j.porteurT = m.t;
+  j.porteurVu = m.t;
+  if (m.t - j.porteurT < (dp < 2.2 ? 0.12 : 0.3)) return;
   if (j.decision > 0) return;
-  j.decision = 0.28 + rng.u() * 0.15;
-  const dBut = hypot(j.p.x, zb - j.p.z);
+  j.decision = (dp < 2.4 ? 0.16 : 0.26) + rng.u() * 0.12;
+  decider(m, j, it, proche, dp, coin);
+}
+
+/** (lot B) L'espace devant le porteur j vers le but : le premier adversaire de champ dans un cône de 40° (8 m au plus). */
+function espaceDevant(m, j, ux, uz) {
+  let d0 = 8;
+  for (const o of m.joueurs) {
+    if (o.absent || o.e === j.e || o.mode === 'sol') continue;
+    const rx = o.p.x - j.p.x, rz = o.p.z - j.p.z, d = hypot(rx, rz);
+    if (d < 1e-6 || d > d0) continue;
+    if ((rx * ux + rz * uz) / d > 0.77) d0 = d;
+  }
+  return d0;
+}
+
+/**
+ * (bola-app#32, lot B) Le choix du porteur de l'IA, sur des critères :
+ *   · frappe : la chance de but (sim/tactique.js chanceBut : angle, distance, corps sur la ligne), moins sous pression ;
+ *     tirée si elle passe le seuil du style (direct plus tôt que court ; perdant en fin de match, plus tôt encore) ;
+ *     le geste suit la situation : piqué sur un gardien sorti, enroulée d'un angle, frappe à ras de terre de près ;
+ *   · passe à chaque coéquipier : progression, chance de but du receveur, démarquage, couloir libre, longueur ; le type
+ *     suit la situation : profondeur dans la course d'un receveur lancé avec de l'espace devant lui, par-dessus
+ *     (profondeur lobée, passe lobée) si le couloir est fermé, puissante de loin en jeu direct, centre (tendu, ou lobé si
+ *     des corps sont sur la ligne) d'un côté vers un receveur dans l'axe près du but ; pas de ping-pong ;
+ *   · conduite : l'espace devant lui ; dribble (crochet ; feinte arrêté) : un seul défenseur de face, de 1,1 à 2,6 m.
+ * La variété vient d'un bruit borné (0 à 0,12) tiré dans le flux « ia », ajouté à chaque note : jamais d'un tirage nu.
+ */
+function decider(m, j, it, proche, dp, coin) {
+  const rng = m.rng.ia, col = m.rng.collectif, e = j.e, zb = butDe(1 - e), s = sens(e);
+  const T = styleDe(m, e);
+  const aJ = av(e, j.p.z);
+  const presse = clamp((2.6 - dp) / 1.6, 0, 1);
+  const perdTard = m.score[e] < m.score[1 - e] && m.reste < m.duree * 0.2;
   // (correctifs #26) pas de frappe de derrière la ligne ni d'un angle fermé : il remet en retrait
   const ferme = (j.p.z - zb) * Math.sign(zb) > -0.3 || Math.abs(j.p.x) > BUT_DL + 2.2 * Math.abs(zb - j.p.z);
-  if (!ferme && (dBut < 7.5 || (dBut < 10 && rng.u() < 0.6) || (dBut < 13 && Math.abs(j.p.x) < 6 && rng.u() < 0.28))) {
-    // près d'un poteau (l'erreur de la frappe fait le reste : à côté, ou dedans)
-    // le côté que le gardien couvre le moins
-    const g = m.joueurs.find((o) => o.gardien && o.e !== j.e);
-    const cote = g ? (g.p.x > 0 ? -1 : 1) : rng.u() < 0.5 ? -1 : 1;
-    const x = (rng.u() < 0.75 ? cote : -cote) * (0.6 + rng.u() * (BUT_DL - 0.95));
-    // (bola-app#26, lot 2) frappe, finesse (intérieur brossé) ou extérieur : un seul tirage, comme avant
-    const u = rng.u();
-    const type = u < 0.13 ? 'finesse' : u < 0.2 ? 'exterieur' : 'frappe';
-    it.action = { type, p: 0.45 + rng.u() * 0.4, x, y: 0.3 + rng.u() * 1.1 };
+  const xg = ferme ? 0 : chanceBut(m, e, j.p.x, j.p.z) * (1 - 0.35 * presse);
+  // (la patience : plus la possession dure, plus la frappe se tente ; à 4 s, le seuil baisse d'un tiers, à 7 s de moitié)
+  const P = m.possession, dure = P && P.e === e ? m.t - P.t : 0;
+  const seuil = T.seuilFrappe * (perdTard ? 0.65 : 1) * (dure > 7 ? 0.5 : dure > 4 ? 0.67 : 1);
+  const bruit = () => rng.u() * 0.12;
+  const coupFranc = !!m.ecart && m.ecart.e !== e;
+  let best = { k: 'conduite', v: -Infinity };
+  // la frappe
+  // (au-dessus du seuil, elle passe avant presque tout ; en dessous, de 0,03 à lui, elle se compare aux autres choix)
+  if (xg >= seuil) best = { k: 'frappe', v: 0.7 + xg * 2 + bruit() };
+  else if (xg >= 0.03) best = { k: 'frappe', v: 0.15 + xg * 4.5 + bruit() };
+  // les passes
+  const der = m.passes[m.passes.length - 1];
+  for (const o of m.joueurs) {
+    if (o.absent || o.e !== e || o === j || o.gardien || o.mode === 'sol') continue;
+    const ox = o.p.x - j.p.x, oz = o.p.z - j.p.z, d = hypot(ox, oz);
+    if (d < 4) continue;
+    let libreO = 9;
+    for (const a of m.joueurs) if (!a.absent && a.e !== e && !a.gardien) libreO = Math.min(libreO, hypot(a.p.x - o.p.x, a.p.z - o.p.z));
+    const ouvert = couloirLibre(m, e, j.p.x, j.p.z, o.p.x, o.p.z, 1.0);
+    const dA = av(e, o.p.z) - aJ;
+    const xgO = chanceBut(m, e, o.p.x, o.p.z);
+    let v = clamp(dA, -8, 10) * 0.05 * T.progression + xgO * 2.5 + 0.11 * Math.min(libreO, 4) + presse * 0.25 + T.garder;
+    if (d > 13) v -= (d - 13) * 0.06 * T.longue;
+    if (libreO < 1.3) v -= 0.5;
+    // (le coup franc : les adversaires tenus à 3 m, la passe sûre d'abord, au pied d'un coéquipier libre)
+    if (coupFranc) v += ouvert && libreO > 2.2 ? 0.5 : -0.6;
+    // (pas de ping-pong : on ne la rend pas tout de suite à celui qui vient de la donner, sauf le une-deux)
+    if (der && der.de === o.i && der.a === j.i && m.t - der.t < 2.5 && !o.uneDeux) v -= 0.2;
+    const avance = o.v.z * s;
+    let k = null;
+    if (ouvert) {
+      if (avance > 2.5 && dA > 1 && espaceDevant(m, o, 0, s) > 3) k = { k: 'profondeur', v: v + 0.25 * T.profondeur };
+      else k = { k: 'passe', v, puissante: d > 11 && T.id === 'direct' };
+    } else if (!coupFranc && d > 8 && libreO > 3.5 && (dA > 2 ? o.prof && m.t < o.prof.t : d > 10)) k = { k: dA > 2 ? 'profondeurLobee' : 'lob', v: v - 0.5 };
+    // le centre : d'un côté, près du but, vers un receveur dans l'axe
+    if (Math.abs(j.p.x) > 3.8 && Math.abs(zb - j.p.z) < 10 && Math.abs(o.p.x) < 3.4 && Math.abs(zb - o.p.z) < 8.5 && d > 4 && libreO > 1.5) {
+      const c = { k: 'centre', v: v + xgO - (ouvert ? 0 : 0.2), haut: !ouvert, tendu: ouvert && d < 9 };
+      if (!k || c.v > k.v) k = c;
+    }
+    if (!k) continue;
+    k.v += bruit(); k.o = o; k.d = d;
+    if (k.v > best.v) best = k;
+  }
+  // la conduite et le dribble
+  const ux = -j.p.x * 0.15, L0 = hypot(ux, s) || 1;
+  const esp = espaceDevant(m, j, ux / L0, s / L0);
+  const vConduite = 0.08 * Math.min(esp, 6) + (aJ < 4 ? 0.05 : esp > 3 ? 0.12 : 0) - presse * 0.5 - (coin ? 1 : 0) - (Math.abs(j.p.x) > BX - 1.6 ? 0.3 : 0) + bruit();
+  if (vConduite > best.v) best = { k: 'conduite', v: vConduite };
+  if (proche && !proche.gardien && dp > 1.1 && dp < 2.6 && hypot(j.v.x, j.v.z) > 1 && m.t - (j.dribbleT ?? -9) > 2.5 && aJ > -8) {
+    const rx = proche.p.x - j.p.x, rz = proche.p.z - j.p.z;
+    const deFace = (rx * sin(j.cap) + rz * cos(j.cap)) / dp > 0.6;
+    let seul = true;
+    for (const o of m.joueurs) if (o !== proche && !o.absent && o.e !== e && !o.gardien && hypot(o.p.x - proche.p.x, o.p.z - proche.p.z) < 3) seul = false;
+    if (deFace && seul) { const vD = 0.34 + 0.1 * Math.min(esp, 3) / 3 + bruit(); if (vD > best.v) best = { k: 'dribble', v: vD, o: proche }; }
+  }
+  if (best.k === 'conduite') return;
+  if (best.k === 'frappe') { frapperIA(m, j, it, xg); return; }
+  if (best.k === 'dribble') {
+    // (le crochet de l'autre côté du défenseur, vers le but ; arrêté : la feinte de corps)
+    const o = best.o, rx = o.p.x - j.p.x, rz = o.p.z - j.p.z, L = hypot(rx, rz) || 1;
+    let dx = -rz / L, dz = rx / L;
+    if (Math.abs(j.p.x) > 1 ? dx * -j.p.x < 0 : col.u() < 0.5) { dx = -dx; dz = -dz; }
+    j.dribbleT = m.t;
+    it.action = hypot(j.v.x, j.v.z) > 2.2 ? { type: 'crochet', dx, dz } : { type: 'feinte', dx, dz };
+    m.stats.dribblesIA = (m.stats.dribblesIA ?? 0) + 1; compter(m, it.action.type);
     return;
   }
-  // (bola-app#26, lot 2) le centre : sur un côté, près de la ligne de but, un coéquipier au point de penalty
-  if (Math.abs(j.p.x) > 3.8 && Math.abs(zb - j.p.z) < 10) {
-    let t = null;
-    for (const o of m.joueurs) if (o.e === j.e && o !== j && !o.gardien && !o.absent && Math.abs(o.p.x) < 3.2 && Math.abs(zb - o.p.z) < 8 && hypot(o.p.x - j.p.x, o.p.z - j.p.z) > 4) t = o;
-    if (t && col.u() < 0.55) { it.action = { type: 'centre', p: 0.9, cible: t.i, dx: t.p.x - j.p.x, dz: t.p.z - j.p.z }; return; }
-  }
-  if ((dp < 2.4 && rng.u() < 0.65) || (dp < 4 && rng.u() < 0.4) || rng.u() < 0.14 || Math.abs(j.p.x) > BX - 1.6 || coin || ferme) {
-    const cible = choisirPartenaire(m, j, sin(j.cap), cos(j.cap) + sens(j.e) * 0.6);
-    if (cible) {
-      const d = hypot(cible.p.x - j.p.x, cible.p.z - j.p.z);
-      const prof = rng.u() < 0.25;
-      // la force qu'il faut pour que la passe arrive à 6 m/s (roulement 1,08 m/s² et l'air ; lot 2 : 4,5 m/s se faisait couper ;
-      // bola-app#32, lot A : 7,5 m/s, le rythme plus nerveux, et la vitesse donnée telle quelle, v0)
-      const v0 = Math.sqrt(JEU.passeArrivee * JEU.passeArrivee + 2 * JEU.passeRoule * d);
-      const lob = d > 14 && rng.u() < 0.4;
-      it.action = { type: lob ? 'lob' : prof ? 'profondeur' : 'passe', p: clamp((v0 - 6) / 12, 0.05, 1), v0, cible: cible.i, dx: cible.p.x - j.p.x, dz: cible.p.z - j.p.z };
-      // (bola-app#26, lot 2) le une-deux : après une passe courte, le passeur repart dans l'espace, devant, du côté
-      // opposé au défenseur le plus proche, pour la redemander
-      if (!lob && j.role !== 'D' && d < 10 && (j.p.z - butDe(j.e)) * sens(j.e) > LB * 0.6 && col.u() < 0.5) {
-        const s = sens(j.e), lat = proche ? Math.sign(j.p.x - proche.p.x || 1) : 1;
-        j.uneDeux = { t: m.t, cible: cible.i, x: clamp(j.p.x + lat * 1.6, -BX + 1.2, BX - 1.2), z: clamp(j.p.z + s * 5.5, -LB + 2, LB - 2) };
-      }
-    }
+  const o = best.o, d = best.d;
+  // la force qu'il faut pour que la passe arrive à 9 m/s (bola-app#32, lot A : la vitesse donnée telle quelle, v0) ;
+  // la passe puissante, 25 % de plus
+  const v0 = Math.sqrt(JEU.passeArrivee * JEU.passeArrivee + 2 * JEU.passeRoule * d) * (best.puissante ? 1.25 : 1);
+  const base = { p: clamp((v0 - 6) / 12, 0.05, 1), v0, cible: o.i, dx: o.p.x - j.p.x, dz: o.p.z - j.p.z };
+  if (best.k === 'profondeur') it.action = { type: 'profondeur', ...base };
+  else if (best.k === 'profondeurLobee') it.action = { type: 'profondeur', lobe: true, ...base };
+  else if (best.k === 'lob') it.action = { type: 'lob', haut: d > 12, ...base };
+  else if (best.k === 'centre') it.action = { type: 'centre', haut: !!best.haut, tendu: !!best.tendu, ...base, p: 0.9 };
+  else it.action = { type: 'passe', puissante: !!best.puissante, ...base };
+  compter(m, it.action.type + (it.action.lobe ? 'Lobee' : it.action.puissante ? 'Puissante' : it.action.haut ? 'Haut' : it.action.tendu ? 'Tendu' : ''));
+  // (bola-app#26, lot 2) le une-deux : après une passe courte, le passeur repart dans l'espace, devant, du côté opposé
+  // au défenseur le plus proche, pour la redemander (lot B : voulu quand un défenseur le presse de face)
+  if (it.action.type === 'passe' && j.poste !== 'fixo' && d < 10 && aJ > -6 && col.u() < (dp < 2.6 ? 0.7 : 0.35)) {
+    const lat = proche ? Math.sign(j.p.x - proche.p.x || 1) : 1;
+    j.uneDeux = { t: m.t, cible: o.i, x: clamp(j.p.x + lat * 1.6, -BX + 1.2, BX - 1.2), z: clamp(j.p.z + s * 5.5, -LB + 2, LB - 2) };
   }
 }
+
+/**
+ * (lot B) La frappe de l'IA : vers le côté que le gardien couvre le moins (trois fois sur quatre) ; le geste suit la
+ * situation : piqué (L1 + ○) sur un gardien sorti de plus de 2,4 m, de 5 à 12 m ; enroulée (R1 + ○) d'un angle (à plus
+ * de 2,2 m de l'axe, de 5,5 à 12 m), vers le second poteau ; à ras de terre (R2 + ○) de près (moins de 8 m) une fois
+ * sur deux ; sinon la frappe du cou-de-pied, à mi-hauteur.
+ */
+function frapperIA(m, j, it, xg) {
+  const rng = m.rng.ia, zb = butDe(1 - j.e);
+  const g = m.joueurs.find((o) => o.gardien && o.e !== j.e);
+  const dBut = hypot(j.p.x, zb - j.p.z);
+  const cote = g ? (g.p.x > 0 ? -1 : 1) : rng.u() < 0.5 ? -1 : 1;
+  const x = (rng.u() < 0.75 ? cote : -cote) * (0.6 + rng.u() * (BUT_DL - 0.95));
+  const sorti = g && Math.abs(g.p.z - zb) > 2.4;
+  let a;
+  if (sorti && dBut > 5 && dBut < 12) a = { type: 'lobFrappe', p: 0.45, x: x * 0.6 };
+  else if (Math.abs(j.p.x) > 2.2 && dBut > 5.5 && dBut < 12) a = { type: 'finesse', p: 0.5 + rng.u() * 0.3, x: -Math.sign(j.p.x) * (0.7 + rng.u() * 0.6), y: 0.5 + rng.u() * 0.8 };
+  else if (dBut < 8 && rng.u() < 0.5) a = { type: 'frappe', ras: true, p: 0.8, x, y: 0.15 };
+  else a = { type: 'frappe', p: 0.45 + rng.u() * 0.4, x, y: 0.3 + rng.u() * 1.1 };
+  it.action = a;
+  compter(m, a.type + (a.ras ? 'Ras' : ''));
+  void xg;
+}
+
+/** (lot B) Les choix du porteur de l'IA, comptés pour le banc (m.choixIA, hors de m.stats : rien n'y est sommé). */
+function compter(m, cle) { m.choixIA ??= {}; m.choixIA[cle] = (m.choixIA[cle] ?? 0) + 1; }
 
 /**
  * Les rôles de la défense de l'équipe e, calculés une fois par pas : le chasseur (le premier à la balle), le couvreur
  * (entre la balle et le but, à une marge qui grandit avec la vitesse du porteur), celui qui coupe la ligne de passe la
  * plus dangereuse, et, sur un déclencheur (mauvais contrôle, porteur dos au but, porteur contre un panneau), le second
  * presseur qui ferme le côté du milieu.
+ * (bola-app#32, lot B) Le plan de l'équipe (sim/tactique.js) règle la sortie du chasseur : hors de sa zone de sortie, et
+ * sans déclencheur, contre-pressing ni porteur sur lui, il attend en haut du bloc (R.attente), et le couvreur se règle
+ * sur ce point ; le second presseur sort sur tout déclencheur en pressing haut (et sur une passe en retrait), seulement
+ * près du but en bloc bas ; la ligne de passe est coupée à mi-chemin en pressing, plus près du receveur en bloc bas.
  */
 function rolesDefense(m, e, p, notre) {
   m._roles ??= [{ pas: -1 }, { pas: -1 }];
   const R = m._roles[e];
   if (R.pas === m.pas) return R;
   R.pas = m.pas;
-  const b = m.balle;
+  const b = m.balle, plan = planDe(m, e);
   // qui va chercher la balle : celui de l'équipe qui y arrive le premier (sauf le joueur humain, qui choisit)
   const humain = m.controle[e];
   const ia = m.joueurs.filter((o) => o.e === e && !o.gardien && !o.absent && o.i !== humain);
@@ -329,19 +662,49 @@ function rolesDefense(m, e, p, notre) {
   const humainPresse = hj && hypot(hj.p.x - b.p.x, hj.p.z - b.p.z) < 4;
   // (l'humain demande un renfort, RB / R1 : le plus proche de l'IA presse avec lui)
   const seul = humainPresse && !m.renfort?.[e];
-  R.chasseur = prochain ?? (seul ? null : ia[0]?.i ?? null);
+  // (lot B : celui qui presse déjà garde le rôle, sauf si un autre arrive 0,4 s avant lui : pas de relais à chaque pas)
+  let premier = ia[0] ?? null;
+  const ancien = R.chasseur != null ? ia.find((o) => o.i === R.chasseur) : null;
+  if (ancien && premier && ancien !== premier && tb(ancien) < tb(premier) + 0.4) premier = ancien;
+  R.chasseur = prochain ?? (seul ? null : premier?.i ?? null);
   let reste = ia.filter((o) => o.i !== R.chasseur);
   const avant0 = { couvreur: R.couvreur, ligne: R.ligne, double: R.double };
-  R.couvreur = null; R.ligne = null; R.double = null;
+  R.couvreur = null; R.ligne = null; R.double = null; R.attente = null;
   // (le plus près du point ; celui qui tenait déjà ce rôle garde 1,5 m d'avance : les rôles ne sautent pas d'un joueur à
   // l'autre à chaque pas)
   const avant = avant0;
   const plusPres = (pt, role) => { let best = null, bd = Infinity; for (const o of reste) { const d = hypot(o.p.x - pt.x, o.p.z - pt.z) - (o.i === avant[role] ? 1.5 : 0); if (d < bd) { bd = d; best = o; } } return best; };
   const zb = butDe(e);
   if (notre === false && p) {
-    const sp = hypot(p.v.x, p.v.z), marge = clamp(2.4 + 0.3 * sp, 2.4, 4.4);
-    const ux = -b.p.x, uz = zb - b.p.z, L = hypot(ux, uz) || 1;
-    R.cov = { x: b.p.x + (ux / L) * marge, z: b.p.z + (uz / L) * marge };
+    const aB = av(e, p.p.z);
+    // le déclencheur du pressing à deux
+    const dos = cos(p.cap) * sens(p.e) < -0.4;
+    const panneau = Math.abs(p.p.x) > BX - 1.5 || Math.abs(p.p.z) > BZ - 2;
+    const rate = (p.controleQ ?? 1) < 0.55 && m.t - (p.controleT ?? -9) < 1;
+    // (lot B) une passe en retrait vient d'arriver au porteur (pressing haut : le signal de la sortie)
+    const der = m.passes[m.passes.length - 1];
+    const retrait = !!der && der.a === p.i && m.t - der.t < 1.5 && av(p.e, m.joueurs[der.de].p.z) > av(p.e, p.p.z) + 2;
+    const declencheur = dos || panneau || rate || (plan.double === 'toujours' && retrait);
+    // (lot B) la sortie du presseur : dans sa zone (le plan), sur un déclencheur, au contre-pressing, ou si le porteur
+    // est déjà sur lui ; sinon il attend en haut du bloc
+    const P = m.possession, contre = P && m.t - P.perte[e] < plan.contre;
+    const c0 = R.chasseur != null ? m.joueurs[R.chasseur] : null;
+    // (en bloc bas, au-dessus du haut du bloc, le porteur sur lui ne le fait pas sortir : il recule avec lui)
+    const surLui = c0 && hypot(c0.p.x - p.p.x, c0.p.z - p.p.z) < 2.6 && (plan.id !== 'blocBas' || aB < plan.haut + 2);
+    const tirable = chanceBut(m, p.e, p.p.x, p.p.z) > 0.07;
+    // (un déclencheur ne fait sortir le presseur que près de sa zone : partout en pressing haut, 4 m au-delà de la ligne
+    // de sortie en équilibre, au haut du bloc en bloc bas)
+    const portee = plan.id === 'pressing' ? 99 : plan.id === 'equilibre' ? plan.sortie + 4 : plan.haut;
+    const sort = aB < plan.sortie || (declencheur && aB < portee) || contre || surLui || tirable || prochain != null;
+    let px = b.p.x, pz = b.p.z;
+    if (!sort && c0) {
+      const aH = Math.min(aB - 3.5, plan.haut), t = clamp((aB - aH) / (aB + LB || 1), 0.05, 0.9);
+      R.attente = { x: p.p.x + (0 - p.p.x) * t, z: p.p.z + (zb - p.p.z) * t };
+      px = R.attente.x; pz = R.attente.z;
+    }
+    const sp = hypot(p.v.x, p.v.z), m0 = plan.id === 'pressing' ? 2.8 : 6.0, marge = clamp(m0 + 0.3 * sp, m0, m0 + 1.6);
+    const ux = -px, uz = zb - pz, L = hypot(ux, uz) || 1;
+    R.cov = { x: px + (ux / L) * marge, z: pz + (uz / L) * marge };
     const c = plusPres(R.cov, 'couvreur');
     R.couvreur = c?.i ?? null;
     reste = reste.filter((o) => o !== c);
@@ -349,24 +712,27 @@ function rolesDefense(m, e, p, notre) {
     let q = null, dq = -Infinity;
     for (const o of m.joueurs) {
       if (o.absent || o.e === e || o.gardien || o === p) continue;
+      // (hors du pressing haut, on ne suit pas un receveur au-dessus du haut du bloc : la zone le prendra s'il descend)
+      if (plan.id !== 'pressing' && av(e, o.p.z) > plan.haut + 3) continue;
       const danger = 1 - hypot(o.p.x, o.p.z - zb) / 30 + (couloirLibre(m, o.e, p.p.x, p.p.z, o.p.x, o.p.z, 1.0) ? 0.4 : 0) - hypot(o.p.x - p.p.x, o.p.z - p.p.z) / 40 + (o.i === R.cible ? 0.15 : 0);
       if (danger > dq) { dq = danger; q = o; }
     }
-    // le déclencheur du pressing à deux
-    const dos = cos(p.cap) * sens(p.e) < -0.4;
-    const panneau = Math.abs(p.p.x) > BX - 1.5 || Math.abs(p.p.z) > BZ - 2;
-    const rate = (p.controleQ ?? 1) < 0.55 && m.t - (p.controleT ?? -9) < 1;
-    if ((dos || panneau || rate) && !seul && reste.length) {
+    const double = declencheur && (plan.double !== 'surface' || aB < -8);
+    if (double && sort && !seul && reste.length) {
       // le côté du milieu (perpendiculaire à la ligne porteur → but, vers x = 0)
       let nx = -(zb - p.p.z), nz = p.p.x - 0; const nl = hypot(nx, nz) || 1; nx /= nl; nz /= nl;
       if (nx * -p.p.x < 0) { nx = -nx; nz = -nz; }
       R.ferme = { x: nx, z: nz };
       const d2 = plusPres({ x: p.p.x + nx, z: p.p.z + nz }, 'double');
-      R.double = d2?.i ?? null;
-      reste = reste.filter((o) => o !== d2);
+      // (lot B : le piège à deux se referme avec celui qui est déjà là, à 6 m au plus ; personne ne traverse le terrain)
+      if (d2 && hypot(d2.p.x - p.p.x, d2.p.z - p.p.z) < 6) { R.double = d2.i; reste = reste.filter((o) => o !== d2); }
     }
     if (q && reste.length) {
-      R.lane = { x: p.p.x + (q.p.x - p.p.x) * 0.42, z: p.p.z + (q.p.z - p.p.z) * 0.42 };
+      // (hors du pressing haut, il se tient plus près du receveur que du porteur : à 6 m du porteur au moins, à
+      // 0,8 m du receveur au plus près)
+      const dq0 = hypot(q.p.x - p.p.x, q.p.z - p.p.z) || 1;
+      const f = plan.id === 'pressing' ? plan.ligne : clamp(Math.max(plan.ligne, 6.0 / dq0), 0, Math.max(plan.ligne, 1 - 0.8 / dq0));
+      R.lane = { x: p.p.x + (q.p.x - p.p.x) * f, z: p.p.z + (q.p.z - p.p.z) * f };
       R.ligne = plusPres(R.lane, 'ligne')?.i ?? null;
       R.cible = q.i;
     }
@@ -375,48 +741,98 @@ function rolesDefense(m, e, p, notre) {
 }
 
 /**
- * L'attaque sans la balle (bola-app#26, lot 2) : le passeur d'un une-deux file vers son espace ; les autres (sauf le
- * défenseur, qui reste derrière) font un appel de balle vers l'espace libre le plus utile autour de leur poste
- * (grille de 2 m, revue toutes les 0,25 s : loin des adversaires, couloir de passe ouvert, vers le but, pas sur un
- * coéquipier), au sprint quand le porteur relève la tête.
+ * L'attaque sans la balle (bola-app#26, lot 2) : le passeur d'un une-deux file vers son espace ; les autres font un appel
+ * de balle vers l'espace libre le plus utile autour de leur poste (grille de 2 m, revue toutes les 0,25 s : loin des
+ * adversaires, couloir de passe ouvert, vers le but, pas sur un coéquipier), au sprint quand le porteur relève la tête.
+ * (bola-app#32, lot B) Autour du POSTE (sim/tactique.js), et non plus du rôle fixe : le fixo reste derrière la balle
+ * (soutien, il ne cherche que de côté) ; aucun appel à moins de 4,5 m du porteur (la distance de soutien : la fin de la
+ * ruée) ; le pivot ou l'ala côté faible part dans le dos du dernier défenseur quand le porteur peut la lui donner
+ * (appelProfondeur), un seul à la fois ; en transition offensive, les appels se font au sprint.
  */
 function attaque(m, j, it, cx, cz, vmax, p) {
   const U = j.uneDeux;
   if (U && m.t - U.t < 3 && b0(m).recepteur !== j.i) {
     // (arrivé à son espace, il ne s'arrête pas : il continue vers le but, la remise doit le trouver lancé)
     if (hypot(U.x - j.p.x, U.z - j.p.z) < 1.5) { U.z = clamp(U.z + sens(j.e) * 2.5, -LB + 2, LB - 2); }
-    it.regard = m.balle.p; return { cx: U.x, cz: U.z, vmax: 6.6 };
+    it.regard = m.balle.p; j.intention = 'uneDeux'; return { cx: U.x, cz: U.z, vmax: 6.6 };
   }
   if (U && m.t - U.t >= 3) j.uneDeux = null;
-  if (j.role === 'D') return { cx, cz, vmax };
-  const a = appel(m, j, cx, cz, p);
+  const phase = phaseDe(m, j.e), poste = j.poste;
+  // (lot B) le porteur sur un côté, près du but (là d'où il centre) : le pivot attaque le second poteau, l'ala côté
+  // faible le point de pénalty ; ils vont au but, pas dans l'espace libre
+  if ((poste === 'pivot' || poste === 'aileFaible') && p && p.e === j.e && Math.abs(p.p.x) > 3.8 && Math.abs(butDe(1 - j.e) - p.p.z) < 10) {
+    const sc = Math.sign(p.p.x) || 1, a = poste === 'pivot' ? 12.5 : 10.3, x = -sc * (poste === 'pivot' ? 1 : 2.6);
+    it.regard = m.balle.p; j.intention = poste === 'pivot' ? 'poteau' : 'penalty';
+    return { cx: x, cz: zDe(j.e, a), vmax: 6.4 };
+  }
+  if ((poste === 'pivot' || poste === 'aileFaible') && p && p.e === j.e) {
+    const P = appelProfondeur(m, j, p, phase);
+    if (P) { it.regard = m.balle.p; j.intention = 'profondeur'; return { cx: P.x, cz: P.z, vmax: 7.0 }; }
+  }
+  const a = appel(m, j, cx, cz, p, poste === 'fixo');
+  j.intention = poste === 'fixo' ? 'soutien' : poste === 'aileBalle' ? 'ecartement' : poste === 'pivot' ? 'pivot' : 'diagonale';
   if (!a) return { cx, cz, vmax };
   const tete = p && (hypot(p.v.x, p.v.z) < 3.5 || (p.decision ?? 1) < 0.2);
-  // (le pas de course de l'appel : 5,4 m/s, l'allure propre du clip de course ; au sprint quand le porteur relève la tête)
-  return { cx: a.x, cz: a.z, vmax: tete ? 6.2 : 5.4 };
+  // (le pas de course de l'appel : 5,4 m/s, l'allure propre du clip de course ; au sprint quand le porteur relève la
+  // tête, et en transition offensive)
+  return { cx: a.x, cz: a.z, vmax: phase === 'transOff' ? 7.0 : tete ? 6.2 : 5.4 };
 }
 const b0 = (m) => m.balle;
 
-function appel(m, j, cx0, cz0, p) {
+/**
+ * (bola-app#32, lot B) L'appel en profondeur (la relation « près / loin » du futsal) : le porteur a la tête levée
+ * (personne à moins de 2,6 m) ou l'équipe est en transition offensive ; il y a de l'espace dans le dos du dernier
+ * défenseur (2,5 m derrière lui, hors de la surface du gardien : 12,3 m au plus) ; personne d'autre ne court déjà.
+ * La course dure 1,6 s ; ensuite 2 s de repos. Le style règle sa fréquence (direct plus que court), tirée dans le flux
+ * « collectif ».
+ */
+function appelProfondeur(m, j, p, phase) {
+  if (j.prof && m.t < j.prof.t) return j.prof;
+  if (j.prof) { j.prof = null; j.profRepos = m.t + 2; }
+  if (m.t < (j.profRepos ?? -9)) return null;
+  const e = j.e;
+  const { d: dp } = adversaireProche(m, p);
+  if (dp < 2.6 && phase !== 'transOff') return null;
+  let aDer = -99;
+  for (const o of m.joueurs) if (o.e !== e && !o.gardien && !o.absent && o.mode !== 'sol') aDer = Math.max(aDer, av(e, o.p.z));
+  const cible = Math.min(12.3, aDer + 2.5), aJ = av(e, j.p.z);
+  if (cible < aJ + 2 || cible < av(e, p.p.z) + 3) return null;
+  for (const o of m.joueurs) if (o !== j && o.e === e && o.prof && m.t < o.prof.t) return null;
+  j.profRepos = m.t + 0.6;
+  if (m.rng.collectif.u() > 0.3 * styleDe(m, e).profondeur) return null;
+  const x = clamp(j.p.x * 0.7, -6.5, 6.5);
+  j.prof = { x, z: zDe(e, cible), t: m.t + 1.6 };
+  m.stats.profondeurs = (m.stats.profondeurs ?? 0) + 1;
+  m.ev('appel', { j: j.i, x, z: j.prof.z, profondeur: true });
+  return j.prof;
+}
+
+function appel(m, j, cx0, cz0, p, fixo = false) {
   if (m.t < (j.appelT ?? -9) && j.appel) return j.appel;
   j.appelT = m.t + 0.25;
   const b = m.balle, s = sens(j.e), zg = butDe(1 - j.e);
   const ox = p ? p.p.x : b.p.x, oz = p ? p.p.z : b.p.z;
+  const aB = av(j.e, oz);
   let best = null, bs = -Infinity;
-  for (let ix = -2; ix <= 2; ix++) for (let iz = -2; iz <= 2; iz++) {
+  for (let ix = -2; ix <= 2; ix++) for (let iz = fixo ? 0 : -2; iz <= (fixo ? 0 : 2); iz++) {
     const x = clamp(cx0 + ix * 2, -BX + 1.2, BX - 1.2), z = clamp(cz0 + iz * 2, -LB + 1.5, LB - 1.5);
+    // (le fixo reste derrière la balle : la passe en retrait, l'équilibre)
+    if (fixo && av(j.e, z) > aB - 3.5) continue;
     let dmin = 9, coupe = 0;
     for (const o of m.joueurs) {
       if (o.absent || o.e === j.e || o.mode === 'sol') continue;
       dmin = Math.min(dmin, hypot(o.p.x - x, o.p.z - z));
       if (!o.gardien && distSegment(o.p.x, o.p.z, ox, oz, x, z) < 1.2) coupe++;
     }
-    let sc = Math.min(dmin, 4) * 0.9 - coupe * 1.2 + (z - cz0) * s * 0.18 - hypot(x - cx0, z - cz0) * 0.12;
-    for (const o of m.joueurs) if (o !== j && !o.absent && o.e === j.e && !o.gardien) { const d = hypot(o.p.x - x, o.p.z - z); if (d < 3) sc -= (3 - d) * 0.6; }
+    let sc = Math.min(dmin, 4) * 0.9 - coupe * 1.2 + (fixo ? 0 : (z - cz0) * s * 0.18) - hypot(x - cx0, z - cz0) * 0.12;
+    for (const o of m.joueurs) if (o !== j && !o.absent && o.e === j.e && !o.gardien) { const d = hypot(o.p.x - x, o.p.z - z); if (d < 3.5) sc -= (3.5 - d) * 0.6; }
     if (hypot(x, z - zg) < 2.5) sc -= 2;
-    if (hypot(x - ox, z - oz) < 2.5) sc -= 1.5;
+    // (lot B) la distance de soutien : pas d'appel à moins de 4,5 m du porteur (avant : 2,5 m)
+    const dpo = hypot(x - ox, z - oz);
+    if (dpo < 4.5) sc -= (4.5 - dpo) * 0.7;
     if (sc > bs) { bs = sc; best = { x, z, sc }; }
   }
+  if (!best) return null;
   // (il ne change d'appel que pour un espace nettement meilleur, ou si le sien n'est plus près de son poste : pas
   // d'hésitation d'une case à l'autre)
   const garde = j.appel && hypot(j.appel.x - cx0, j.appel.z - cz0) < 4.5 && best && best.sc < (j.appel.sc ?? -Infinity) + 0.8;

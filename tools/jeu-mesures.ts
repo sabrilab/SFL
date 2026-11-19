@@ -11,13 +11,21 @@
 //   · passes « humaines » : un joueur simulé tient les Noirs à la manette (aide de la manette), passe à un coéquipier
 //     choisi au hasard en visant son corps au stick, d'un appui bref ; part des passes qui arrivent au receveur ;
 //   · gardien : la hauteur du pied le plus bas au-dessus du gazon hors plongeon (animateur et clips des .pak, comme
-//     tools/jeu-banc-anim.ts), max et moyenne, et la même mesure sur les joueurs de champ pour comparer.
+//     tools/jeu-banc-anim.ts), max et moyenne, et la même mesure sur les joueurs de champ pour comparer ;
+//   · (bola-app#32, lot B) IA contre IA, en plus : les joueurs qui courent vers la balle (vitesse > 3 m/s, à 2-12 m, la
+//     course à moins de 30° d'elle, le porteur exclu : la ruée), la part du temps où trois joueurs d'une même équipe ou
+//     plus sont à moins de 5 m de la balle, et les choix du porteur de l'IA (m.choixIA) ;
+//   · (lot B) tactiques : les Noirs avec un plan (pressing haut, équilibre, bloc bas) ou un style (court, direct) contre
+//     des Blancs en équilibre et jeu court, N matchs chacun (graines 1..N) : hauteur moyenne du bloc des Noirs quand les
+//     Blancs ont la balle (avancée moyenne de leurs 4 joueurs de champ, −15 m sur leur ligne de but), pressions (un Noir
+//     qui arrive à moins de 1,5 m du porteur Blanc), récupérations dans le camp adverse, passes, possession, tirs et buts.
 // Le bouton d'une action (passe, frappe) est lu dans entrees/touches.js (ligne « passe », « frappe ») : le banc suit
 // la table, il marche avant et après un changement de disposition.
 //
 //   npx tsx tools/jeu-mesures.ts                        tout (≈ 3 à 5 min)
 //   npx tsx tools/jeu-mesures.ts --reactivite           seulement la réactivité (quelques secondes)
 //   npx tsx tools/jeu-mesures.ts --ia=30 --passes=10 --gardien=2 --json=/chemin/mesures.json
+//   npx tsx tools/jeu-mesures.ts --tactiques=30           seulement les tactiques (≈ 2 min)
 import fs from 'node:fs';
 import path from 'node:path';
 import * as Clp from '../src/lib/jeu/sim/clips.js';
@@ -45,9 +53,9 @@ chargerMesures(fs.readFileSync(path.join(RACINE, 'public/jeu/anims/mesures.pak')
 
 const args = process.argv.slice(2);
 const arg = (k: string, def: number) => { const a = args.find((x) => x.startsWith(`--${k}=`)); return a ? +a.split('=')[1] : args.includes(`--${k}`) ? def : null; };
-const seulement = ['reactivite', 'ia', 'passes', 'gardien'].filter((k) => args.some((a) => a === `--${k}` || a.startsWith(`--${k}=`)));
+const seulement = ['reactivite', 'ia', 'passes', 'gardien', 'tactiques'].filter((k) => args.some((a) => a === `--${k}` || a.startsWith(`--${k}=`)));
 const faire = (k: string) => seulement.length === 0 || seulement.includes(k);
-const N_IA = arg('ia', 30) ?? 30, N_PASSES = arg('passes', 10) ?? 10, N_GARDIEN = arg('gardien', 2) ?? 2;
+const N_IA = arg('ia', 30) ?? 30, N_PASSES = arg('passes', 10) ?? 10, N_GARDIEN = arg('gardien', 2) ?? 2, N_TAC = arg('tactiques', 30) ?? 30;
 const jsonOut = args.find((a) => a.startsWith('--json='))?.split('=')[1] ?? null;
 const RES: Any = { date: new Date().toISOString(), commit: null, reactivite: {}, ia: null, passesHumaines: null, gardien: null };
 try { RES.commit = fs.readFileSync(path.join(RACINE, '.git'), 'utf8').trim(); } catch { /* worktree */ }
@@ -245,7 +253,7 @@ if (faire('reactivite')) {
 }
 
 // ─────────────────────────── IA contre IA ───────────────────────────
-type Suivi = { possessions: number[]; equipe: number; debut: number; proches: number; prochesN: number; passes: number; passesOk: number; passeEq: number };
+type Suivi = { possessions: number[]; equipe: number; debut: number; proches: number; prochesN: number; passes: number; passesOk: number; passeEq: number; versBalle: number; ruee: number };
 function suivreStats(m: Any, S: Suivi) {
   const b = m.balle;
   if (m.phase !== 'jeu') { if (S.equipe >= 0) { S.possessions.push(m.t - S.debut); S.equipe = -1; } }
@@ -254,8 +262,16 @@ function suivreStats(m: Any, S: Suivi) {
     const e = p ? p.e : b.garde != null ? m.joueurs[b.garde].e : S.equipe;
     if (e !== S.equipe) { if (S.equipe >= 0) S.possessions.push(m.t - S.debut); S.equipe = e; S.debut = m.t; }
     let n = 0;
-    for (const j of m.joueurs) if (!j.gardien && !j.absent && Math.hypot(j.p.x - b.p.x, j.p.z - b.p.z) < 5) n++;
+    const k5 = [0, 0];
+    for (const j of m.joueurs) if (!j.gardien && !j.absent && Math.hypot(j.p.x - b.p.x, j.p.z - b.p.z) < 5) { n++; k5[j.e]++; }
     S.proches += n; S.prochesN++;
+    // (bola-app#32, lot B) la ruée : ceux qui courent vers la balle ; trois d'une même équipe ou plus à moins de 5 m
+    if (k5[0] >= 3 || k5[1] >= 3) S.ruee++;
+    for (const j of m.joueurs) {
+      if (j.gardien || j.absent || j === p) continue;
+      const rx = b.p.x - j.p.x, rz = b.p.z - j.p.z, d = Math.hypot(rx, rz), sv = Math.hypot(j.v.x, j.v.z);
+      if (d > 2 && d < 12 && sv > 3 && (rx * j.v.x + rz * j.v.z) / (d * sv) > 0.87) S.versBalle++;
+    }
   }
   for (const ev of m.evts) {
     if (ev.type === 'passe') { if (S.passeEq >= 0) S.passes++; S.passeEq = m.joueurs[ev.j].e; }
@@ -263,13 +279,14 @@ function suivreStats(m: Any, S: Suivi) {
     else if (ev.type === 'tacleBalle' || ev.type === 'frappe' || ev.type === 'but' || ev.type === 'engagement' || ev.type === 'coupFranc') { if (S.passeEq >= 0) S.passes++; S.passeEq = -1; }
   }
 }
-const nouveauSuivi = (): Suivi => ({ possessions: [], equipe: -1, debut: 0, proches: 0, prochesN: 0, passes: 0, passesOk: 0, passeEq: -1 });
+const nouveauSuivi = (): Suivi => ({ possessions: [], equipe: -1, debut: 0, proches: 0, prochesN: 0, passes: 0, passesOk: 0, passeEq: -1, versBalle: 0, ruee: 0 });
 
 if (faire('ia')) {
   console.log(`IA contre IA : ${N_IA} matchs de 150 s (graines 1 à ${N_IA})`);
   const S = nouveauSuivi();
   const buts: number[] = [];
   let arrets = 0, tirs = 0, demandes = 0, essais = 0;
+  const choix: Record<string, number> = {};
   const t0 = Date.now();
   for (let g = 1; g <= N_IA; g++) {
     const m: Any = creerMonde({ graine: g, duree: 150, humains: [false, false], aides: [0, 0] });
@@ -278,6 +295,7 @@ if (faire('ia')) {
     if (S.equipe >= 0) { S.possessions.push(m.t - S.debut); S.equipe = -1; }
     buts.push(m.score[0] + m.score[1]);
     arrets += m.stats.arrets; tirs += m.stats.tirs; demandes += m.stats.demandes; essais++;
+    for (const [k, v] of Object.entries(m.choixIA ?? {})) choix[k] = (choix[k] ?? 0) + (v as number);
   }
   const butsT = buts.reduce((a, b) => a + b, 0);
   RES.ia = {
@@ -285,12 +303,77 @@ if (faire('ia')) {
     passesTentees: S.passes / N_IA, passesReussies: S.passesOk / N_IA, passesPct: (100 * S.passesOk) / (S.passes || 1),
     possessionsParMatch: S.possessions.length / N_IA, possessionMoy_s: moy(S.possessions), possessionMed_s: [...S.possessions].sort((a, b) => a - b)[Math.floor(S.possessions.length / 2)] ?? 0,
     prochesDuBallon5m: S.proches / (S.prochesN || 1),
+    versLaBalle: S.versBalle / (S.prochesN || 1), rueePct: (100 * S.ruee) / (S.prochesN || 1),
+    choixPorteurParMatch: Object.fromEntries(Object.entries(choix).sort((a, b) => b[1] - a[1]).map(([k, v]) => [k, v / N_IA])),
     tirsParMatch: tirs / N_IA, arretsParMatch: arrets / N_IA, arretsPct: (100 * arrets) / ((arrets + butsT) || 1),
     secondes: (Date.now() - t0) / 1000,
   };
   void demandes; void essais;
   const I = RES.ia;
-  console.log(`  buts/match ${I.butsParMatch.toFixed(2)} (${(I.sansBut * 100).toFixed(0)} % sans but) · passes ${I.passesTentees.toFixed(1)} tentées/match, réussies ${I.passesPct.toFixed(1)} % · possessions ${I.possessionsParMatch.toFixed(1)}/match, ${I.possessionMoy_s.toFixed(2)} s en moyenne (médiane ${I.possessionMed_s.toFixed(2)} s) · joueurs de champ à moins de 5 m du ballon ${I.prochesDuBallon5m.toFixed(2)} · tirs ${I.tirsParMatch.toFixed(1)}/match, arrêts ${I.arretsParMatch.toFixed(2)}/match (${I.arretsPct.toFixed(0)} % des tirs arrêtés ou marqués) · ${I.secondes.toFixed(0)} s`);
+  console.log(`  buts/match ${I.butsParMatch.toFixed(2)} (${(I.sansBut * 100).toFixed(0)} % sans but) · passes ${I.passesTentees.toFixed(1)} tentées/match, réussies ${I.passesPct.toFixed(1)} % · possessions ${I.possessionsParMatch.toFixed(1)}/match, ${I.possessionMoy_s.toFixed(2)} s en moyenne (médiane ${I.possessionMed_s.toFixed(2)} s) · joueurs de champ à moins de 5 m du ballon ${I.prochesDuBallon5m.toFixed(2)} · qui courent vers la balle ${(I.versLaBalle ?? 0).toFixed(2)} · trois d'une équipe à 5 m ${(I.rueePct ?? 0).toFixed(1)} % · tirs ${I.tirsParMatch.toFixed(1)}/match, arrêts ${I.arretsParMatch.toFixed(2)}/match (${I.arretsPct.toFixed(0)} % des tirs arrêtés ou marqués) · ${I.secondes.toFixed(0)} s`);
+}
+
+// ─────────────────────────── (bola-app#32, lot B) les tactiques ───────────────────────────
+if (faire('tactiques')) {
+  const CONF: [string, Any[]][] = [
+    ['pressing haut', [{ plan: 'pressing', style: 'court' }, { plan: 'equilibre', style: 'court' }]],
+    ['équilibre', [{ plan: 'equilibre', style: 'court' }, { plan: 'equilibre', style: 'court' }]],
+    ['bloc bas', [{ plan: 'blocBas', style: 'court' }, { plan: 'equilibre', style: 'court' }]],
+    ['jeu direct', [{ plan: 'equilibre', style: 'direct' }, { plan: 'equilibre', style: 'court' }]],
+  ];
+  console.log(`Tactiques : les Noirs avec chaque plan contre des Blancs en équilibre et jeu court, ${N_TAC} matchs chacun (graines 1 à ${N_TAC})`);
+  RES.tactiques = {};
+  for (const [nom, tac] of CONF) {
+    let hautH = 0, hautN = 0, pressionsHautes = 0, hauteur = 0, hauteurN = 0, pressions = 0, recupsHautes = 0, tempsNoirs = 0, tempsJeu = 0, passes = 0, passesOk = 0, profondeurs = 0, longues = 0;
+    const tirs = [0, 0], buts = [0, 0];
+    for (let g = 1; g <= N_TAC; g++) {
+      const m: Any = creerMonde({ graine: g, duree: 150, humains: [false, false], aides: [0, 0], tactiques: tac });
+      // (le plan est tenu tout le match, comme celui qu'un humain choisit à la croix : on mesure le plan, pas l'adaptation)
+      if (tac[0].plan !== 'equilibre' || tac[0].style === 'court') m.tactique[0].choisi = tac[0].plan;
+      demarrer(m, { intro: false });
+      let colle = false, passeEq = -1, avant: Any = null;
+      for (let i = 0; i < 180 * 120 && m.phase !== 'fin'; i++) {
+        pas(m);
+        if (m.phase === 'jeu') {
+          tempsJeu++;
+          const P = m.possession, p = porteur(m), b = m.balle;
+          if (P?.e === 0) tempsNoirs++;
+          if (P?.e === 1) {
+            let a = 0, n = 0;
+            for (const j of m.joueurs) if (j.e === 0 && !j.gardien && !j.absent) { a += j.p.z * sens(0); n++; }
+            hauteur += a / (n || 1); hauteurN++;
+            // (la balle dans la moitié des Blancs : leur relance ; c'est là que les plans se séparent)
+            const qb = p ?? (b.garde != null ? m.joueurs[b.garde] : b);
+            if (qb.p.z * sens(0) > 0) { hautH += a / (n || 1); hautN++; }
+          }
+          const proche = !!p && p.e === 1 && m.joueurs.some((j: Any) => j.e === 0 && !j.gardien && Math.hypot(j.p.x - p.p.x, j.p.z - p.p.z) < 1.5);
+          if (proche && !colle) { pressions++; if (p.p.z * sens(0) > 0) pressionsHautes++; }
+          colle = proche;
+          // (une récupération des Noirs : la possession leur revient, la balle dans le camp adverse)
+          if (avant === 1 && P?.e === 0 && b.p.z * sens(0) > 0) recupsHautes++;
+          avant = P?.e ?? avant;
+        }
+        for (const ev of m.evts) {
+          if (ev.type === 'frappe') tirs[m.joueurs[ev.j].e]++;
+          if (ev.type === 'but') buts[ev.e]++;
+          if (ev.type === 'elan' && m.joueurs[ev.j].e === 0 && /^profondeur/.test(ev.commande ?? '')) profondeurs++;
+          if (ev.type === 'elan' && m.joueurs[ev.j].e === 0 && (ev.commande === 'passePuissante' || /Lobe/.test(ev.commande ?? ''))) longues++;
+          if (ev.type === 'passe') { passeEq = m.joueurs[ev.j].e; if (passeEq === 0) passes++; }
+          else if ((ev.type === 'controle' || ev.type === 'capte') && passeEq >= 0) { if (passeEq === 0 && m.joueurs[ev.j].e === 0) passesOk++; passeEq = -1; }
+          else if (ev.type === 'tacleBalle' || ev.type === 'frappe' || ev.type === 'but' || ev.type === 'engagement' || ev.type === 'coupFranc') passeEq = -1;
+        }
+        m.evts.length = 0;
+      }
+    }
+    const R2 = {
+      hauteurBloc_m: hauteur / (hauteurN || 1), hauteurBlocRelanceAdverse_m: hautH / (hautN || 1), pressionsParMatch: pressions / N_TAC, pressionsCampAdverseParMatch: pressionsHautes / N_TAC, recupsCampAdverseParMatch: recupsHautes / N_TAC,
+      possessionNoirsPct: (100 * tempsNoirs) / (tempsJeu || 1), passesNoirsParMatch: passes / N_TAC, passesNoirsReussiesPct: (100 * passesOk) / (passes || 1),
+      profondeursParMatch: profondeurs / N_TAC, longuesParMatch: longues / N_TAC,
+      tirsPour: tirs[0] / N_TAC, tirsContre: tirs[1] / N_TAC, butsPour: buts[0] / N_TAC, butsContre: buts[1] / N_TAC,
+    };
+    RES.tactiques[nom] = R2;
+    console.log(`  ${nom.padEnd(14)} bloc à ${R2.hauteurBloc_m.toFixed(1)} m (${R2.hauteurBlocRelanceAdverse_m.toFixed(1)} m sur la relance adverse) · pressions ${R2.pressionsParMatch.toFixed(1)}/match (${R2.pressionsCampAdverseParMatch.toFixed(1)} dans le camp adverse) · récupérations dans le camp adverse ${R2.recupsCampAdverseParMatch.toFixed(1)} · possession ${R2.possessionNoirsPct.toFixed(0)} % · passes ${R2.passesNoirsParMatch.toFixed(1)} (${R2.passesNoirsReussiesPct.toFixed(0)} % réussies) · profondeurs ${R2.profondeursParMatch.toFixed(1)} · longues/lobées ${R2.longuesParMatch.toFixed(1)} · tirs ${R2.tirsPour.toFixed(1)} pour / ${R2.tirsContre.toFixed(1)} contre · buts ${R2.butsPour.toFixed(2)} / ${R2.butsContre.toFixed(2)}`);
+  }
 }
 
 // ─────────────────────────── passes « humaines » ───────────────────────────

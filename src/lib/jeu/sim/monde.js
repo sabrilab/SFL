@@ -40,7 +40,8 @@
 // Pendant le but et la fin, les corps se démêlent aussi. Une intention NaN ou infinie est remise à zéro à l'entrée. Le monde publie la liste des événements du pas (ev) pour le rendu, le son et
 // les vibrations ; la simulation n'en dépend pas.
 import { PAS, JEU, ROLES, ENGAGEMENT, BX, BZ, LB, butDe, sens, BALLON, TERRAIN } from './constantes.js';
-import { creerHasard } from './hasard.js';
+import { creerHasard, creerFlux } from './hasard.js';
+import { creerTactique, tactiqueTiree, majTactiques, choisirPlan } from './tactique.js';
 import { creerCorps, pasCorps, libre, lancerGeste, finirGeste, clamp, impactDe, duree } from './corps.js';
 import { creerBalle, pasBalle, antiBlocage, poserBalle } from './ballon.js';
 import { pasConduite, pasControle, demanderFrappe, pasDemande, pasFrappe, porteur, pasAnticipation, estFrappe, gestePrise } from './gestes.js';
@@ -54,7 +55,7 @@ import { exigerMesures, CLIPS } from './clips.js';
  * Crée un match. humains : [bool, bool] (une équipe jouée par un humain) ; aides : [aide0, aide1] (1 = pouce,
  * 0,5 = manette, 0 = IA) ; journal : une fonction (type, ...valeurs) pour le banc.
  */
-export function creerMonde({ graine = 1, duree = JEU.duree, humains = [true, false], aides = [1, 0], journal = null, presents = null } = {}) {
+export function creerMonde({ graine = 1, duree = JEU.duree, humains = [true, false], aides = [1, 0], journal = null, presents = null, tactiques = null } = {}) {
   // (les mesures des clips, public/jeu/anims/mesures.pak, doivent être chargées : sim/clips.js)
   exigerMesures();
   const joueurs = [];
@@ -82,6 +83,14 @@ export function creerMonde({ graine = 1, duree = JEU.duree, humains = [true, fal
     avantage: null,           // une faute notée : l'arbitre regarde l'avantage (pasAvantage)
     arret: null,              // un coup franc : la balle posée, les adversaires à 3 m (pasArret)
     passes: [],               // les deux dernières passes { de, a, t } (une-deux)
+    // (bola-app#32, lot B) la tactique de chaque équipe (sim/tactique.js) : « équilibre » et « jeu court » par défaut ;
+    // tactiques: 'graine' tire celle de chaque équipe de l'IA (flux « tactique ») ; ou [{ plan, style }, …]
+    tactique: [0, 1].map((e) => {
+      const t = Array.isArray(tactiques) ? tactiques[e] : null;
+      if (t) return creerTactique(t.plan, t.style);
+      return tactiques === 'graine' && !humains[e] ? tactiqueTiree(creerFlux(graine, `tactique${e}`)) : creerTactique();
+    }),
+    possession: null,         // (lot B) qui a la balle, depuis quand ; la perte et la récupération de chaque équipe
     _p0: { x: 0, y: 0, z: 0 },
     _phases: new Float64Array(joueurs.length),
   };
@@ -112,6 +121,8 @@ export function engagement(m, e) {
   }
   m.buteur = null;
   m.avantage = null; m.arret = null; m.ecart = null; m.passes.length = 0;
+  // (bola-app#32, lot B) l'engagement : l'équipe qui engage a la balle, sans transition en cours
+  m.possession = { e, t: m.t, perte: [-9, -9], recup: [-9, -9], pertePos: [null, null] };
 }
 
 /** Démarre le match (après l'écran d'attente) ; sans intro : le coup d'envoi tout de suite. */
@@ -841,10 +852,14 @@ export function pas(m, entrees = null) {
     const src = m.humains[e] ? entrees?.[e] : null;
     m.renfort[e] = !!src?.renfort; m.sortie[e] = !!src?.sortie;
     if (src?.changer) changerJoueur(m, e, src.changer === true ? null : src.changer);
+    // (bola-app#32, lot B) la croix de la manette (1 2 3 au clavier) : le plan de l'équipe
+    if (src?.tactique) choisirPlan(m, e, src.tactique);
   }
   // (bola-app#26, lot 2) un coup franc : la balle posée, chacun se place, puis le jeu reprend
   if (m.arret) { pasArret(m); return; }
   majControle(m);
+  // (lot B) la possession, les transitions, l'adaptation des plans au score et au temps
+  majTactiques(m, porteur(m));
   for (const j of m.joueurs) {
     const e = j.e;
     if (j.absent) continue;

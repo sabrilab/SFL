@@ -156,14 +156,17 @@ function appui(P: Any, bouton: number, n: number, autres?: (e: Any[]) => void) {
 {
   const P = partie(9);
   const evt = (t: string) => P.evts.some((e: Any) => e.type === t);
+  // (depuis que la balle ne traverse plus les corps, l'attaquant blanc placé devant au coup d'envoi la bloque : on
+  // l'écarte, le geste se joue balle au pied, sans adversaire sur la route ; bola-app#32, lot B : aussi pour le crochet,
+  // le presseur blanc attend maintenant à 3,6 m devant le porteur et lui reprend la balle du pied quand il lui fonce
+  // dessus de face — la récupération au pied du point 15 —, avant le coup de stick)
+  const ecarter = () => { const o = P.m.joueurs[9]; o.p.x = 7; o.p.z = 6; };
+  ecarter();
   P.images(40, (e) => { e[0].ax[0] = 1; });
   // coup sec vers le haut de l'écran
   for (let i = 0; i < 10; i++) P.image((e) => { e[0].ax[0] = 1; e[0].ax[3] = i < 5 ? -1 : 0; });
   P.images(40, (e) => { e[0].ax[0] = 1; });
   const crochet = evt('crochet');
-  // (depuis que la balle ne traverse plus les corps, l'attaquant blanc placé devant au coup d'envoi la bloque : on
-  // l'écarte, le geste se joue balle au pied, sans adversaire sur la route)
-  const ecarter = () => { const o = P.m.joueurs[9]; o.p.x = 7; o.p.z = 6; };
   engagement(P.m, 0); P.m.phase = 'jeu'; ecarter();
   P.images(40, (e) => { e[0].ax[0] = 1; });
   // demi-cercle : du bas, par la droite, vers le haut
@@ -196,7 +199,9 @@ function appui(P: Any, bouton: number, n: number, autres?: (e: Any[]) => void) {
   const j = () => P.m.joueurs[P.m.controle[0]];
   const p = porteur(P.m);
   const d0 = p ? Math.hypot(p.p.x - j().p.x, p.p.z - j().p.z) : 0;
-  P.images(40, (e) => { e[0].b.fill(0); e[0].b[K.A] = 1; e[0].b[K.RB] = 1; e[0].b[K.Y] = 1; });
+  // (bola-app#32, lot B : le porteur de l'IA choisit vite, et à l'engagement il joue souvent la passe de sécurité au fixo ;
+  // on mesure ici la course du presseur vers le porteur, pas le choix du porteur : sa décision est retenue pendant l'essai)
+  P.images(40, (e) => { e[0].b.fill(0); e[0].b[K.A] = 1; e[0].b[K.RB] = 1; e[0].b[K.Y] = 1; const pp = porteur(P.m); if (pp) pp.decision = 9; });
   const renfort = P.m.renfort[0], sortie = P.m.sortie[0];
   const q = porteur(P.m) ?? P.m.balle;
   const d1 = Math.hypot((q.p?.x ?? q.p.x) - j().p.x, (q.p?.z ?? q.p.z) - j().p.z);
@@ -278,7 +283,10 @@ function deuxManettes(graine: number) {
   // (bola-app#32, lot A2 : le geste de chaque commande — son clip, son élan, son rythme, 0,17 à 0,3 s pour l'IA au lieu de
   // 0,22 s partout —, le gardien qui plonge même tard et sort dans les pieds, les trois issues du tacle glissé et sa
   // portée selon la course, le tacle debout sans tirage au sort changent le match de l'IA ; 7fcad362 au lot A)
-  const REF = '59097628';
+  // (bola-app#32, lot B : l'IA du foot à 5 — postes du losange qui tournent, bloc de zone selon le plan, presseur qui
+  // attend hors de sa zone, porteur qui choisit sur des critères, tacles à bon escient, tireur du coup franc qui le
+  // joue de son point, rond de 7 m autour de la balle, plans plus marqués — change le match de l'IA ; 59097628 au lot A2)
+  const REF = 'b385be9a';
   verifier('IA contre IA inchangée (graine 7)', empreinte(m) === REF, `${empreinte(m)} (attendu ${REF}, celle du banc physique)`);
 }
 
@@ -372,9 +380,10 @@ const { TOUCHES, touchesMarkdown }: Any = Tch;
 
 // ── le tableau des touches, ligne par ligne, à la manette et au clavier ──
 type Image = { b?: string[]; ls?: [number, number]; rs?: [number, number] };
-const BTN: Record<string, number> = { A: K.A, B: K.B, X: K.X, Y: K.Y, LB: K.LB, RB: K.RB, LT: K.LT, RT: K.RT, R3: K.R3 };
+// (bola-app#32, lot B : la croix, la tactique ; au clavier 1 ↑, 2 ←, 3 ↓)
+const BTN: Record<string, number> = { A: K.A, B: K.B, X: K.X, Y: K.Y, LB: K.LB, RB: K.RB, LT: K.LT, RT: K.RT, R3: K.R3, HAUT: K.HAUT, BAS: K.BAS, GAUCHE: K.GAUCHE };
 // (bola-app#32 : Espace = B / ○, S = X / □)
-const TOUCHE: Record<string, string> = { A: 'd', B: ' ', X: 's', Y: 'f', LB: 'q', RB: 'r', LT: 'c', RT: 'shift', R3: 'u' };
+const TOUCHE: Record<string, string> = { A: 'd', B: ' ', X: 's', Y: 'f', LB: 'q', RB: 'r', LT: 'c', RT: 'shift', R3: 'u', HAUT: '1', GAUCHE: '2', BAS: '3' };
 /** n images identiques. */
 const tenir = (n: number, im: Image = {}): Image[] => Array.from({ length: n }, () => im);
 /** Les touches tenues qui font cette image au clavier (I J K L relatives au joueur de cap « cap »). */
@@ -446,6 +455,8 @@ function jouerSuite(S: Situation, suite: Image[], appareil: 'pad' | 'clavier', a
     }
     if (c.dernier && c.dernier !== dernier) { dernier = c.dernier; actions.push({ ...dernier }); }
     const ch = c.changer;
+    // (bola-app#32, lot B : le choix de tactique à la croix est une action de la table, comme changer)
+    if (c.tactique) actions.push({ type: 'tactique', plan: c.tactique });
     for (let k = 0; k < 2; k++) {
       pas(m, [intentionDe(c), null]);
       for (const ev of m.evts) evts.push(ev);
@@ -507,6 +518,10 @@ const ESSAIS: Record<string, { S: Situation; suite: Image[]; ev?: string | ((r: 
   recuperer: { S: { defense: true }, suite: appuyer(['B'], 3), ev: (r) => r.gestes.includes('tacleDebout') && !r.gestes.includes('tacle') },
   changer: { S: { defense: true, fixe: false, partenaire: [3, 3, 0] }, suite: appuyer(['LB'], 3), ev: 'changer' },
   choisir: { S: { defense: true, fixe: false, partenaire: [3, 3, 0] }, suite: [...tenir(4, { rs: [0, -1] }), ...tenir(3)], ev: 'changer' },
+  // (bola-app#32, lot B) la croix : le plan de l'équipe change, la simulation le publie (événement « tactique »)
+  tactiquePressing: { S: {}, suite: appuyer(['HAUT'], 3), ev: (r) => r.evts.some((e: Any) => e.type === 'tactique' && e.plan === 'pressing' && e.e === 0) && r.m.tactique[0].plan === 'pressing', verif: (a) => a.plan === 'pressing' },
+  tactiqueEquilibre: { S: { defense: true }, suite: [...appuyer(['HAUT'], 3), ...appuyer(['GAUCHE'], 3)], ev: (r) => r.m.tactique[0].plan === 'equilibre' && r.m.tactique[0].choisi === 'equilibre', verif: (a) => a.plan === 'pressing' || a.plan === 'equilibre' },
+  tactiqueBlocBas: { S: { defense: true }, suite: appuyer(['BAS'], 3), ev: (r) => r.m.tactique[0].plan === 'blocBas', verif: (a) => a.plan === 'blocBas' },
 };
 // (changer en attaque : la balle libre près de nous, LB)
 ESSAIS.changerA.suite = appuyer(['LB'], 3);

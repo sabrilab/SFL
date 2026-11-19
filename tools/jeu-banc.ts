@@ -1254,19 +1254,25 @@ const balleA = (m: Any, x: number, z: number, vx = 0, vz = 0, pos: number | null
     // l'herbe : un vrai tacle glissé de la simulation (hauteur de hanche mesurée sur le clip) laisse une trace ; un
     // joueur debout ou qui marche n'en laisse pas
     const { hancheA }: Any = Crp2;
-    const m: Any = creerMonde({ graine: 3, humains: [false, false], aides: [0, 0] }); demarrer(m, { intro: false });
-    let traces = 0, glisses = 0, faux = 0; const fauxNoms = new Set<string>(); const etats: Any[] = m.joueurs.map(() => ({}));
-    for (let i = 0; i < 120 * 150; i++) {
-      pas(m); m.evts.length = 0; if (i % 2) continue;
-      for (const j of m.joueurs) {
-        const h = j.g && (j.mode === 'geste' || j.mode === 'sol') ? hancheA(j.g.nom, j.g.t) : 0.95;
-        const T = traceGlisse(etats[j.i], { x: j.p.x, y: h, z: j.p.z }, m.t);
-        if (T) { traces++; if (j.g?.nom === 'slide' || j.g?.nom === 'c_slide' || /fall|trip|volley|bicycle|k_block|k_low|k_high|k_dive/.test(j.g?.nom ?? '')) glisses++; else { faux++; fauxNoms.add(`${j.mode}:${j.g?.nom ?? '-'}`); } }
+    // (bola-app#32, lot B : l'IA tacle à bon escient — glissé seulement de côté ou de dos, jamais dans sa surface, pas
+    // en série, point 15 — et le match de la graine 3 peut ne plus en compter aucun : on joue les graines 3 à 6 jusqu'à
+    // trouver des traits ; les traits fautifs sont comptés sur tous les matchs joués)
+    let traces = 0, glisses = 0, faux = 0; const fauxNoms = new Set<string>();
+    for (let g = 3; g <= 6 && traces === 0; g++) {
+      const m: Any = creerMonde({ graine: g, humains: [false, false], aides: [0, 0] }); demarrer(m, { intro: false });
+      const etats: Any[] = m.joueurs.map(() => ({}));
+      for (let i = 0; i < 120 * 150; i++) {
+        pas(m); m.evts.length = 0; if (i % 2) continue;
+        for (const j of m.joueurs) {
+          const h = j.g && (j.mode === 'geste' || j.mode === 'sol') ? hancheA(j.g.nom, j.g.t) : 0.95;
+          const T = traceGlisse(etats[j.i], { x: j.p.x, y: h, z: j.p.z }, m.t);
+          if (T) { traces++; if (j.g?.nom === 'slide' || j.g?.nom === 'c_slide' || /fall|trip|volley|bicycle|k_block|k_low|k_high|k_dive/.test(j.g?.nom ?? '')) glisses++; else { faux++; fauxNoms.add(`${j.mode}:${j.g?.nom ?? '-'}`); } }
+        }
       }
     }
     const e2: Any = {}; let marche = 0; for (let i = 0; i < 60; i++) if (traceGlisse(e2, { x: 0, y: 0.95, z: i * 0.05 }, i / 60)) marche++;
     const e3: Any = {}; let lent = 0; for (let i = 0; i < 60; i++) if (traceGlisse(e3, { x: 0, y: 0.2, z: i * 0.01 }, i / 60)) lent++;
-    verifier('Herbe qui marque', traces > 0 && faux === 0 && marche === 0 && lent === 0, `${traces} traits peints sur un match IA (${glisses} de glissades, chutes, ciseaux et retournés, ${faux} ailleurs${faux ? ' : ' + [...fauxNoms].join(', ') : ''}) ; joueur debout qui court : ${marche} ; corps au sol presque immobile : ${lent}`);
+    verifier('Herbe qui marque', traces > 0 && faux === 0 && marche === 0 && lent === 0, `${traces} traits peints (matchs IA des graines 3 à 6, arrêtés au premier qui en peint) (${glisses} de glissades, chutes, ciseaux et retournés, ${faux} ailleurs${faux ? ' : ' + [...fauxNoms].join(', ') : ''}) ; joueur debout qui court : ${marche} ; corps au sol presque immobile : ${lent}`);
   }
 
   // ── le son (le plan, sans navigateur) et la police ──

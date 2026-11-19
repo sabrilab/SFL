@@ -1,7 +1,8 @@
 // Le clavier (bola-app#26, lot 3) : une manette faite de touches. Les touches tenues deviennent un état de manette
 // rangé dans l'ordre standard (entrees/commande.js), que lit la même commande que les vraies manettes : à séquence
 // égale, intention égale (le banc le vérifie). La table est dans entrees/touches.js (BOUTONS_CLAVIER) :
-//   flèches stick gauche, Maj RT, D A, Espace ou E B, S X, F Y, Q LB, R RB, C LT, U R3, I J K L stick droit.
+//   flèches stick gauche, Maj RT, D A, Espace ou E B, S X, F Y, Q LB, R RB, C LT, U R3, I J K L stick droit,
+//   1 2 3 la croix (↑ ← ↓ : la tactique).
 // I J K L sont RELATIVES AU JOUEUR, comme les gestes : I devant lui, K derrière, J sa gauche, L sa droite (on ne
 // cherche pas où il regarde à l'écran) ; la page passe le cap du joueur tenu, et l'état de manette rendu est le stick
 // d'écran qui va dans cette direction.
@@ -11,7 +12,8 @@
 // La pause (Échap, P) reste lue par match.js.
 
 // (bola-app#32 : Espace et E = ○ / B, la frappe ; S = □ / X, le centre et le tacle ; avant : Espace = X, S = B)
-const BOUTON = { d: 0, ' ': 1, e: 1, s: 2, f: 3, q: 4, r: 5, c: 6, shift: 7, u: 11 };
+// (bola-app#32, lot B : 1 2 3 = la croix ↑ ← ↓, le plan de l'équipe : pressing haut, équilibre, bloc bas)
+const BOUTON = { d: 0, ' ': 1, e: 1, s: 2, f: 3, q: 4, r: 5, c: 6, shift: 7, u: 11, 1: 12, 2: 14, 3: 13 };
 const AXES = { arrowleft: [0, -1], arrowright: [0, 1], arrowup: [1, -1], arrowdown: [1, 1] };
 const DROIT = { i: [1, 0], k: [-1, 0], j: [0, 1], l: [0, -1] }; // [devant, gauche] du joueur
 export const TOUCHES_JEU = new Set([...Object.keys(BOUTON), ...Object.keys(AXES), ...Object.keys(DROIT)]);

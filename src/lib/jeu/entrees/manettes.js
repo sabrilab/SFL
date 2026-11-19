@@ -103,6 +103,7 @@ export function creerManettes({ versJeu = (sx, sy) => ({ x: -sy, z: -sx }) } = {
   const places = []; // { cle, index, id, marque, reconnue, branchee, equipe, ancienne, cmd, etat, prec, gx, choc }
   let mode = 'repos';
   let version = 0, instant = null;
+  let activite = -Infinity; // (bola-app#32, lot B) l'heure du dernier vrai geste de jeu d'une manette, en match
   const abonnes = new Set();
   const api = { surSalon: null, surDemarrer: null, surPause: null, surTouches: null, surPasser: null };
 
@@ -171,6 +172,10 @@ export function creerManettes({ versJeu = (sx, sy) => ({ x: -sy, z: -sx }) } = {
       if (mode === 'salon') salon(p, bas, gauche, droite);
       else if (mode === 'repos') { if (bas(K.A) || bas(K.MENU)) api.surSalon?.(); }
       else if (mode === 'match' && M) {
+        // (bola-app#32, lot B) un vrai geste de jeu (une touche, sauf Menu et Vue ; un stick poussé) : l'heure est gardée,
+        // c'est ce qui rend la main à un humain pendant « IA contre IA » (match.js)
+        for (let i = 0; i < 16; i++) if (i !== K.MENU && i !== K.VUE && bas(i)) activite = t;
+        if (Math.hypot(p.etat.ax[0], p.etat.ax[1]) > 0.5 || Math.hypot(p.etat.ax[2], p.etat.ax[3]) > 0.5) activite = t;
         // (bola-app#26, lot 4) A / ✕ passe le ralenti du but (match.js ne l'écoute que pendant le ralenti)
         if (bas(K.A)) api.surPasser?.();
         if (p.equipe != null) {
@@ -240,6 +245,8 @@ export function creerManettes({ versJeu = (sx, sy) => ({ x: -sy, z: -sx }) } = {
     /** 'repos' | 'salon' | 'match' */
     mode: (m) => { if (m && m !== mode) { mode = m; for (const p of places) oublier(p.cmd); changer(); } return mode; },
     reconnues: () => places.filter((p) => p.branchee && p.reconnue).length,
+    /** (bola-app#32, lot B) l'heure (s, celle de lire) du dernier vrai geste de jeu d'une manette en match */
+    activite: () => activite,
     abonner: (f) => { abonnes.add(f); return () => abonnes.delete(f); },
     instantane,
     /** une manette rangée dans une équipe est-elle branchée ? (sinon la pause ne peut pas être levée par elle) */
