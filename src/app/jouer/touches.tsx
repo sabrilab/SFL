@@ -9,6 +9,8 @@
 // boutons ronds, gâchettes et bumpers en pastilles, sticks en socle pointillé et tête pleine, fléchés, touches du clavier en cabochons) puis
 // le nom de l'action. Les flèches des gestes sont relatives au joueur (↑ devant lui). En paysage, deux colonnes.
 // Inter, noir et blanc. Aucun texte d'aide : le nom de chaque action seulement.
+// (bola-app#32, lot C) Les mêmes dessins servent au panneau des touches du match (./panneau-touches.tsx), en petit
+// (Boutons petit) ; la croix de la manette (la tactique) est dessinée, les chiffres du clavier sont des cabochons.
 
 import { useState } from "react";
 import { cn } from "@/lib/utils";
@@ -24,10 +26,10 @@ const FACE = new Set(["A", "B", "X", "Y", "✕", "○", "□", "△"]);
 const EPAULE = new Set(["LB", "RB", "LT", "RT", "L1", "R1", "L2", "R2", "Menu", "Options", "Vue", "Share"]);
 const STICK = new Set(["LS", "RS", "R3"]);
 const FLECHES = new Set(["↑", "↓", "←", "→", "←/→", "◠", "◡◠"]);
-const CLAVIER = /^([A-Z]|Espace|Maj|Échap|flèches)$/;
+const CLAVIER = /^([A-Z0-9]|Espace|Maj|Échap|flèches)$/;
 
 /** Un bouton de face : rond ; les symboles PlayStation sont dessinés. */
-function Face({ k }: { k: string }) {
+function Face({ k, petit }: { k: string; petit?: boolean }) {
   const sym =
     k === "✕" ? <path d="M8.6 8.6 L15.4 15.4 M15.4 8.6 L8.6 15.4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
     : k === "○" ? <circle cx="12" cy="12" r="4.1" fill="none" stroke="currentColor" strokeWidth="1.7" />
@@ -35,7 +37,7 @@ function Face({ k }: { k: string }) {
     : k === "△" ? <path d="M12 7.6 L16.4 15.4 H7.6 Z" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
     : <text x="12" y="16.2" textAnchor="middle" fontSize="11.5" fontWeight="800" fill="currentColor" fontFamily="var(--font-inter), system-ui, sans-serif">{k}</text>;
   return (
-    <svg viewBox="0 0 24 24" className="h-[26px] w-[26px] shrink-0" aria-label={k}>
+    <svg viewBox="0 0 24 24" className={cn("shrink-0", petit ? "h-[19px] w-[19px]" : "h-[26px] w-[26px]")} aria-label={k}>
       <circle cx="12" cy="12" r="10.6" fill="none" stroke="currentColor" strokeWidth="1.5" />
       {sym}
     </svg>
@@ -43,21 +45,27 @@ function Face({ k }: { k: string }) {
 }
 
 /** Une gâchette, un bumper, Menu ou Vue : une pastille au nom du bouton. */
-function Pastille({ k }: { k: string }) {
+function Pastille({ k, petit }: { k: string; petit?: boolean }) {
   const gachette = /^(LT|RT|L2|R2)$/.test(k);
   return (
-    <span className={cn("inline-flex h-[24px] min-w-[34px] items-center justify-center border-[1.5px] border-white px-1.5 text-[11px] font-extrabold tracking-[0.04em]", gachette ? "rounded-t-[11px] rounded-b-[4px]" : "rounded-[6px]")}>
+    <span
+      className={cn(
+        "inline-flex items-center justify-center border-white font-extrabold tracking-[0.04em]",
+        petit ? "h-[17px] min-w-[25px] border-[1.25px] px-1 text-[9px]" : "h-[24px] min-w-[34px] border-[1.5px] px-1.5 text-[11px]",
+        gachette ? (petit ? "rounded-t-[8px] rounded-b-[3px]" : "rounded-t-[11px] rounded-b-[4px]") : petit ? "rounded-[4px]" : "rounded-[6px]",
+      )}
+    >
       {k}
     </span>
   );
 }
 
 /** Un stick : un socle en pointillé et une tête pleine à sa lettre (L, R ; R3 : cliqué), une flèche s'il est poussé. */
-function Stick({ k, fleche }: { k: string; fleche?: string }) {
+function Stick({ k, fleche, petit }: { k: string; fleche?: string; petit?: boolean }) {
   const rot = fleche === "↓" ? 180 : fleche === "←" ? -90 : fleche === "→" ? 90 : 0;
   const trait = { fill: "none", stroke: "currentColor", strokeWidth: 1.7, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
   return (
-    <svg viewBox="0 0 34 34" className="h-[30px] w-[30px] shrink-0" aria-label={k}>
+    <svg viewBox="0 0 34 34" className={cn("shrink-0", petit ? "h-[22px] w-[22px]" : "h-[30px] w-[30px]")} aria-label={k}>
       {/* (le socle en pointillé, la tête du stick pleine, à sa lettre : on ne le confond pas avec ○) */}
       <circle cx="17" cy="17" r="11" fill="none" stroke="currentColor" strokeWidth="1.2" strokeDasharray="2 2.4" />
       <circle cx="17" cy="17" r="5" fill="currentColor" />
@@ -79,39 +87,63 @@ function Stick({ k, fleche }: { k: string; fleche?: string }) {
 }
 
 /** Une touche du clavier : un cabochon. */
-function Cabochon({ k }: { k: string }) {
+function Cabochon({ k, petit }: { k: string; petit?: boolean }) {
   const large = k.length > 1;
   return (
-    <span className={cn("inline-flex h-[25px] items-center justify-center rounded-[5px] border-[1.5px] border-white border-b-[3px] text-[11.5px] font-extrabold", large ? "px-2" : "w-[25px]")}>
+    <span
+      className={cn(
+        "inline-flex items-center justify-center border-white font-extrabold",
+        petit ? "h-[18px] rounded-[4px] border-[1.25px] border-b-[2.5px] text-[9.5px]" : "h-[25px] rounded-[5px] border-[1.5px] border-b-[3px] text-[11.5px]",
+        large ? (petit ? "px-1.5" : "px-2") : petit ? "w-[18px]" : "w-[25px]",
+      )}
+    >
       {k === "flèches" ? "← ↑ ↓ →" : k}
     </span>
   );
 }
 
-/** Les boutons d'une ligne, dessinés ; les mots de liaison (+, puis, tenu…) en gris, d'un seul tenant. */
-export function Boutons({ texte, appareil }: { texte: string; appareil: Appareil }) {
+/** (bola-app#32, lot C) La croix de la manette : quatre branches, celle qui est poussée pleine (aucune : toutes au trait). */
+function Croix({ fleche, petit }: { fleche?: string; petit?: boolean }) {
+  const plein = (d: string) => fleche === d || (fleche === "←/→" && (d === "←" || d === "→"));
+  const branche = (d: string, x: number, y: number, w: number, h: number) => (
+    <rect key={d} x={x} y={y} width={w} height={h} rx="1.2" fill={plein(d) ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.3" />
+  );
+  return (
+    <svg viewBox="0 0 24 24" className={cn("shrink-0", petit ? "h-[19px] w-[19px]" : "h-[26px] w-[26px]")} aria-label="croix">
+      {branche("↑", 9, 2.5, 6, 7)}
+      {branche("↓", 9, 14.5, 6, 7)}
+      {branche("←", 2.5, 9, 7, 6)}
+      {branche("→", 14.5, 9, 7, 6)}
+    </svg>
+  );
+}
+
+/** Les boutons d'une ligne, dessinés ; les mots de liaison (+, puis, tenu…) en gris, d'un seul tenant. petit : la taille
+ *  du panneau des touches du match. */
+export function Boutons({ texte, appareil, petit }: { texte: string; appareil: Appareil; petit?: boolean }) {
   if (texte === "—") return <span className="text-white/30">—</span>;
   // « RS ↑ » : un stick fléché ; « RS ◠ » : un stick et son quart de cercle ; « J / L » : deux cabochons
   const mots = texte.split(" ");
   const out: React.ReactNode[] = [];
   let gris: string[] = [];
   const vider = (k: number) => {
-    if (gris.length) out.push(<span key={`g${k}`} className="whitespace-nowrap text-[12.5px] font-semibold text-white/55">{gris.join(" ")}</span>);
+    if (gris.length) out.push(<span key={`g${k}`} className={cn("whitespace-nowrap font-semibold text-white/55", petit ? "text-[10px]" : "text-[12.5px]")}>{gris.join(" ")}</span>);
     gris = [];
   };
   for (let i = 0; i < mots.length; i++) {
     const m = mots[i];
     let el: React.ReactNode = null;
     if (m === "+" || m === "/") el = <span key={i} className="text-white/45">{m}</span>;
-    else if (appareil === "clavier") { if (CLAVIER.test(m)) el = <Cabochon key={i} k={m} />; }
-    else if (FACE.has(m)) el = <Face key={i} k={m} />;
-    else if (EPAULE.has(m)) el = <Pastille key={i} k={m} />;
-    else if (STICK.has(m)) el = <Stick key={i} k={m} fleche={FLECHES.has(mots[i + 1] ?? "") ? mots[++i] : undefined} />;
-    else if (FLECHES.has(m)) el = <Stick key={i} k="RS" fleche={m} />;
+    else if (appareil === "clavier") { if (CLAVIER.test(m)) el = <Cabochon key={i} k={m} petit={petit} />; }
+    else if (m === "croix") el = <Croix key={i} petit={petit} fleche={FLECHES.has(mots[i + 1] ?? "") ? mots[++i] : undefined} />;
+    else if (FACE.has(m)) el = <Face key={i} k={m} petit={petit} />;
+    else if (EPAULE.has(m)) el = <Pastille key={i} k={m} petit={petit} />;
+    else if (STICK.has(m)) el = <Stick key={i} k={m} petit={petit} fleche={FLECHES.has(mots[i + 1] ?? "") ? mots[++i] : undefined} />;
+    else if (FLECHES.has(m)) el = <Stick key={i} k="RS" petit={petit} fleche={m} />;
     if (el) { vider(i); out.push(el); } else gris.push(m);
   }
   vider(mots.length);
-  return <span className="inline-flex flex-wrap items-center justify-end gap-1.5">{out}</span>;
+  return <span className={cn("inline-flex flex-wrap items-center", petit ? "gap-1" : "justify-end gap-1.5")}>{out}</span>;
 }
 
 function Choix<T extends string>({ valeur, options, onChoix }: { valeur: T; options: { id: T; titre: string }[]; onChoix: (v: T) => void }) {

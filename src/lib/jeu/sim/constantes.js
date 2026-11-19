@@ -24,6 +24,10 @@ export const BZ = TERRAIN.TL / 2;         // panneaux du fond : 16 m
 export const BUT_DL = TERRAIN.but[0] / 2; // demi-largeur du but
 export const BUT_H = TERRAIN.but[1];
 export const BUT_P = TERRAIN.but[2];
+// (bola-app#32, lot C) le cadre du filet, vu de côté (celui des tubes du plateau, plateau-code.js, mesuré sur le GLB) :
+// le toit part de la barre (0 ; 2 m) et descend jusqu'au coin (0,54 m derrière la ligne ; 1,6 m), le fond descend de ce
+// coin jusqu'au sol, à 0,9 m derrière la ligne
+export const BUT_COIN = [TERRAIN.but[2] * 0.6, TERRAIN.but[1] * 0.8];
 export const HAUT_FILET = TERRAIN.panneau + TERRAIN.filet; // 6,15 m
 
 // ── les corps ──
@@ -73,6 +77,11 @@ export const BALLON = {
   panneauE: 0.66, panneauPente: 0.006, panneauMin: 0.45, panneauT: 0.15,
   filetE: 0.15, filetT: 0.5,
   filetBut: 0.10,
+  // (bola-app#32, lot C) la poche du filet, pour une balle entrée dans le but : le filet cède (ressort amorti au-delà du
+  // critique, pulsation w s⁻¹, amortissement zeta : elle ne rebondit pas), la retient (frot : la maille agrippe la balle,
+  // 1/s ; la rotation meurt) puis la laisse retomber ; jusqu'à fond / cote / toit m au-delà du cadre au repos, et jamais
+  // à plus de mur m derrière la ligne (le panneau du fond est à 1 m)
+  poche: { w: 30, zeta: 1.35, fond: 0.34, cote: 0.22, toit: 0.24, frot: 7, rotation: 6, mur: 0.87 },
   poteauR: 0.05, poteauE: 0.55,
   vMax: 30,
 };

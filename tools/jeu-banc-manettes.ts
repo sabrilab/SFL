@@ -286,7 +286,10 @@ function deuxManettes(graine: number) {
   // (bola-app#32, lot B : l'IA du foot à 5 — postes du losange qui tournent, bloc de zone selon le plan, presseur qui
   // attend hors de sa zone, porteur qui choisit sur des critères, tacles à bon escient, tireur du coup franc qui le
   // joue de son point, rond de 7 m autour de la balle, plans plus marqués — change le match de l'IA ; 59097628 au lot A2)
-  const REF = 'b385be9a';
+  // (bola-app#32, lot C, point 8 « le ballon reste accroché de manière réaliste » : la balle marquée est retenue par la
+  // poche du filet au lieu de rebondir sur un plan dur, ce qui change la fin de chaque but, donc l'empreinte d'un match
+  // qui en a ; b385be9a au lot B ; la même que celle du banc physique, jeu-banc « Ralenti »)
+  const REF = 'f0095cf5';
   verifier('IA contre IA inchangée (graine 7)', empreinte(m) === REF, `${empreinte(m)} (attendu ${REF}, celle du banc physique)`);
 }
 
@@ -792,6 +795,40 @@ ESSAIS.changerA.suite = appuyer(['LB'], 3);
   const { TOUCHES_JEU }: Any = Clv;
   const libre = !TOUCHES_JEU.has('m') && !TOUCHES_JEU.has('enter');
   verifier('ralenti passé à la manette, son coupé au clavier', salon === 0 && tenu === 2 && libre, `A dans le salon : ${salon} ; deux appuis de A en match (tenus 2 images) : ${tenu} ; M et Entrée libres dans le tableau du clavier : ${libre ? 'oui' : 'NON'}`);
+}
+// ── (bola-app#32, lot C) le panneau des touches du match lit la même table, et Vue / Share le masque ──
+{
+  const PH = ['attaque', 'libre', 'defense'];
+  const ecarts: string[] = [];
+  const MOD = /^(L1|R1|R2|L2) \+ (.+)$/;
+  for (const l of TOUCHES.filter((x: Any) => x.panneau)) {
+    if (!l.court) ecarts.push(`${l.id} sans nom court`);
+    for (const ph of Object.keys(l.panneau)) {
+      if (!PH.includes(ph)) ecarts.push(`${l.id} : phase « ${ph} »`);
+      const m = MOD.exec(l.ps);
+      if (m && !TOUCHES.some((b: Any) => b.panneau?.[ph] != null && b.ps === m[2])) ecarts.push(`${l.id} : variante de ${m[2]} sans sa touche en ${ph}`);
+    }
+  }
+  // les variantes L1 et R1 des quatre touches de face, que le panneau montre quand le modificateur est tenu
+  for (const f of ['✕', '○', '□', '△']) for (const mod of ['L1', 'R1']) if (!TOUCHES.some((l: Any) => l.panneau?.attaque != null && l.ps === `${mod} + ${f}`)) ecarts.push(`${mod} + ${f} absente`);
+  const { TOUCHES_JEU }: Any = Clv;
+  const h = TOUCHES.find((l: Any) => l.id === 'touches');
+  if (h?.clavier !== 'H' || TOUCHES_JEU.has('h')) ecarts.push('H : la touche du panneau doit rester libre dans le jeu');
+  // Vue / Share en match : surPanneau, une fois par appui (et ce n'est pas un geste de jeu qui rendrait la main)
+  const pads: Any[] = [];
+  const btn3 = (on: number[]) => Array.from({ length: 17 }, (_, i) => ({ pressed: on.includes(i), value: on.includes(i) ? 1 : 0 }));
+  const g = (on: number[] = []) => ({ index: 0, id: 'Xbox Wireless Controller (STANDARD GAMEPAD Vendor: 045e Product: 0b13)', connected: true, mapping: 'standard', buttons: btn3(on), axes: [0, 0, 0, 0] });
+  Object.defineProperty(globalThis, 'navigator', { value: { getGamepads: () => pads }, configurable: true, writable: true });
+  const M = Man.creerManettes({ versJeu });
+  let vues = 0; (M as Any).surPanneau = () => { vues++; };
+  const m3: Any = creerMonde({ graine: 3, humains: [true, false], aides: [0.5, 0] }); demarrer(m3, { intro: false });
+  M.mode('match');
+  let t = 1;
+  for (const on of [[], [8], [8], [], [8], []]) { pads[0] = g(on); M.lire(t, m3); t += 0.02; }
+  const activite = M.activite();
+  M.detruire();
+  verifier('panneau des touches : la même table, Vue / Share le masque', ecarts.length === 0 && vues === 2 && activite === -Infinity,
+    `${TOUCHES.filter((x: Any) => x.panneau).length} lignes au panneau (nom court, phase, variantes de ✕ ○ □ △) ${ecarts.length ? ': ' + ecarts.join(' ; ') : 'cohérentes'} ; H libre dans le jeu ; Vue en match, deux appuis : ${vues} bascule(s), geste de jeu : ${activite === -Infinity ? 'non' : 'OUI'}`);
 }
 // ── (correctifs) le A / ✕ qui passe le ralenti (phase « but ») ne devient pas une passe au coup d'envoi ──
 {

@@ -9,6 +9,10 @@
 //   au sol     glissement jusqu'au roulement (μ = 0,40), puis résistance au roulement (μ_r = 0,11, synthétique) ;
 //   panneaux   (0,95 m) restitution 0,66 − 0,006 |v_n| ; au-dessus, le filet (jusqu'à 6,15 m) amortit presque tout ;
 //   buts       poteaux et barre en cylindres (r = 5 cm, e = 0,55), filets du but (e = 0,10), fermés de l'extérieur.
+//   (bola-app#32, lot C) une balle entrée dans un but (b.filet = le côté) est dans la poche de son filet : le toit
+//              incliné, le fond incliné et les côtés (le cadre des tubes, constantes.js BUT_COIN) cèdent comme un ressort
+//              amorti au-delà du critique (BALLON.poche) ; la maille agrippe la balle, qui s'enfonce, est retenue puis
+//              retombe, sans traverser ni rebondir, et jamais jusqu'au panneau du fond.
 // Le déplacement d'un pas est découpé en sous-pas de 5 cm au plus : à 30 m/s, rien ne traverse un poteau ni un panneau.
 // Le but est compté quand le ballon entier a passé la ligne entre les poteaux et sous la barre (on ne peut entrer dans
 // la cage que par devant), sans tirage au sort. Un ballon arrêté dans un coin plus de 1,5 s reçoit une petite poussée
@@ -16,7 +20,7 @@
 //
 // Rien ici ne dépend de three ni du DOM : le même code tourne dans la page, dans le banc node et dans la prédiction du
 // gardien (predire), qui rejoue l'intégrateur sur une copie.
-import { PAS, G, BALLON as B, BX, BZ, LB, BUT_DL, BUT_H, BUT_P, HAUT_FILET, TERRAIN } from './constantes.js';
+import { PAS, G, BALLON as B, BX, BZ, LB, BUT_DL, BUT_H, BUT_P, BUT_COIN, HAUT_FILET, TERRAIN } from './constantes.js';
 import { exp, hypot } from './maths.js';
 
 const R = B.R;
@@ -31,6 +35,7 @@ export function creerBalle() {
     possesseur: null,     // le joueur qui la conduit (dernier toucher contrôlé), ou null
     recepteur: null,      // le destinataire d'une passe en cours
     tir: null,            // la frappe en cours vers un but : { e (équipe qui frappe), t0 }
+    filet: null,          // (bola-app#32, lot C) le but où elle est entrée (−1 ou 1 : le côté), dans la poche de son filet
     coinT: 0,             // temps passé arrêtée dans un coin
     sol: true,            // au sol (roule ou glisse)
   };
@@ -52,14 +57,14 @@ export function sortirBalle(b, cx, cy, cz, nx, ny, nz, d) {
 export function poserBalle(b, x, z) {
   b.p.x = x; b.p.y = R; b.p.z = z;
   b.v.x = 0; b.v.y = 0; b.v.z = 0; b.w.x = 0; b.w.y = 0; b.w.z = 0;
-  b.sol = true; b.coinT = 0;
+  b.sol = true; b.coinT = 0; b.filet = null;
 }
 
 export function copierBalle(b, o = creerBalle()) {
   o.p.x = b.p.x; o.p.y = b.p.y; o.p.z = b.p.z;
   o.v.x = b.v.x; o.v.y = b.v.y; o.v.z = b.v.z;
   o.w.x = b.w.x; o.w.y = b.w.y; o.w.z = b.w.z;
-  o.garde = b.garde; o.sol = b.sol;
+  o.garde = b.garde; o.sol = b.sol; o.filet = b.filet ?? null;
   return o;
 }
 
@@ -146,15 +151,79 @@ function mur(b, axe, lim, ev) {
   if (vn > 1) ev?.(panneau ? 'panneau' : 'filet', vn);
 }
 
-/** Les murs et les buts, après un sous-pas. ev(type, force) signale les chocs (panneau, filet, poteau). */
-function bords(b, ev) {
+// ── (bola-app#32, lot C) la poche du filet ──
+// Vu de côté (d = profondeur derrière la ligne, y = hauteur), le filet suit le cadre des tubes : le toit, de la barre
+// (0 ; BUT_H) au coin BUT_COIN, et le fond, du coin au sol à BUT_P. Les normales sortantes (vers l'extérieur du but) :
+const plan = (d0, y0, d1, y1) => { const dd = d1 - d0, dy = y1 - y0, l = hypot(dd, dy); return { d0, y0, nd: -dy / l, ny: dd / l }; };
+export const TOIT_FILET = plan(0, BUT_H, BUT_COIN[0], BUT_COIN[1]);
+export const FOND_FILET = plan(BUT_COIN[0], BUT_COIN[1], BUT_P, 0);
+
+/**
+ * Un pan du filet (normale sortante n, dans le repère du jeu) dans lequel la balle s'enfonce de pen (m) : il cède comme
+ * un ressort amorti au-delà du critique (pas de rebond), sans dépasser max ; la maille agrippe la balle (sa vitesse le
+ * long du filet et sa rotation meurent). Le premier contact est signalé (ev 'filet'). Vitesse normale implicite : stable
+ * au pas du sous-pas h.
+ */
+function toile(b, nx, ny, nz, pen, max, h, ev) {
+  if (pen <= 0) return;
+  const p = b.p, v = b.v, w = b.w, P = B.poche;
+  let vn = v.x * nx + v.y * ny + v.z * nz;
+  if (pen - vn * h <= 0 && vn > 1) ev?.('filet', vn);
+  if (pen > max) {
+    const k = pen - max;
+    p.x -= nx * k; p.y -= ny * k; p.z -= nz * k;
+    if (vn > 0) { v.x -= nx * vn; v.y -= ny * vn; v.z -= nz * vn; vn = 0; }
+    pen = max;
+  }
+  const c = 2 * P.zeta * P.w;
+  const vn2 = (vn - P.w * P.w * pen * h) / (1 + c * h);
+  const f = 1 / (1 + P.frot * h);
+  const tx = v.x - nx * vn, ty = v.y - ny * vn, tz = v.z - nz * vn;
+  v.x = nx * vn2 + tx * f; v.y = ny * vn2 + ty * f; v.z = nz * vn2 + tz * f;
+  const kr = exp(-P.rotation * h);
+  w.x *= kr; w.y *= kr; w.z *= kr;
+}
+
+/**
+ * La balle dans le but s (entrée par devant) : les poteaux et la barre (elle peut encore les toucher), puis les côtés,
+ * le toit et le fond de la poche ; le filet, tenu aux poteaux et à la barre, n'y cède pas (il cède de plus en plus
+ * jusqu'à 30 cm derrière la ligne) ; jamais au-delà de poche.mur.
+ */
+function poche(b, s, ev, h) {
+  const p = b.p, P = B.poche, zl = s * LB;
+  for (const sx of COTES) cylindre(b, sx * BUT_DL, 0, zl, 0, 1, 0, 0, BUT_H, B.poteauR, B.poteauE, ev);
+  cylindre(b, 0, BUT_H, zl, 1, 0, 0, -BUT_DL, BUT_DL, B.poteauR, B.poteauE, ev);
+  const d = (p.z - zl) * s, cede = Math.min(1, Math.max(0, d / 0.3));
+  for (const sx of COTES) toile(b, sx, 0, 0, sx * p.x - (BUT_DL - R), P.cote * cede, h, ev);
+  toile(b, 0, TOIT_FILET.ny, s * TOIT_FILET.nd, d * TOIT_FILET.nd + (p.y - TOIT_FILET.y0) * TOIT_FILET.ny + R, P.toit * cede, h, ev);
+  const d2 = (p.z - s * LB) * s;
+  toile(b, 0, FOND_FILET.ny, s * FOND_FILET.nd, (d2 - FOND_FILET.d0) * FOND_FILET.nd + (p.y - FOND_FILET.y0) * FOND_FILET.ny + R, P.fond, h, ev);
+  if ((p.z - s * LB) * s > P.mur) { p.z = s * (LB + P.mur); if (b.v.z * s > 0) b.v.z = 0; }
+}
+
+/** Le but où la balle est entrée : posé quand son centre passe la ligne entre les poteaux, sous la barre ; oublié dès
+ *  qu'elle est ressortie (de tout son rayon devant la ligne) ou posée ailleurs. */
+function majFilet(b) {
   const p = b.p;
-  // panneaux de côté et du fond (au-dessus : le filet, puis le toit)
+  if (b.filet != null) { if ((p.z - b.filet * LB) * b.filet < -R) b.filet = null; return; }
+  for (const s of COTES) {
+    const d = (p.z - s * LB) * s;
+    if (d > 0 && d < BUT_P && Math.abs(p.x) < BUT_DL && p.y < BUT_H) { b.filet = s; return; }
+  }
+}
+
+/** Les murs et les buts, après un sous-pas (de h s). ev(type, force) signale les chocs (panneau, filet, poteau). */
+function bords(b, ev, h = PAS) {
+  const p = b.p;
+  majFilet(b);
+  // panneaux de côté et du fond (au-dessus : le filet, puis le toit) ; (lot C) dans la poche d'un but, c'est le filet
+  // qui la tient, bien avant le panneau du fond
   mur(b, 'x', BX - R, ev);
-  mur(b, 'z', BZ - R, ev);
+  if (b.filet == null) mur(b, 'z', BZ - R, ev);
   if (p.y > HAUT_FILET + 8) { p.y = HAUT_FILET + 8; if (b.v.y > 0) b.v.y = -b.v.y * 0.2; }
   // les deux buts
   for (const s of COTES) {
+    if (b.filet === s) { poche(b, s, ev, h); continue; }
     const zl = s * LB;
     const dz = (p.z - zl) * s; // > 0 : derrière la ligne
     if (dz > -0.4 && dz < BUT_P + 0.4 && Math.abs(p.x) < BUT_DL + 0.4 && p.y < BUT_H + 0.4) {
@@ -239,13 +308,14 @@ export function pasBalle(b, ev, dt = PAS) {
         if (vn > 2) ev?.('rebond', vn);
       } else if (v.y < 0) v.y = 0;
     }
-    bords(b, ev);
+    bords(b, ev, dt / n);
   }
   b.sol = p.y <= R + 1e-3 && Math.abs(v.y) < 1e-6;
-  // le but : le ballon entier derrière la ligne, entre les poteaux, sous la barre
+  // le but : le ballon entier derrière la ligne, entre les poteaux, sous la barre (lot C : ou entré par devant dans ce
+  // but, s'il a déjà enfoncé un côté ou le toit de la poche en passant la ligne)
   for (const s of COTES) {
     const lim = s * (LB + R);
-    if ((p.z - lim) * s > 0 && (zAvant - lim) * s <= 0 && Math.abs(p.x) < BUT_DL && p.y < BUT_H) return s < 0 ? 0 : 1;
+    if ((p.z - lim) * s > 0 && (zAvant - lim) * s <= 0 && ((Math.abs(p.x) < BUT_DL && p.y < BUT_H) || b.filet === s)) return s < 0 ? 0 : 1;
   }
   return -1;
 }
@@ -255,7 +325,8 @@ export function antiBlocage(b, dt = PAS) {
   const s = hypot(b.v.x, b.v.z);
   const coin = (Math.abs(b.p.x) > BX - 0.7 && Math.abs(b.p.z) > BZ - 0.7);
   // (ou posé sur le toit d'un but : il roule vers le terrain et retombe devant la barre)
-  const toit = Math.abs(b.p.z) > LB && Math.abs(b.p.x) < BUT_DL + 0.3 && b.p.y > BUT_H - 0.05;
+  // (lot C : pas une balle dans la poche d'un but, sous le toit du filet)
+  const toit = b.filet == null && Math.abs(b.p.z) > LB && Math.abs(b.p.x) < BUT_DL + 0.3 && b.p.y > BUT_H - 0.05;
   if (b.garde == null && (coin || toit) && s < 0.3) b.coinT += dt; else b.coinT = 0;
   if (b.coinT > 1.5) {
     b.coinT = 0;

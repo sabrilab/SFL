@@ -112,7 +112,7 @@ export function engagement(m, e) {
   const porteurE = m.joueurs.find((j) => j.e === e && j.role === 'A');
   porteurE.p.x = 0; porteurE.p.z = -sens(e) * 0.4;
   const b = m.balle;
-  b.p.x = 0; b.p.y = BALLON.R; b.p.z = 0; b.v.x = b.v.y = b.v.z = 0; b.w.x = b.w.y = b.w.z = 0;
+  b.p.x = 0; b.p.y = BALLON.R; b.p.z = 0; b.v.x = b.v.y = b.v.z = 0; b.w.x = b.w.y = b.w.z = 0; b.filet = null;
   // (bola-app#32 : l'engagement est à lui tout de suite, balle aimantée au pied ; avant, dernierT = −9 la laissait libre)
   b.garde = null; b.dernier = porteurE.i; b.dernierT = m.t; b.possesseur = porteurE.i; b.recepteur = null; b.tir = null;
   for (const eq of [0, 1]) {

@@ -1239,11 +1239,49 @@ const balleA = (m: Any, x: number, z: number, vx = 0, vz = 0, pos: number | null
 
   // ── effets : le filet, les ombres, l'herbe ──
   {
-    const { ondeFilet, FILET, formeOmbres, traceGlisse }: Any = Eff;
-    let maxD = 0, finD = 0, loinD = 0;
-    for (let a = 0; a <= FILET.vie; a += 0.005) { maxD = Math.max(maxD, Math.abs(ondeFilet(0, a, 40))); if (a > FILET.vie - 0.05) finD = Math.max(finD, Math.abs(ondeFilet(0, a, 40))); loinD = Math.max(loinD, Math.abs(ondeFilet(1.6, a, 40))); }
-    verifier('Filet : une onde bornée qui s\'éteint', maxD <= FILET.max + 1e-6 && maxD > FILET.max * 0.95 && finD < 0.001 && loinD < 0.01 && ondeFilet(0, 0, 40) === 0,
-      `au plus ${(maxD * 100).toFixed(1)} cm (borne ${FILET.max * 100}), ${(finD * 1000).toFixed(2)} mm à la fin (${FILET.vie} s), ${(loinD * 1000).toFixed(1)} mm à 1,6 m du choc`);
+    const { creerToile, pasToile, reposToile, ecartToile, formeOmbres, traceGlisse }: Any = Eff;
+    // (bola-app#32, lot C, point 8 « des vrais filets […] que le ballon reste accroché de manière réaliste » : l'onde du
+    // shader de #27 est remplacée par une vraie toile, et le filet de la simulation retient la balle ; l'ancien contrôle
+    // de l'onde n'a plus d'objet, il devient celui-ci) des tirs dans le but (8, 18, 30 m/s ; au ras du sol, à 0,9 et 1,6 m ;
+    // de face et à 30°), la vraie balle de la simulation et la toile affichée qu'elle pousse, 4 s chacun
+    {
+      const T: Any = creerToile(1);
+      let essais = 0, buts = 0, retenues = 0, traverse = 0, rebond = 0, ecart = 0, zMax = 0, profond = 0;
+      for (const v of [8, 18, 30]) for (const y of [0.11, 0.9, 1.6]) for (const ang of [0, 30]) {
+        reposToile(T); essais++;
+        const b: Any = creerBalle(), a = (ang * Math.PI) / 180;
+        b.p.x = -Math.sin(a) * 2.4; b.p.z = LB - 6; b.p.y = y;
+        const dx = Math.sin(a) - b.p.x, dz = 6.5, L = Math.hypot(dx, dz);
+        b.v.x = (dx / L) * v; b.v.z = (dz / L) * v; b.v.y = y > 0.2 ? (G * 3) / v : 0;
+        let but = false, entre = false;
+        for (let k = 0; k < Math.round(4 / PAS); k++) {
+          if (pasBalle(b, null) >= 0) but = true;
+          pasToile(T, b.p);
+          const d = b.p.z - LB;
+          if (d > 0.35) entre = true;
+          if (entre) rebond = Math.max(rebond, -b.v.z);
+          profond = Math.max(profond, d); ecart = Math.max(ecart, ecartToile(T));
+          for (let i = 0; i < T.n; i++) {
+            if (T.fixe[i]) continue;
+            const o = 3 * i, rx = T.P[o] - b.p.x, ry = T.P[o + 1] - b.p.y, rz = T.P[o + 2] - b.p.z;
+            const h = rx * T.N[o] + ry * T.N[o + 1] + rz * T.N[o + 2], l2 = rx * rx + ry * ry + rz * rz - h * h;
+            zMax = Math.max(zMax, T.P[o + 2]);
+            if (T.dedans && l2 < R * R && h > -0.6 && h < Math.sqrt(R * R - l2) - 0.01) traverse++;
+          }
+        }
+        if (but) buts++;
+        const d = b.p.z - LB;
+        if (but && d > R && d < Cst.BUT_P && Math.abs(b.p.x) < BUT_DL && Math.hypot(b.v.x, b.v.y, b.v.z) < 0.2) retenues++;
+      }
+      // la balle partie (un nouvel engagement) : la toile revient à son repos et s'endort
+      const loin = { x: 0, y: R, z: 0 };
+      let pasRetour = 0;
+      while (T.eveille && pasRetour < 600) { pasToile(T, loin); pasRetour++; }
+      verifier('Filet : la balle reste prise dans la poche', buts === essais && retenues === essais && rebond < 2 && profond <= Cst.BALLON.poche.mur + 1e-6 && traverse === 0 && zMax < BZ,
+        `${buts}/${essais} buts, ${retenues} balles retenues au fond du but à l'arrêt ; ressort vers le terrain à ${f2(rebond)} m/s au plus (< 2) ; ${f2(profond)} m derrière la ligne au plus (panneau à ${f2(BZ - LB)}) ; toile enfoncée de ${(ecart * 100).toFixed(0)} cm au plus, jamais traversée (${traverse}), jamais au-delà du panneau (${f2(zMax)} m)`);
+      verifier('Filet : la toile revient et s\'endort', !T.eveille && ecartToile(T) < 0.01 && pasRetour < 600,
+        `au repos et endormie ${(pasRetour * PAS).toFixed(2)} s après le départ de la balle, à ${(ecartToile(T) * 1000).toFixed(1)} mm de sa forme`);
+    }
     const o = new Float32Array(18);
     const pied = (x: number, y: number) => ({ x, y, z: 0, ax: 0, az: 1 });
     formeOmbres({ x: 0, y: 0.95, z: 0 }, pied(-0.1, 0.03), pied(0.1, 0.45), { x: 0, y: 1.7, z: 0 }, o);

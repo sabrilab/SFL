@@ -15,8 +15,15 @@
 // à chaque image : une manette débranchée rend son équipe à l'IA au pas suivant, sans pause. Les gardiens restent à
 // l'IA. Menu / Options (ou Échap, P au clavier) met le match en pause ; un toucher sur le voile la lève, et elle se lève
 // d'elle-même si plus aucune manette d'équipe n'est branchée. Les vibrations suivent les événements de la simulation (frappe, tacle,
-// chute, épaule, poteau, but). Sous le joueur de chaque humain, un anneau : blanc pour les Noirs, noir cerclé de blanc
-// pour les Blancs ; la jauge de puissance s'y remplit pendant qu'on charge une passe ou une frappe.
+// chute, épaule, poteau, but). (bola-app#32, lot C : à la place de l'anneau au sol) au-dessus de la tête du joueur de
+// chaque humain, un chevron : blanc bordé de noir pour les Noirs, noir bordé de blanc pour les Blancs, avec le numéro de
+// la manette quand deux humains jouent ; la jauge de puissance, une barre fine au-dessus, se remplit pendant qu'on charge
+// une passe ou une frappe ; un chevron creux, plus petit, montre le receveur d'une passe.
+//
+// (bola-app#32, lot C) La page affiche les touches utiles sur un côté (src/app/jouer/panneau-touches.tsx, lu dans
+// entrees/touches.js) : etat.panneau dit, pour chaque équipe humaine, l'appareil (manette Xbox ou PlayStation, clavier,
+// pouce), la phase (attaque balle au pied, balle libre, défense) et le modificateur tenu (L1, R1, R2, L2) ; Vue / Share
+// (surPanneau) et H au clavier (la page) le masquent.
 //
 // Les règles de Bola (un five en salle) : la balle ne sort jamais, elle rebondit sur les panneaux et les filets ; pas
 // de touche, pas de corner, pas de hors-jeu ; après un but, l'équipe qui l'a pris engage au rond central.
@@ -47,7 +54,7 @@
 //   second doigt     (lot 3) le stick droit des gestes techniques, comme à la manette (entrees/geste-stick.js) ;
 //                    touché sans bouger : la semelle
 // Comme à la manette, tu joues le porteur ; en défense, la main passe au Noir le plus près de la balle. Celui que tu
-// joues porte un anneau blanc au pied.
+// joues porte un chevron blanc au-dessus de la tête.
 //
 // Le décor est le plateau BOLA (plateau.js, celui des vidéos) en qualité « jeu ». Le plateau a son grand axe en x ;
 // le jeu, lui, compte en (x = largeur, z = longueur) : tout le match vit dans un groupe tourné d'un quart de tour
@@ -70,7 +77,7 @@ import { SCENARIOS } from './sim/scenarios.js';
 import { chargerMesuresUrl } from './sim/clips.js';
 import { changerHumains } from './sim/monde.js';
 import { creerManettes, EFFETS } from './entrees/manettes.js';
-import { creerCommande, lireManette, intentionDe, oublier, enAttaque } from './entrees/commande.js';
+import { creerCommande, lireManette, intentionDe, oublier, enAttaque, gachette } from './entrees/commande.js';
 import { creerClavier, creerEtatClavier, etatDepuisTouches } from './entrees/clavier.js';
 import { creerLecteur, oublierLecteur, lireGesteStick } from './entrees/geste-stick.js';
 import { creerCameraTele, majCameraTele, poserFoyer, duelPresDuBut } from './rendu/camera.js';
@@ -106,13 +113,13 @@ function creerBallon() {
 /**
  * Lance le jeu dans conteneur. Renvoie { demarrer(), detruire(), _test }.
  * @param {HTMLElement} conteneur
- * @param {{ photo?: string | null, surEtat?: (etat: any) => void, reduit?: boolean, duree?: number, surProgres?: (p: number) => void, surSalon?: () => void, surDemarrer?: () => void, surTouches?: (marque: string) => void }} [options]
+ * @param {{ photo?: string | null, surEtat?: (etat: any) => void, reduit?: boolean, duree?: number, surProgres?: (p: number) => void, surSalon?: () => void, surDemarrer?: () => void, surTouches?: (marque: string) => void, surPanneau?: () => void }} [options]
  *   photo : ta photo du studio ; surEtat : le tableau (HUD) ; reduit : « Réduire les animations » ; duree : en secondes ;
  *   surSalon : une manette demande l'écran Manettes (A / ✕ ou Menu avant le match) ; surDemarrer : Menu / Options
- *   dans l'écran Manettes.
+ *   dans l'écran Manettes ; surPanneau : Vue / Share en match (bola-app#32, lot C : masquer ou montrer le panneau des touches).
  */
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, reduit = false, duree = 150, surProgres = () => {}, surSalon = () => {}, surDemarrer = () => {}, surTouches = () => {} } = {}) {
+export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, reduit = false, duree = 150, surProgres = () => {}, surSalon = () => {}, surDemarrer = () => {}, surTouches = () => {}, surPanneau = () => {} } = {}) {
   const pr = Math.min(window.devicePixelRatio || 1, 1.5);
   let echelle = 1; // la définition adaptative
   const dims = () => {
@@ -206,47 +213,77 @@ export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, 
   // (lot 4) les ombres de contact (un seul maillage instancié), l'herbe qui marque, le filet qui bouge, le son
   const ombres = creerOmbres(monde, vus.length);
   const marques = creerMarques(monde);
-  const filet = creerFilet(pl.scene, versMonde);
+  // (bola-app#32, lot C) le vrai filet des buts (rendu/effets.js) : construit sur le cadre, une toile que la balle pousse
+  const filet = creerFilet(monde, pl.scene);
   const son = creerSon({ reduit });
   const sons = [];
   // (leurs programmes liés au chargement, pas à la première image du match)
   try { await renderer.compileAsync(pl.scene, camera); } catch { /* le premier rendu compilera */ }
 
-  // l'anneau sous le joueur que tu joues
-  const anneau = new THREE.Mesh(
-    new THREE.RingGeometry(0.42, 0.5, 48).rotateX(-Math.PI / 2),
-    new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.9, depthWrite: false, toneMapped: false }),
-  );
-  anneau.renderOrder = 3;
-  monde.add(anneau);
-  // celui des Blancs : noir cerclé de blanc, pour qu'il se voie sur le gazon
-  const anneauB = new THREE.Group();
-  {
-    const mat = (c) => new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0.95, depthWrite: false, toneMapped: false });
-    const a = new THREE.Mesh(new THREE.RingGeometry(0.42, 0.5, 48).rotateX(-Math.PI / 2), mat(0x050505));
-    const b1 = new THREE.Mesh(new THREE.RingGeometry(0.5, 0.53, 48).rotateX(-Math.PI / 2), mat(0xffffff));
-    const b2 = new THREE.Mesh(new THREE.RingGeometry(0.39, 0.42, 48).rotateX(-Math.PI / 2), mat(0xffffff));
-    for (const o of [a, b1, b2]) { o.renderOrder = 3; anneauB.add(o); }
-  }
-  anneauB.visible = false;
-  monde.add(anneauB);
-  // la jauge de puissance : un arc qui se remplit autour de l'anneau (une par équipe)
-  const jauges = [0, 1].map((e) => {
-    const g = new THREE.RingGeometry(0.55, 0.62, 48, 1, Math.PI / 2, -Math.PI * 2).rotateX(-Math.PI / 2);
-    const o = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ color: e === 0 ? 0xffffff : 0xf2f2f2, transparent: true, opacity: 0.95, depthWrite: false, toneMapped: false }));
-    o.renderOrder = 3; o.visible = false; monde.add(o);
-    return o;
+  // ── (bola-app#32, lot C) les repères, une seule famille, noir et blanc (Sabri, 18/11 21:09 : « un curseur au-dessus
+  // de la tête […] plus joli » à la place du rond au sol) : un chevron au-dessus de la tête du joueur tenu ; un plus
+  // petit, creux, au-dessus du receveur d'une passe ; la jauge de la charge, une barre fine au-dessus du chevron ; le
+  // numéro de la manette à côté quand deux humains jouent ; et, au sol, la flèche de la charge dessinée de même (pointe
+  // en chevron, bord contrasté). Noirs : blanc bordé de noir ; Blancs : noir bordé de blanc. Les repères au-dessus des
+  // têtes sont des sprites sans perspective (taille constante à l'écran, en px, quel que soit le cadre) et sans test de
+  // profondeur (un joueur devant ne les cache pas).
+  const TEINTES = [{ plein: '#ffffff', bord: '#000000', fond: 0x000000 }, { plein: '#0b0b0b', bord: '#ffffff', fond: 0xffffff }];
+  const toileRepere = (w, h, dessin) => {
+    const c = document.createElement('canvas'); c.width = w; c.height = h; dessin(c.getContext('2d'));
+    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return t;
+  };
+  // le chevron : une pointe de flèche vers le bas (encoche en haut), 64 × 64 ; creux : le bord seul
+  const dessinChevron = (T, creux) => (g) => {
+    g.lineJoin = 'round'; g.lineCap = 'round';
+    // (un bord épais, plein : le chevron blanc se lit aussi sur les panneaux LED blancs, le noir sur le gazon sombre)
+    g.beginPath(); g.moveTo(10, 12); g.lineTo(32, 22); g.lineTo(54, 12); g.lineTo(32, 53); g.closePath();
+    g.lineWidth = creux ? 13 : 12; g.strokeStyle = T.bord; g.stroke();
+    if (creux) { g.lineWidth = 5; g.strokeStyle = T.plein; g.stroke(); } else { g.fillStyle = T.plein; g.fill(); }
+  };
+  const blanc = toileRepere(8, 8, (g) => { g.fillStyle = '#fff'; g.fillRect(0, 0, 8, 8); });
+  const matSprite = (map, opts = {}) => new THREE.SpriteMaterial({ map, transparent: true, depthTest: false, depthWrite: false, toneMapped: false, sizeAttenuation: false, ...opts });
+  const sprite = (mat) => { const o = new THREE.Sprite(mat); o.renderOrder = 20; o.visible = false; o.frustumCulled = false; monde.add(o); return o; };
+  const numeros = new Map();
+  const texNumero = (e, n) => {
+    const k = `${e}:${n}`;
+    if (!numeros.has(k)) numeros.set(k, toileRepere(48, 64, (g) => {
+      g.font = '800 46px Inter, system-ui, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+      g.lineJoin = 'round'; g.lineWidth = 8; g.strokeStyle = TEINTES[e].bord; g.strokeText(String(n), 24, 34); g.fillStyle = TEINTES[e].plein; g.fillText(String(n), 24, 34);
+    }));
+    return numeros.get(k);
+  };
+  const reperes = [0, 1].map((e) => {
+    const T = TEINTES[e];
+    const chevron = sprite(matSprite(toileRepere(64, 64, dessinChevron(T, false))));
+    chevron.center.set(0.5, 0);
+    const receveur = sprite(matSprite(toileRepere(64, 64, dessinChevron(T, true))));
+    receveur.center.set(0.5, 0);
+    const numero = sprite(matSprite(null));
+    const piste = sprite(matSprite(blanc, { color: T.fond, opacity: 0.75 }));
+    const rempli = sprite(matSprite(blanc, { color: e === 0 ? 0xffffff : 0x0b0b0b }));
+    return { chevron, receveur, numero, piste, rempli, n: 0, hauteur: 1.75 };
   });
+  const objetsReperes = reperes.flatMap((r) => [r.chevron, r.receveur, r.numero, r.piste, r.rempli]);
+  // les tailles à l'écran (px CSS) : chevron, receveur, jauge (le plein ; sa piste le borde d'1 px), numéro
+  const TAILLES = { chevron: 26, receveur: 17, jaugeL: 30, jaugeH: 5, numero: 16 };
+  const teteY = (k) => { const os = vus[k].perso.os; const o = os.head ?? os.neck; return o ? w.setFromMatrixPosition(o.matrixWorld).y : 1.75; };
 
-  // (bola-app#32, lot A) la flèche discrète au sol pendant une charge : depuis le pied, vers où part la balle (la
-  // simulation publie le point visé, j.vise), plus longue avec la puissance ; blanche pour les Noirs, noire pour les Blancs
+  // (bola-app#32, lot A ; lot C : dessinée comme les repères) la flèche discrète au sol pendant une charge : depuis le
+  // pied, vers où part la balle (la simulation publie le point visé, j.vise), plus longue avec la puissance ; une pointe
+  // en chevron, le plein et son bord contrasté (blanc bordé de noir pour les Noirs, noir bordé de blanc pour les Blancs)
+  const formeFleche = (b) => {
+    const w0 = 0.032 + b, hw = 0.13 + b * 1.4, hl = 0.2 + b * 1.2, f = new THREE.Shape();
+    f.moveTo(-w0, -b); f.lineTo(w0, -b); f.lineTo(w0, 1 - hl * 0.62); f.lineTo(hw, 1 - hl); f.lineTo(0, 1 + b * 1.3); f.lineTo(-hw, 1 - hl); f.lineTo(-w0, 1 - hl * 0.62); f.closePath();
+    return new THREE.ShapeGeometry(f).rotateX(Math.PI / 2);
+  };
   const fleches = [0, 1].map((e) => {
-    const forme = new THREE.Shape();
-    forme.moveTo(-0.035, 0); forme.lineTo(0.035, 0); forme.lineTo(0.035, 0.82); forme.lineTo(0.12, 0.82); forme.lineTo(0, 1); forme.lineTo(-0.12, 0.82); forme.lineTo(-0.035, 0.82); forme.closePath();
-    const g = new THREE.ShapeGeometry(forme).rotateX(Math.PI / 2);
-    const o = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ color: e === 0 ? 0xffffff : 0x0a0a0a, transparent: true, opacity: 0.85, depthWrite: false, toneMapped: false, side: THREE.DoubleSide }));
-    o.renderOrder = 3; o.visible = false; monde.add(o);
-    return o;
+    const g = new THREE.Group();
+    const mat = (c, o) => new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: o, depthWrite: false, toneMapped: false, side: THREE.DoubleSide });
+    const bord = new THREE.Mesh(formeFleche(0.022), mat(e === 0 ? 0x000000 : 0xffffff, e === 0 ? 0.55 : 0.85));
+    const plein = new THREE.Mesh(formeFleche(0), mat(e === 0 ? 0xffffff : 0x0b0b0b, 0.92));
+    bord.renderOrder = 3; plein.renderOrder = 4; plein.position.y = 0.002;
+    g.add(bord, plein); g.visible = false; monde.add(g);
+    return g;
   });
   const pouce = creerPouce(renderer.domElement);
   // l'écran vu de la tribune : la droite de l'écran = vers le but attaqué par les Noirs (-z), le haut = vers -x
@@ -260,6 +297,7 @@ export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, 
   manettes.surSalon = () => surSalon();
   manettes.surDemarrer = () => surDemarrer();
   manettes.surTouches = (marque) => surTouches(marque);
+  manettes.surPanneau = () => surPanneau();
   let pause = false, pauseManette = false;
   const poserPause = (v, parManette = false) => { if (v === pause) return; if (v && !(m().phase === 'jeu' || m().phase === 'engagement')) return; pause = v; pauseManette = v && parManette; etat.pause = pause; signaler(); };
   manettes.surPause = () => poserPause(!pause, true);
@@ -283,7 +321,10 @@ export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, 
   // (bola-app#32, lot B) demo : « IA contre IA », l'IA joue les deux équipes (son, ralentis et caméra de la télé gardés) ;
   // une manette, une touche du clavier ou un toucher reprend la main ; tactique : le court libellé du plan d'une équipe
   // quand il change (la croix d'un humain, ou l'IA qui s'adapte au score et au temps), et ceux de l'IA au coup d'envoi
-  const etat = { phase: 'attente', noirs: 0, blancs: 0, reste: duree, message: null, buteur: null, pause: false, manettes: false, ralenti: false, demo: false, tactique: null };
+  // (lot C) panneau : ce que montre le panneau des touches, une entrée par équipe humaine : { e, appareil ('xbox' |
+  // 'playstation' | 'clavier' | 'pouce'), phase ('attaque' | 'libre' | 'defense'), mod ('L1' | 'R1' | 'R2' | 'L2' | null),
+  // numero (la manette, quand deux humains jouent) }
+  const etat = { phase: 'attente', noirs: 0, blancs: 0, reste: duree, message: null, buteur: null, pause: false, manettes: false, ralenti: false, demo: false, tactique: null, panneau: [] };
   let demo = false, demoDepuis = 0, demoDepuisS = null, demoClavier = 0, demoFin = 0, numTactique = 0, tBoucle = 0;
   const MOI = 4; // l'attaquant des Noirs
   const signaler = () => surEtat({ ...etat });
@@ -413,7 +454,9 @@ export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, 
         case 'tacleBalle': case 'tacleJambes': secouer(eqDe(e.j), EFFETS.tacle(), 14); break;
         case 'chute': if (joue(e.j)) secouer(eqDe(e.j), EFFETS.chute(), 22); break;
         case 'epaule': for (const i of [e.a, e.b]) if (joue(i) && eq[eqDe(i)]) manettes.vibrer(eqDe(i), EFFETS.epaule()); break;
-        case 'poteau': if (!banc.auto) { for (const k of [0, 1]) if (eq[k]) manettes.vibrer(k, EFFETS.poteau()); if (!eq[0] && M.humains[0]) vibrer(12); } break;
+        case 'poteau': if (!banc.auto) { for (const k of [0, 1]) if (eq[k]) manettes.vibrer(k, EFFETS.poteau()); if (!eq[0] && M.humains[0]) vibrer(12); } grosseAction(e.force > 7); break;
+        // (bola-app#32, lot C) une parade du gardien : un ralenti bref pour le spectateur (IA contre IA)
+        case 'parade': grosseAction(true); break;
         case 'but':
           banc.stats.buts = M.stats.buts;
           etat.message = 'BUT';
@@ -427,16 +470,23 @@ export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, 
         case 'engagement': etat.message = null; etat.buteur = null; break;
         // (bola-app#32, lot B) le plan d'une équipe change : son court libellé (la page l'affiche un instant)
         case 'tactique': if (!e.meme || !e.auto) { etat.tactique = libelleTactique([e.e], ++numTactique); signaler(); } break;
-        case 'balleChoc':
-          // le filet se gonfle vers l'extérieur du but (du centre du but vers le choc), de la force du choc
-          if (e.genre === 'filet' && filet && Math.abs(e.z) > 14.5) { const s = Math.sign(e.z); const dx = e.x, dy = e.y - 1, dz = e.z - s * 15.45, l = Math.hypot(dx, dy, dz) || 1; filet.choc(e.t, e.x, e.y, e.z, dx / l, dy / l, dz / l, e.f); }
-          break;
         default: break;
       }
     }
     // le son (rendu/son.js) : ce que la simulation vient de faire ; coupé au banc qui fait jouer l'IA seule
     if (!banc.auto && M.evts.length) son.jouer(planSons(M.evts, M, sons));
     M.evts.length = 0;
+  }
+
+  /**
+   * (bola-app#32, lot C, lisibilité pour un spectateur) Une grosse action (un poteau frappé fort, une parade du gardien) :
+   * un ralenti bref dans le jeu (0,45×, 0,6 s), seulement quand l'IA joue seule (« IA contre IA », le mode d'un stream :
+   * personne n'a la main, rien ne ralentit sous les doigts d'un joueur) et jamais en mouvement réduit. Le ralenti du but
+   * en trois plans (rendu/ralenti.js) reste celui de #27.
+   */
+  function grosseAction(oui) {
+    if (!oui || !demo || reduit || ralentiFin > 0) return;
+    ralenti = 0.45; ralentiFin = 0.6;
   }
 
   function majEtat() {
@@ -449,6 +499,48 @@ export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, 
     if (M.phase !== 'but') { etat.message = null; if (M.phase !== 'fin') etat.buteur = null; }
     const s = Math.ceil(etat.reste);
     if (changePhase || s !== derniereSeconde) { derniereSeconde = s; signaler(); }
+    majPanneau();
+  }
+
+  // ── (bola-app#32, lot C) ce que montre le panneau des touches ──
+  // L'appareil de chaque équipe humaine : sa manette (Xbox ou PlayStation ; une manette générique a la disposition
+  // standard, celle de la Xbox), sinon, pour les Noirs, le clavier s'il sert, le pouce s'il a servi après lui, et avant
+  // tout geste, le pouce sur un écran tactile, le clavier ailleurs. La phase : attaque si l'équipe a la balle (ou si sa
+  // passe ou sa frappe est en l'air), balle libre si elle est à moins de 3,5 m du joueur tenu (○ la prend), défense
+  // sinon ; une phase nouvelle doit tenir 0,18 s (une passe qui part ne fait pas clignoter le panneau). Le modificateur
+  // tenu (L1, R1, R2, L2 ; Q, R, Maj, C au clavier) s'affiche tout de suite. La page n'est prévenue que d'un changement.
+  const tactile = typeof matchMedia !== 'undefined' && matchMedia('(pointer: coarse)').matches;
+  const phasesPanneau = [{ ph: null, cand: null, depuis: 0 }, { ph: null, cand: null, depuis: 0 }];
+  let clePanneau = '';
+  function majPanneau() {
+    const M = m(), liste = [];
+    if (!banc.auto && !demo && !scene && (M.phase === 'jeu' || M.phase === 'engagement')) {
+      const eq = manettes.equipes(), deux = !!(M.humains[0] && M.humains[1]);
+      const p = porteur(M), bl = M.balle, now = performance.now();
+      for (const e of [0, 1]) {
+        if (!M.humains[e]) continue;
+        const pad = eq[e];
+        const appareil = pad ? (pad.marque === 'playstation' ? 'playstation' : 'xbox')
+          : e !== 0 ? null
+          : clavierJoue() ? 'clavier' : pouce.utilise && pouce.vu >= clavier.vu ? 'pouce' : tactile ? 'pouce' : 'clavier';
+        if (!appareil) continue;
+        let mod = null;
+        if (pad) { const b = pad.etat.b; mod = b[4] > 0.5 ? 'L1' : b[5] > 0.5 ? 'R1' : gachette(b[7] ?? 0) > 0.5 ? 'R2' : gachette(b[6] ?? 0) > 0.3 ? 'L2' : null; }
+        else if (appareil === 'clavier') { const t = clavier.tenues; mod = t.has('q') ? 'L1' : t.has('r') ? 'R1' : t.has('shift') ? 'R2' : t.has('c') ? 'L2' : null; }
+        const j = M.controle[e] != null ? M.joueurs[M.controle[e]] : null;
+        let ph;
+        if (p) ph = p.e === e ? 'attaque' : 'defense';
+        else if (bl.garde != null) ph = M.joueurs[bl.garde]?.e === e ? 'attaque' : 'defense';
+        else if ((bl.recepteur != null && M.joueurs[bl.recepteur]?.e === e) || bl.tir?.e === e) ph = 'attaque';
+        else ph = j && Math.hypot(bl.p.x - j.p.x, bl.p.z - j.p.z) < 3.5 ? 'libre' : 'defense';
+        const H = phasesPanneau[e];
+        if (ph !== H.cand) { H.cand = ph; H.depuis = now; }
+        if (H.ph == null || (H.ph !== ph && now - H.depuis > 180)) H.ph = ph;
+        liste.push({ e, appareil, phase: H.ph, mod, numero: deux && pad ? pad.index + 1 : null });
+      }
+    } else { phasesPanneau[0].ph = null; phasesPanneau[1].ph = null; }
+    const cle = JSON.stringify(liste);
+    if (cle !== clePanneau) { clePanneau = cle; etat.panneau = liste; signaler(); }
   }
 
   /** (lot B) Le libellé des plans des équipes données : [{ e, plan, nom, style }], numéroté pour que la page le relance. */
@@ -511,26 +603,63 @@ export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, 
       if (j.appuiT != null && j.appuiT !== c.appuiVu) { c.appuiVu = j.appuiT; if ((j.appuiF ?? 0) > 0.6) { const P = ombres.pieds[i]; if (P) appuis.push({ x: P.x, z: P.z, ang: P.ang }); } }
     }
     if (dt > 0) marques.maj(M.t, ombres.bassins, appuis);
-    filet?.temps(M.t);
+    // (lot C) le filet suit la balle affichée (sa toile ne travaille que la balle près d'un but, ou tant qu'il bouge)
+    filet?.suivre(bInterp, M.t);
     if (dt > 0) enregistrerImage(M);
-    // l'anneau sous le joueur que tu joues
-    const visibleJeu = !banc.auto && (M.phase === 'jeu' || M.phase === 'engagement');
-    const c = M.controle[0], c1 = M.controle[1];
-    anneau.visible = visibleJeu && c != null;
-    if (c != null) { const I = vus[c].interp; anneau.position.set(I.x, 0.05, I.z); }
-    anneauB.visible = visibleJeu && c1 != null;
-    if (c1 != null) { const I = vus[c1].interp; anneauB.position.set(I.x, 0.05, I.z); }
+    majReperes(M);
+  }
+
+  /** (lot C) Les repères : le chevron du joueur tenu de chaque équipe humaine, le receveur d'une passe, la jauge, le
+   *  numéro de manette (deux humains), la flèche au sol de la charge. */
+  function majReperes(M) {
+    const visibleJeu = !banc.auto && !demo && (M.phase === 'jeu' || M.phase === 'engagement');
+    // une taille constante à l'écran : sprites sans perspective, l'échelle est en « mètres à 1 m » (px × 2 tan(fov/2) / h)
+    const u = (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2)) / Math.max(1, ch);
+    const eq = manettes.equipes(), deux = !!(M.humains[0] && M.humains[1]);
+    const bl = M.balle, rc = bl.recepteur != null && bl.possesseur == null ? bl.recepteur : null;
     for (const e of [0, 1]) {
-      const o = jauges[e], q = M.controle[e], f = e === 0 && !manettes.equipes()[0] && clavierJoue() ? cmdClavier.p : manettes.jauge(e);
-      o.visible = visibleJeu && q != null && f > 0.02;
-      if (o.visible) { const I = vus[q].interp; o.position.set(I.x, 0.055, I.z); o.geometry.setDrawRange(0, 6 * Math.max(1, Math.round(48 * f))); }
+      const R = reperes[e], q = M.controle[e];
+      const voit = visibleJeu && M.humains[e] && q != null;
+      R.chevron.visible = voit;
+      const f = e === 0 && !eq[0] && clavierJoue() ? cmdClavier.p : manettes.jauge(e);
+      const jauge = voit && f > 0.02;
+      R.piste.visible = jauge; R.rempli.visible = jauge;
+      const nm = voit && deux && eq[e] ? eq[e].index + 1 : 0;
+      R.numero.visible = nm > 0;
+      if (voit) {
+        const I = vus[q].interp;
+        // au-dessus de la tête (au sol, un tacle, une chute : plus bas, jamais sous 0,95 m), sans suivre le balancement
+        const cible = clamp(teteY(q) + 0.24, 0.95, 2.35);
+        R.hauteur += (cible - R.hauteur) * (Math.abs(cible - R.hauteur) > 0.5 ? 1 : 0.25);
+        const hC = TAILLES.chevron * u;
+        R.chevron.position.set(I.x, R.hauteur, I.z); R.chevron.scale.set(hC, hC, 1);
+        if (jauge) {
+          // au-dessus du chevron (son sommet est à 0,81 de sa hauteur), 3 px plus haut ; la piste déborde d'1 px
+          const bas = TAILLES.chevron * 0.81 + 3, L = TAILLES.jaugeL, H = TAILLES.jaugeH;
+          R.piste.position.copy(R.chevron.position); R.piste.scale.set((L + 2) * u, (H + 2) * u, 1); R.piste.center.set(0.5, -bas / (H + 2));
+          R.rempli.position.copy(R.chevron.position); R.rempli.scale.set(L * f * u, H * u, 1); R.rempli.center.set(1 / (2 * f), -(bas + 1) / H);
+        }
+        if (nm) {
+          if (R.n !== nm) { R.n = nm; R.numero.material.map = texNumero(e, nm); R.numero.material.needsUpdate = true; }
+          const hN = TAILLES.numero * u;
+          R.numero.position.copy(R.chevron.position); R.numero.scale.set(hN * 0.75, hN, 1);
+          R.numero.center.set(-(TAILLES.chevron * 0.36) / (TAILLES.numero * 0.75), -(TAILLES.chevron * 0.18) / TAILLES.numero);
+        }
+      }
+      // le receveur d'une passe de cette équipe (qu'un humain ne tient pas encore)
+      const rv = visibleJeu && M.humains[e] && rc != null && M.joueurs[rc]?.e === e && rc !== q;
+      R.receveur.visible = rv;
+      if (rv) {
+        const I = vus[rc].interp, hR = TAILLES.receveur * u;
+        R.receveur.position.set(I.x, clamp(teteY(rc) + 0.22, 0.95, 2.3), I.z); R.receveur.scale.set(hR, hR, 1);
+      }
       // (lot A) la flèche de la charge
       const fl = fleches[e], V = q != null ? M.joueurs[q].vise : null;
       fl.visible = visibleJeu && !!V;
       if (fl.visible) {
-        const I = vus[q].interp, dx = V.x - I.x, dz = V.z - I.z;
-        fl.position.set(I.x + Math.sin(Math.atan2(dx, dz)) * 0.45, 0.06, I.z + Math.cos(Math.atan2(dx, dz)) * 0.45);
-        fl.rotation.set(0, Math.atan2(dx, dz), 0);
+        const I = vus[q].interp, dx = V.x - I.x, dz = V.z - I.z, a = Math.atan2(dx, dz);
+        fl.position.set(I.x + Math.sin(a) * 0.45, 0.06, I.z + Math.cos(a) * 0.45);
+        fl.rotation.set(0, a, 0);
         fl.scale.setScalar(1.1 + 2.6 * Math.max(V.p, f));
       }
     }
@@ -613,7 +742,7 @@ export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, 
     ecrireImage(sauveR, 0);
     planR = null;
     etat.ralenti = true; etat.message = null; signaler();
-    for (const o of [anneau, anneauB, ...jauges, ...fleches]) o.visible = false;
+    for (const o of [...objetsReperes, ...fleches]) o.visible = false;
   }
   function finirRalenti() {
     poserImage(sauveR);
@@ -634,7 +763,7 @@ export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, 
     camera.lookAt(versMonde(camR.regard, w));
     renderer.toneMappingExposure = expoBase * (1 - o.noir);
     ombres.maj(vus, balle.position, true);
-    filet?.temps(o.t);
+    filet?.suivre(balle.position, o.t);
     peindreEcran(`${etat.noirs}-${etat.blancs}-${horlogeTexte(etat.reste)}`, etat.noirs, etat.blancs, horlogeTexte(etat.reste));
     if (banc.rendu) pl.rendre(performance.now() / 1000);
   }
@@ -797,7 +926,7 @@ export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, 
     manettes: { abonner: manettes.abonner, instantane: manettes.instantane, reconnues: manettes.reconnues },
     // banc d'essai (?banc) : l'état, la graine, des pas exacts, l'empreinte, les scénarios de capture
     _test: {
-      etat, banc, anneau, anneauB, pouce, manettes, clavier, cmdClavier,
+      etat, banc, reperes, fleches, pouce, manettes, clavier, cmdClavier,
       get pause() { return pause; },
       get demo() { return demo; },
       get monde() { return m(); },

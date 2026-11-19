@@ -16,7 +16,8 @@
 //   · Match : chaque manette rangée dans une équipe écrit l'intention de cette équipe (entrees/commande.js). Débranchée,
 //     son équipe repasse à l'IA au pas suivant (la page lit equipes() à chaque image), sans pause ni plantage ;
 //     rebranchée, A / ✕ la remet dans son équipe ; une manette qui arrive pendant le match entre avec A / ✕ dans
-//     l'équipe que tient l'IA. Menu / Options : pause (surPause).
+//     l'équipe que tient l'IA. Menu / Options : pause (surPause). (bola-app#32, lot C) Vue / Share : masquer ou montrer
+//     le panneau des touches (surPanneau, lu par la page).
 //   · Vibrations : vibrationActuator.playEffect('dual-rumble') (Chrome, Edge), sinon hapticActuators[0].pulse
 //     (Firefox), sinon rien ; dans un try/catch, et seulement page visible.
 //
@@ -105,7 +106,7 @@ export function creerManettes({ versJeu = (sx, sy) => ({ x: -sy, z: -sx }) } = {
   let version = 0, instant = null;
   let activite = -Infinity; // (bola-app#32, lot B) l'heure du dernier vrai geste de jeu d'une manette, en match
   const abonnes = new Set();
-  const api = { surSalon: null, surDemarrer: null, surPause: null, surTouches: null, surPasser: null };
+  const api = { surSalon: null, surDemarrer: null, surPause: null, surTouches: null, surPasser: null, surPanneau: null };
 
   const changer = () => { version++; instant = null; for (const f of abonnes) f(); };
 
@@ -178,6 +179,8 @@ export function creerManettes({ versJeu = (sx, sy) => ({ x: -sy, z: -sx }) } = {
         if (Math.hypot(p.etat.ax[0], p.etat.ax[1]) > 0.5 || Math.hypot(p.etat.ax[2], p.etat.ax[3]) > 0.5) activite = t;
         // (bola-app#26, lot 4) A / ✕ passe le ralenti du but (match.js ne l'écoute que pendant le ralenti)
         if (bas(K.A)) api.surPasser?.();
+        // (bola-app#32, lot C) Vue / Share en match : masquer ou montrer le panneau des touches (la page)
+        if (bas(K.VUE)) api.surPanneau?.();
         if (p.equipe != null) {
           // (hors du jeu, but, ralenti, engagement, fin : rien n'est gardé pour plus tard, sinon le A qui passe le
           // ralenti deviendrait une passe au coup d'envoi ; comme le clavier, la commande est oubliée)
