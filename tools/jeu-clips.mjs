@@ -4,7 +4,7 @@
 // La simulation ne lit jamais le squelette animé (elle tourne aussi sans navigateur, dans le banc) : ce qu'elle doit
 // savoir des clips Mixamo est mesuré ici, une fois, hors navigateur. Le .pak est débrouillé en mémoire (pakcodec.js),
 // le GLB n'est jamais écrit sur disque, aucun FBX n'est lu. Pour chaque clip des paquets « player », « keeper »,
-// « player2 », « keeper2 » et « celeb2 » (bola-app#26, tools/jeu-anims.mjs) :
+// « player2 », « keeper2 », « celeb2 » (bola-app#26, tools/jeu-anims.mjs) et « player3 » (bola-app#32, le saut) :
 //   dur, hit (part du clip à l'impact, index.json), turn (courbe de lacet fournie, index.json) ;
 //   root : le déplacement horizontal de la racine (root motion), en mètres, à 30 images/s (x, z alternés) ;
 //   pieds : la position du milieu de chaque pied (entre cheville et orteil) dans le repère du joueur, sans le root
@@ -42,7 +42,7 @@ const voir = process.argv.includes('--voir');
 
 await MeshoptDecoder.ready;
 const sortie = {}, sources = {};
-const PAQUETS = ['player', 'keeper', 'player2', 'keeper2', 'celeb2'];
+const PAQUETS = ['player', 'keeper', 'player2', 'keeper2', 'celeb2', 'player3'];
 for (const pack of PAQUETS) {
   const brut = fs.readFileSync(path.join(racine, `public/jeu/anims/${pack}.pak`));
   sources[pack] = empreinteOctets(brut);

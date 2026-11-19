@@ -96,7 +96,13 @@ export function pasGardien(m, k) {
     if (!k.lecture || k.lecture.t0 !== t.t0) {
       const tireur = m.joueurs[t.j];
       const pres = hypot(tireur.p.x - k.p.x, tireur.p.z - k.p.z) < 6 ? 0.06 : 0;
-      k.lecture = { t0: t.t0, reaction: m.rng.gardiens.entre(0.26, 0.36) + pres, prochaine: 0, fait: false, pred: null };
+      // (correctifs #32, D1 du contrôle du jeu) le temps de réaction laisse au moins 0,15 s de vol à la balle (0,12 s de
+      // réaction au moins) : sur une frappe de près, le gardien lit le geste du tireur et plonge, même court ; avant, une
+      // frappe à 7 m (0,32 s de vol) arrivait avant la fin de sa réaction : 0 plongeon sur 45, 45 buts. De plus loin, rien
+      // ne change (0,26 à 0,36 s)
+      const vol = (predire(b, (q) => (q.p.z - zb) * Math.sign(zb) >= 0, 2.2)?.t ?? 9) + (m.t - t.t0);
+      const base = m.rng.gardiens.entre(0.26, 0.36) + pres;
+      k.lecture = { t0: t.t0, reaction: Math.min(base, Math.max(0.12, vol - 0.15)), prochaine: 0, fait: false, pred: null };
     }
     const L = k.lecture;
     const age = m.t - t.t0;
@@ -134,6 +140,16 @@ export function pasGardien(m, k) {
       if (hypot(o.p.x, o.p.z - zb) < dBut - 0.5 && Math.abs(o.p.x - b.p.x * (hypot(o.p.x, o.p.z - zb) / dBut)) < 1.6) seul = false;
     }
     if (seul) prof = clamp(Math.max(prof, 1.6 + (9 - dBut) * 0.35), 0.7, Math.min(3.2, dBut - 1.5));
+    // (bola-app#32, lot A2) la sortie dans les pieds : seul face à lui, le porteur à moins de 1,7 m, la balle au sol et
+    // pas encore au pied (plus de 0,35 m devant lui) : le gardien plonge sur la balle (parade couchée dans l'axe, plongeon
+    // bas de côté : decider, sur la balle dans 0,22 s) ; une fois toutes les 2,5 s au plus
+    const dk = hypot(b.p.x - k.p.x, b.p.z - k.p.z), dpb = hypot(b.p.x - pa.p.x, b.p.z - pa.p.z);
+    if (seul && !k.g && dk < 1.7 && dpb > 0.35 && m.t > (k.sortieT ?? -9) + 2.5) {
+      k.sortieT = m.t;
+      decider(m, k, { p: { x: b.p.x + b.v.x * 0.22, y: 0.12, z: b.p.z + b.v.z * 0.22 }, t: 0.22 });
+      m.ev('sortiePieds', { j: k.i });
+      if (k.g) return;
+    }
   }
   const { x: cxA, z: czA } = surAngle(b.p.x, b.p.z, zb, prof);
   let cx = cxA, cz = czA;
@@ -182,7 +198,15 @@ function finPlongeon(m, k) {
   const c = CLIPS[k.g.nom], i = (c.n - 1) * 6;
   const lx = (c.pieds[i] + c.pieds[i + 3]) / 200, lz = (c.pieds[i + 2] + c.pieds[i + 5]) / 200;
   versMonde(k.cap, lx, lz, t2);
-  k.p.x += t2.x; k.p.z += t2.z;
+  // (bola-app#32, lot A2) la racine rejoint les pieds, mais pas dans un autre corps (une sortie dans les pieds finit
+  // contre l'attaquant) : elle s'arrête avant, sur le chemin
+  let u = 1;
+  for (let it = 0; it < 6; it++) {
+    const x = k.p.x + t2.x * u, z = k.p.z + t2.z * u;
+    if (!m.joueurs.some((o) => o !== k && !o.absent && o.mode !== 'sol' && hypot(o.p.x - x, o.p.z - z) < 0.7)) break;
+    u -= 0.2;
+  }
+  k.p.x += t2.x * Math.max(0, u); k.p.z += t2.z * Math.max(0, u);
   finirGeste(k);
   k.sauts = (k.sauts ?? 0) + 1;
 }
@@ -191,10 +215,13 @@ function finPlongeon(m, k) {
 function decider(m, k, r) {
   const T = r.p, reste = r.t;
   const lat = T.x - k.p.x;
-  if (Math.abs(lat) < 0.6 && T.y < 2.1) {
+  // (correctifs #32, D1 du contrôle du jeu) une balle haute à moins de 0,9 m de lui : le saut bras levés (k_high), avec son
+  // appel de côté ; avant, seulement dans l'axe (0,6 m), et le saut n'était jamais joué
+  const haute = T.y > 1.45 && T.y < 2.3 && Math.abs(lat) < 0.9 && CLIPS.k_high;
+  if ((Math.abs(lat) < 0.6 && T.y < 2.1) || haute) {
     // (bola-app#26) dans l'axe : la parade couchée en bas (k_block), l'arrêt face à hauteur de poitrine
     // (k_catch_std), le saut sur une balle haute (k_high, sinon k_catch)
-    const nom = T.y <= 0.9 ? 'k_block' : T.y <= 1.55 && CLIPS.k_catch_std ? 'k_catch_std' : CLIPS.k_high ? 'k_high' : 'k_catch';
+    const nom = haute ? 'k_high' : T.y <= 0.9 ? 'k_block' : T.y <= 1.55 && CLIPS.k_catch_std ? 'k_catch_std' : CLIPS.k_high ? 'k_high' : 'k_catch';
     // l'image où les mains sont les plus proches de la hauteur visée, dans la première moitié du clip
     const c = CLIPS[nom];
     let f = 10, best = Infinity;
@@ -206,23 +233,49 @@ function decider(m, k, r) {
     m.ev('arret', { j: k.i, nom });
     return;
   }
-  // trop tard : la balle passe dans moins de 0,2 s loin de lui ; il ne plonge pas après coup, il est battu (k_miss :
-  // l'élan qui part trop tard, sans les mains)
-  if (reste < 0.2) {
+  // trop tard : la balle passe dans moins de 0,2 s loin de lui. (bola-app#32, lot A2) Il plonge quand même, plus vite et
+  // sans sa prise d'élan (un vrai plongeon, souvent trop court) ; battu sur ses appuis (k_miss) seulement si même ce
+  // plongeon-là ne mène pas ses mains vers la balle. Avant : battu à chaque fois, plus de la moitié des tirs cadrés.
+  const tard = reste < 0.2;
+  // le plongeon : le côté, l'image, le cap, le rythme (parti trop tard, il ne couvre qu'un peu plus de la moitié du chemin : le
+  // plongeon est vrai, mais court)
+  const Tp = tard ? { x: k.p.x + (T.x - k.p.x) * 0.55, y: T.y, z: T.z } : T;
+  const meilleur = chercherPlongeon(k, Tp, reste, tard);
+  // (correctifs #32, D1 du contrôle du jeu) parti tard, il plonge quand même du côté de la balle, même court (un vrai
+  // plongeon, qui peut la manquer) ; battu debout (k_miss) seulement s'il n'a aucun plongeon de ce côté. Avant : k_miss
+  // dès que le plongeon ne menait pas les mains à 1,2 m de la balle, c'est-à-dire sur presque toutes les frappes proches
+  if (!meilleur || (tard && meilleur.err > 3)) {
     m.ev('battu', { j: k.i });
-    if (CLIPS.k_miss && Math.abs(lat) < 2.5) { k.cap = dedansDe(k.e) > 0 ? 0 : Math.PI; lancerGeste(k, 'k_miss', { taux: 1.3, depuis: 0.25, type: 'battu', fin: duree('k_miss') * 0.8 }); }
+    // (bola-app#32, lot A2 : battu en pleine course — une sortie —, il ne pivote plus d'un coup face au jeu, jusqu'à 110° en
+    // une image : il est battu dans sa course)
+    const face = dedansDe(k.e) > 0 ? 0 : Math.PI;
+    if (CLIPS.k_miss && Math.abs(lat) < 2.5) { if (hypot(k.v.x, k.v.z) < 2 || Math.abs(enrouler(face - k.cap)) < 0.6) k.cap = face; lancerGeste(k, 'k_miss', { taux: 1.3, depuis: 0.25, type: 'battu', fin: duree('k_miss') * 0.8 }); }
     return;
   }
-  // le plongeon : le côté, l'image, le cap, le rythme
+  k.cap = meilleur.cap;
+  const g = lancerGeste(k, meilleur.nom, { taux: meilleur.taux, type: 'plongeon', depuis: meilleur.elan / duree(meilleur.nom) });
+  const appel = clamp(meilleur.appel, -0.5, 0.5), ta = 0.15;
+  g.donnees = { appel: { x: (meilleur.tx / meilleur.rt) * appel / ta, z: (meilleur.tz / meilleur.rt) * appel / ta, t: ta }, err: meilleur.err, dy: meilleur.dy, tVise: meilleur.i / FPS_CLIPS };
+  m.ev('plongeon', { j: k.i, nom: meilleur.nom, err: meilleur.err, tard, x: T.x, y: T.y, t: reste });
+  m.stats.plongeons++;
+}
+
+/**
+ * Le plongeon qui amène les mains au point de passage T à l'instant prédit (reste, s) : le clip (haut k_dive, ou bas
+ * k_low pour une balle sous 0,75 m), l'image où les mains y sont, le cap (le gardien reste face au jeu, 75° au plus), le
+ * rythme (0,8 à 1,3 fois la capture) et l'appel (0,5 m au plus) ; chaque clip saute sa prise d'élan (ELANS). tard : la
+ * balle passe dans moins de 0,2 s, le plongeon part de plus loin dans le clip (0,12 s d'élan en moins) et peut aller
+ * au même rythme. Renvoie le meilleur, ou null.
+ */
+function chercherPlongeon(k, T, reste, tard = false) {
   let meilleur = null;
   const face = dedansDe(k.e) > 0 ? 0 : Math.PI;
-  // les plongeons : haut (k_dive) et, pour une balle basse, la parade couchée sur le côté (k_low, hanches gardées) ;
-  // chacun saute sa prise d'élan (ELANS)
+  const tmax = TAUX_MAX;
   const noms = T.y < 0.75 && CLIPS.k_low_l ? ['k_dive_r', 'k_dive_l', 'k_low_r', 'k_low_l'] : ['k_dive_r', 'k_dive_l'];
   for (const nom of noms) {
     const c = CLIPS[nom];
-    const ELAN = ELANS[nom] ?? ELANS.k_dive_r;
-    for (let i = nom.startsWith('k_low') ? Math.ceil(ELAN * FPS_CLIPS) + 2 : 9; i < Math.min(c.n, 46); i++) {
+    const ELAN = (ELANS[nom] ?? ELANS.k_dive_r) + (tard ? 0.12 : 0);
+    for (let i = nom.startsWith('k_low') ? Math.ceil(ELAN * FPS_CLIPS) + 2 : Math.max(9, Math.ceil(ELAN * FPS_CLIPS) + 2); i < Math.min(c.n, 46); i++) {
       const hx = c.mains[i * 3] / 100, hy = c.mains[i * 3 + 1] / 100, hz = c.mains[i * 3 + 2] / 100;
       const rho = hypot(hx, hz);
       const tx = T.x - k.p.x, tz = T.z - k.p.z, rt = hypot(tx, tz);
@@ -230,19 +283,15 @@ function decider(m, k, r) {
       const ecartFace = Math.abs(enrouler(cap - face));
       if (ecartFace > 1.3) continue;
       const taux = (i / FPS_CLIPS - ELAN) / Math.max(0.05, reste - 0.02);
-      const pTaux = taux > TAUX_MAX ? (taux - TAUX_MAX) * 2 : taux < 0.8 ? (0.8 - taux) : 0;
+      const pTaux = taux > tmax ? (taux - tmax) * 2 : taux < 0.8 ? (0.8 - taux) : 0;
       const dy = clamp(T.y - hy, -0.4, 0.5);
-      const err = Math.max(0, Math.abs(rt - rho) - 0.5) + Math.abs(hy + dy - T.y) * 0.8 + pTaux + ecartFace * 0.05;
-      if (!meilleur || err < meilleur.err) meilleur = { nom, i, cap, taux: clamp(taux, 0.8, TAUX_MAX), err, appel: rt - rho, tx, tz, rt, dy };
+      // (correctifs #32 : la parade basse sur le côté, k_low, pour les balles basses ; au-dessus de 0,45 m, le vrai plongeon
+      // k_dive l'emporte à erreur égale, à plus de 1 m de lui ; il n'était jamais joué)
+      const err = Math.max(0, Math.abs(rt - rho) - 0.5) + Math.abs(hy + dy - T.y) * 0.8 + pTaux + ecartFace * 0.05 + (nom.startsWith('k_low') && T.y > 0.45 && Math.abs(T.x - k.p.x) > 1 ? 0.3 : 0);
+      if (!meilleur || err < meilleur.err) meilleur = { nom, i, cap, taux: clamp(taux, 0.8, tmax), err, appel: rt - rho, tx, tz, rt, dy, elan: ELAN };
     }
   }
-  if (!meilleur) return;
-  k.cap = meilleur.cap;
-  const g = lancerGeste(k, meilleur.nom, { taux: meilleur.taux, type: 'plongeon', depuis: (ELANS[meilleur.nom] ?? ELANS.k_dive_r) / duree(meilleur.nom) });
-  const appel = clamp(meilleur.appel, -0.5, 0.5), ta = 0.15;
-  g.donnees = { appel: { x: (meilleur.tx / meilleur.rt) * appel / ta, z: (meilleur.tz / meilleur.rt) * appel / ta, t: ta }, err: meilleur.err, dy: meilleur.dy, tVise: meilleur.i / FPS_CLIPS };
-  m.ev('plongeon', { j: k.i, nom: meilleur.nom, err: meilleur.err });
-  m.stats.plongeons++;
+  return meilleur;
 }
 
 /** Le gardien pendant un arrêt : l'appel de départ (seul déplacement de la racine), puis immobile. */

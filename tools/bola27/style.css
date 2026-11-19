@@ -1,0 +1,27 @@
+/* Bola 27 (bola-app#33) : la feuille de style du jeu seul.
+   La même que celle de l'app (src/app/globals.css et ce qu'il importe : Tailwind, les jetons du design), pour que la
+   page du jeu ait exactement son aspect de /jouer. construire.mjs la compile avec Tailwind 4, en ne cherchant les
+   classes que dans les fichiers réellement mis dans le paquet du jeu, puis applique le même repli d'opacité que l'app
+   (postcss-repli-opacite.cjs).
+   Les polices : dans l'app, next/font pose --font-inter, --font-anton et --font-barlow sur <html>. Ici, Anton est le
+   fichier du jeu (public/jeu/plateau/anton-latin.woff2, celui que lit déjà le cube du score) ; Inter est récupérée
+   au moment de la construction, comme le fait next/font (construire.mjs ajoute sa règle @font-face « BolaInter ») ;
+   sans elle, la police du système prend le relais. */
+@import "../../src/app/globals.css";
+
+@font-face {
+  font-family: "BolaAnton";
+  src: url("/jeu/plateau/anton-latin.woff2") format("woff2");
+  font-display: swap;
+}
+
+:root {
+  --font-inter: "BolaInter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-anton: "BolaAnton", Impact, "Arial Narrow", sans-serif;
+  --font-barlow: "Arial Narrow", system-ui, sans-serif;
+}
+
+html,
+body {
+  background: #05070a;
+}

@@ -125,42 +125,48 @@ function appui(P: Any, bouton: number, n: number, autres?: (e: Any[]) => void) {
 }
 
 // ── passes et frappes à la puissance d'appui ──
+// (bola-app#32 : l'action part à l'appui, chargée ; la puissance est celle du relâché, lue par la simulation à
+// l'impact : on la lit dans l'événement « passe » / « frappe » ; la frappe est sur B / ○, la combinaison lue à l'appui)
 {
   const P = partie(5);
   const vus: Any[] = P.actions;
   appui(P, K.A, 12); // 0,2 s
-  const passe = vus.find((a) => a.type === 'passe');
   P.images(90);
+  const evP = P.evts.find((e: Any) => e.type === 'passe');
   engagement(P.m, 0); P.m.phase = 'jeu';
-  vus.length = 0;
-  appui(P, K.X, 27); // 0,45 s
-  const frappe = vus.find((a) => a.type === 'frappe');
+  vus.length = 0; P.evts.length = 0;
+  appui(P, K.B, 27); // 0,45 s
   P.images(30);
-  verifier('passe à l\'appui', !!passe && Math.abs(passe.p - 12 / 60 / 0.9) < 0.04 && P.evts.some((e: Any) => e.type === 'passe'), `0,2 s → p = ${f2(passe?.p ?? -1)}, passe jouée : ${P.evts.some((e: Any) => e.type === 'passe')}`);
-  verifier('frappe à l\'appui', !!frappe && Math.abs(frappe.p - 0.5) < 0.04 && P.evts.some((e: Any) => e.type === 'frappe'), `0,45 s → p = ${f2(frappe?.p ?? -1)}, frappe partie : ${P.evts.some((e: Any) => e.type === 'frappe')}`);
-  // lobée, profondeur, finesse, frappe lobée, passe tendue : le bon type
+  const evF = P.evts.find((e: Any) => e.type === 'frappe');
+  verifier('passe à l\'appui', !!evP && Math.abs(evP.p - 12 / 60 / 0.9) < 0.04, `0,2 s → p = ${f2(evP?.p ?? -1)}, passe jouée : ${!!evP}`);
+  verifier('frappe à l\'appui (B / ○)', !!evF && Math.abs(evF.p - 0.5) < 0.04, `0,45 s → p = ${f2(evF?.p ?? -1)}, frappe partie : ${!!evF}`);
+  // la commande à l'appui : centre (passe lobée au milieu), profondeur, enroulée, piqué, puissante, extérieur, R2 + ○
   const types: string[] = [];
-  for (const [b, mod] of [[K.B, -1], [K.Y, -1], [K.X, K.RB], [K.X, K.LB], [K.A, K.RB]] as [number, number][]) {
+  for (const [b, mod] of [[K.X, -1], [K.Y, -1], [K.B, K.RB], [K.B, K.LB], [K.A, K.RB], [K.B, K.LT], [K.B, K.RT]] as [number, number][]) {
     engagement(P.m, 0); P.m.phase = 'jeu'; vus.length = 0;
     appui(P, b, 20, (e) => { if (mod >= 0) e[0].b[mod] = 1; });
-    types.push(vus[0] ? `${vus[0].type}${vus[0].p > 0.6 ? '+' : ''}` : 'rien');
+    types.push(vus[0] ? `${vus[0].commande}:${vus[0].type}` : 'rien');
     P.images(60);
   }
-  verifier('lobée, profondeur, finesse, frappe lobée, tendue', types.join(',') === 'lob,profondeur,finesse,lobFrappe,passe+', types.join(', '));
+  const attendu = 'centre:lob,profondeur:profondeur,finesse:finesse,pique:lobFrappe,passePuissante:passe,exterieur:exterieur,ras:frappe';
+  verifier('commandes à l\'appui (□, △, R1 + ○, L1 + ○, R1 + ✕, L2 + ○, R2 + ○)', types.join(',') === attendu, types.join(', '));
 }
 
 // ── stick droit : crochet, roulette ; R3 : semelle ──
 {
   const P = partie(9);
   const evt = (t: string) => P.evts.some((e: Any) => e.type === t);
+  // (depuis que la balle ne traverse plus les corps, l'attaquant blanc placé devant au coup d'envoi la bloque : on
+  // l'écarte, le geste se joue balle au pied, sans adversaire sur la route ; bola-app#32, lot B : aussi pour le crochet,
+  // le presseur blanc attend maintenant à 3,6 m devant le porteur et lui reprend la balle du pied quand il lui fonce
+  // dessus de face — la récupération au pied du point 15 —, avant le coup de stick)
+  const ecarter = () => { const o = P.m.joueurs[9]; o.p.x = 7; o.p.z = 6; };
+  ecarter();
   P.images(40, (e) => { e[0].ax[0] = 1; });
   // coup sec vers le haut de l'écran
   for (let i = 0; i < 10; i++) P.image((e) => { e[0].ax[0] = 1; e[0].ax[3] = i < 5 ? -1 : 0; });
   P.images(40, (e) => { e[0].ax[0] = 1; });
   const crochet = evt('crochet');
-  // (depuis que la balle ne traverse plus les corps, l'attaquant blanc placé devant au coup d'envoi la bloque : on
-  // l'écarte, le geste se joue balle au pied, sans adversaire sur la route)
-  const ecarter = () => { const o = P.m.joueurs[9]; o.p.x = 7; o.p.z = 6; };
   engagement(P.m, 0); P.m.phase = 'jeu'; ecarter();
   P.images(40, (e) => { e[0].ax[0] = 1; });
   // demi-cercle : du bas, par la droite, vers le haut
@@ -193,17 +199,23 @@ function appui(P: Any, bouton: number, n: number, autres?: (e: Any[]) => void) {
   const j = () => P.m.joueurs[P.m.controle[0]];
   const p = porteur(P.m);
   const d0 = p ? Math.hypot(p.p.x - j().p.x, p.p.z - j().p.z) : 0;
-  P.images(40, (e) => { e[0].b.fill(0); e[0].b[K.A] = 1; e[0].b[K.RB] = 1; e[0].b[K.Y] = 1; });
+  // (bola-app#32, lot B : le porteur de l'IA choisit vite, et à l'engagement il joue souvent la passe de sécurité au fixo ;
+  // on mesure ici la course du presseur vers le porteur, pas le choix du porteur : sa décision est retenue pendant l'essai)
+  P.images(40, (e) => { e[0].b.fill(0); e[0].b[K.A] = 1; e[0].b[K.RB] = 1; e[0].b[K.Y] = 1; const pp = porteur(P.m); if (pp) pp.decision = 9; });
   const renfort = P.m.renfort[0], sortie = P.m.sortie[0];
   const q = porteur(P.m) ?? P.m.balle;
   const d1 = Math.hypot((q.p?.x ?? q.p.x) - j().p.x, (q.p?.z ?? q.p.z) - j().p.z);
   verifier('pressing, renfort, sortie', d1 < d0 && renfort && sortie, `distance au porteur ${f2(d0)} → ${f2(d1)} m ; renfort ${renfort} ; sortie ${sortie}`);
   P.images(2, (e) => { e[0].b.fill(0); });
+  // (bola-app#32 : l'IA joue plus vite, la balle a souvent changé de pied pendant le pressing ; on remet les Blancs au
+  // coup d'envoi, le joueur tenu à 1,6 m du porteur, pour essayer le tacle en défense)
+  engagement(P.m, 1); P.m.phase = 'jeu';
+  { const pb = porteur(P.m), jj = j(); if (pb) { jj.p.x = pb.p.x; jj.p.z = pb.p.z - 1.6; jj.cap = 0; jj.v.x = 0; jj.v.z = 0; } }
   const avant = j();
   // (bola-app#26, lot 3 : la disposition du genre, X / □ tacle glissé, B / ○ tacle debout)
   P.images(2, (e) => { e[0].b[K.X] = 1; });
   const glisse = avant.g?.type === 'tacle' || P.evts.some((e: Any) => e.type === 'tacleBalle' || e.type === 'tacleJambes');
-  verifier('tacle glissé (X)', glisse, `geste ${avant.g?.type ?? 'aucun'}`);
+  verifier('tacle glissé (X)', glisse, `geste ${avant.g?.type ?? 'aucun'} ; porteur ${porteur(P.m)?.i ?? '-'} (${porteur(P.m)?.e ?? '-'}), joueur ${avant.i}, mode ${avant.mode}, attaque ${(Cmd as Any).enAttaque(P.m, 0)}, dernière ${JSON.stringify(P.cmds[0].dernier)}`);
 }
 
 // ── deux manettes, un match entier, reproductible ──
@@ -266,7 +278,22 @@ function deuxManettes(graine: number) {
   // relevés, contrôles anticipés, plongeons bas, IA qui glisse moins souvent — d3f4e37b avant ; re-bénie par le lot 2 :
   // duels (tirage, poussée de dos, tacle contré), fautes et avantage, effet au pied, contrôle raté, centres et reprises,
   // appels, une-deux, pressing coordonné, gardien sur l'angle — 7c88787c avant ; les manettes ne la changent pas)
-  const REF = '98ccc5d7'; // (correctifs #26 : l'IA sort des coins, ciseau et tacle glissé corrigés, pouce levé seulement debout, coup franc à côté du joueur au sol ; 7919334a avant)
+  // (bola-app#32, lot A : la physique des corps plus vive, la balle aimantée, les passes dosées, les frappes à l'appui et la
+  // prise automatique changent le match de l'IA ; 98ccc5d7 aux correctifs #26, 7919334a avant)
+  // (bola-app#32, lot A2 : le geste de chaque commande — son clip, son élan, son rythme, 0,17 à 0,3 s pour l'IA au lieu de
+  // 0,22 s partout —, le gardien qui plonge même tard et sort dans les pieds, les trois issues du tacle glissé et sa
+  // portée selon la course, le tacle debout sans tirage au sort changent le match de l'IA ; 7fcad362 au lot A)
+  // (bola-app#32, lot B : l'IA du foot à 5 — postes du losange qui tournent, bloc de zone selon le plan, presseur qui
+  // attend hors de sa zone, porteur qui choisit sur des critères, tacles à bon escient, tireur du coup franc qui le
+  // joue de son point, rond de 7 m autour de la balle, plans plus marqués — change le match de l'IA ; 59097628 au lot A2)
+  // (bola-app#32, lot C, point 8 « le ballon reste accroché de manière réaliste » : la balle marquée est retenue par la
+  // poche du filet au lieu de rebondir sur un plan dur, ce qui change la fin de chaque but, donc l'empreinte d'un match
+  // qui en a ; b385be9a au lot B ; la même que celle du banc physique, jeu-banc « Ralenti »)
+  // (correctifs #32 du 19/11 : la frappe en course qui n'est plus effleurée, la prise aimantée à la portée du pied pour
+  // l'IA, la balle aimantée qui ne rebondit plus sur les corps, le gardien qui plonge de près, le receveur au sol oublié,
+  // les chutes plus courtes, les alas qui tiennent la largeur et le bloc bas plus bas changent le match de l'IA ; f0095cf5
+  // au lot C ; la même que celle du banc physique, npx tsx tools/jeu-banc.ts --graine=7)
+  const REF = '72b56bf5';
   verifier('IA contre IA inchangée (graine 7)', empreinte(m) === REF, `${empreinte(m)} (attendu ${REF}, celle du banc physique)`);
 }
 
@@ -360,8 +387,10 @@ const { TOUCHES, touchesMarkdown }: Any = Tch;
 
 // ── le tableau des touches, ligne par ligne, à la manette et au clavier ──
 type Image = { b?: string[]; ls?: [number, number]; rs?: [number, number] };
-const BTN: Record<string, number> = { A: K.A, B: K.B, X: K.X, Y: K.Y, LB: K.LB, RB: K.RB, LT: K.LT, RT: K.RT, R3: K.R3 };
-const TOUCHE: Record<string, string> = { A: 'd', B: 's', X: ' ', Y: 'f', LB: 'q', RB: 'r', LT: 'c', RT: 'shift', R3: 'u' };
+// (bola-app#32, lot B : la croix, la tactique ; au clavier 1 ↑, 2 ←, 3 ↓)
+const BTN: Record<string, number> = { A: K.A, B: K.B, X: K.X, Y: K.Y, LB: K.LB, RB: K.RB, LT: K.LT, RT: K.RT, R3: K.R3, HAUT: K.HAUT, BAS: K.BAS, GAUCHE: K.GAUCHE };
+// (bola-app#32 : Espace = B / ○, S = X / □)
+const TOUCHE: Record<string, string> = { A: 'd', B: ' ', X: 's', Y: 'f', LB: 'q', RB: 'r', LT: 'c', RT: 'shift', R3: 'u', HAUT: '1', GAUCHE: '2', BAS: '3' };
 /** n images identiques. */
 const tenir = (n: number, im: Image = {}): Image[] => Array.from({ length: n }, () => im);
 /** Les touches tenues qui font cette image au clavier (I J K L relatives au joueur de cap « cap »). */
@@ -382,7 +411,7 @@ function touchesDe(im: Image, cap: number | null) {
   return s;
 }
 // le monde d'une ligne : le n° 10 Noir (4) balle au pied, face au but attaqué (−z), et ce qu'il faut autour
-type Situation = { libre?: boolean; x?: number; z?: number; cap?: number; v?: number; adv?: [number, number, number][]; fixe?: boolean; defense?: boolean; partenaire?: [number, number, number] };
+type Situation = { libre?: boolean | number; air?: boolean; x?: number; z?: number; cap?: number; v?: number; adv?: [number, number, number][]; fixe?: boolean; defense?: boolean; partenaire?: [number, number, number] };
 function monde(S: Situation) {
   const m: Any = creerMonde({ graine: 3, humains: [true, false], aides: [0.5, 0], presents: [0, 4, 5, ...(S.adv ?? []).map((a) => a[0]), ...(S.partenaire ? [S.partenaire[0]] : []), ...(S.defense ? [9] : [])] });
   demarrer(m, { intro: false });
@@ -401,7 +430,9 @@ function monde(S: Situation) {
     b.v.x = j.v.x; b.v.y = 0; b.v.z = j.v.z; b.w.x = b.w.y = b.w.z = 0;
     b.possesseur = 4; b.dernier = 4; b.dernierT = m.t;
     // (la balle libre à 2,5 m devant lui : il n'est pas porteur)
-    if (S.libre) { b.p.x = j.p.x + 2.5; b.possesseur = null; b.dernier = null; }
+    if (S.libre) { b.p.x = j.p.x + (typeof S.libre === 'number' ? S.libre : 2.5); b.possesseur = null; b.dernier = null; }
+    // (bola-app#32 : la balle en l'air devant lui, qui retombe : R2 + ○ y est acrobatique)
+    if (S.air) { b.p.y = 1.0; b.v.y = 0.5; }
   }
   b.garde = null; b.tir = null; b.recepteur = null;
   if (S.fixe !== false) m.controleFixe = [4, null];
@@ -431,6 +462,8 @@ function jouerSuite(S: Situation, suite: Image[], appareil: 'pad' | 'clavier', a
     }
     if (c.dernier && c.dernier !== dernier) { dernier = c.dernier; actions.push({ ...dernier }); }
     const ch = c.changer;
+    // (bola-app#32, lot B : le choix de tactique à la croix est une action de la table, comme changer)
+    if (c.tactique) actions.push({ type: 'tactique', plan: c.tactique });
     for (let k = 0; k < 2; k++) {
       pas(m, [intentionDe(c), null]);
       for (const ev of m.evts) evts.push(ev);
@@ -454,20 +487,27 @@ const appuyer = (bt: string[], n = 15, ls?: [number, number]): Image[] => [...te
 // (le n° 10 regarde −z, la droite de l'écran : devant lui = stick à droite, sa gauche = le haut de l'écran)
 const AV: [number, number] = [1, 0], AR: [number, number] = [-1, 0], GA: [number, number] = [0, 1];
 const ESSAIS: Record<string, { S: Situation; suite: Image[]; ev?: string | ((r: Any) => boolean); verif?: (a: Any) => boolean; apres?: number }> = {
-  passe: { S: { partenaire: [3, 0, -2] }, suite: appuyer(['A']), ev: 'passe' },
-  tendue: { S: { partenaire: [3, 0, -2] }, suite: appuyer(['A', 'RB']), ev: 'passe', verif: (a) => a.p > 0.45 },
+  // (bola-app#32 : la disposition de Sabri ; « ev » prouve le geste dans la simulation, « verif » la commande)
+  passe: { S: { partenaire: [3, 0, -2] }, suite: appuyer(['A']), ev: 'passe', verif: (a) => a.commande === 'passe' },
+  passePuissante: { S: { partenaire: [3, 0, -2] }, suite: appuyer(['A', 'RB']), ev: 'passe', verif: (a) => a.puissante === true && a.commande === 'passePuissante' },
   uneDeux: { S: { partenaire: [3, -1, -4], fixe: false }, suite: [...tenir(12, { b: ['LB', 'A'] }), ...tenir(40, { b: ['LB'] })], ev: (r) => r.evts.some((e: Any) => e.type === 'appelUneDeux') && r.actions.some((a: Any) => a.uneDeux === 'remise'), apres: 200 },
-  lob: { S: { partenaire: [3, 0, -8] }, suite: appuyer(['B']), ev: 'passe' },
-  centre: { S: { x: 6.5, z: -9, cap: Math.PI * 1.5, partenaire: [3, 0, -11] }, suite: appuyer(['B']), ev: 'passe' },
+  frappe: { S: {}, suite: appuyer(['B'], 25), ev: 'frappe', verif: (a) => a.commande === 'frappe' },
+  finesse: { S: {}, suite: appuyer(['B', 'RB'], 25), ev: 'frappe' },
+  pique: { S: {}, suite: appuyer(['B', 'LB'], 25), ev: 'frappe' },
+  ras: { S: {}, suite: appuyer(['B', 'RT'], 25), ev: (r) => r.evts.some((e: Any) => e.type === 'elan' && e.commande === 'ras') && r.evts.some((e: Any) => e.type === 'frappe'), verif: (a) => a.r2 === true },
+  acrobatique: { S: { air: true }, suite: appuyer(['B', 'RT'], 6), ev: (r) => r.evts.some((e: Any) => e.type === 'elan' && e.commande === 'acrobatique'), verif: (a) => a.r2 === true },
+  exterieur: { S: {}, suite: appuyer(['B', 'LT'], 25), ev: 'frappe' },
+  feinteFrappe: { S: {}, suite: [...tenir(12, { b: ['B'] }), ...tenir(3, { b: ['B', 'A'] }), ...tenir(3)], ev: (r) => r.evts.some((e: Any) => e.type === 'feinteFrappe') && !r.evts.some((e: Any) => e.type === 'frappe') },
+  frappeParfaite: { S: {}, suite: [...tenir(4, { b: ['B'] }), ...tenir(1), ...tenir(2, { b: ['B'] })], ev: (r) => r.evts.some((e: Any) => e.type === 'frappeParfaite') && r.evts.some((e: Any) => e.type === 'frappe') },
+  centre: { S: { x: 6.5, z: -9, cap: Math.PI * 1.5, partenaire: [3, 0, -11] }, suite: appuyer(['X']), ev: 'passe' },
+  centreLobe: { S: { x: 6.5, z: -9, cap: Math.PI * 1.5, partenaire: [3, 0, -11] }, suite: appuyer(['X', 'LB']), ev: 'passe', verif: (a) => a.haut === true },
+  centreTendu: { S: { x: 6.5, z: -9, cap: Math.PI * 1.5, partenaire: [3, 0, -11] }, suite: appuyer(['X', 'RB']), ev: 'passe', verif: (a) => a.tendu === true },
   profondeur: { S: { partenaire: [3, 0, -2] }, suite: appuyer(['Y']), ev: 'passe' },
-  frappe: { S: {}, suite: appuyer(['X'], 25), ev: 'frappe' },
-  finesse: { S: {}, suite: appuyer(['X', 'RB'], 25), ev: 'frappe' },
-  exterieur: { S: {}, suite: appuyer(['X', 'LT'], 25), ev: 'frappe' },
-  pique: { S: {}, suite: appuyer(['X', 'LB'], 25), ev: 'frappe' },
-  ras: { S: {}, suite: appuyer(['X', 'LB', 'RB'], 25), ev: 'frappe', verif: (a) => a.y === 0.15 },
-  feinteFrappe: { S: {}, suite: [...tenir(12, { b: ['X'] }), ...tenir(3, { b: ['X', 'A'] }), ...tenir(3)], ev: (r) => r.evts.some((e: Any) => e.type === 'feinteFrappe') && !r.evts.some((e: Any) => e.type === 'frappe') },
+  profondeurLobee: { S: { partenaire: [3, 0, -2] }, suite: appuyer(['Y', 'LB']), ev: 'passe', verif: (a) => a.lobe === true },
+  profondeurTendue: { S: { partenaire: [3, 0, -2] }, suite: appuyer(['Y', 'RB']), ev: 'passe', verif: (a) => a.puissante === true },
   semelle: { S: COURSE, suite: [...tenir(3, { b: ['R3'], ls: AV }), ...tenir(3, { ls: AV })], ev: 'semelle' },
   jongle: { S: {}, suite: tenir(110, { b: ['LB', 'RB'] }), ev: (r) => r.evts.filter((e: Any) => e.type === 'jongle').length >= 2 },
+  prendre: { S: { fixe: true, libre: 1.6 }, suite: appuyer(['B'], 3), ev: (r) => r.evts.some((e: Any) => e.type === 'prendre') && r.evts.some((e: Any) => e.type === 'controle' && e.j === 4) },
   changerA: { S: { fixe: false, libre: true, partenaire: [3, -3, 2] }, suite: [], ev: 'changer' },
   crochet: { S: COURSE, suite: sec(GA), ev: 'crochet' },
   crochetCourt: { S: COURSE, suite: sec(GA, ['LT']), ev: 'crochet', verif: (a) => a.court === true },
@@ -480,10 +520,15 @@ const ESSAIS: Record<string, { S: Situation; suite: Image[]; ev?: string | ((r: 
   pousser: { S: COURSE, suite: sec(AV), ev: 'pousser' },
   petitPont: { S: { adv: [[7, 0, 3.0]] }, suite: sec(AV), ev: 'petitPont' },
   sombrero: { S: {}, suite: [...tenir(3, { b: ['R3'] }), ...tenir(5, { b: ['R3'], rs: AV }), ...tenir(10, { b: ['R3'] }), ...tenir(3)], ev: 'sombrero', apres: 120 },
-  tacle: { S: { defense: true }, suite: appuyer(['B'], 3), ev: (r) => r.gestes.includes('tacleDebout') && !r.gestes.includes('tacle') },
-  tacleGlisse: { S: { defense: true }, suite: appuyer(['X'], 3), ev: (r) => r.gestes.includes('tacle') && !r.gestes.includes('tacleDebout') },
+  // (défense : □ / X tacle glissé, ○ / B récupérer du pied, debout)
+  tacle: { S: { defense: true }, suite: appuyer(['X'], 3), ev: (r) => r.gestes.includes('tacle') && !r.gestes.includes('tacleDebout') },
+  recuperer: { S: { defense: true }, suite: appuyer(['B'], 3), ev: (r) => r.gestes.includes('tacleDebout') && !r.gestes.includes('tacle') },
   changer: { S: { defense: true, fixe: false, partenaire: [3, 3, 0] }, suite: appuyer(['LB'], 3), ev: 'changer' },
   choisir: { S: { defense: true, fixe: false, partenaire: [3, 3, 0] }, suite: [...tenir(4, { rs: [0, -1] }), ...tenir(3)], ev: 'changer' },
+  // (bola-app#32, lot B) la croix : le plan de l'équipe change, la simulation le publie (événement « tactique »)
+  tactiquePressing: { S: {}, suite: appuyer(['HAUT'], 3), ev: (r) => r.evts.some((e: Any) => e.type === 'tactique' && e.plan === 'pressing' && e.e === 0) && r.m.tactique[0].plan === 'pressing', verif: (a) => a.plan === 'pressing' },
+  tactiqueEquilibre: { S: { defense: true }, suite: [...appuyer(['HAUT'], 3), ...appuyer(['GAUCHE'], 3)], ev: (r) => r.m.tactique[0].plan === 'equilibre' && r.m.tactique[0].choisi === 'equilibre', verif: (a) => a.plan === 'pressing' || a.plan === 'equilibre' },
+  tactiqueBlocBas: { S: { defense: true }, suite: appuyer(['BAS'], 3), ev: (r) => r.m.tactique[0].plan === 'blocBas', verif: (a) => a.plan === 'blocBas' },
 };
 // (changer en attaque : la balle libre près de nous, LB)
 ESSAIS.changerA.suite = appuyer(['LB'], 3);
@@ -514,6 +559,107 @@ ESSAIS.changerA.suite = appuyer(['LB'], 3);
   verifier('tableau à la manette (Xbox et PlayStation : mêmes boutons standard)', ratesPad.length === 0, ratesPad.length ? ratesPad.join(' ; ') : `${lignes.length} lignes, chaque geste par sa combinaison`);
   verifier('tableau au clavier', ratesClavier.length === 0, ratesClavier.length ? ratesClavier.join(' ; ') : `${lignes.length} lignes`);
   verifier('mêmes intentions manette et clavier', ecarts.length === 0, ecarts.length ? ecarts.join(' ; ') : 'mêmes actions, dans le même ordre, sur chaque ligne');
+}
+
+// ── (bola-app#32, lot A) réactivité, balle aimantée, passes qui arrivent, L1, R2, charge ──
+{
+  /** Une manette sur un monde de situation, image par image (1/60 s, deux pas) ; f(e, k) règle l'image k. */
+  const rejouer = (S: Situation, n: number, f: (e: Any, k: number, m: Any) => void, apresImage?: (m: Any, k: number) => void) => {
+    const m = monde(S), c = creerCommande(), e = pad();
+    let t = 0;
+    const evts: Any[] = [];
+    lireManette(c, e, t, m, 0, versJeu); t += 1 / 60;
+    for (let k = 0; k < n; k++) {
+      e.b.fill(0); e.ax.fill(0);
+      f(e, k, m);
+      lireManette(c, e, t, m, 0, versJeu);
+      for (let s2 = 0; s2 < 2; s2++) { pas(m, [intentionDe(c), null]); for (const ev of m.evts) evts.push({ ...ev, k }); m.evts.length = 0; }
+      apresImage?.(m, k);
+      t += 1 / 60;
+    }
+    return { m, evts, c };
+  };
+  // (le stick d'écran qui va vers (gx, gz) du jeu : versJeu(sx, sy) = (−sy, −sx))
+  const stick = (e: Any, gx: number, gz: number) => { e.ax[0] = -gz; e.ax[1] = gx; };
+  const res: string[] = [];
+  let ok = true;
+  // 1. l'appui répond à l'image suivante, un appui bref part tout de suite (passe et frappe)
+  for (const [nom, bt, S] of [['passe', K.A, { partenaire: [3, 0, -4] }], ['frappe', K.B, {}]] as [string, number, Situation][]) {
+    let rep = -1, dep = -1;
+    const r0 = rejouer(S, 40, (e, k) => { if (k >= 1 && k < 7) e.b[bt] = 1; }, (m, k) => {
+      const j = m.joueurs[4];
+      if (rep < 0 && j.g && k >= 1) rep = k - 1;
+    });
+    const ev0 = r0.evts.find((x: Any) => (x.type === 'passe' || x.type === 'frappe') && x.j === 4);
+    dep = ev0 ? ev0.k - 1 : -1;
+    const bon = rep >= 0 && rep <= 1 && dep >= 0 && dep <= 12;
+    ok &&= bon; res.push(`${nom} : élan ${rep} image(s) après l'appui, balle partie ${dep} images après (appui de 0,1 s)`);
+  }
+  // 2. la charge : un appui bref → la puissance juste ; tenu 0,6 s → l'élan est tenu armé, la flèche publiée, p ≈ 0,67
+  {
+    const bref = rejouer({ partenaire: [3, 0, -6] }, 50, (e, k) => { if (k >= 1 && k < 5) e.b[K.A] = 1; });
+    const pb = bref.evts.find((x: Any) => x.type === 'passe');
+    let gel = 0, fleche = 0;
+    const long = rejouer({ partenaire: [3, 0, -6] }, 90, (e, k) => { if (k >= 1 && k < 37) e.b[K.A] = 1; }, (m) => { const j = m.joueurs[4]; if (j.g?.gel) gel++; if (j.vise) fleche++; });
+    const pl = long.evts.find((x: Any) => x.type === 'passe');
+    const bon = !!pb && pb.p == null && !!pl && Math.abs(pl.p - 36 / 60 / 0.9) < 0.05 && gel > 15 && fleche > 15 && pl.k <= 40;
+    ok &&= bon; res.push(`charge : appui bref p ${pb?.p ?? 'juste'}, tenu 0,6 s p ${pl ? f2(pl.p) : '—'} (élan tenu armé ${gel} images, flèche ${fleche} images, balle partie ${pl ? pl.k - 36 : '—'} images après le relâché)`);
+  }
+  // 3. trop chargée (1 s), la frappe passe au-dessus de la barre ; à moitié, elle reste sous la barre
+  {
+    const haut = (n: number) => { let y = NaN; rejouer({ z: 0 }, 160, (e, k) => { if (k >= 1 && k < 1 + n) e.b[K.B] = 1; }, (m) => { const b = m.balle; if (Number.isNaN(y) && b.p.z <= -14.9 && b.tir) y = b.p.y; }); return y; };
+    const y1 = haut(60), y5 = haut(27);
+    const bon = y1 > 2.05 && !(y5 > 2.05);
+    ok &&= bon; res.push(`frappe trop chargée : à la ligne à ${f2(y1)} m (au-dessus de 2 m), à moitié ${Number.isNaN(y5) ? 'arrêtée avant' : f2(y5) + ' m'}`);
+  }
+  // 4. arrêt net, virage serré, demi-tour immédiat, balle au pied et gardée
+  {
+    const lance = (k: number) => k < 150;
+    const sit: Situation = { z: 10, cap: Math.PI };
+    let tStop = -1;
+    const a = rejouer(sit, 220, (e, k) => { if (lance(k)) { stick(e, 0, -1); e.b[K.RT] = 1; } }, (m, k) => { const j = m.joueurs[4]; if (!lance(k) && tStop < 0 && Math.hypot(j.v.x, j.v.z) < 0.3) tStop = (k - 150) / 60; });
+    const ja = a.m.joueurs[4], dA = Math.hypot(a.m.balle.p.x - ja.p.x, a.m.balle.p.z - ja.p.z);
+    let tRep = -1;
+    const d = rejouer(sit, 240, (e, k) => { stick(e, 0, lance(k) ? -1 : 1); e.b[K.RT] = 1; }, (m, k) => { const j = m.joueurs[4]; if (!lance(k) && tRep < 0 && j.v.z > 2) tRep = (k - 150) / 60; });
+    const jd = d.m.joueurs[4];
+    let tVir = -1;
+    const v = rejouer(sit, 220, (e, k) => { if (lance(k)) stick(e, 0, -1); else stick(e, 1, 0); e.b[K.RT] = 1; }, (m, k) => { const j = m.joueurs[4], s3 = Math.hypot(j.v.x, j.v.z); if (!lance(k) && tVir < 0 && s3 > 1 && Math.abs(Math.atan2(j.v.x, j.v.z) - Math.PI / 2) < 0.26) tVir = (k - 150) / 60; });
+    const jv = v.m.joueurs[4];
+    const garde = (r: Any, j: Any) => porteur(r.m) === j && Math.hypot(r.m.balle.p.x - j.p.x, r.m.balle.p.z - j.p.z) < 1.2;
+    const bon = tStop >= 0 && tStop <= 0.6 && dA < 0.8 && garde(a, ja) && tRep >= 0 && tRep <= 0.6 && garde(d, jd) && tVir >= 0 && tVir <= 0.65 && garde(v, jv);
+    ok &&= bon; res.push(`balle au pied lancé : arrêt ${f2(tStop)} s (balle à ${f2(dA)} m), demi-tour reparti en ${f2(tRep)} s, virage 90° en ${f2(tVir)} s ; balle gardée ${garde(a, ja)}/${garde(d, jd)}/${garde(v, jv)}`);
+  }
+  // 5. la passe arrive : couloir libre, 6 à 11 m, quatre angles ; le receveur (Noir n° 3) la contrôle
+  {
+    let arrive = 0, n = 0;
+    for (const [x, z] of [[0, -6], [4, -6], [-5, -4], [6, 1], [-7, 0], [3, -10], [0, -11], [-4, -9]] as [number, number][]) {
+      n++;
+      const r = rejouer({ partenaire: [3, x, 4 + z] }, 150, (e, k, m) => { const j = m.joueurs[4], o = m.joueurs[3]; if (k >= 1 && k < 5) { e.b[K.A] = 1; const L = Math.hypot(o.p.x - j.p.x, o.p.z - j.p.z) || 1; stick(e, (o.p.x - j.p.x) / L, (o.p.z - j.p.z) / L); } });
+      if (r.evts.some((ev: Any) => ev.type === 'controle' && ev.j === 3)) arrive++;
+    }
+    const bon = arrive >= n - 1;
+    ok &&= bon; res.push(`passes qui arrivent (couloir libre) : ${arrive}/${n}`);
+  }
+  // 6. L1 seul, sans la balle : le joueur le plus proche du ballon ; R2 tenu ne change pas de joueur et fait sprinter
+  {
+    const r = rejouer({ defense: true, fixe: false, partenaire: [3, 0.5, 2.4] }, 6, (e, k) => { if (k === 1) e.b[K.LB] = 1; });
+    const c1 = r.m.controle[0];
+    // (R2 tapé quatre fois en défense : le même joueur tenu qu'avec rien ; R2 tenu, sans la balle : le sprint)
+    const r2 = rejouer({ defense: true, fixe: false, partenaire: [3, 0.5, 2.4] }, 30, (e, k) => { if (k % 6 < 2) e.b[K.RT] = 1; });
+    const r0b = rejouer({ defense: true, fixe: false, partenaire: [3, 0.5, 2.4] }, 30, () => {});
+    const c2 = r2.m.controle[0], c0 = r0b.m.controle[0];
+    const rs = rejouer({ libre: 9 }, 90, (e) => { e.b[K.RT] = 1; stick(e, 0, -1); });
+    const v2 = Math.hypot(rs.m.joueurs[4].v.x, rs.m.joueurs[4].v.z);
+    const bon = c1 === 3 && c2 === c0 && v2 > 6.5;
+    ok &&= bon; res.push(`L1 : contrôle → ${c1} (le plus proche du ballon : 3) ; R2 tapé : contrôle ${c2} (sans R2 : ${c0}) ; R2 tenu sans la balle : ${f2(v2)} m/s`);
+  }
+  // 7. un geste raté coûte la balle : deux gestes du stick droit à moins de 0,25 s
+  {
+    const r = rejouer({ v: 4.2 }, 60, (e, k) => { stick(e, 0, -1); if (k >= 2 && k < 5) e.ax[3] = -1; if (k >= 9 && k < 12) e.ax[3] = 1; });
+    const rate = r.evts.some((x: Any) => x.type === 'gesteRate');
+    ok &&= rate; res.push(`geste raté (deux gestes à 0,12 s) : ${rate ? 'balle perdue' : 'RIEN'}`);
+  }
+  verifier('lot A : réactivité, balle aimantée, passes, L1, R2, charge', ok, res.join(' ; '));
 }
 
 // ── I J K L : relatives au joueur (I = pousser devant lui, quel que soit son cap) ──
@@ -566,7 +712,7 @@ ESSAIS.changerA.suite = appuyer(['LB'], 3);
   const suite: Image[] = [
     ...sec(GA).map((im) => ({ ...im, ls: AV })),
     ...[AR, [-0.7071, 0.7071], GA, [0.7071, 0.7071], AV].flatMap((d) => tenir(2, { rs: d as [number, number], ls: AV })),
-    ...tenir(10, { b: ['X'], ls: AV }), ...tenir(2, { ls: AV }),
+    ...tenir(10, { b: ['B'], ls: AV }), ...tenir(2, { ls: AV }),
   ];
   const r = jouerSuite(COURSE, suite, 'pad', 120);
   const t = (ty: string) => r.evts.find((e: Any) => e.type === ty && e.j === 4)?.t;
@@ -576,16 +722,17 @@ ESSAIS.changerA.suite = appuyer(['LB'], 3);
   verifier('enchaînement crochet → roulette → frappe', ok, `crochet ${f(t0)} s, roulette ${f(t1)} s, élan de la frappe ${f(te)} s (${t0 != null && te != null ? (te - t0).toFixed(2) : '—'} s, seuil 1,2), balle frappée ${f(t2)} s (seuil 1,5) ; la frappe a attendu en file : ${r.evts.some((e: Any) => e.type === 'enchaine')}`);
 }
 
-// ── (correctifs) la feinte de frappe « X puis A » quand A arrive juste APRÈS le relâché de X (16 à 200 ms) :
-// l'élan de la frappe est annulé, la balle n'est pas frappée (le A ne va pas en file derrière la frappe) ──
+// ── (correctifs) la feinte de frappe « ○ puis ✕ » (bola-app#32 : ○ / B ; tenue, la frappe chargée attend armée, la
+// feinte la coupe tant qu'elle n'est pas partie ; juste après le relâché, 1 image, aussi : l'impact tombe 0,05 s après) ──
 {
   const rates: string[] = [];
-  for (const d of [1, 3, 8, 12]) {
-    const r = jouerSuite({}, [...tenir(25, { b: ['X'] }), ...tenir(d), ...tenir(2, { b: ['A'] })], 'pad', 60);
+  for (const [n, d] of [[25, -10], [25, -3], [25, 0], [25, 1]] as [number, number][]) {
+    const suite = d < 0 ? [...tenir(n + d, { b: ['B'] }), ...tenir(2, { b: ['B', 'A'] }), ...tenir(3)] : [...tenir(n, { b: ['B'] }), ...tenir(d), ...tenir(2, { b: ['A'] })];
+    const r = jouerSuite({}, suite, 'pad', 60);
     const fr = r.evts.some((e: Any) => e.type === 'frappe'), ff = r.evts.some((e: Any) => e.type === 'feinteFrappe');
-    if (fr || !ff) rates.push(`A ${d} image(s) après : frappe ${fr}, feinte ${ff}`);
+    if (fr || !ff) rates.push(`A ${d} image(s) ${d < 0 ? 'avant' : 'après'} le relâché : frappe ${fr}, feinte ${ff}`);
   }
-  verifier('feinte de frappe après le relâché de X', rates.length === 0, rates.length ? rates.join(' ; ') : 'A 1, 3, 8, 12 images après le relâché : feinte, aucune frappe');
+  verifier('feinte de frappe (○ puis ✕)', rates.length === 0, rates.length ? rates.join(' ; ') : 'A pendant la charge (10 et 3 images avant le relâché), au relâché, 1 image après : feinte, aucune frappe');
 }
 
 // ── (correctifs #26) B tenu dans le dos d'un porteur qui court : le tirage de maillot, pas un tacle debout ──
@@ -653,6 +800,40 @@ ESSAIS.changerA.suite = appuyer(['LB'], 3);
   const libre = !TOUCHES_JEU.has('m') && !TOUCHES_JEU.has('enter');
   verifier('ralenti passé à la manette, son coupé au clavier', salon === 0 && tenu === 2 && libre, `A dans le salon : ${salon} ; deux appuis de A en match (tenus 2 images) : ${tenu} ; M et Entrée libres dans le tableau du clavier : ${libre ? 'oui' : 'NON'}`);
 }
+// ── (bola-app#32, lot C) le panneau des touches du match lit la même table, et Vue / Share le masque ──
+{
+  const PH = ['attaque', 'libre', 'defense'];
+  const ecarts: string[] = [];
+  const MOD = /^(L1|R1|R2|L2) \+ (.+)$/;
+  for (const l of TOUCHES.filter((x: Any) => x.panneau)) {
+    if (!l.court) ecarts.push(`${l.id} sans nom court`);
+    for (const ph of Object.keys(l.panneau)) {
+      if (!PH.includes(ph)) ecarts.push(`${l.id} : phase « ${ph} »`);
+      const m = MOD.exec(l.ps);
+      if (m && !TOUCHES.some((b: Any) => b.panneau?.[ph] != null && b.ps === m[2])) ecarts.push(`${l.id} : variante de ${m[2]} sans sa touche en ${ph}`);
+    }
+  }
+  // les variantes L1 et R1 des quatre touches de face, que le panneau montre quand le modificateur est tenu
+  for (const f of ['✕', '○', '□', '△']) for (const mod of ['L1', 'R1']) if (!TOUCHES.some((l: Any) => l.panneau?.attaque != null && l.ps === `${mod} + ${f}`)) ecarts.push(`${mod} + ${f} absente`);
+  const { TOUCHES_JEU }: Any = Clv;
+  const h = TOUCHES.find((l: Any) => l.id === 'touches');
+  if (h?.clavier !== 'H' || TOUCHES_JEU.has('h')) ecarts.push('H : la touche du panneau doit rester libre dans le jeu');
+  // Vue / Share en match : surPanneau, une fois par appui (et ce n'est pas un geste de jeu qui rendrait la main)
+  const pads: Any[] = [];
+  const btn3 = (on: number[]) => Array.from({ length: 17 }, (_, i) => ({ pressed: on.includes(i), value: on.includes(i) ? 1 : 0 }));
+  const g = (on: number[] = []) => ({ index: 0, id: 'Xbox Wireless Controller (STANDARD GAMEPAD Vendor: 045e Product: 0b13)', connected: true, mapping: 'standard', buttons: btn3(on), axes: [0, 0, 0, 0] });
+  Object.defineProperty(globalThis, 'navigator', { value: { getGamepads: () => pads }, configurable: true, writable: true });
+  const M = Man.creerManettes({ versJeu });
+  let vues = 0; (M as Any).surPanneau = () => { vues++; };
+  const m3: Any = creerMonde({ graine: 3, humains: [true, false], aides: [0.5, 0] }); demarrer(m3, { intro: false });
+  M.mode('match');
+  let t = 1;
+  for (const on of [[], [8], [8], [], [8], []]) { pads[0] = g(on); M.lire(t, m3); t += 0.02; }
+  const activite = M.activite();
+  M.detruire();
+  verifier('panneau des touches : la même table, Vue / Share le masque', ecarts.length === 0 && vues === 2 && activite === -Infinity,
+    `${TOUCHES.filter((x: Any) => x.panneau).length} lignes au panneau (nom court, phase, variantes de ✕ ○ □ △) ${ecarts.length ? ': ' + ecarts.join(' ; ') : 'cohérentes'} ; H libre dans le jeu ; Vue en match, deux appuis : ${vues} bascule(s), geste de jeu : ${activite === -Infinity ? 'non' : 'OUI'}`);
+}
 // ── (correctifs) le A / ✕ qui passe le ralenti (phase « but ») ne devient pas une passe au coup d'envoi ──
 {
   const pads: Any[] = [];
@@ -676,6 +857,140 @@ ESSAIS.changerA.suite = appuyer(['LB'], 3);
   for (let k = 0; k < 90; k++) { lire(); for (let s2 = 0; s2 < 2; s2++) { pas(m3, [M.intention(0), null]); for (const ev of m3.evts) if (ev.type === 'passe' || ev.type === 'frappe') passeEnJeu = true; m3.evts.length = 0; } }
   M.detruire();
   verifier('A du ralenti oublié au coup d\'envoi', rangee && evts.length === 0 && passeEnJeu, `manette rangée ${rangee} ; 1 s de jeu après le A du ralenti : ${evts.join(', ') || 'rien'} ; un A en jeu ensuite : passe ${passeEnJeu}`);
+}
+
+// ── (correctifs #32, contrôles du 19/11) les défauts relevés par les contrôles, rejoués ──
+{
+  // une manette sur le monde de la situation S, image par image (1/60 s, deux pas) ; f(e, k, m) règle l'image k
+  const jouer = (S: Situation, n: number, f: (e: Any, k: number, m: Any) => void, apres?: (m: Any, k: number) => void) => {
+    const m = monde(S), c = creerCommande(), e = pad();
+    let t = 0;
+    const evts: Any[] = [];
+    lireManette(c, e, t, m, 0, versJeu); t += 1 / 60;
+    for (let k = 0; k < n; k++) {
+      e.b.fill(0); e.ax.fill(0);
+      f(e, k, m);
+      lireManette(c, e, t, m, 0, versJeu);
+      for (let s2 = 0; s2 < 2; s2++) { pas(m, [intentionDe(c), null]); for (const ev of m.evts) evts.push({ ...ev, k }); m.evts.length = 0; }
+      apres?.(m, k);
+      t += 1 / 60;
+    }
+    return { m, evts, c };
+  };
+  const stick = (e: Any, gx: number, gz: number) => { e.ax[0] = -gz; e.ax[1] = gx; };
+  // 1. (D2 du contrôle du jeu) un appui bref en course : la frappe part fort (au moins 18 m/s), la passe puissante au
+  //    moins aussi vite que la passe et à 14 m/s au moins (avant : 9 m/s et 5,6 m/s, la balle effleurée)
+  {
+    const depart = (bt: number[], mods: number[]) => {
+      let v = 0;
+      jouer({ z: 9, cap: Math.PI }, 120, (e, k) => { stick(e, 0, -1); if (k >= 45 && k < 51) { for (const x of [...bt, ...mods]) e.b[x] = 1; } if (k >= 43 && k < 51) for (const x of mods) e.b[x] = 1; }, (m) => { const b = m.balle; if (!v && b.possesseur == null && Math.hypot(b.v.x, b.v.z) > 2) v = Math.hypot(b.v.x, b.v.y, b.v.z); });
+      return v;
+    };
+    const vF = depart([K.B], []), vE = depart([K.B], [K.RB]), vX = depart([K.B], [K.LT]), vP = depart([K.A], []), vPP = depart([K.A], [K.RB]);
+    verifier('appui bref en course : frappe forte, puissante au moins la passe (correctifs #32)', vF >= 18 && vE >= 13 && vX >= 15 && vPP >= Math.max(14, vP),
+      `en course à 3,7 m/s, appui de 0,1 s : frappe ${f2(vF)} m/s (au moins 18), enroulée ${f2(vE)}, extérieur ${f2(vX)} ; passe ${f2(vP)}, puissante ${f2(vPP)} m/s (au moins 14 et la passe)`);
+  }
+  // 2. (D3 du contrôle du jeu, D1 et D5 du contrôle du code) ○ sur une balle libre arrêtée à 1 / 1,6 / 2,2 m, devant, de
+  //    côté ou derrière, avec ou sans R2 : la balle vient au pied (moins de 0,6 m) en 1 s et y reste ; jamais plus loin
+  {
+    const rates: string[] = [];
+    let n = 0;
+    for (const d of [1.0, 1.6, 2.2]) for (const a of [0, Math.PI / 2, Math.PI]) for (const r2 of [false, true]) {
+      n++;
+      let d0 = NaN, dMax = 0, dFin = NaN, k60 = NaN, frappe = false;
+      jouer({ z: 4 }, 90, (e, k, m) => {
+        if (k === 0) { const b = m.balle, j = m.joueurs[4], h = Math.PI + a; b.p.x = j.p.x + Math.sin(h) * d; b.p.z = j.p.z + Math.cos(h) * d; b.v.x = b.v.z = 0; b.possesseur = null; b.dernier = null; b.dernierT = -9; }
+        if (k >= 2 && k < 5) e.b[K.B] = 1;
+        if (r2 && k >= 1 && k < 60) e.b[K.RT] = 1;
+      }, (m, k) => {
+        const b = m.balle, j = m.joueurs[4], dd = Math.hypot(b.p.x - j.p.x, b.p.z - j.p.z);
+        if (k === 1) d0 = dd;
+        if (k >= 2) dMax = Math.max(dMax, dd);
+        if (k === 62) k60 = dd;
+        if (k > 62 && k < 90) dFin = Math.max(Number.isNaN(dFin) ? 0 : dFin, dd);
+        if (m.evts.some((x: Any) => x.type === 'frappe')) frappe = true;
+      });
+      if (!(k60 < 0.6 && dFin < 0.7 && dMax < d0 + 0.15 && !frappe)) rates.push(`${d} m à ${Math.round((a * 180) / Math.PI)}°${r2 ? ' avec R2' : ''} : ${f2(k60)} m à 1 s, ${f2(dFin)} m ensuite, au plus ${f2(dMax)} m${frappe ? ', FRAPPÉE' : ''}`);
+    }
+    verifier('○ sur une balle libre : elle vient au pied et y reste, avec ou sans R2 (correctifs #32)', rates.length === 0, rates.length ? rates.join(' ; ') : `${n} cas : au pied à 1 s, à moins de 0,7 m ensuite, jamais repoussée`);
+  }
+  // 3. (D2 du contrôle du code) L1, R1 et L2 passent avant R2 sur ○ ; le panneau lit le même modificateur
+  {
+    const { commandeDe, modificateur }: Any = Cmd;
+    const cas: Array<[Any, string]> = [[{ r2: true, lb: true }, 'pique'], [{ r2: true, rb: true }, 'finesse'], [{ r2: true, lt: true }, 'exterieur'], [{ r2: true }, 'ras'], [{}, 'frappe']];
+    const faux = cas.filter(([mods, id]) => commandeDe(K.B, mods).id !== id).map(([mods, id]) => `${JSON.stringify(mods)} → ${commandeDe(K.B, mods).id} (attendu ${id})`);
+    const panneau = cas.map(([mods]) => modificateur(mods) ?? '—').join(' ');
+    verifier('R2 tenu n\'écrase plus L1, R1, L2 (correctifs #32)', faux.length === 0 && panneau === 'L1 R1 L2 R2 —', faux.length ? faux.join(' ; ') : `R2 + L1 + ○ piqué, R2 + R1 + ○ enroulée, R2 + L2 + ○ extérieur, R2 + ○ ras de terre ; panneau : ${panneau}`);
+  }
+  // 4. (D4 du contrôle du code) clavier AZERTY : les chiffres de la tactique par leur place, et la touche relâchée par sa
+  //    place (Maj lâchée avant « 1 » ne laisse rien de tenu)
+  {
+    const { creerClavier }: Any = Clv;
+    const g: Any = globalThis as Any;
+    const ecoute: Record<string, Array<(e: Any) => void>> = {};
+    const ancien = { add: g.addEventListener, rem: g.removeEventListener };
+    g.addEventListener = (type: string, fn: (e: Any) => void) => { (ecoute[type] ??= []).push(fn); };
+    g.removeEventListener = () => {};
+    const c = creerClavier();
+    const ev = (type: string, key: string, code: string) => { for (const fn of ecoute[type] ?? []) fn({ key, code, preventDefault() {} }); };
+    ev('keydown', '&', 'Digit1'); const t1 = [...c.tenues]; ev('keyup', '&', 'Digit1'); const t1b = [...c.tenues];
+    ev('keydown', 'Shift', 'ShiftLeft'); ev('keydown', '1', 'Digit1'); ev('keyup', 'Shift', 'ShiftLeft'); ev('keyup', '&', 'Digit1'); const t2 = [...c.tenues];
+    ev('keydown', '"', 'Digit3'); const t3 = [...c.tenues]; ev('keyup', '"', 'Digit3');
+    c.detruire(); g.addEventListener = ancien.add; g.removeEventListener = ancien.rem;
+    verifier('clavier AZERTY : 1 2 3 par leur place, relâchées par leur place (correctifs #32)', t1.join() === '1' && t1b.length === 0 && t2.length === 0 && t3.join() === '3',
+      `« & » (Digit1) → [${t1}] puis [${t1b}] ; Maj + 1, Maj lâchée d'abord → [${t2}] ; « " » (Digit3) → [${t3}]`);
+  }
+  // 5. (D4 du contrôle du jeu, retour de 21:19) une balle en l'air qui vient d'un coéquipier : ○ appuyé tôt (à 5 m) reste
+  //    une frappe ; R2 + ○ au-dessus de 0,7 m est un retourné ou un ciseau, ○ seul jamais ; en dessous, la demi-volée
+  {
+    const reprise = (r2: boolean, h: number, dos: boolean) => {
+      let clip = '', cmd = '', recup = false;
+      const r = jouer({ z: -8, cap: dos ? 0 : Math.PI, partenaire: [3, 8, -8] }, 50, (e, k, m) => {
+        if (k === 0) { const b = m.balle; b.p.x = 8; b.p.z = -8; b.p.y = h + 0.6; b.v.x = -11; b.v.z = 0; b.v.y = 1.5; b.possesseur = null; b.dernier = 3; b.dernierT = m.t; b.recepteur = 4; }
+        const b = m.balle, j = m.joueurs[4], d = Math.hypot(b.p.x - j.p.x, b.p.z - j.p.z);
+        if (d <= 5.2 && d > 3.5) { e.b[K.B] = 1; if (r2) e.b[K.RT] = 1; }
+      }, (m) => { const g = m.joueurs[4].g; if (g?.type === 'frappe' && !clip) { clip = g.nom; cmd = g.donnees?.spec?.commande ?? ''; } });
+      // (la commande sortie de l'appui : une frappe, jamais « récupérer », le tacle debout de la défense)
+      recup = r.c.dernier?.commande === 'recuperer';
+      return { clip, cmd, recup, frappe: r.evts.some((x: Any) => x.type === 'frappe' && x.j === 4) };
+    };
+    const lignes: string[] = [];
+    let ok = true;
+    for (const dos of [false, true]) {
+      const a = reprise(true, 1.3, dos), b = reprise(false, 0.9, dos), c = reprise(true, 0.5, dos);
+      const bon = /^(bicycle|volley)/.test(a.clip) && !/^(bicycle|volley)/.test(b.clip) && !!b.clip && /^shoot(_l)?$/.test(c.clip) && !a.recup && !b.recup && !c.recup;
+      ok &&= bon;
+      lignes.push(`${dos ? 'dos au but' : 'de face'} : R2 + ○ haute ${a.clip || 'rien'} (${a.cmd}), ○ seul à mi-hauteur ${b.clip || 'rien'}, R2 + ○ basse ${c.clip || 'rien'}${a.recup || b.recup || c.recup ? ', RÉCUPÉRER joué' : ''}`);
+    }
+    verifier('R2 + ○ en l\'air acrobatique, ○ tôt sur un centre reste une frappe (correctifs #32)', ok, lignes.join(' ; '));
+  }
+  // 6. (D8 du contrôle du jeu) aucun appui perdu : ✕ appuyé pendant un demi-tour (pivot), juste après une passe reçue
+  //    (amorti) ou dans la reprise d'appuis : une passe part dans la seconde, vers le stick lu à l'appui
+  {
+    let n = 0, perdus = 0;
+    const ex: string[] = [];
+    for (let i = 0; i < 50; i++) {
+      // a. le demi-tour lancé, l'appui pendant le pivot (de la 2e à la 26e image après le retour du stick)
+      n++;
+      const kA = 62 + (i % 25);
+      const r = jouer({ z: 10, cap: Math.PI, partenaire: [3, 4, 12] }, 160, (e, k) => { stick(e, 0, k < 60 ? -1 : 1); e.b[K.RT] = k < 60 ? 1 : 0; if (k >= kA && k < kA + 4) e.b[K.A] = 1; });
+      const p0 = r.evts.find((x: Any) => x.type === 'passe' && x.j === 4 && x.k >= kA);
+      if (!p0 || p0.k - kA > 60) { perdus++; if (ex.length < 4) ex.push(`demi-tour, appui à l'image ${kA}`); }
+    }
+    for (let i = 0; i < 50; i++) {
+      // b. une passe reçue arrêté, l'appui pendant l'amorti ou juste après (de 0 à 24 images après le contrôle)
+      n++;
+      const dk = i % 25;
+      let kC = -1;
+      const r = jouer({ z: 4, partenaire: [3, 0, -4] }, 200, (e, k, m) => {
+        if (k === 0) { const b = m.balle; b.p.x = 0; b.p.z = -2; b.p.y = 0.11; b.v.x = 0; b.v.z = 8; b.v.y = 0; b.possesseur = null; b.dernier = 3; b.dernierT = m.t; b.recepteur = 4; }
+        if (kC >= 0 && k >= kC + dk && k < kC + dk + 4) e.b[K.A] = 1;
+      }, (m, k) => { if (kC < 0 && m.balle.possesseur === 4) kC = k; });
+      const p0 = r.evts.find((x: Any) => x.type === 'passe' && x.j === 4);
+      if (kC < 0 || !p0 || p0.k - (kC + dk) > 60) { perdus++; if (ex.length < 8) ex.push(`amorti, appui ${dk} images après la prise${kC < 0 ? ' (passe jamais reçue)' : ''}`); }
+    }
+    verifier('aucun appui perdu pendant un pivot ou un amorti (correctifs #32)', perdus === 0, `${perdus} appui(s) sans geste sur ${n}${ex.length ? ' : ' + ex.join(' ; ') : ''}`);
+  }
 }
 console.log(echecs ? `\n${echecs} contrôle(s) en échec` : '\nTout est vert.');
 process.exit(echecs ? 1 : 0);

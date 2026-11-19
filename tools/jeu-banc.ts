@@ -171,7 +171,8 @@ const lancerA = (j: Any, v: number) => { j.int.dx = 0; j.int.dz = 1; j.int.allur
 {
   const j = corpsSeul();
   const t = lancerA(j, 7);
-  verifier('Accélération 0 → 7 m/s', t >= 2.2 && t <= 3.0, `${f2(t)} s`);
+  // (bola-app#32 : « du peps, comme des sportifs de haut niveau » ; avant 2,2 à 3 s, désormais 1,2 à 2 s)
+  verifier('Accélération 0 → 7 m/s', t >= 1.2 && t <= 2.0, `${f2(t)} s (bola-app#32 : 1,2 à 2 s)`);
 }
 {
   const j = corpsSeul(); lancerA(j, 7);
@@ -179,7 +180,9 @@ const lancerA = (j: Any, v: number) => { j.int.dx = 0; j.int.dz = 1; j.int.allur
   const z0 = j.p.z; let zMax = z0, t = 0, pivot = false;
   j.int.dz = -1;
   while (j.v.z > -2 && t < 5) { pasCorps(j, PAS, false); t += PAS; zMax = Math.max(zMax, j.p.z); if (j.mode === 'pivot') pivot = true; }
-  verifier('Demi-tour à 7 m/s', t >= 0.9 && zMax - z0 >= 2.5 && pivot, `${f2(t)} s jusqu'à repartir à 2 m/s, ${f2(zMax - z0)} m de freinage, pivot ${pivot}`);
+  // (bola-app#32 : « demi-tour immédiat, sans boucle ni ralentissement mou » ; avant : au moins 0,9 s et 2,5 m de freinage,
+  // désormais au plus 0,7 s et 2,2 m, toujours par le pivot sur appuis)
+  verifier('Demi-tour à 7 m/s', t <= 0.7 && zMax - z0 <= 2.2 && pivot, `${f2(t)} s jusqu'à repartir à 2 m/s, ${f2(zMax - z0)} m de freinage, pivot ${pivot} (bola-app#32 : 0,7 s et 2,2 m au plus)`);
 }
 {
   const j = corpsSeul(); lancerA(j, 7);
@@ -193,7 +196,8 @@ const lancerA = (j: Any, v: number) => { j.int.dx = 0; j.int.dz = 1; j.int.allur
     const om = Math.abs(h - h0) / PAS; h0 = h;
     if (s > 6.9 && om > 1e-3) { omMax = Math.max(omMax, om); rMin = Math.min(rMin, s / om); if (om > (CORPS.aLat / s) * 1.01) depasse++; }
   }
-  verifier('Virage plein stick à 7 m/s', rMin >= 6 && depasse === 0, `rayon mini ${f2(rMin)} m, lacet max ${f2(omMax)} rad/s, ${depasse} pas au-delà de a_lat / v`);
+  // (bola-app#32 : « virages serrés » ; avant, rayon d'au moins 6 m à 7 m/s ; désormais 2 à 4 m, toujours borné par a_lat / v)
+  verifier('Virage plein stick à 7 m/s', rMin >= 2 && rMin <= 4 && depasse === 0, `rayon mini ${f2(rMin)} m, lacet max ${f2(omMax)} rad/s, ${depasse} pas au-delà de a_lat / v (bola-app#32 : rayon de 2 à 4 m)`);
 }
 
 // ─────────────────────────── la conduite ───────────────────────────
@@ -234,7 +238,9 @@ function sceneConduite(graine: number, defenseur: boolean) {
     for (const l of s.split('\n')) if (re.test(l) && !/engagement|b\.p\.x = 0; b\.p\.y = BALLON\.R; b\.p\.z = 0/.test(l)) fautifs.push(`${f}: ${l.trim()}`);
   }
   const dm = moy(dist);
-  verifier('Conduite en sprint', dm > 1.0 && pertes > 0 && fautifs.length === 0, `balle à ${f2(dm)} m en moyenne (médiane ${f2(med(dist))}), ${pertes}/20 balles perdues sous pression, ${fautifs.length} affectation(s) de position hors ballon.js${fautifs.length ? ' : ' + fautifs.join(' | ') : ''}`);
+  // (bola-app#32 : la balle aimantée reste au pied en sprint, « elle suit le joueur au lieu de partir devant » ; avant, à plus
+  // d'un mètre devant ; désormais entre 0,5 et 1 m ; un défenseur sur la route la prend encore, au tacle)
+  verifier('Conduite en sprint', dm >= 0.5 && dm <= 1.0 && pertes > 0 && fautifs.length === 0, `balle à ${f2(dm)} m en moyenne (médiane ${f2(med(dist))}), ${pertes}/20 balles perdues sous pression, ${fautifs.length} affectation(s) de position hors ballon.js${fautifs.length ? ' : ' + fautifs.join(' | ') : ''} (bola-app#32 : 0,5 à 1 m)`);
 }
 
 // ─────────────────────────── le contrôle orienté ───────────────────────────
@@ -277,6 +283,12 @@ const totaux: Record<string, number> = {};
 const SM: Record<string, number> = { passes: 0, passesOk: 0, arrets: 0, fautes: 0, vols: 0, uneDeux: 0, aeriens: 0, avantages: 0, coupsFrancs: 0, tirages: 0, appels: 0, contresTacle: 0 };
 let bisN = 0, bisSomme = 0, fautesOuvertes = 0, ecartMin = Infinity;
 const surPlaceMax = { d: 0, ou: '' };
+// (correctifs #32, D6 du contrôle du jeu) une balle libre lente (moins de 1 m/s, au sol) sans personne qui va vers elle
+// (plus de 1 m/s dans sa direction) ni à moins de 1 m : au plus 1,5 s ; avant, 4 s (graine 11, receveur au sol)
+const ignoree = { max: 0, ou: '', n: 0 };
+// (correctifs #32, D7 du contrôle du jeu) la forme en attaque installée (porteur de champ, possession depuis 1,5 s) : un
+// joueur derrière la balle, de la largeur des deux côtés (à ±4,5 m), un pivot devant ; mesurée toutes les 0,05 s
+const forme = { n: 0, largeur: 0, tout: 0 };
 let cfPoses = 0, cfSous = 0;
 const { surAngle }: Any = Gar;
 for (let g = 1; g <= N; g++) {
@@ -284,6 +296,7 @@ for (let g = 1; g <= N; g++) {
   let immobile = 0, memePorteur = 0, dernierPorteur = -1;
   const surPlace = { x: 0, z: 0, t: 0 };
   const coince = new Float64Array(10), locoDepuis = new Float64Array(10);
+  let seule = 0;
   const m = matchIA(g, 150, (m: Any) => {
     for (const j of m.joueurs) {
       if (!Number.isFinite(j.p.x + j.p.z + j.v.x + j.v.z + j.cap + j.d)) nan++;
@@ -299,6 +312,30 @@ for (let g = 1; g <= N; g++) {
       const p = porteur(m);
       if (!p && b.garde == null && Math.hypot(b.v.x, b.v.z) < 0.2) immobile += PAS; else immobile = 0;
       if (immobile > 8) { blocages++; detailsBlocage.push(`g${g} balle immobile à ${m.t.toFixed(1)} s`); immobile = -1e9; }
+      if (!p && b.garde == null && !m.arret && b.p.y < 0.45 && Math.hypot(b.v.x, b.v.z) < 1) {
+        let enRoute = false;
+        for (const j of m.joueurs) {
+          if (j.absent || j.mode === 'sol') continue;
+          const dx = b.p.x - j.p.x, dz = b.p.z - j.p.z, d = Math.hypot(dx, dz) || 1;
+          if (d < 1 || (j.v.x * dx + j.v.z * dz) / d > 1) { enRoute = true; break; }
+        }
+        seule = enRoute ? 0 : seule + PAS;
+        if (seule > ignoree.max) { ignoree.max = seule; ignoree.ou = `g${g} à ${m.t.toFixed(1)} s (${b.p.x.toFixed(1)} ; ${b.p.z.toFixed(1)})`; }
+        if (seule > 1.5 && seule - PAS <= 1.5) ignoree.n++;
+      } else seule = 0;
+      if (p && !p.gardien && m.possession && m.possession.e === p.e && m.t - m.possession.t > 1.5 && m.pas % 6 === 0) {
+        const e = p.e, sg = e === 0 ? -1 : 1, ab = sg * b.p.z;
+        let xMax = p.p.x, xMin = p.p.x, fixo = false, piv = false;
+        for (const o of m.joueurs) {
+          if (o.e !== e || o.gardien || o.absent || o === p) continue;
+          xMax = Math.max(xMax, o.p.x); xMin = Math.min(xMin, o.p.x);
+          const ao = sg * o.p.z;
+          if (ao < ab - 3) fixo = true;
+          if (ab < 7 ? ao > ab + 4 : ao > 8) piv = true;
+        }
+        const larg = xMax >= 4.5 && xMin <= -4.5;
+        forme.n++; if (larg) forme.largeur++; if (larg && fixo && piv) forme.tout++;
+      }
       const id = p ? p.i : b.garde ?? -1;
       if (id >= 0 && id === dernierPorteur) memePorteur += PAS; else { memePorteur = 0; dernierPorteur = id; }
       if (memePorteur > 30) { blocages++; detailsBlocage.push(`g${g} même porteur ${id} à ${m.t.toFixed(1)} s`); memePorteur = -1e9; }
@@ -353,6 +390,11 @@ for (let g = 1; g <= N; g++) {
     `NaN ${nan}, blocages ${blocages}${detailsBlocage.length ? ' (' + detailsBlocage.slice(0, 4).join(', ') + ')' : ''}, corps hors du terrain ${dehorsCorps}, buts par match ${f2(mb)} (de ${Math.min(...buts)} à ${Math.max(...buts)}, ${(sansBut * 100).toFixed(0)} % sans but), relances de coin ${antiBlocages}`);
   verifier('Coup franc : balle à côté du joueur au sol', cfPoses > 10 && cfSous === 0, `${cfPoses} coups francs, ${cfSous} balle(s) posée(s) à moins de 0,45 m d'un corps au sol (31 sur 58 avant le correctif)`);
   verifier('Balle jamais coincée (correctifs #26)', surPlaceMax.d <= 15, `au plus ${surPlaceMax.d.toFixed(1)} s dans un rond de 2 m en jeu (${surPlaceMax.ou}) ; borne 15 s`);
+  // (l'objectif du contrôle, la forme complète la moitié du temps, n'est pas encore atteint : on garde la largeur, 47 % avant
+  // ces correctifs, au-dessus de 50 % ; la forme complète, 19 % avant, est relevée pour la suite)
+  verifier('Placements : largeur des deux côtés en attaque installée (correctifs #32)', forme.largeur / (forme.n || 1) >= 0.5,
+    `largeur des deux côtés ${((100 * forme.largeur) / (forme.n || 1)).toFixed(0)} % du temps (au moins 50 %) ; forme 1-2-1 complète ${((100 * forme.tout) / (forme.n || 1)).toFixed(0)} % (relevée, objectif 50 %) ; ${forme.n} relevés`);
+  verifier('Balle libre lente jamais ignorée (correctifs #32)', ignoree.n === 0, `${ignoree.n} fois plus de 1,5 s sans joueur qui va vers elle ; au plus ${ignoree.max.toFixed(2)} s (${ignoree.ou || '—'})`);
   const per = (k: string) => f2((totaux[k] ?? 0) / N);
   console.log(`      par match : passes ${per('passe')}, frappes ${per('frappe')}, tacles balle ${per('tacleBalle')}, tacles jambes ${per('tacleJambes')}, épaules ${per('epaule')}, chutes ${per('chute')}, plongeons ${per('plongeon')}, parades ${per('parade')}, captés ${per('capte')}, poteaux ${per('poteau')}`);
   {
@@ -412,8 +454,10 @@ function tacle(graine: number, deFace: boolean) {
     if (act) lance = true;
     pas(m, [{ dx: 0, dz: -1, allure: 0.85, sprint: 0 }, { dx: dx / d, dz: dz / d, allure: 1, sprint: 0.4, action: act }]);
     for (const e of m.evts) {
-      if (e.type === 'tacleBalle' && balle < 0) balle = m.t; if (e.type === 'tacleJambes' && jambes < 0) jambes = m.t; if (e.type === 'chute' && e.j === 4) tombe = true;
-      if ((e.type === 'tacleBalle' || e.type === 'tacleJambes') && e.j === 6 && e.h != null) hanches.push(e.h);
+      // (bola-app#32, lot A2, point 15 : la balle au pied du porteur, prise de face, est « contrée » — tacleContre — : c'est
+      // toujours la balle touchée d'abord, l'une des trois issues du tacle ; elle compte comme balle gagnée)
+      if ((e.type === 'tacleBalle' || (e.type === 'tacleContre' && e.glisse)) && balle < 0) balle = m.t; if (e.type === 'tacleJambes' && jambes < 0) jambes = m.t; if (e.type === 'chute' && e.j === 4) tombe = true;
+      if ((e.type === 'tacleBalle' || e.type === 'tacleJambes' || (e.type === 'tacleContre' && e.glisse)) && e.j === 6 && e.h != null) hanches.push(e.h);
     }
     m.evts.length = 0;
     if (lance && t0 < 0 && t.g?.nom === 'slide') t0 = m.t;
@@ -485,8 +529,40 @@ function tacle(graine: number, deFace: boolean) {
   const tot = taux(() => true);
   const centre = taux((t) => Math.abs(t.x) < 0.7), coin = taux((t) => Math.abs(t.x) > 0.7);
   const faible = taux((t) => t.p <= 0.45), fort = taux((t) => t.p >= 0.75);
-  verifier('Gardiens (400 frappes)', tot >= 0.3 && tot <= 0.7 && centre > coin && faible > fort && racineBouge === 0 && mainPoteau === 0,
+  // (correctifs #32, point 13, D1 du contrôle du jeu : le gardien plonge pour de vrai — k_dive au-dessus de 0,45 m, k_high sur
+  // une balle haute à moins de 0,9 m de lui, un plongeon court quand il part tard — ; sur ces frappes de 11 m sans
+  // défenseur, ses arrêts passent de 67-68 % à 72 % : la borne haute passe de 70 à 75 %)
+  verifier('Gardiens (400 frappes)', tot >= 0.3 && tot <= 0.75 && centre > coin && faible > fort && racineBouge === 0 && mainPoteau === 0,
     `${cadres.length} cadrées sur ${tirs.length} ; arrêts ${(tot * 100).toFixed(0)} % (centre ${(centre * 100).toFixed(0)} %, coins ${(coin * 100).toFixed(0)} % ; p ≤ 0,45 : ${(faible * 100).toFixed(0)} %, p ≥ 0,75 : ${(fort * 100).toFixed(0)} %) ; racine qui bouge en plongeon ${racineBouge}, mains dans un poteau ${mainPoteau}`);
+  // (correctifs #32, D1 du contrôle du jeu) une frappe de près (7 m) dans un coin : il plonge (avant : 0 sur 45, il était
+  // battu avant même d'avoir réagi)
+  let pres = 0, plonges = 0;
+  for (const x of [-1.15, -0.95, 0.95, 1.15]) for (const y of [0.3, 0.9]) for (const x0 of [-2, 0, 2]) for (const p of [0.45, 0.7]) {
+    const m: Any = creerMonde({ graine: 500 + x0 * 7 + Math.round(x * 100) + Math.round(y * 10) + Math.round(p * 1000), humains: [true, false], aides: [0, 0], presents: [4, 5] });
+    demarrer(m, { intro: false });
+    const j = m.joueurs[4], g = m.joueurs[5];
+    j.p.x = x0; j.p.z = -LB + 7.6; j.cap = Math.PI;
+    const b = m.balle; b.p.x = x0; b.p.z = -LB + 7; b.v.x = 0; b.v.z = 0; b.possesseur = 4; b.dernier = 4; b.dernierT = 0;
+    g.p.x = x0 * 0.12; g.p.z = -LB + 1; g.cap = 0;
+    m.controle[0] = 4;
+    for (let i = 0; i < 30; i++) pas(m, [{ dx: 0, dz: 0, allure: 0 }, null]);
+    demanderFrappe(m, j, { type: 'frappe', p, x, y });
+    // (on ne compte que les frappes cadrées qui passent à plus de 0,8 m du gardien, dans son plan : un coin pour lui ;
+    // près de lui, il arrête dans l'axe, debout ou couché)
+    let plonge = false, loin: boolean | null = null;
+    for (let i = 0; i < 120 && m.phase === 'jeu'; i++) {
+      pas(m, [{ dx: 0, dz: 0, allure: 0 }, null]);
+      if (loin == null && m.evts.some((e: Any) => e.type === 'frappe')) {
+        const zk = g.p.z, rk = predire(m.balle, (q: Any) => q.p.z <= zk, 2), rl = predire(m.balle, (q: Any) => q.p.z <= -LB, 2);
+        loin = !!rk && !!rl && Math.abs(rl.p.x) < BUT_DL - R && rl.p.y < BUT_H - R && Math.abs(rk.p.x - g.p.x) > 0.8;
+      }
+      m.evts.length = 0;
+      if (g.g?.type === 'plongeon') plonge = true;
+    }
+    if (!loin) continue;
+    pres++; if (plonge) plonges++;
+  }
+  verifier('Gardien : frappe de près dans un coin (correctifs #32)', pres >= 12 && plonges >= 0.8 * pres, `frappes à 7 m cadrées loin de lui (plus de 0,8 m) : ${plonges}/${pres} plongeons (au moins 80 %)`);
 }
 
 // ─────────────────────────── les correctifs du contrôle (balle et corps, chutes, demi-tour, lob, gardien) ───────────
@@ -554,26 +630,28 @@ function tacle(graine: number, deFace: boolean) {
   verifier('Chute bornée', n >= 25 && pireExces <= 1e-9 && reaccel === 0, `${n} chutes ; vitesse au plus ${pireExces <= 0 ? 'sous' : 'AU-DESSUS de'} celle d'avant le contact + 1 m/s (écart ${f2(pireExces)}) ; réaccélérations au sol ${reaccel}`);
 }
 {
-  // le demi-tour balle au pied : stick retourné à 6 m/s, la balle à moins de 1,5 m : il la garde (crochet) ; et la
-  // touche part du pied prévu
-  let garde = 0, n = 0;
-  const distPied: number[] = [];
+  // le demi-tour balle au pied : stick retourné en pleine course (bola-app#32 : la balle aimantée tourne autour de lui et
+  // repart dans le nouveau sens avant lui ; avant, un crochet de 170° et des touches du pied prévu) : il la garde dans
+  // 80 % des cas au moins, elle n'est jamais à plus de 1,2 m de lui pendant le demi-tour, et il est reparti en moins d'1 s
+  let garde = 0, n = 0, dMax = 0;
+  const reparti: number[] = [];
   for (let g = 1; g <= 20; g++) {
     const m: Any = sceneConduite(g, false);
-    m.journal = (type: string, i: number) => { if (type === 'touche' && i === 4) distPied.push(Gst.piedProche(m.joueurs[4], m.balle, true).d); };
-    let crochet = false;
+    let tR = -1;
     for (let i = 0; i < 360; i++) {
       const retourne = i > 150;
       pas(m, [{ dx: 0, dz: retourne ? 1 : -1, allure: 1, sprint: retourne ? 0.3 : 1 }, null]);
-      for (const e of m.evts) if (e.type === 'crochet') crochet = true;
       m.evts.length = 0;
+      const j = m.joueurs[4], b = m.balle;
+      if (retourne && i < 300) dMax = Math.max(dMax, Math.hypot(b.p.x - j.p.x, b.p.z - j.p.z));
+      if (retourne && tR < 0 && j.v.z > 2) tR = (i - 150) * PAS;
     }
     n++;
+    if (tR >= 0) reparti.push(tR);
     const j = m.joueurs[4], b = m.balle;
-    if (crochet && porteur(m) === j && Math.hypot(b.p.x - j.p.x, b.p.z - j.p.z) < 2.5 && j.v.z > 0.5) garde++;
+    if (porteur(m) === j && Math.hypot(b.p.x - j.p.x, b.p.z - j.p.z) < 1.2 && j.v.z > 0.5) garde++;
   }
-  const pmax = Math.max(...distPied);
-  verifier('Demi-tour balle au pied', garde / n >= 0.8 && pmax <= Cst.JEU.porteeTouche + 1e-9, `${garde}/${n} demi-tours gardent la balle (crochet) ; ${distPied.length} touches de conduite, pied prévu à ${f2(med(distPied))} m en médiane, ${f2(pmax)} m au plus`);
+  verifier('Demi-tour balle au pied', garde / n >= 0.8 && dMax <= 1.2 && reparti.length === n && Math.max(...reparti) < 1.0, `${garde}/${n} demi-tours gardent la balle (aimantée), à ${f2(dMax)} m au plus pendant le demi-tour, reparti à 2 m/s en ${f2(med(reparti))} s (médiane), ${f2(Math.max(...reparti))} s au plus`);
 }
 {
   // la passe lobée : 13 m, un adversaire à 3 m sur la ligne ; elle passe au-dessus (sommet ≥ 2,5 m, angle ≥ 40°)
@@ -1015,7 +1093,9 @@ const balleA = (m: Any, x: number, z: number, vx = 0, vz = 0, pos: number | null
         poser(p, 0.5, -1 + g * 0.3, dos ? Math.PI : 0); balleA(m, 0.5, -1 + g * 0.3 + (dos ? -0.4 : 0.4), 0, 0, 9);
         poser(m.joueurs[8], 4.5, 2.5, 0);
         poser(m.joueurs[1], 0, 9, Math.PI); poser(m.joueurs[2], -2, 3.5, Math.PI); poser(m.joueurs[3], 2.5, 4.5, Math.PI); poser(m.joueurs[4], 0, 3, Math.PI);
-        for (let i = 0; i < 300; i++) { pas(m, [null, { dx: 0, dz: 0, allure: 0, protege: false }]); m.balle.dernierT = m.t; }
+        // (bola-app#32 : le chasseur, plus vif, arrive au porteur planté et le tacle avant 2,5 s ; on mesure ici les places
+        // du pressing, pas le tacle : les Noirs ne tentent pas de tacle pendant la scène, j.essai tenu haut)
+        for (let i = 0; i < 300; i++) { for (const o of m.joueurs) if (o.e === 0) o.essai = 9; pas(m, [null, { dx: 0, dz: 0, allure: 0, protege: false }]); m.balle.dernierT = m.t; }
         const Rr = m._roles?.[0];
         if (!Rr) continue;
         const J = (i: number | null) => (i != null ? m.joueurs[i] : null);
@@ -1227,11 +1307,49 @@ const balleA = (m: Any, x: number, z: number, vx = 0, vz = 0, pos: number | null
 
   // ── effets : le filet, les ombres, l'herbe ──
   {
-    const { ondeFilet, FILET, formeOmbres, traceGlisse }: Any = Eff;
-    let maxD = 0, finD = 0, loinD = 0;
-    for (let a = 0; a <= FILET.vie; a += 0.005) { maxD = Math.max(maxD, Math.abs(ondeFilet(0, a, 40))); if (a > FILET.vie - 0.05) finD = Math.max(finD, Math.abs(ondeFilet(0, a, 40))); loinD = Math.max(loinD, Math.abs(ondeFilet(1.6, a, 40))); }
-    verifier('Filet : une onde bornée qui s\'éteint', maxD <= FILET.max + 1e-6 && maxD > FILET.max * 0.95 && finD < 0.001 && loinD < 0.01 && ondeFilet(0, 0, 40) === 0,
-      `au plus ${(maxD * 100).toFixed(1)} cm (borne ${FILET.max * 100}), ${(finD * 1000).toFixed(2)} mm à la fin (${FILET.vie} s), ${(loinD * 1000).toFixed(1)} mm à 1,6 m du choc`);
+    const { creerToile, pasToile, reposToile, ecartToile, formeOmbres, traceGlisse }: Any = Eff;
+    // (bola-app#32, lot C, point 8 « des vrais filets […] que le ballon reste accroché de manière réaliste » : l'onde du
+    // shader de #27 est remplacée par une vraie toile, et le filet de la simulation retient la balle ; l'ancien contrôle
+    // de l'onde n'a plus d'objet, il devient celui-ci) des tirs dans le but (8, 18, 30 m/s ; au ras du sol, à 0,9 et 1,6 m ;
+    // de face et à 30°), la vraie balle de la simulation et la toile affichée qu'elle pousse, 4 s chacun
+    {
+      const T: Any = creerToile(1);
+      let essais = 0, buts = 0, retenues = 0, traverse = 0, rebond = 0, ecart = 0, zMax = 0, profond = 0;
+      for (const v of [8, 18, 30]) for (const y of [0.11, 0.9, 1.6]) for (const ang of [0, 30]) {
+        reposToile(T); essais++;
+        const b: Any = creerBalle(), a = (ang * Math.PI) / 180;
+        b.p.x = -Math.sin(a) * 2.4; b.p.z = LB - 6; b.p.y = y;
+        const dx = Math.sin(a) - b.p.x, dz = 6.5, L = Math.hypot(dx, dz);
+        b.v.x = (dx / L) * v; b.v.z = (dz / L) * v; b.v.y = y > 0.2 ? (G * 3) / v : 0;
+        let but = false, entre = false;
+        for (let k = 0; k < Math.round(4 / PAS); k++) {
+          if (pasBalle(b, null) >= 0) but = true;
+          pasToile(T, b.p);
+          const d = b.p.z - LB;
+          if (d > 0.35) entre = true;
+          if (entre) rebond = Math.max(rebond, -b.v.z);
+          profond = Math.max(profond, d); ecart = Math.max(ecart, ecartToile(T));
+          for (let i = 0; i < T.n; i++) {
+            if (T.fixe[i]) continue;
+            const o = 3 * i, rx = T.P[o] - b.p.x, ry = T.P[o + 1] - b.p.y, rz = T.P[o + 2] - b.p.z;
+            const h = rx * T.N[o] + ry * T.N[o + 1] + rz * T.N[o + 2], l2 = rx * rx + ry * ry + rz * rz - h * h;
+            zMax = Math.max(zMax, T.P[o + 2]);
+            if (T.dedans && l2 < R * R && h > -0.6 && h < Math.sqrt(R * R - l2) - 0.01) traverse++;
+          }
+        }
+        if (but) buts++;
+        const d = b.p.z - LB;
+        if (but && d > R && d < Cst.BUT_P && Math.abs(b.p.x) < BUT_DL && Math.hypot(b.v.x, b.v.y, b.v.z) < 0.2) retenues++;
+      }
+      // la balle partie (un nouvel engagement) : la toile revient à son repos et s'endort
+      const loin = { x: 0, y: R, z: 0 };
+      let pasRetour = 0;
+      while (T.eveille && pasRetour < 600) { pasToile(T, loin); pasRetour++; }
+      verifier('Filet : la balle reste prise dans la poche', buts === essais && retenues === essais && rebond < 2 && profond <= Cst.BALLON.poche.mur + 1e-6 && traverse === 0 && zMax < BZ,
+        `${buts}/${essais} buts, ${retenues} balles retenues au fond du but à l'arrêt ; ressort vers le terrain à ${f2(rebond)} m/s au plus (< 2) ; ${f2(profond)} m derrière la ligne au plus (panneau à ${f2(BZ - LB)}) ; toile enfoncée de ${(ecart * 100).toFixed(0)} cm au plus, jamais traversée (${traverse}), jamais au-delà du panneau (${f2(zMax)} m)`);
+      verifier('Filet : la toile revient et s\'endort', !T.eveille && ecartToile(T) < 0.01 && pasRetour < 600,
+        `au repos et endormie ${(pasRetour * PAS).toFixed(2)} s après le départ de la balle, à ${(ecartToile(T) * 1000).toFixed(1)} mm de sa forme`);
+    }
     const o = new Float32Array(18);
     const pied = (x: number, y: number) => ({ x, y, z: 0, ax: 0, az: 1 });
     formeOmbres({ x: 0, y: 0.95, z: 0 }, pied(-0.1, 0.03), pied(0.1, 0.45), { x: 0, y: 1.7, z: 0 }, o);
@@ -1242,19 +1360,25 @@ const balleA = (m: Any, x: number, z: number, vx = 0, vz = 0, pos: number | null
     // l'herbe : un vrai tacle glissé de la simulation (hauteur de hanche mesurée sur le clip) laisse une trace ; un
     // joueur debout ou qui marche n'en laisse pas
     const { hancheA }: Any = Crp2;
-    const m: Any = creerMonde({ graine: 3, humains: [false, false], aides: [0, 0] }); demarrer(m, { intro: false });
-    let traces = 0, glisses = 0, faux = 0; const fauxNoms = new Set<string>(); const etats: Any[] = m.joueurs.map(() => ({}));
-    for (let i = 0; i < 120 * 150; i++) {
-      pas(m); m.evts.length = 0; if (i % 2) continue;
-      for (const j of m.joueurs) {
-        const h = j.g && (j.mode === 'geste' || j.mode === 'sol') ? hancheA(j.g.nom, j.g.t) : 0.95;
-        const T = traceGlisse(etats[j.i], { x: j.p.x, y: h, z: j.p.z }, m.t);
-        if (T) { traces++; if (j.g?.nom === 'slide' || j.g?.nom === 'c_slide' || /fall|trip|volley|bicycle|k_block|k_low|k_high|k_dive/.test(j.g?.nom ?? '')) glisses++; else { faux++; fauxNoms.add(`${j.mode}:${j.g?.nom ?? '-'}`); } }
+    // (bola-app#32, lot B : l'IA tacle à bon escient — glissé seulement de côté ou de dos, jamais dans sa surface, pas
+    // en série, point 15 — et le match de la graine 3 peut ne plus en compter aucun : on joue les graines 3 à 6 jusqu'à
+    // trouver des traits ; les traits fautifs sont comptés sur tous les matchs joués)
+    let traces = 0, glisses = 0, faux = 0; const fauxNoms = new Set<string>();
+    for (let g = 3; g <= 6 && traces === 0; g++) {
+      const m: Any = creerMonde({ graine: g, humains: [false, false], aides: [0, 0] }); demarrer(m, { intro: false });
+      const etats: Any[] = m.joueurs.map(() => ({}));
+      for (let i = 0; i < 120 * 150; i++) {
+        pas(m); m.evts.length = 0; if (i % 2) continue;
+        for (const j of m.joueurs) {
+          const h = j.g && (j.mode === 'geste' || j.mode === 'sol') ? hancheA(j.g.nom, j.g.t) : 0.95;
+          const T = traceGlisse(etats[j.i], { x: j.p.x, y: h, z: j.p.z }, m.t);
+          if (T) { traces++; if (j.g?.nom === 'slide' || j.g?.nom === 'c_slide' || /fall|trip|volley|bicycle|k_block|k_low|k_high|k_dive/.test(j.g?.nom ?? '')) glisses++; else { faux++; fauxNoms.add(`${j.mode}:${j.g?.nom ?? '-'}`); } }
+        }
       }
     }
     const e2: Any = {}; let marche = 0; for (let i = 0; i < 60; i++) if (traceGlisse(e2, { x: 0, y: 0.95, z: i * 0.05 }, i / 60)) marche++;
     const e3: Any = {}; let lent = 0; for (let i = 0; i < 60; i++) if (traceGlisse(e3, { x: 0, y: 0.2, z: i * 0.01 }, i / 60)) lent++;
-    verifier('Herbe qui marque', traces > 0 && faux === 0 && marche === 0 && lent === 0, `${traces} traits peints sur un match IA (${glisses} de glissades, chutes, ciseaux et retournés, ${faux} ailleurs${faux ? ' : ' + [...fauxNoms].join(', ') : ''}) ; joueur debout qui court : ${marche} ; corps au sol presque immobile : ${lent}`);
+    verifier('Herbe qui marque', traces > 0 && faux === 0 && marche === 0 && lent === 0, `${traces} traits peints (matchs IA des graines 3 à 6, arrêtés au premier qui en peint) (${glisses} de glissades, chutes, ciseaux et retournés, ${faux} ailleurs${faux ? ' : ' + [...fauxNoms].join(', ') : ''}) ; joueur debout qui court : ${marche} ; corps au sol presque immobile : ${lent}`);
   }
 
   // ── le son (le plan, sans navigateur) et la police ──

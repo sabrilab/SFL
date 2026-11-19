@@ -3,10 +3,11 @@
 // La simulation décide des positions et des vitesses ; l'animation suit (rendu/animateur.js). Chaque joueur reçoit à
 // chaque pas une intention (sim/commandes.js : direction, allure, sprint, regard, contenir, protéger…), la même pour le
 // pouce, la manette et l'IA, et ce fichier la change en mouvement avec les limites d'un vrai corps :
-//   · accélération a(v) = a0 (1 − v / 1,08 v_cible) : 0 → 7 m/s en 2,5 s environ ;
-//   · virage : la direction de la course tourne d'au plus ω = min(9 ; a_lat / v) rad/s, donc un rayon v² / a_lat
-//     (0,5 m à 2 m/s, 6,5 m à 7 m/s) ; au-delà de 45° d'écart, le joueur ralentit, au-delà de 90° il freine sur ses
-//     appuis ; un demi-tour (plus de 150°) lancé passe par le freinage puis le pivot (turn180) ;
+//   · accélération a(v) = a0 (1 − v / 1,08 v_cible) : 0 → 7 m/s en 1,7 s environ (bola-app#32, « du peps » ; 2,5 s avant) ;
+//   · virage : la direction de la course tourne d'au plus ω = min(16 ; a_lat / v) rad/s, donc un rayon v² / a_lat
+//     (0,2 m à 2 m/s, 2,7 m à 7 m/s ; bola-app#32, a_lat 18 m/s² au lieu de 7,5) ; au-delà de 45° d'écart, le joueur
+//     ralentit, au-delà de 90° il freine sur ses appuis (16 m/s²) ; un demi-tour (plus de 150°) lancé passe par un
+//     freinage court puis le pivot (turn180 joué 2,2 fois, reparti à 4,2 m/s) ; le stick lâché, il s'arrête net (16 m/s²) ;
 //   · orientation (cap) séparée de la vitesse : en contenant ou en protégeant, le joueur fait face au porteur ou dos
 //     à l'adversaire et se déplace en pas chassés ou en arrière (3 m/s au plus) ;
 //   · gestes à root motion (tacle, chute, roulette, frappe en course, relances du gardien) : la vitesse EST la courbe
@@ -155,7 +156,7 @@ const tmp = { x: 0, y: 0, z: 0 };
 export function lancerGeste(j, nom, { taux = 1, depuis = 0, rm = false, echelle = 1, type = nom, fin = null, finApresImpact = null, donnees = null, impact = null } = {}) {
   j.mode = 'geste';
   j.g = {
-    nom, type, t: depuis * duree(nom), taux, rm, echelle, cap0: j.cap, donnees,
+    nom, type, t: depuis * duree(nom), debut: depuis * duree(nom), taux, rm, echelle, cap0: j.cap, donnees,
     impact: impact ?? impactDe(nom), fait: false,
     fin: fin ?? duree(nom),
     finApresImpact, // s de jeu après l'impact où le geste rend la main (le reste des clips de passe est trop long)
@@ -185,6 +186,9 @@ const TAUX_CHUTE = { fall_side: 1.5, fall_back: 1.45, fall_sweep: 1.35, fall_tri
 // (correctifs #26) balayé ou croché, le corps part tout de suite : ces deux clips restent debout près d'une seconde
 // avant de basculer (hanches à 0,8 m jusqu'à 1,1 s) ; ils sont pris à partir de 36 % (au sol en ~0,3 s)
 const DEPUIS_CHUTE = { fall_sweep: 0.36, fall_trip: 0.36 };
+// (correctifs #32, D6 du contrôle du jeu, point 15 « relevé rapide ») la chute s'arrête peu après que les hanches touchent
+// le sol (s de clip) : les clips restaient couchés 1,2 s de plus, et une collision gardait le joueur 3,3 s au sol
+const FIN_CHUTE = { fall_back: 2.1, fall_side: 1.9, fall_sweep: 1.95, fall_trip: 2.0 };
 
 /** Le genre de chute que donne une poussée (px, pz : la direction où le corps est poussé), dans son repère. */
 export function genreChute(j, px, pz) {
@@ -212,7 +216,7 @@ export function tomber(j, genre = 'avant') {
     lancerGeste(j, 'trip', { taux: 1.5, rm: true, echelle: clamp(s / 3.4, 0.5, 1.4), type: 'chute', donnees: { vLim: s + 0.5 } });
   } else {
     // (de côté ou en arrière : le corps garde son cap, il est emporté par sa course)
-    lancerGeste(j, nom, { taux: TAUX_CHUTE[nom] ?? 1.4, depuis: DEPUIS_CHUTE[nom] ?? 0, type: 'chute', donnees: { vLim: Math.min(6, s + 0.5), glisse: { x: s > 0.3 ? j.v.x / s : 0, z: s > 0.3 ? j.v.z / s : 0 } } });
+    lancerGeste(j, nom, { taux: TAUX_CHUTE[nom] ?? 1.4, depuis: DEPUIS_CHUTE[nom] ?? 0, fin: FIN_CHUTE[nom] != null ? Math.min(duree(nom), FIN_CHUTE[nom]) : null, type: 'chute', donnees: { vLim: Math.min(6, s + 0.5), glisse: { x: s > 0.3 ? j.v.x / s : 0, z: s > 0.3 ? j.v.z / s : 0 } } });
   }
   j.mode = 'sol';
   j.solT = 0;
@@ -221,10 +225,10 @@ export function tomber(j, genre = 'avant') {
 }
 
 /** Le relevé, selon la pose au sol du clip qui finit. */
-export function relever(j, apres) {
+export function relever(j, apres, rapide = 1) {
   const nom = RELEVES[apres] && CLIPS[RELEVES[apres]] ? RELEVES[apres] : 'getup';
   const r = RELEVE[nom];
-  lancerGeste(j, nom, { taux: r.taux, depuis: r.depuis, type: 'releve', fin: (r.fin ?? 1) * duree(nom), donnees: { debout: r.debout } });
+  lancerGeste(j, nom, { taux: r.taux * rapide, depuis: r.depuis, type: 'releve', fin: (r.fin ?? 1) * duree(nom), donnees: { debout: r.debout } });
   j.mode = 'releve';
   j.v.x = 0; j.v.z = 0;
 }
@@ -287,8 +291,9 @@ export function pasCorps(j, dt, balle) {
       if (s <= C.pivotEntree) {
         j.v.x = sin(h) * s; j.v.z = cos(h) * s;
         j.cap = h;
-        // (joué 1,3 fois plus vite que la capture : sa mise en garde, jambes écartées, ne dure plus 0,4 s)
-        const g = lancerGeste(j, 'turn180', { taux: 1.3, type: 'pivot', donnees: { s0: s, h0: h, cible: j.cible } });
+        // (joué 1,3 fois plus vite que la capture : sa mise en garde, jambes écartées, ne dure plus 0,4 s ; bola-app#32 :
+        // 2,2 fois, le demi-tour lancé se fait en 0,3 s sur l'appui au lieu de 0,52 s)
+        const g = lancerGeste(j, 'turn180', { taux: C.pivotTaux, type: 'pivot', donnees: { s0: s, h0: h, cible: j.cible } });
         j.mode = 'pivot';
         g.cap0 = h;
       } else { j.v.x = sin(h) * s; j.v.z = cos(h) * s; j.cap = h; }
@@ -317,7 +322,12 @@ export function pasCorps(j, dt, balle) {
           const om = Math.min(C.lacetMax, aLat / Math.max(0.1, s));
           h += clamp(delta, -om * dt, om * dt);
         }
-        if (s < vt) s = Math.min(vt, s + C.a0 * accF * Math.max(0.15, 1 - s / (1.08 * vt)) * dt);
+        // (correctifs #32, D10 du contrôle du jeu) le premier appui d'un départ arrêté, quand un humain pousse lui-même le
+        // stick, pousse fort (2,4 fois l'accélération jusqu'à 1,4 m/s) : le corps bouge de 3 cm dès la 3e image au lieu de la
+        // 5e ; l'élan d'ensemble ne change presque pas ; l'IA et les courses automatiques (au-devant d'une passe) gardent le
+        // leur
+        const premier = s < 1.4 && vt > 2 && (it.stickHumain ?? 0) > 0.5 ? 2.4 : 1;
+        if (s < vt) s = Math.min(vt, s + C.a0 * premier * accF * Math.max(0.15, 1 - s / (1.08 * vt)) * dt);
         else s = Math.max(vt, s - freinage * dt);
         j.v.x = sin(h) * s; j.v.z = cos(h) * s;
       }
@@ -359,8 +369,10 @@ function pasGeste(j, dt) {
   const g = j.g;
   if (!g) { j.mode = 'loco'; return; }
   g.age += dt;
-  g.t += dt * g.taux;
-  if (g.rm) {
+  // (bola-app#32, lot A) une frappe chargée tenue armée (gestes.js pasFrappe, g.gel) : le clip ne bouge plus, le corps
+  // se plante sur ses appuis (pas de root motion)
+  if (!g.gel) g.t += dt * g.taux;
+  if (g.rm && !g.gel) {
     vitesseRacine(g.nom, g.t, tmp);
     versMonde(g.cap0, tmp.x * g.taux * g.echelle, tmp.z * g.taux * g.echelle, tmp);
     j.v.x = tmp.x; j.v.z = tmp.z;
@@ -397,24 +409,30 @@ function pasGeste(j, dt) {
     const lacet = c?.turn ? echantillon(c.turn, c.turn.length, 1, 0, u * duree(g.nom), duree(g.nom)) : -Math.PI * u;
     j.cap = enrouler(g.cap0 + lacet);
     if (u < 0.45) { const s = s0 * (1 - u / 0.45); j.v.x = sin(h0) * s; j.v.z = cos(h0) * s; }
-    else { const s = 2.5 * ((u - 0.45) / 0.55); j.v.x = sin(j.cap) * s; j.v.z = cos(j.cap) * s; }
+    else { const s = C.pivotSortie * ((u - 0.45) / 0.55); j.v.x = sin(j.cap) * s; j.v.z = cos(j.cap) * s; }
   } else {
-    // geste sur place (passe arrêtée, frappe arrêtée, contrôle) : le joueur s'arrête sur ses appuis
+    // geste sur place (passe arrêtée, frappe arrêtée, contrôle) : le joueur s'arrête sur ses appuis (bola-app#32 : son
+    // propre freinage, freinGeste ; une frappe chargée tenue armée freine plus fort, elle se plante)
     const s = hypot(j.v.x, j.v.z);
-    if (s > 0) { const ns = Math.max(0, s - C.freinPlante * dt); j.v.x *= ns / s; j.v.z *= ns / s; }
+    const fg = g.charge ? C.freinPlante : C.freinGeste;
+    if (s > 0) { const ns = Math.max(0, s - fg * dt); j.v.x *= ns / s; j.v.z *= ns / s; }
   }
   // fin du geste
   const fini = g.t >= g.fin - 1e-6 || (g.finApresImpact != null && g.fait && g.age >= g.impactAge + g.finApresImpact);
   if (j.mode === 'sol') {
-    if (g.t >= duree(g.nom)) {
+    const finSol = g.type === 'chute' ? Math.min(g.fin, duree(g.nom)) : duree(g.nom);
+    if (g.t >= finSol) {
       // au sol : la pose de fin tenue, frottement 7 m/s² (le root motion est fini), puis le relevé
-      g.t = duree(g.nom);
+      g.t = finSol;
       if (g.rm) g.rm = false;
       if (!g.donnees?.glisse) { const sv = hypot(j.v.x, j.v.z); if (sv > 0) { const ns = Math.max(0, sv - 7 * dt); j.v.x *= ns / sv; j.v.z *= ns / sv; } }
       j.solT += dt;
       // (la glissade du tacle : relevé dès que le corps s'arrête ; une chute : après solChute au sol)
       const arrete = hypot(j.v.x, j.v.z) < (g.type === 'tacle' ? 0.9 : 0.3);
-      if (g.type === 'tacle' ? arrete && j.solT > 0.1 : j.solT > C.solChute) relever(j, g.nom);
+      // (bola-app#32, lot A2) le tacle raté laisse le tacleur au sol un court instant (0,7 s) ; le tacle qui a pris la
+      // balle se relève vite (1,3 fois plus vite)
+      if (g.type === 'tacle') { if (arrete && j.solT > (g.donnees?.rate ? 0.7 : 0.1)) relever(j, g.nom, g.donnees?.issue ? 1.3 : 1); }
+      else if (j.solT > C.solChute) relever(j, g.nom);
     }
     return;
   }

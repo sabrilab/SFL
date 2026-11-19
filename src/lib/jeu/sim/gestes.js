@@ -1,14 +1,14 @@
 // Les gestes de balle : conduite par touches, contrôle orienté, passes, lobs, frappes et finesse (bola-app#23).
 //
-// La balle n'est jamais collée au pied : « avoir la balle » veut dire être le dernier à l'avoir touchée et pouvoir la
-// toucher de nouveau (balle.possesseur). Tout passe par des impulsions données quand le pied est à portée :
-//   · conduite : une touche tombe sur un appui de la foulée (phase φ, corps.js) quand le pied prévu (piedLoco, la table
-//     des pieds du clip de course à cette phase) est à moins de 0,25 m du centre du ballon ;
-//     elle repart à v + Δv, Δv = √(2 a L(v)) pour qu'elle prenne au plus L(v) = 0,4 + 0,38 v mètres d'avance (0,9 m au
-//     trot lent, 3 m en sprint) avant que le roulement ne la ramène, dans la direction voulue à θ_max près de sa course
-//     (35° à l'arrêt, 12° en sprint), avec une erreur à graine qui grandit avec la vitesse, la pression et le
-//     déséquilibre. En sprint, la balle part à 2,5-4 m : un défenseur peut s'interposer. À l'arrêt, la semelle
-//     ramène la balle par petites touches ; en protégeant, la balle est gardée de l'autre côté du corps.
+// (bola-app#32, lot A) La balle du porteur est AIMANTÉE au pied (« le stick dirige d'abord la balle, le joueur suit ») :
+// « avoir la balle » veut dire être le dernier à l'avoir touchée et la tenir à portée (balle.possesseur) ; elle est
+// ramenée chaque pas, par un ressort, à un point devant un pied, dans la direction du stick (pasConduite), et ne se perd
+// que sur un tacle, une récupération au pied, un geste raté ou une touche voulue (passe, frappe, gestes). Avant (#23 à
+// #27), des touches de pied à chaque appui la faisaient partir devant ; elles ne restent que pour le rendu (toucheT).
+// Toute action d'un humain part à l'appui : l'élan démarre, la balle est tenue au point de frappe, l'impact tombe 0,13 s
+// après (0,22 s pour l'IA), ou 0,05 s après le relâché d'une charge (l'élan est tenu armé, la jauge règle la puissance,
+// le stick la visée ; pasFrappe). Les passes au sol sont dosées sur la distance (vitessePasse) ; le receveur vient
+// au-devant (ia.js auDevant) et la balle lui vient au pied (monde.js).
 //   · contrôle orienté (à portée : 0,35 m du pied prévu, de la cuisse ou du buste ; une balle qui vient de changer de
 //     camp ne se reprend pas avant 0,25 s) : la qualité q baisse avec la vitesse d'arrivée, l'angle de rotation, la pression, le
 //     déséquilibre et la surface (pied, cuisse, poitrine, tête) ; la balle sortante mêle la sortie voulue (q) et le
@@ -30,6 +30,7 @@ import { piedA, teteA, piedLoco, racineA, versMonde, lancerGeste, impactDe, libr
 import { predire } from './ballon.js';
 import { CLIPS, FPS_CLIPS } from './clips.js';
 import { acos, atan2, cos, hypot, sin } from './maths.js';
+import { commandeDe, gesteDe, tempsContact } from './gestes-commandes.js';
 
 const R = BALLON.R;
 /** (bola-app#26, lot 2) les gestes qui visent le but : frappe, finesse (intérieur brossé), extérieur, piqué */
@@ -85,95 +86,86 @@ function toucher(m, j, { possede = true } = {}) {
 }
 
 // ── la conduite ──
-const classe = (v) => (v < 2 ? 0 : v < 4.6 ? 1 : v < 6.2 ? 2 : 3);
 
 /**
- * Une touche de conduite, si le pied qui arrive est à portée et que la balle n'est pas déjà assez loin devant.
+ * (bola-app#32, lot A) La conduite aimantée : « le stick dirige d'abord la balle, le joueur suit ». La balle du porteur
+ * (au sol, à moins de 1,4 m) est tenue à un point devant le pied, dans la direction voulue (le stick, sinon la course,
+ * sinon le cap), à 0,36 m arrêté et 0,06 s × v plus loin en course (0,8 m en sprint) ; ce point tourne autour du joueur
+ * à 14 rad/s au plus quand le stick change (la balle passe devant lui, jamais à travers ses jambes : un demi-tour est un
+ * tirer-en-arrière, la balle repart avant le corps), et la balle y est ramenée par un ressort (16/s, écart de vitesse
+ * borné à 5 m/s). Elle ne se perd que si on la lui prend : tacle, récupération au pied, geste raté (monde.js), ou une
+ * touche qui l'envoie (passe, frappe, gestes). En protégeant, le point est derrière le corps, à l'opposé du défenseur.
+ * Les appuis de la foulée marquent une touche pour le rendu (toucheT) quand la balle est devant le pied.
+ * Avant (#23-#27) : des touches de pied à chaque appui, la balle partait devant et ne suivait ni arrêt ni virage.
  * appui : un pied vient de se poser (la phase a passé un multiple de 0,5).
  */
 export function pasConduite(m, j, appui) {
-  const b = m.balle, it = j.int;
-  if (b.p.y > 0.4 || !libre(j)) return;
+  const b = m.balle, it = j.int, A = JEU.aimant;
+  // (correctifs #32) l'amorti de la prise sur ○ (gestePrise) tient aussi la balle : avant, l'aimant s'arrêtait pendant le
+  // geste et la balle « prise » s'en allait
+  const prise = j.g?.type === 'controle' && !!j.g.donnees?.prise;
+  if (b.p.y > 0.45 || !(libre(j) || j.mode === 'frein' || j.mode === 'pivot' || prise)) return;
+  const rx = b.p.x - j.p.x, rz = b.p.z - j.p.z, d = hypot(rx, rz);
+  if (d > A.rayon) { j.aimA = null; j.aimCote = null; return; }
   const s = hypot(j.v.x, j.v.z);
-  const fx = sin(j.cap), fz = cos(j.cap);
-  const rx = b.p.x - j.p.x, rz = b.p.z - j.p.z;
-  const avant = rx * fx + rz * fz, cote = rx * fz - rz * fx;
-  // direction voulue (sinon la course, sinon le cap)
-  let ux = it?.dx ?? 0, uz = it?.dz ?? 0;
-  if (!(ux || uz) || (it?.allure ?? 0) < 0.05) { if (s > 0.5) { ux = j.v.x / s; uz = j.v.z / s; } else { ux = fx; uz = fz; } }
-  const bv = hypot(b.v.x, b.v.z);
-
+  let ux, uz, off;
   if (it?.protege) {
-    // protéger : la balle derrière le corps par rapport à l'adversaire, à 0,55 m, par petites touches
+    // protéger : la balle derrière le corps, à l'opposé de l'adversaire le plus proche, à 0,5 m
     const { o } = adversaireProche(m, j);
-    if (!o) return;
-    if (m.t - (j.toucheT ?? -9) < 0.18) return;
-    const ox = j.p.x - o.p.x, oz = j.p.z - o.p.z, L = hypot(ox, oz) || 1;
-    const cx = j.p.x + (ox / L) * 0.55, cz = j.p.z + (oz / L) * 0.55;
-    const d = hypot(b.p.x - cx, b.p.z - cz);
-    if (hypot(rx, rz) > 1.0) return;
-    if (d > 0.12) {
-      j.toucheT = m.t;
-      b.v.x = j.v.x + clamp((cx - b.p.x) * 3, -1.5, 1.5); b.v.z = j.v.z + clamp((cz - b.p.z) * 3, -1.5, 1.5);
-      rouler(b); toucher(m, j);
-    }
-    return;
+    if (o) { const ox = j.p.x - o.p.x, oz = j.p.z - o.p.z, L = hypot(ox, oz) || 1; ux = ox / L; uz = oz / L; } else { ux = sin(j.cap); uz = cos(j.cap); }
+    off = 0.5;
+  } else {
+    if ((it?.allure ?? 0) > 0.05 && (it.dx || it.dz)) { const L = hypot(it.dx, it.dz) || 1; ux = it.dx / L; uz = it.dz / L; }
+    else if (s > 0.5) { ux = j.v.x / s; uz = j.v.z / s; }
+    // (correctifs #32, D14) arrêté sans stick, la balle reste où elle est (le point ne suit plus le cap : le joueur arrêté
+    // regarde la balle, son cap tournait vers elle et la faisait tourner autour de lui à 1 m/s sans fin)
+    else if (j.aimA != null) { ux = sin(j.aimA); uz = cos(j.aimA); }
+    else { ux = sin(j.cap); uz = cos(j.cap); }
+    off = A.pres + A.loin * s;
   }
+  // (après une touche voulue — crochet, sombrero, jonglage — la balle file où le geste l'a mise, puis l'aimant la reprend)
+  if (m.t < (j.horsAimant ?? -9)) return;
+  // le point tourne vers la direction voulue, au plus vite de A.rotation
+  let a = j.aimA ?? (d > 0.15 ? atan2(rx, rz) : j.cap);
+  a += clamp(enrouler(atan2(ux, uz) - a), -A.rotation * PAS, A.rotation * PAS);
+  j.aimA = a;
+  // (devant un pied, pas entre les deux : la balle garde le côté où elle est, de 6 à 14 cm de l'axe, pour que le geste
+  // qui suit parte du bon pied)
+  const fa = sin(a), ga = cos(a);
+  const lat0 = rx * ga - rz * fa;
+  // (correctifs #32, D14 du contrôle du jeu) le côté ne change que si la balle passe franchement de l'autre (4 cm) : avant,
+  // une balle sur l'axe faisait sauter le point de 12 cm d'un pied à l'autre à chaque pas (balle qui tremble, ±1 m/s)
+  const c0 = j.aimCote ?? (lat0 >= 0 ? 1 : -1);
+  const cote = lat0 * c0 < -0.04 ? -c0 : c0;
+  j.aimCote = cote;
+  const lat = cote * clamp(lat0 * cote, 0.06, 0.14);
+  j.aimLat = lat;
+  const tx = j.p.x + j.v.x * PAS + fa * off + ga * lat, tz = j.p.z + j.v.z * PAS + ga * off - fa * lat;
+  // (correctifs #32) juste après une prise aimantée (prendreBalle), la balle vient au pied sans être « aspirée » : l'écart de
+  // vitesse permis monte de 1,5 à 5 m/s en 0,35 s, et la vitesse de la balle rejoint celle de la cible en 0,05 s puis de
+  // plus en plus vite (pas d'un coup)
+  const depuis = m.t - (j.priseT ?? -9);
+  const k = A.raideur, E = depuis < 0.35 ? A.ecart * (0.3 + 0.7 * depuis / 0.35) : A.ecart;
+  const vx = j.v.x + clamp((tx - b.p.x) * k, -E, E), vz = j.v.z + clamp((tz - b.p.z) * k, -E, E);
+  if (depuis < 0.35) { const a0 = Math.min(1, PAS / 0.05), a = a0 + (1 - a0) * (depuis / 0.35) ** 2; b.v.x += (vx - b.v.x) * a; b.v.z += (vz - b.v.z) * a; }
+  else { b.v.x = vx; b.v.z = vz; }
+  if (b.p.y < R + 0.03) { b.v.y = Math.min(b.v.y, 0); rouler(b); }
+  b.dernier = j.i; b.dernierT = m.t; b.possesseur = j.i;
+  if (b.recepteur === j.i) b.recepteur = null;
+  if (appui && hypot(b.p.x - tx, b.p.z - tz) < 0.5 && s > 0.8) { j.toucheT = m.t; m.journal?.('touche', j.i, hypot(b.v.x, b.v.z)); }
+}
 
-  if (s < 0.8) {
-    // la semelle : petites touches qui ramènent la balle devant le pied
-    if (hypot(rx, rz) > 0.95 || m.t - (j.toucheT ?? -9) < 0.2) return;
-    // vers où il veut repartir (sinon devant lui)
-    const veut = (it?.allure ?? 0) > 0.05 && (it.dx || it.dz);
-    const cx = j.p.x + (veut ? ux : fx) * 0.42, cz = j.p.z + (veut ? uz : fz) * 0.42;
-    const d = hypot(b.p.x - cx, b.p.z - cz);
-    if (d > 0.1 || bv > 0.6) {
-      j.toucheT = m.t;
-      b.v.x = j.v.x + clamp((cx - b.p.x) * 2.5, -1.5, 1.5); b.v.z = j.v.z + clamp((cz - b.p.z) * 2.5, -1.5, 1.5);
-      rouler(b); toucher(m, j);
-    }
-    return;
-  }
-  // la touche part du pied : le pied prévu (table du clip de course, à la phase de la foulée) doit être à moins de
-  // porteeTouche (0,25 m) du centre du ballon, devant le corps ; un appui qui tombe à portée, ou un pied en l'air qui
-  // la rattrape au passage
-  if (!(avant > 0.0 && avant < 1.2 && Math.abs(cote) < 0.5)) return;
-  const pp = piedProche(j, b, true);
-  if (pp.d > JEU.porteeTouche) return;
-  const rattrape = (j.v.x - b.v.x) * fx + (j.v.z - b.v.z) * fz > 0.3;
-  if (!appui && !rattrape) return;
-  // la balle file déjà assez devant : pas besoin de la toucher à cet appui
-  const k = classe(s);
-  const bAvant = (b.v.x * ux + b.v.z * uz);
-  if (avant > 0.35 && bAvant > s + 0.4) return;
-  // la touche
-  const pr = pression(m, j);
-  const v7 = s / CORPS.vSprint;
-  const rng = m.rng.touches;
-  const sigT = (2 + 4 * v7 * v7 + 6 * pr + 8 * j.d) * DEG;
-  const sigL = 0.06 + 0.12 * v7 * v7;
-  // direction : la voulue, à θ_max près de la course actuelle de la balle (ou du joueur)
-  let hb = bv > 1 ? atan2(b.v.x, b.v.z) : atan2(j.v.x, j.v.z);
-  const hv = atan2(ux, uz);
-  const tmax = JEU.touche.thetaMax[k] * DEG;
-  const h = hb + clamp(enrouler(hv - hb), -tmax, tmax) + rng.normal() * sigT;
-  // la longueur de la touche : la balle prend d'avance au plus L(v) = 0,4 + 0,38 v mètres (3 m en sprint) avant que
-  // le roulement (1,1 m/s²) ne la ramène à la vitesse du joueur ; d'où l'écart de vitesse Δv = √(2 a L) (λ = Δv / v)
-  const Lt = 0.4 + 0.38 * s;
-  const dv = Math.sqrt(2 * 1.1 * Lt);
-  const vt = (s + dv) * (1 + rng.normal() * sigL);
-  b.v.x = sin(h) * vt; b.v.z = cos(h) * vt; b.v.y = 0;
-  rouler(b);
-  j.toucheT = m.t;
-  toucher(m, j);
-  m.journal?.('touche', j.i, vt);
+/** (lot A) La balle est-elle aimantée au pied de j (porteur, au sol, à portée de l'aimant) ? */
+export function aimantee(m, j) {
+  const b = m.balle;
+  return b.possesseur === j.i && b.garde == null && b.p.y < 0.45 && hypot(b.p.x - j.p.x, b.p.z - j.p.z) < JEU.aimant.rayon;
 }
 
 // ── le contrôle ──
 /**
  * Un joueur qui veut la balle et l'a à portée la contrôle (ou la rate). Renvoie vrai s'il l'a touchée.
  */
-export function pasControle(m, j, contact = false) {
+export function pasControle(m, j, contact = false, aimant = false) {
   const b = m.balle;
   // (un amorti lancé d'avance, pasAnticipation, attend la balle : il peut la contrôler)
   if (!(libre(j) || (j.g?.type === 'amorti' && j.recup <= 0)) || b.garde != null) return false;
@@ -182,7 +174,8 @@ export function pasControle(m, j, contact = false) {
   const pos = b.possesseur != null ? m.joueurs[b.possesseur] : null;
   // la balle d'un porteur qui la conduit de près : c'est l'affaire du tacle, pas d'un contrôle
   // (pour la lui prendre, il faut un tacle ; une balle poussée loin devant, elle, se prend)
-  if (pos && pos !== j && pos.e !== j.e && hypot(pos.p.x - b.p.x, pos.p.z - b.p.z) < 0.85 && (pos.mode === 'loco' || pos.mode === 'frein' || pos.mode === 'pivot')) return false;
+  // (bola-app#32 : la balle aimantée d'un porteur, jusqu'à 1 m de lui, ne se prend qu'au tacle ou à la récupération au pied)
+  if (pos && pos !== j && pos.e !== j.e && hypot(pos.p.x - b.p.x, pos.p.z - b.p.z) < JEU.aimant.garde && (pos.mode === 'loco' || pos.mode === 'frein' || pos.mode === 'pivot')) return false;
   // une balle qui vient de changer de pied ne change pas de nouveau tout de suite (plus de possession en ping-pong)
   if (b.dernier != null && m.joueurs[b.dernier].e !== j.e && m.t - b.dernierT < 0.25) return false;
   if (pos && pos !== j && pos.e === j.e && hypot(pos.p.x - b.p.x, pos.p.z - b.p.z) < 1.2) return false;
@@ -199,11 +192,13 @@ export function pasControle(m, j, contact = false) {
   else dh = hypot(b.p.x - j.p.x, b.p.z - j.p.z);
   // (contact : la balle vient de heurter ses jambes ou son buste, contacts.js ; il la contrôle de là, moins bien)
   if (contact) dh = Math.min(dh, 0.3);
+  // (lot A) la prise aimantée d'une balle libre : elle vient au pied (monde.js choisit qui, à 1,2 m au plus)
+  if (aimant) dh = Math.min(dh, 0.3);
   if (dh > JEU.porteeControle) return false;
   const vrx = b.v.x - j.v.x, vry = b.v.y, vrz = b.v.z - j.v.z;
   const vin = hypot(vrx, vry, vrz);
   // la balle s'éloigne déjà du joueur : rien
-  if ((b.p.x - j.p.x) * vrx + (b.p.z - j.p.z) * vrz > 0.2 && vin > 1.5 && dh > 0.3) return false;
+  if (!aimant && (b.p.x - j.p.x) * vrx + (b.p.z - j.p.z) * vrz > 0.2 && vin > 1.5 && dh > 0.3) return false;
   const surface = b.p.y < 0.35 ? 'pied' : b.p.y < 0.95 ? 'cuisse' : b.p.y < 1.45 ? 'poitrine' : 'tete';
   const it = j.int ?? {};
   const aide = j.aide ?? 0;
@@ -216,7 +211,10 @@ export function pasControle(m, j, contact = false) {
   const vs = sj < 0.8 ? 0.5 : sj + 1;
   const bh = hypot(b.v.x, b.v.z);
   const rot = bh > 0.5 ? Math.abs(enrouler(atan2(ux, uz) - atan2(b.v.x, b.v.z))) : 0;
-  let q = (contact ? 1 - 0.15 * clamp((vin - 10) / 8, 0, 1) : 1) - Math.max(0, vin - 7) / 20 - 0.35 * (rot / Math.PI) - 0.2 * pr - 0.3 * j.d - (surface !== 'pied' ? 0.1 : 0) + 0.15 * aide;
+  let q = (contact ? 1 - 0.15 * clamp((vin - 10) / 8, 0, 1) : 1) - Math.max(0, vin - 7) / 20 - 0.35 * (rot / Math.PI) - 0.2 * pr - 0.3 * j.d - (surface !== 'pied' ? 0.1 : 0) + 0.15 * aide
+    // (lot A) le receveur visé d'une passe la contrôle mieux : il est venu au-devant, il l'attendait
+    // (jusqu'à 7 m/s ; plus rien au-delà de 14 m/s : une passe trop appuyée reste dure à contrôler)
+    + (b.recepteur === j.i ? 0.25 * clamp((14 - vin) / 7, 0, 1) : 0) + (aimant ? 0.2 : 0);
   q = clamp(q, 0, 1);
   const rng = m.rng.touches;
   // le rebond sur la surface : la vitesse relative réfléchie (la normale fait face à la balle), amortie
@@ -324,6 +322,46 @@ export function clipControle(j, b, surface, sj, vin, possede = true) {
 }
 
 /**
+ * (bola-app#32, lot A2) La prise d'une balle libre sur ○ par un humain : un geste à voir, l'amorti du pied (trap) du côté de
+ * la balle, joué vite (0,2 s) ; il se coupe comme tout contrôle dès qu'une autre touche arrive. Lancé (plus de 3,5 m/s)
+ * la course continue, le pied va à la balle (rendu). Rien si un contrôle est déjà joué.
+ */
+export function gestePrise(m, j) {
+  const b = m.balle;
+  if (j.g || hypot(j.v.x, j.v.z) > 3.5) return;
+  const c = clipControle(j, b, 'pied', 0, 9, true);
+  if (!c) return;
+  lancerGeste(j, c.nom, { depuis: Math.max(0, c.impact - 0.1) / duree(c.nom), taux: 1.5, fin: Math.min(duree(c.nom), c.impact + 0.2), type: 'controle', donnees: { surface: 'pied', prise: true } });
+  m.ev('prise', { j: j.i, clip: c.nom });
+}
+
+/**
+ * (correctifs #32, D1 du contrôle du code, D3 du contrôle du jeu) La prise aimantée d'une balle libre : ○ d'un humain (à
+ * 1,2 m au plus, la balle vient à lui), ou l'IA à la portée du pied (JEU.aimant.priseIA). Le joueur devient le porteur
+ * et pasConduite ramène la balle au pied (écart de vitesse borné juste après la prise : elle roule vers lui, elle n'est
+ * pas aspirée). Avant : pasControle donnait à la balle la sortie d'un contrôle orienté (3 à 4 m/s vers l'avant) pendant
+ * que l'amorti plantait le joueur ; la balle « prise » finissait à 2,3-2,8 m. L'amorti du pied (gestePrise) n'est lancé
+ * qu'à l'arrivée de la balle (monde.js, à 0,6 m), pour que son contact tombe sur elle.
+ */
+export function prendreBalle(m, j) {
+  const b = m.balle;
+  if (!libre(j) || b.garde != null || b.possesseur === j.i) return false;
+  if (b.dernier != null && b.dernier !== j.i && m.joueurs[b.dernier].e !== j.e && m.t - b.dernierT < 0.25) return false;
+  if (m.ecart?.e === j.e) return false;
+  const vin = hypot(b.v.x - j.v.x, b.v.z - j.v.z), sj = hypot(j.v.x, j.v.z);
+  const gauche = (b.p.x - j.p.x) * cos(j.cap) - (b.p.z - j.p.z) * sin(j.cap) > 0;
+  toucher(m, j);
+  j.priseT = m.t; j.aimA = null; j.aimCote = null; j.controleQ = 1; j.controleT = m.t;
+  m.ev('controle', { j: j.i, q: 1, vin, surface: 'pied', possede: true, rate: false, tir: false, clip: null, sj, gauche, prise: true });
+  // (le une-deux : la passe de j à X, puis la remise de X à j, reprise par j dans les 4,5 s)
+  const [p1, p2] = m.passes;
+  if (p1 && p2 && !p2.compte && p1.de === j.i && p2.de === p1.a && p2.a === j.i && m.t - p1.t < 4.5) {
+    p2.compte = true; m.stats.uneDeux++; m.ev('uneDeux', { j: j.i, o: p1.a });
+  }
+  return true;
+}
+
+/**
  * L'anticipation du contrôle : le receveur d'une passe, presque arrêté, lance son amorti avant que la balle n'arrive,
  * pour que le contact du clip tombe à son arrivée (le pied s'avance, la poitrine s'ouvre) ; la balle est prédite
  * (sans hasard) toutes les 0,05 s. S'il ne la touche pas, l'amorti finit seul et la course reprend.
@@ -413,7 +451,6 @@ const hauteurDans = (b, T) => Math.max(R, b.p.y + b.v.y * T - 0.5 * G * T * T);
  *     à la hauteur de la balle, pour les gestes aériens.
  */
 function clipFrappe(j, b, spec) {
-  const frappe = estFrappe(spec.type);
   const s = hypot(j.v.x, j.v.z);
   const fx = sin(j.cap), fz = cos(j.cap);
   const cote = (b.p.x - j.p.x) * fz - (b.p.z - j.p.z) * fx; // > 0 : à gauche
@@ -426,12 +463,7 @@ function clipFrappe(j, b, spec) {
   // la hauteur de la balle à l'impact (un premier jet à 0,22 s)
   const yb = hauteurDans(b, 0.22);
   if (yb > 0.3 || b.p.y > 0.45) {
-    const choix = [];
-    if (yb > 1.25 && ecart < 1.9) choix.push('head_std', 'header2');
-    if (yb > 0.7 && yb < 1.25 && ecart > 1.9 && CLIPS.bicycle) choix.push('bicycle');
-    // (correctifs #26) le ciseau (volley) seulement pour une frappe, de côté ou dos à la cible (un dégagement : volée basse ou tête) ; de face, la volée basse jusqu'à 1 m
-    if (yb > 0.9 && ecart > 1.0 && spec.type !== 'passe') choix.push('volley');
-    if (yb < 1.0) choix.push('shoot2');
+    const choix = choixAeriens(yb, ecart, spec);
     let best = null;
     for (const n0 of choix) {
       const tete = /^head/.test(n0);
@@ -449,12 +481,36 @@ function clipFrappe(j, b, spec) {
         if (!best || err < best.err) best = { nom: n, impact: t, taux, pied, err };
       }
     }
-    if (best && best.err < 0.35) return { nom: best.nom, course: false, taux: best.taux, s, impact: best.impact, pied: best.pied, cote };
+    if (best && best.err < 0.35) return { nom: best.nom, course: false, taux: best.taux, s, impact: best.impact, depuis: 0, pied: best.pied, cote, commande: commandeDe(spec), echelle: 1 };
   }
-  let nom = course ? 'strike_run' : frappe && spec.type !== 'finesse' ? 'shoot' : 'pass';
-  if (cote > 0.08) nom += '_l';
-  const taux = clamp(impactDe(nom) / (spec.type === 'finesse' && !course ? 0.18 : 0.22), 0.8, 2.4);
-  return { nom, course, taux, s, impact: impactDe(nom), pied: CLIPS_PIED(nom), cote };
+  // (bola-app#32, lot A2) au sol : le geste de la commande (gestes-commandes.js) — son clip arrêté ou en course, au pied
+  // du côté de la balle, et son élan (la part du clip jouée avant le contact)
+  const commande = commandeDe(spec), Gc = gesteDe(commande);
+  const nom = versionPied(course ? Gc.course : Gc.arrete, cote) ?? versionPied(course ? 'strike_run' : 'pass', cote);
+  const impact = impactDe(nom);
+  const elan = course ? Gc.elanC : Gc.elanA;
+  const depuis = elan == null ? 0 : Math.max(0, impact - elan);
+  const taux = clamp((impact - depuis) / tempsContact(Gc, false), 0.8, 2.4);
+  // (arrêté, un geste « pas » fait un pas d'élan : le root motion de son clip, à l'échelle d'un départ arrêté)
+  const rm = course || (!!Gc.pas && /^strike_run/.test(nom));
+  return { nom, course: rm, taux, s, impact, depuis, pied: CLIPS_PIED(nom), cote, commande, echelle: rm ? echelleCourse(nom, depuis, impact, Math.max(s, 1.6), taux) : 1 };
+}
+
+/** (lot A2) La version du clip (base ou miroir « _l ») qui frappe du pied du côté de la balle (cote > 0 : à gauche). */
+function versionPied(base, cote) {
+  const veut = cote > 0.08 ? 'g' : 'd';
+  for (const n of [base, base + '_l']) if (CLIPS[n]?.piedImpact?.pied === veut) return n;
+  return CLIPS[base] ? base : null;
+}
+
+/**
+ * (lot A2) L'échelle du root motion d'une frappe en course : le corps garde sa vitesse pendant l'élan joué (de depuis au
+ * contact), quel que soit le rythme ; la vitesse moyenne du root motion sur ce morceau, pas sur tout le clip.
+ */
+function echelleCourse(nom, depuis, impact, s, taux) {
+  racineA(nom, depuis, f0); racineA(nom, impact, f1);
+  const v = hypot(f1.x - f0.x, f1.z - f0.z) / Math.max(0.05, impact - depuis);
+  return clamp(s / (Math.max(0.5, v) * taux), 0.6, 2.6);
 }
 
 /**
@@ -466,12 +522,37 @@ export function pasDemande(m, j) {
   if (!dm) return;
   const b = m.balle;
   const p = porteur(m);
-  if (!libre(j) || b.garde != null || (p && p.e !== j.e && p !== j) || m.t - dm.t0 > 1.0) { j.demande = null; return; }
+  // (une charge tenue peut attendre la balle plus longtemps : 1,8 s)
+  if (!libre(j) || b.garde != null || (p && p.e !== j.e && p !== j) || m.t - dm.t0 > (dm.spec.charge ? 1.8 : 1.0)) { j.demande = null; j.vise = null; return; }
+  syncCharge(j, dm.spec);
+  resoudreR2(b, dm.spec);
   const cible = viser(m, j, dm.spec, true);
+  if (dm.spec.humain) publierVisee(j, dm.spec, cible);
+  // (bola-app#32, lot A) balle aimantée au pied : l'élan part tout de suite, l'impact dans 0,13 s pour un humain, 0,22 s
+  // pour l'IA (la balle est tenue au point de frappe par pasFrappe) ; plus d'attente que le pied arrive
+  if (b.p.y < 0.45 && b.v.y < 1.5 && aimantee(m, j)) {
+    const c = clipFrappe(j, b, dm.spec);
+    // (lot A2) le rythme du geste de la commande : le contact tombe G.t après l'appui pour un humain (0,11 à 0,2 s selon
+    // l'élan du geste), 1,6 fois plus tard pour l'IA (ses frappes en course jouées 3 fois plus vite faisaient sauter le bras
+    // de 95° en une image dans le fondu) ; l'élan démarre là où le geste le veut (c.depuis)
+    const Gc = gesteDe(c.commande), aerien0 = c.depuis === 0 && AERIENS.test(c.nom);
+    const taux = clamp((c.impact - c.depuis) / (aerien0 ? (dm.spec.humain ? JEU.rapide : 0.22) : tempsContact(Gc, !!dm.spec.humain)), 0.8, 3.4);
+    j.demande = null;
+    dm.spec.commande ??= c.commande;
+    if (c.course) j.cap = atan2(cible.x - b.p.x, cible.z - b.p.z);
+    lancerGeste(j, c.nom, {
+      taux, depuis: c.depuis / duree(c.nom), rm: c.course, echelle: c.course ? echelleCourse(c.nom, c.depuis, c.impact, Math.max(c.s, 1.6), taux) : 1,
+      type: 'frappe', finApresImpact: dm.spec.humain ? Gc.apres : Gc.apres * 1.2, impact: c.impact, donnees: { spec: dm.spec, pied: c.pied, aimant: true },
+    });
+    const aerien = AERIENS.test(c.nom) && b.p.y > 0.3;
+    if (aerien) m.stats.aeriens++;
+    m.ev('elan', { j: j.i, nom: c.nom, pied: c.pied, cote: c.cote, y: b.p.y, aerien, geste: dm.spec.type, commande: dm.spec.commande ?? null });
+    return;
+  }
   // (lot 2) une balle en l'air : la reprise se cale sur l'instant où elle passe à sa portée (prédiction complète)
   if (b.p.y > 0.45 || b.v.y > 1.5) { if (reprendre(m, j, dm, cible) !== null) return; }
   const c = clipFrappe(j, b, dm.spec);
-  const T = c.impact / c.taux;
+  const T = (c.impact - c.depuis) / c.taux;
   const bx = b.p.x + b.v.x * T, bz = b.p.z + b.v.z * T;
   const hc = atan2(cible.x - bx, cible.z - bz);
   surfaceA(c.nom, c.impact, c.pied, t1);
@@ -481,11 +562,12 @@ export function pasDemande(m, j) {
   // où il sera : son élan (ou le root motion de la frappe en course)
   let ex = j.p.x + j.v.x * T, ez = j.p.z + j.v.z * T;
   if (c.course) {
-    const ech = clamp(c.s / (2.19 * c.taux), 0.6, 2);
-    racineA(c.nom, c.impact, t1);
-    versMonde(hc, t1.x * ech, t1.z * ech, t1);
+    const ech = c.echelle;
+    racineA(c.nom, c.impact, t1); const rx = t1.x, rz = t1.z;
+    racineA(c.nom, c.depuis, t1);
+    versMonde(hc, (rx - t1.x) * ech, (rz - t1.z) * ech, t1);
     ex = j.p.x + t1.x; ez = j.p.z + t1.z;
-  } else { const s = c.s, fr = Math.min(T, s / CORPS.freinPlante); const L = s || 1; ex = j.p.x + (j.v.x / L) * (s * fr - 0.5 * CORPS.freinPlante * fr * fr); ez = j.p.z + (j.v.z / L) * (s * fr - 0.5 * CORPS.freinPlante * fr * fr); }
+  } else { const s = c.s, fr = Math.min(T, s / CORPS.freinGeste); const L = s || 1; ex = j.p.x + (j.v.x / L) * (s * fr - 0.5 * CORPS.freinGeste * fr * fr); ez = j.p.z + (j.v.z / L) * (s * fr - 0.5 * CORPS.freinGeste * fr * fr); }
   // le point de frappe hors du terrain (balle collée à un panneau) : impossible, l'IA renonce
   if (Math.abs(sx) > BX - 0.3 || Math.abs(sz) > BZ - 0.3) { if (!j.aide) { j.demande = null; j.decision = 0.8; return; } }
   const err = hypot(sx - ex, sz - ez);
@@ -494,14 +576,15 @@ export function pasDemande(m, j) {
     j.demande = null;
     // la course de frappe part dans la direction de la cible : le root motion du clip suit ce cap
     if (c.course) j.cap = hc;
+    dm.spec.commande ??= c.commande;
     lancerGeste(j, c.nom, {
-      taux: c.taux, rm: c.course, echelle: c.course ? clamp(c.s / (2.19 * c.taux), 0.6, 2) : 1,
+      taux: c.taux, depuis: c.depuis / duree(c.nom), rm: c.course, echelle: c.echelle,
       type: 'frappe', finApresImpact: 0.25, impact: c.impact, donnees: { spec: dm.spec, pied: c.pied },
     });
     // (pour le banc : le geste choisi, le pied qui frappe et le côté de la balle à l'élan)
     const aerien = AERIENS.test(c.nom) && b.p.y > 0.3;
     if (aerien) m.stats.aeriens++;
-    m.ev('elan', { j: j.i, nom: c.nom, pied: c.pied, cote: c.cote, y: b.p.y, aerien, geste: dm.spec.type });
+    m.ev('elan', { j: j.i, nom: c.nom, pied: c.pied, cote: c.cote, y: b.p.y, aerien, geste: dm.spec.type, commande: dm.spec.commande ?? null });
     return;
   }
   // aller au point de frappe
@@ -542,13 +625,7 @@ function reprendre(m, j, dm, cible) {
   const cote = (P.x - j.p.x) * fz - (P.z - j.p.z) * fx;
   const hv = hypot(j.v.x, j.v.z) > 0.3 ? atan2(j.v.x, j.v.z) : j.cap;
   const ecart = Math.abs(enrouler(atan2(cible.x - P.x, cible.z - P.z) - hv));
-  const choix = [];
-  // (la tête debout jusqu'à 1,65 m ; au-dessus, la tête en extension, sautée)
-  if (P.y > 1.25 && ecart < 1.9) choix.push(P.y < 1.65 ? 'head_std' : 'header2');
-  if (P.y > 0.7 && P.y < 1.25 && ecart > 1.9 && CLIPS.bicycle) choix.push('bicycle');
-  // (correctifs #26) le ciseau (volley) seulement pour une frappe, de côté ou dos à la cible (un dégagement : volée basse ou tête) ; de face, la volée basse jusqu'à 1 m
-  if (P.y > 0.9 && P.y < 1.8 && ecart > 1.0 && dm.spec.type !== 'passe') choix.push('volley');
-  if (P.y < 1.0) choix.push('shoot2');
+  const choix = choixAeriens(P.y, ecart, dm.spec, true);
   let g = null;
   for (const n0 of choix) {
     const tete = /^head/.test(n0);
@@ -558,7 +635,8 @@ function reprendre(m, j, dm, cible) {
     const pied = tete ? 'tete' : CLIPS_PIED(n);
     for (let i = 3; i < (c.n * 2) / 3; i++) {
       const t = i / FPS_CLIPS, taux = t / tc;
-      if (taux < 0.8 || taux > 2.2) continue;
+      // (correctifs #32 : un humain peut reprendre plus tard, le geste joué jusqu'à 3 fois plus vite)
+      if (taux < 0.8 || taux > (dm.spec.humain ? 3 : 2.2)) continue;
       // (la tête doit être à la balle à 0,2 m près : sinon c'est la poitrine ou les mains qui la prennent)
       const err = Math.abs(surfaceA(n, t, pied, t1).y - P.y) * (tete ? 1.75 : 1);
       if (!g || err < g.err) g = { nom: n, impact: t, taux, pied, err };
@@ -572,14 +650,15 @@ function reprendre(m, j, dm, cible) {
     versMonde(hc, t1.x, t1.z, t2);
     const sx = P.x - sin(hc) * (R + 0.04) - t2.x, sz = P.z - cos(hc) * (R + 0.04) - t2.z;
     const ex = j.p.x + j.v.x * tc, ez = j.p.z + j.v.z * tc;
-    // (pasFrappe rattrape jusqu'à 1,2 m/s pendant l'élan)
-    if (hypot(sx - ex, sz - ez) < 0.2 + 1.1 * tc) {
+    // (pasFrappe rattrape jusqu'à 1,2 m/s pendant l'élan ; 2,5 m/s pour la reprise d'un humain, correctifs #32)
+    if (hypot(sx - ex, sz - ez) < 0.2 + (dm.spec.humain ? 2.3 : 1.1) * tc) {
       j.demande = null;
       j.cap = hc;
+      dm.spec.commande ??= commandeDe(dm.spec);
       lancerGeste(j, g.nom, { taux: g.taux, rm: false, type: 'frappe', finApresImpact: 0.25, impact: g.impact, donnees: { spec: dm.spec, pied: g.pied } });
       const aerien = AERIENS.test(g.nom);
       if (aerien) m.stats.aeriens++;
-      m.ev('elan', { j: j.i, nom: g.nom, pied: g.pied, cote, y: P.y, aerien, geste: dm.spec.type });
+      m.ev('elan', { j: j.i, nom: g.nom, pied: g.pied, cote, y: P.y, aerien, geste: dm.spec.type, commande: dm.spec.commande ?? null });
       return true;
     }
     const dx = sx - j.p.x, dz = sz - j.p.z, L = hypot(dx, dz) || 1;
@@ -590,6 +669,40 @@ function reprendre(m, j, dm, cible) {
   const dx = P.x - j.p.x, dz = P.z - j.p.z, L = hypot(dx, dz) || 1;
   if (L > 0.3) { it.dx = dx / L; it.dz = dz / L; it.allure = Math.max(it.allure, clamp(L / 1.2, 0.3, 1)); }
   return true;
+}
+
+/**
+ * Les gestes aériens possibles pour une balle à la hauteur y au contact, ecart l'angle entre la course et la cible (rad).
+ *   · l'IA, et la reprise d'une passe : la tête au-dessus de 1,25 m face au jeu (debout jusqu'à 1,65 m, sautée au-dessus
+ *     pour la reprise), le retourné dos au but de 0,7 à 1,25 m, le ciseau pour une frappe de côté ou dos à la cible de 0,9
+ *     à 1,8 m (correctifs #26), la jambe tendue (shoot2) sous 1 m ;
+ *   · (correctifs #32, D4 du contrôle du jeu, retour de Sabri de 21:19 : « une animation distincte par commande ») R2 + ○
+ *     d'un humain, l'acrobatique : au-dessus de 0,7 m, le retourné dos au but (ou de côté, à plus de 90°) et le ciseau
+ *     ailleurs, seulement eux ; en dessous, la demi-volée, la frappe sèche du cou-de-pied sur la balle qui retombe
+ *     (shoot) ; ○ seul d'un humain ne fait plus ni retourné ni ciseau : la volée jambe tendue jusqu'à 1,3 m, la tête
+ *     au-dessus (avant : les deux jouaient le même geste, shoot2 ou bicycle).
+ */
+function choixAeriens(y, ecart, spec, reprise = false) {
+  const choix = [];
+  if (spec.acro) {
+    if (y > 0.7) {
+      if (CLIPS.bicycle && ecart > 1.6 && y < 1.35) choix.push('bicycle');
+      if (y > 0.75 && y < 1.9) choix.push('volley');
+      if (!choix.length) choix.push('volley');
+    } else choix.push('shoot');
+    return choix;
+  }
+  const tete = reprise ? (y < 1.65 ? 'head_std' : 'header2') : null;
+  if (spec.humain && estFrappe(spec.type)) {
+    if (y > 1.25) { if (tete) choix.push(tete); else choix.push('head_std', 'header2'); }
+    if (y < 1.3) choix.push('shoot2');
+    return choix;
+  }
+  if (y > 1.25 && ecart < 1.9) { if (tete) choix.push(tete); else choix.push('head_std', 'header2'); }
+  if (y > 0.7 && y < 1.25 && ecart > 1.9 && CLIPS.bicycle) choix.push('bicycle');
+  if (y > 0.9 && (!reprise || y < 1.8) && ecart > 1.0 && spec.type !== 'passe') choix.push('volley');
+  if (y < 1.0) choix.push('shoot2');
+  return choix;
 }
 
 /** le pied qui frappe dans ce clip (0 = gauche, 1 = droit), mesuré par tools/jeu-clips.mjs */
@@ -603,8 +716,15 @@ export function pasFrappe(m, j, dt) {
   const g = j.g, b = m.balle;
   if (!g || g.type !== 'frappe' || g.fait) return;
   const spec = g.donnees.spec;
+  syncCharge(j, spec);
+  // (bola-app#32, lot A) la charge : l'élan est tenu armé (0,05 s avant l'impact) tant que la touche est tenue, 1,6 s
+  // au plus ; le corps se plante (corps.js, g.gel) ; au relâché l'impact tombe 0,05 s après
+  const tArme = g.impact - JEU.arme * g.taux;
+  g.gel = !!(spec.charge && spec.tenu && g.t >= tArme - 1e-9 && g.age < 1.6);
+  if (g.gel) { g.t = Math.min(g.t, tArme); g.charge = true; }
   const reste = (g.impact - g.t) / g.taux;
   const cible = viser(m, j, spec, true);
+  if (spec.humain) publierVisee(j, spec, cible);
   // tourner vers la cible, au rythme du buste
   const hc = atan2(cible.x - b.p.x, cible.z - b.p.z);
   const dc = enrouler(hc - j.cap);
@@ -616,6 +736,29 @@ export function pasFrappe(m, j, dt) {
     surfaceA(g.nom, g.impact, g.donnees.pied, t1);
     versMonde(j.cap, t1.x, t1.z, t2);
     const hx = sin(hc), hz = cos(hc);
+    // (lot A) la balle aimantée d'un humain : c'est elle qui est tenue au point de frappe, devant le pied qui arrive
+    if (g.donnees.aimant && b.possesseur === j.i && b.p.y < 0.5) {
+      // (correctifs #32, D2 du contrôle du jeu) où sera le corps à l'impact : en course, le root motion du clip (le corps ne
+      // garde pas sa vitesse : strike_run ralentit sur l'appui) ; avant, j.v × reste mettait la balle 0,34 m trop loin
+      // du pied, la frappe était effleurée (0,4 × la vitesse : 9 m/s au lieu de 22,6)
+      let cx = j.p.x + j.v.x * reste, cz = j.p.z + j.v.z * reste;
+      if (g.rm) {
+        racineA(g.nom, g.impact, t1); const ax = t1.x, az = t1.z;
+        racineA(g.nom, g.t, t1);
+        versMonde(g.cap0, (ax - t1.x) * g.echelle, (az - t1.z) * g.echelle, t1);
+        cx = j.p.x + t1.x; cz = j.p.z + t1.z;
+      }
+      const qx = cx + t2.x + hx * (R + 0.04), qz = cz + t2.z + hz * (R + 0.04);
+      // (le point de frappe est fixe sur le terrain : la balle y va, sans la vitesse du corps en plus, qui la faisait
+      // finir j.v / 20 devant le pied)
+      const vq = g.donnees.vq ??= { x: 0, z: 0, qx, qz, t: m.t };
+      if (m.t > vq.t) { vq.x = (qx - vq.qx) / (m.t - vq.t); vq.z = (qz - vq.qz) / (m.t - vq.t); }
+      vq.qx = qx; vq.qz = qz; vq.t = m.t;
+      b.v.x = clamp(vq.x, -8, 8) + clamp((qx - b.p.x) * 20, -7, 7); b.v.z = clamp(vq.z, -8, 8) + clamp((qz - b.p.z) * 20, -7, 7);
+      if (b.p.y < R + 0.03) { b.v.y = Math.min(b.v.y, 0); rouler(b); }
+      b.dernier = j.i; b.dernierT = m.t;
+      return;
+    }
     const bx = b.p.x + b.v.x * reste, bz = b.p.z + b.v.z * reste;
     const px = bx - hx * (R + 0.04) - t2.x, pz = bz - hz * (R + 0.04) - t2.z;
     let qx = j.p.x + j.v.x * reste, qz = j.p.z + j.v.z * reste;
@@ -626,13 +769,20 @@ export function pasFrappe(m, j, dt) {
       qx = j.p.x + t1.x; qz = j.p.z + t1.z;
     }
     const ex = px - qx, ez = pz - qz;
-    const corr = Math.min(g.rm ? 2 : 1.2, hypot(ex, ez) / Math.max(reste, 0.05));
+    // (correctifs #32, D4 du contrôle du jeu : la reprise de volée d'un humain rattrape 2,5 m/s, sinon un centre repris
+    // était presque toujours effleuré, la balle à 0,3-0,45 m du pied, frappée à 8 m/s)
+    const vRattrape = g.rm ? 2 : spec.humain && (AERIENS.test(g.nom) || spec.acro) ? 2.5 : 1.2;
+    const corr = Math.min(vRattrape, hypot(ex, ez) / Math.max(reste, 0.05));
     const L = hypot(ex, ez) || 1;
     j.p.x += (ex / L) * corr * dt; j.p.z += (ez / L) * corr * dt;
     return;
   }
   // l'impact
-  g.fait = true; g.impactAge = g.age;
+  g.fait = true; g.impactAge = g.age; g.gel = false;
+  j.vise = null;
+  // (lot A) la puissance d'une charge : celle du relâché ; un appui bref, la puissance juste (lancer)
+  if (spec.charge) spec.p = spec.bref || spec.pCharge == null ? null : spec.pCharge;
+  if (!estFrappe(spec.type)) viser(m, j, spec, false);
   surfaceA(g.nom, g.impact, g.donnees.pied, t1);
   versMonde(j.cap, t1.x, t1.z, t2);
   const px = j.p.x + t2.x, pz = j.p.z + t2.z;
@@ -664,10 +814,10 @@ function viser(m, j, spec, provisoire) {
   }
   if (!o) { out.x = b.p.x + (spec.dx ?? 0) * 10; out.z = b.p.z + (spec.dz ?? sens(j.e)) * 10; out.y = 0; return out; }
   const d0 = hypot(o.p.x - b.p.x, o.p.z - b.p.z);
-  const v0 = spec.type === 'lob' ? 14 : spec.type === 'centre' ? 13 : JEU.passeV0[0] + JEU.passeV0[1] * spec.p;
+  const v0 = spec.type === 'lob' || spec.lobe ? 14 : spec.type === 'centre' ? 13 : vitessePasse(spec, d0);
   const t = clamp(d0 / Math.max(5, v0 * 0.85), 0.2, 2);
   out.x = o.p.x + o.v.x * t; out.z = o.p.z + o.v.z * t;
-  if (spec.type === 'profondeur') { const fwd = 4 + 6 * spec.p; out.z += sens(o.e) * fwd * 0.8; out.x += (o.v.x / (hypot(o.v.x, o.v.z) || 1)) * fwd * 0.2; }
+  if (spec.type === 'profondeur') { const fwd = 4 + 6 * (spec.p ?? 0); out.z += sens(o.e) * fwd * 0.8; out.x += (o.v.x / (hypot(o.v.x, o.v.z) || 1)) * fwd * 0.2; }
   out.x = clamp(out.x, -BX + 0.8, BX - 0.8); out.z = clamp(out.z, -BZ + 0.8, BZ - 0.8);
   out.y = 0; out.t = t;
   return out;
@@ -676,7 +826,8 @@ function viser(m, j, spec, provisoire) {
 /** Le départ de la balle. */
 function lancer(m, j, spec, cible, effleure, pied = 1, nom = '') {
   const b = m.balle, rng = m.rng.frappes;
-  const p = clamp(spec.p ?? 0.5, 0, 1);
+  // (lot A) un appui bref d'un humain : pas de puissance, la puissance juste de la commande
+  const p = clamp(spec.p ?? puissanceJuste(spec), 0, 1);
   const s = hypot(j.v.x, j.v.z);
   const pr = pression(m, j);
   const hx = cible.x - b.p.x, hz = cible.z - b.p.z, dist = hypot(hx, hz) || 1;
@@ -686,12 +837,16 @@ function lancer(m, j, spec, cible, effleure, pied = 1, nom = '') {
   let vx, vy, vz, w = null;
   const frappe = estFrappe(spec.type);
   if (!frappe) {
-    let sig = (1 + 3 * p * p + 3 * pr + 2 * (s / CORPS.vSprint)) * DEG * (1 - 0.5 * aide);
+    // (lot A : une passe d'humain part où il vise, l'aide de la manette ou du pouce tient la direction à 0,3 près ;
+    // avant : 1 − 0,5 × aide)
+    let sig = (1 + 3 * p * p + 3 * pr + 2 * (s / CORPS.vSprint)) * DEG * (spec.humain ? 1 - 0.7 * clamp(aide * 2, 0, 1) : 1 - 0.5 * aide);
     h += rng.normal() * sig;
     if (spec.type === 'centre') {
       // (bola-app#26, lot 2) le centre : plus tendu qu'un lob (24 à 34°), il arrive à hauteur de tête (1,5 m) sur le
       // receveur, pour une reprise de volée ou de la tête ; v0 cherché sur l'intégrateur (traînée, léger rétro-effet)
-      const th = clamp(24 + dist * 0.6, 24, 34) * DEG;
+      // (lot A) le centre tendu (R1 + □) : 14 à 20°, plus vite, à 1,2 m sur le receveur ; le centre lobé (L1 + □) : en cloche
+      const th = (spec.tendu ? clamp(14 + dist * 0.3, 14, 20) : spec.haut ? clamp(40 + dist * 0.5, 40, 52) : clamp(24 + dist * 0.6, 24, 34)) * DEG;
+      const hRec = spec.tendu ? 1.2 : 1.5;
       const w0 = { x: -cos(h) * 10, y: 0, z: sin(h) * 10 };
       let a = 6, c = 24;
       for (let k = 0; k < 12; k++) {
@@ -699,12 +854,12 @@ function lancer(m, j, spec, cible, effleure, pied = 1, nom = '') {
         const q = essai(b, sin(h) * v0 * cos(th), v0 * sin(th), cos(h) * v0 * cos(th), w0);
         const r = predire(q, (x) => hypot(x.p.x - b.p.x, x.p.z - b.p.z) >= dist || (x.v.y < 0 && x.p.y < 0.3), 2.5);
         const ok = r && hypot(r.p.x - b.p.x, r.p.z - b.p.z) >= dist - 0.05;
-        if (!ok || r.p.y < 1.5) a = v0; else c = v0;
+        if (!ok || r.p.y < hRec) a = v0; else c = v0;
       }
       const v0 = (a + c) / 2;
       vx = sin(h) * v0 * cos(th); vz = cos(h) * v0 * cos(th); vy = v0 * sin(th);
       w = w0;
-    } else if (spec.type === 'lob') {
+    } else if (spec.type === 'lob' || spec.lobe) {
       // un vrai lob : 42 à 55° selon la distance (65° au plus), un sommet d'au moins 2,5 m, et 2,3 m au-dessus de
       // l'adversaire le plus proche sur la ligne (à moins de 5 m)
       let th = clamp(42 + 13 * (dist / 25), 42, 55) * DEG;
@@ -733,7 +888,8 @@ function lancer(m, j, spec, cible, effleure, pied = 1, nom = '') {
       vx = sin(h) * v0 * cos(th); vz = cos(h) * v0 * cos(th); vy = v0 * sin(th);
       w = { x: -cos(h) * 20, y: 0, z: sin(h) * 20 }; // rétro-effet
     } else {
-      const v0 = JEU.passeV0[0] + JEU.passeV0[1] * p;
+      // (lot A) dosée sur la distance (humains, appui bref), ou à la jauge autour de cette dose ; l'IA donne v0
+      const v0 = vitessePasse(spec, dist);
       vx = sin(h) * v0; vz = cos(h) * v0; vy = 0;
     }
   } else {
@@ -742,6 +898,8 @@ function lancer(m, j, spec, cible, effleure, pied = 1, nom = '') {
     const tete = /^head/.test(nom), volee = /^(volley|bicycle|shoot2)/.test(nom) && b.p.y > 0.3;
     let v0 = finesse ? JEU.finesseV0[0] + JEU.finesseV0[1] * p : ext ? JEU.exterieurV0[0] + JEU.exterieurV0[1] * p : JEU.frappeV0[0] + JEU.frappeV0[1] * p;
     if (tete) v0 = 8 + 7 * p; else if (volee) v0 *= 0.85;
+    // (lot A) R2 + ○ au sol : la frappe forte à ras de terre, plus sèche
+    if (spec.ras && !tete && !volee) v0 += 2.5;
     const cx = cible.x;
     let wy = 0;
     if (brosse) {
@@ -751,11 +909,14 @@ function lancer(m, j, spec, cible, effleure, pied = 1, nom = '') {
       const sc = (finesse ? 1 : -1) * (pied === 0 ? -1 : 1);
       wy = sc * (finesse ? 45 + 25 * p : 34 + 18 * p);
     }
-    const yv = spec.type === 'lobFrappe' ? 2.2 : (spec.y ?? clamp(0.25 + ((1.6 - 0.25) * (p - 0.3)) / 0.6, 0.15, 2.6) + (p > 0.95 ? (p - 0.95) * 30 : 0));
+    const yv = spec.type === 'lobFrappe' ? 2.2 : (spec.y ?? clamp(0.25 + ((1.6 - 0.25) * (p - 0.3)) / 0.6, 0.15, 2.6) + (p > 0.88 ? (p - 0.88) * 22 : 0));
+    // (lot A : trop chargée, au-delà de 88 % de la jauge, elle monte au-dessus de la barre ; avant : au-delà de 95 %)
     let sig = (0.6 + 5 * p * p + 4 * pr + 3 * (s / CORPS.vSprint) + 4 * (Math.min(angleCorps, Math.PI / 2) / (Math.PI / 2))) * DEG;
     if (finesse) sig *= 0.5; else if (ext) sig *= 0.8;
     if (tete) sig += 3 * DEG; else if (volee) sig += 4 * DEG;
     sig *= 1 - 0.3 * aide;
+    // (lot A, profondeur technique) la frappe parfaite : un second appui à 0,07 s de l'impact ; raté : plus d'erreur
+    if (spec.timing === 'parfait') sig /= 2.5; else if (spec.timing === 'rate') sig *= 1.6;
     const bruitH = rng.normal() * sig;
     h = atan2(cx - b.p.x, cible.z - b.p.z);
     const dh = hypot(cx - b.p.x, cible.z - b.p.z);
@@ -818,6 +979,61 @@ function chercherLob(b, h, th, voulu) {
     if (dd < voulu) a = v0; else c = v0;
   }
   return (a + c) / 2;
+}
+
+// ── (bola-app#32, lot A) les commandes chargées des humains ──
+/** La puissance juste d'un appui bref (jauge 0..1), selon la commande. */
+export function puissanceJuste(spec) {
+  if (spec.ras) return 0.8;
+  if (spec.acro) return 0.6;
+  if (spec.type === 'finesse' || spec.type === 'exterieur') return 0.6;
+  if (spec.type === 'lobFrappe') return 0.45;
+  if (estFrappe(spec.type)) return 0.55;
+  return 0.3;
+}
+/**
+ * La vitesse de départ d'une passe au sol (m/s) pour une distance d (m) : celle que donne l'IA (spec.v0) ; sinon dosée
+ * pour arriver à 7,5 m/s (appui bref), ou réglée par la jauge de 0,6 à 1,6 fois cette dose (une passe trop douce
+ * s'intercepte, trop forte se contrôle mal) ; la passe puissante 1,4 fois, 14 m/s au moins.
+ */
+export function vitessePasse(spec, d) {
+  if (spec.v0 != null) return spec.v0;
+  if (spec.p == null || spec.humain) {
+    const juste = Math.sqrt(JEU.passeArrivee * JEU.passeArrivee + 2 * JEU.passeRoule * Math.max(0, d));
+    let v = spec.p == null ? juste : juste * (JEU.passeDose[0] + JEU.passeDose[1] * clamp(spec.p, 0, 1));
+    if (spec.puissante) v = Math.max(v * JEU.passePuissante, 14);
+    return Math.min(v, 26);
+  }
+  return JEU.passeV0[0] + JEU.passeV0[1] * spec.p;
+}
+/** La charge d'un humain suit son intention : touche tenue, puissance, visée au stick ; figée au relâché. */
+function syncCharge(j, spec) {
+  if (!spec.charge || spec.lache) return;
+  const it = j.int;
+  spec.tenu = !!it?.tenir;
+  if (it?.puissance != null) spec.pCharge = it.puissance;
+  spec.bref = !!it?.bref;
+  // (correctifs #32, D8 du contrôle du jeu) le stick ne vise que pendant que la touche est tenue : relâchée, la direction
+  // lue à l'appui (ou au relâché) reste, même si la passe part plus tard (en file derrière un geste) ; avant, la passe
+  // partait vers le stick du moment, à 55° de celui de l'appui
+  if (spec.tenu && it && (it.allure ?? 0) > 0.3 && (it.dx || it.dz)) {
+    if (estFrappe(spec.type)) { if (it.viseX != null) spec.x = it.viseX; }
+    else { spec.dx = it.dx; spec.dz = it.dz; }
+  }
+  if (!spec.tenu) spec.lache = true;
+}
+/** R2 + ○ : forte à ras de terre si la balle est au sol, acrobatique si elle est en l'air (décidé une fois). */
+function resoudreR2(b, spec) {
+  if (!spec.r2 || spec.r2Fait) return;
+  spec.r2Fait = true;
+  if (b.p.y > 0.45 || b.v.y > 1.5) { spec.acro = true; spec.commande = 'acrobatique'; }
+  else { spec.ras = true; spec.y = 0.15; spec.commande = 'ras'; }
+}
+/** Pour le rendu : où part la balle d'une charge en cours (la flèche) et la jauge. */
+function publierVisee(j, spec, cible) {
+  if (!spec.charge || (spec.lache && !spec.tenu && j.vise?.fige)) return;
+  const V = (j.vise ??= { x: 0, z: 0, p: 0, fige: false });
+  V.x = cible.x; V.z = cible.z; V.p = spec.pCharge ?? 0; V.fige = !!spec.lache;
 }
 
 export { LB, BUT_DL, BUT_H, PAS };

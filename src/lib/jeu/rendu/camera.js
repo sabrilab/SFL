@@ -38,7 +38,9 @@ export const CAMERA_TELE = {
   avance: 0.45,       // s : où sera la balle (net, une fois le retard des ressorts rattrapé)
   avanceZ: 6, avanceX: 2.5, // m : la visée devant la balle au plus
   w: 3.2, wTir: 6.5,  // pulsations du ressort du foyer (s⁻¹)
-  wCadre: 4.5, wCadreTir: 6, wFace: 3, // pulsations des ressorts de la place et du regard de la caméra
+  // (bola-app#32 : wCadreTir 6 → 5 ; les frappes partent plus vite et plus souvent, le cadre qui recule pour tenir le but
+  // donnait un saut d'accélération de 24 m/s² par image, au-delà du seuil de 20 : plus doux, 8)
+  wCadre: 4.5, wCadreTir: 5, wFace: 3, // pulsations des ressorts de la place et du regard de la caméra
   lisse: 0.2,         // s : la vitesse de la balle est lissée avant de servir à viser (un rebond ne fait pas sursauter)
   serre: 0.92,        // le cadre au duel près d'un but
 };

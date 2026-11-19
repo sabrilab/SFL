@@ -297,4 +297,98 @@ export const SCENARIOS = {
   },
 };
 
+// (bola-app#32, lot A2) une scène par commande, pour la planche « une animation distincte par commande » : le Noir n° 4,
+// balle au pied, arrêté (ou lancé : suffixe « _course »), face au but des Blancs (−z), un coéquipier (n° 3) à servir ;
+// l'action part à la 12e image, avec sa commande (id de entrees/touches.js), comme une touche d'un appui bref.
+const SPEC_COMMANDE = {
+  passe: { type: 'passe' }, passePuissante: { type: 'passe', puissante: true }, frappe: { type: 'frappe' }, finesse: { type: 'finesse' },
+  pique: { type: 'lobFrappe' }, ras: { type: 'frappe', r2: true }, acrobatique: { type: 'frappe', r2: true }, exterieur: { type: 'exterieur' },
+  centre: { type: 'centre' }, centreLobe: { type: 'centre', haut: true }, centreTendu: { type: 'centre', tendu: true },
+  profondeur: { type: 'profondeur' }, profondeurLobee: { type: 'profondeur', lobe: true }, profondeurTendue: { type: 'profondeur', puissante: true },
+};
+for (const [id, spec] of Object.entries(SPEC_COMMANDE)) {
+  for (const course of [false, true]) {
+    if (course && id === 'acrobatique') continue;
+    SCENARIOS[`geste_${id}${course ? '_course' : ''}`] = {
+      graine: 130, presents: [0, 3, 4, 5],
+      creer(M) {
+        M.humains = [true, false]; M.controleFixe = [4, null];
+        const flanc = id.startsWith('centre'), v = course ? 5 : 0;
+        const x = flanc ? 5.5 : 0;
+        poser(M.joueurs[4], x, 3, Math.PI, 0, -v);
+        if (id === 'acrobatique') { balleA(M, x, 2.55, 0, 0, 4); M.balle.p.y = 1.0; M.balle.v.y = 0.5; }
+        else balleA(M, x, 2.6, 0, -v, 4);
+        poser(M.joueurs[3], flanc ? -1 : 3, -6, 0);
+        poser(M.joueurs[5], 0, -14, 0);
+        let n = 0;
+        return {
+          entrees() {
+            n++;
+            const action = n === 12 ? { ...spec, commande: id, p: null, charge: false } : null;
+            return [intention(0, course ? -1 : 0, course ? 0.7 : 0, 0, { action }), null];
+          },
+        };
+      },
+    };
+  }
+}
+// la défense : récupérer du pied (○) et le tacle glissé (□) sur un porteur Blanc qui arrive ; la balle libre prise (○)
+SCENARIOS.geste_recuperer = {
+  graine: 131, presents: [0, 4, 5, 6],
+  creer(M) {
+    M.humains = [true, true]; M.controleFixe = [4, 6];
+    poser(M.joueurs[4], 0, 1, 0); poser(M.joueurs[6], 0, 2.6, Math.PI, 0, -2.5); balleA(M, 0, 2.15, 0, -2.6, 6);
+    let n = 0;
+    return { entrees() { n++; return [intention(0, 0, 0, 0, { action: n === 8 ? { type: 'tacle', glisse: false, commande: 'recuperer' } : null }), intention(0, -1, 0.35, 0)]; } };
+  },
+};
+SCENARIOS.geste_tacle = {
+  graine: 132, presents: [0, 4, 5, 6],
+  creer(M) {
+    M.humains = [true, true]; M.controleFixe = [4, 6];
+    poser(M.joueurs[4], 0.2, 1, 0, 0, 4); poser(M.joueurs[6], 0, 4.6, Math.PI, 0, -3); balleA(M, 0, 4.1, 0, -3.2, 6);
+    let n = 0;
+    return { entrees() { n++; return [intention(0, 1, 0.6, 0, { action: n === 6 ? { type: 'tacle', glisse: true, commande: 'tacle' } : null }), intention(0, -1, 0.45, 0)]; } };
+  },
+};
+SCENARIOS.geste_prendre = {
+  graine: 133, presents: [0, 4, 5],
+  creer(M) {
+    M.humains = [true, false]; M.controleFixe = [4, null];
+    poser(M.joueurs[4], 0, 4, Math.PI); balleA(M, 0.4, 2.3, 0, 0, null);
+    let n = 0;
+    return { entrees() { n++; return [intention(0, 0, 0, 0, { action: n === 8 ? { type: 'prendre', commande: 'prendre' } : null }), null]; } };
+  },
+};
+// (lot A2, point 15) les trois issues du tacle glissé et le saut du porteur, pour la vidéo tacles.mp4 : de face sur la
+// balle au pied (contrée), de côté sur une balle poussée loin (prise, vers un coéquipier), par derrière (fauché, faute)
+function sceneTacle(tacleur, porteurV, balleD, coequipier) {
+  return {
+    graine: 134, presents: [0, 2, 4, 5, 6],
+    creer(M) {
+      M.humains = [true, true]; M.controleFixe = [4, 6];
+      poser(M.joueurs[6], 0, 4, Math.PI, 0, -porteurV);
+      balleA(M, 0, 4 - balleD, 0, -porteurV, balleD > 0.6 ? null : 6);
+      const [x, z, cap, vx, vz] = tacleur;
+      poser(M.joueurs[4], x, z, cap, vx, vz);
+      poser(M.joueurs[2], coequipier[0], coequipier[1], 0);
+      let n = 0;
+      return { entrees() { n++; return [intention(Math.sin(M.joueurs[4].cap), Math.cos(M.joueurs[4].cap), 0.65, 0, { action: n === 4 ? { type: 'tacle', glisse: true, commande: 'tacle' } : null }), intention(0, -1, porteurV / 7, 0)]; } };
+    },
+  };
+}
+SCENARIOS.tacleContre = sceneTacle([0.15, 1.4, 0, 0, 4.5], 3, 0.4, [6, -6]);
+SCENARIOS.taclePropre = sceneTacle([2.0, 2.6, -Math.PI / 2, -4.5, 0], 3, 1.3, [-1, -6]);
+SCENARIOS.tacleFaute = sceneTacle([-0.1, 6, Math.PI, 0, -6.5], 3, 0.4, [6, -6]);
+SCENARIOS.tacleSaut = {
+  graine: 135, presents: [0, 4, 5, 6],
+  creer(M) {
+    M.humains = [true, true]; M.controleFixe = [4, 6];
+    poser(M.joueurs[6], 0, 5.5, Math.PI, 0, -6); balleA(M, 0, 1.2, 0, -0.5, null);
+    poser(M.joueurs[4], 2.4, 2.0, -Math.PI / 2, -4.5, 0);
+    let n = 0;
+    return { entrees() { n++; return [intention(-1, 0, 0.7, 0, { action: n === 1 ? { type: 'tacle', glisse: true, commande: 'tacle' } : null }), intention(0, -1, 1, 1)]; } };
+  },
+};
+
 export { PAS };

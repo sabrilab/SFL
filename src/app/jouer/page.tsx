@@ -24,6 +24,14 @@
 // met en pause (deux barres au milieu, sans texte ; Échap ou P au clavier ; un toucher sur le voile reprend). Sur
 // l'écran d'attente, une manette branchée apparaît tout de suite en petit au-dessus de « Jouer ». (bola-app#26, lot 3)
 // L'écran Manettes ouvre le schéma des touches (./touches.tsx ; Vue / Share sur la manette aussi).
+// (bola-app#32, lot B) « IA contre IA » : sous « Jouer » avant le match (et après), et dans la pause ; l'IA joue les deux
+// équipes (le mode démonstration d'un stream : un nouveau match repart seul après la fin) ; une manette, une touche ou
+// un toucher reprend la main. Le plan d'une équipe (pressing, équilibre, bloc bas : la croix de la manette, 1 2 3 au
+// clavier ; l'IA qui s'adapte au score et au temps) s'affiche un instant sous le score, en un court libellé noir et blanc.
+// (bola-app#32, lot C) Pendant le match, le panneau des touches (./panneau-touches.tsx) montre sur un côté les touches
+// utiles de l'appareil qui joue, selon la phase ; Vue / Share, H au clavier ou un toucher sur le panneau le masquent
+// (affiché par défaut, le choix gardé dans le navigateur) ; masqué, l'écran est propre (le mode d'un stream). En
+// paysage, le score et le temps sont plus grands (lisibles pour un spectateur en 16:9).
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
@@ -35,6 +43,7 @@ import { photoPerso, rafraichirPhotos } from "@/lib/sfl/photos";
 import { cn } from "@/lib/utils";
 import { EcranManettes, ManettesVues, type MagasinManettes } from "./manettes";
 import { SchemaTouches, type Appareil } from "./touches";
+import { PanneauTouches, TOUCHE_PANNEAU, type InfoPanneau } from "./panneau-touches";
 // la police du score et de « BUT » : un mot à changer dans lib/jeu/police.js pour passer à Inter 800 (décision 1 de #25)
 import { CLASSE_SCORE } from "@/lib/jeu/police.js";
 
@@ -48,6 +57,9 @@ type Etat = {
   pause: boolean;
   manettes: boolean;
   ralenti: boolean;
+  demo: boolean;
+  tactique: { n: number; lignes: { e: number; plan: string; nom: string; style: string }[] } | null;
+  panneau: InfoPanneau[];
 };
 type Match = {
   demarrer: () => void;
@@ -55,6 +67,8 @@ type Match = {
   salon: (ouvert: boolean) => void;
   reprendre: () => void;
   passer: () => void;
+  demo: () => void;
+  reprendreMain: () => void;
   manettes: MagasinManettes & { reconnues: () => number };
 };
 
@@ -63,6 +77,22 @@ const chrono = (s: number) => {
   return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, "0")}`;
 };
 const rien = () => () => {};
+// (lot C) le panneau des touches masqué : gardé dans le navigateur (en try/catch : stockage absent ou refusé)
+const CLE_PANNEAU = "bola-jeu-panneau-touches";
+const lirePanneauCache = () => {
+  try {
+    return localStorage.getItem(CLE_PANNEAU) === "cache";
+  } catch {
+    return false;
+  }
+};
+const estTactile = () => {
+  try {
+    return window.matchMedia("(pointer: coarse)").matches;
+  } catch {
+    return false;
+  }
+};
 
 export default function JouerPage() {
   const { me } = useMyPlayer();
@@ -82,6 +112,24 @@ export default function JouerPage() {
   const ouvrirSalon = useRef<() => void>(() => {});
   const lancer = useRef<() => void>(() => {});
   const [magasin, setMagasin] = useState<MagasinManettes | null>(null);
+  // (lot C) le panneau des touches : affiché par défaut, masqué d'une touche (Vue / Share, H) ou d'un toucher
+  const [panneauCache, setPanneauCache] = useState(lirePanneauCache);
+  const basculerPanneau = () => setPanneauCache((c) => !c);
+  useEffect(() => {
+    try {
+      localStorage.setItem(CLE_PANNEAU, panneauCache ? "cache" : "vu");
+    } catch {
+      /* stockage refusé : le choix vaut pour la partie */
+    }
+  }, [panneauCache]);
+  useEffect(() => {
+    const touche = (e: KeyboardEvent) => {
+      if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
+      if (e.key?.toLowerCase() === TOUCHE_PANNEAU) setPanneauCache((c) => !c);
+    };
+    addEventListener("keydown", touche);
+    return () => removeEventListener("keydown", touche);
+  }, []);
   const phaseVue = etat?.phase ?? "attente";
   useEffect(() => {
     ouvrirSalon.current = () => {
@@ -116,6 +164,7 @@ export default function JouerPage() {
           surSalon: () => ouvrirSalon.current(),
           surDemarrer: () => lancer.current(),
           surTouches: (marque: string) => setTouches((t) => (t ? null : marque === "playstation" ? "playstation" : "xbox")),
+          surPanneau: () => setPanneauCache((c) => !c),
         })) as unknown as Match;
         if (fini) {
           m.detruire();
@@ -159,17 +208,40 @@ export default function JouerPage() {
         </div>
         {etat && enJeu && !etat.ralenti && (
           <div className={cn("absolute left-1/2 top-[calc(env(safe-area-inset-top)+10px)] flex -translate-x-1/2 items-center overflow-hidden rounded-full bg-black/55 leading-none backdrop-blur", CLASSE_SCORE)}>
-            <span className="flex items-center gap-2 py-1.5 pl-3.5 pr-3 text-[22px] tabular-nums">
-              <span className="h-2.5 w-2.5 rounded-full border border-white/70 bg-black" />
+            {/* (lot C) en paysage, le score grandit avec l'écran : lisible sur un stream en 16:9 */}
+            <span className="flex items-center gap-2 py-1.5 pl-3.5 pr-3 text-[22px] tabular-nums landscape:text-[clamp(22px,3.6vh,42px)]">
+              <span className="h-2.5 w-2.5 rounded-full border border-white/70 bg-black landscape:h-[clamp(10px,1.4vh,16px)] landscape:w-[clamp(10px,1.4vh,16px)]" />
               {etat.noirs}
               <span className="text-white/40">–</span>
               {etat.blancs}
-              <span className="h-2.5 w-2.5 rounded-full bg-white" />
+              <span className="h-2.5 w-2.5 rounded-full bg-white landscape:h-[clamp(10px,1.4vh,16px)] landscape:w-[clamp(10px,1.4vh,16px)]" />
             </span>
-            <span className="border-l border-white/15 py-1.5 pl-3 pr-3.5 text-[18px] tabular-nums text-white/80">{chrono(etat.reste)}</span>
+            <span className="border-l border-white/15 py-1.5 pl-3 pr-3.5 text-[18px] tabular-nums text-white/80 landscape:text-[clamp(18px,3vh,34px)]">{chrono(etat.reste)}</span>
           </div>
         )}
       </div>
+
+      {/* (bola-app#32, lot B) le plan d'une équipe, un instant sous le score ; « IA contre IA » tant que l'IA joue seule */}
+      {etat && enJeu && !etat.ralenti && (etat.tactique || etat.demo) && (
+        <div className="pointer-events-none absolute inset-x-0 top-[calc(env(safe-area-inset-top)+52px)] flex flex-col items-center gap-1.5 landscape:top-[calc(env(safe-area-inset-top)+max(52px,6.6vh+16px))]">
+          {etat.demo && <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/60">IA contre IA</span>}
+          {etat.tactique && (
+            <div key={etat.tactique.n} className="jeu-tactique flex gap-1.5">
+              {etat.tactique.lignes.map((l) => (
+                <span
+                  key={l.e}
+                  className={cn(
+                    "rounded-full px-2.5 py-1 text-[12px] font-semibold leading-none",
+                    l.e === 0 ? "border border-white/70 bg-black text-white" : "bg-white text-black",
+                  )}
+                >
+                  {l.e === 0 ? "Noirs" : "Blancs"} · {l.nom}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* le mot du résultat, en haut (correctifs #26 : au milieu, à 64 %, il couvrait le buteur qui célèbre au plan
           rapproché) */}
@@ -198,8 +270,16 @@ export default function JouerPage() {
         </div>
       )}
 
+      {/* (lot C) le panneau des touches, sur un côté (au-dessus de la zone du pouce) ; sous le voile de la pause */}
+      {etat && (phase === "jeu" || phase === "engagement") && !etat.ralenti && !etat.demo && (
+        <div className="pointer-events-none absolute inset-0">
+          <PanneauTouches infos={etat.panneau ?? []} cache={panneauCache} tactile={estTactile()} onBasculer={basculerPanneau} />
+        </div>
+      )}
+
       {/* le pouce fantôme : le geste, tant qu'on n'a pas touché */}
-      {phase === "jeu" && !touche && !etat?.manettes && !etat?.pause && (
+      {/* (lot C : pas quand on joue au clavier ou à la manette, le panneau dit alors les touches : un écran propre) */}
+      {phase === "jeu" && !touche && !etat?.manettes && !etat?.pause && !etat?.demo && !etat?.panneau?.some((i) => i.appareil !== "pouce") && (
         <div className="pointer-events-none absolute bottom-[14%] left-[38%] -translate-x-1/2">
           <div className="jeu-fantome h-10 w-10 rounded-full bg-white/80 shadow-[0_2px_14px_rgba(0,0,0,.4)]" />
         </div>
@@ -219,6 +299,19 @@ export default function JouerPage() {
             <span className="h-14 w-4 rounded-sm bg-white" />
             <span className="h-14 w-4 rounded-sm bg-white" />
           </div>
+          {/* (lot B) l'IA prend les deux équipes, ou on reprend la main */}
+          <button
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              if (etat.demo) match.current?.reprendreMain();
+              else match.current?.demo();
+            }}
+            className="absolute inset-x-0 mx-auto h-11 w-full max-w-[240px] rounded-full border border-white/70 text-[15px] font-semibold text-white"
+            style={{ bottom: "calc(env(safe-area-inset-bottom) + 28px)" }}
+          >
+            {etat.demo ? "Reprendre la main" : "IA contre IA"}
+          </button>
         </div>
       )}
 
@@ -266,6 +359,20 @@ export default function JouerPage() {
               {!pret ? `${Math.round(progres * 100)} %` : phase === "fin" ? "Rejouer" : "Jouer"}
             </button>
           )}
+          {/* (bola-app#32, lot B) l'IA joue les deux équipes : pour montrer le jeu, et le regarder jouer */}
+          {pret && !erreur && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setSalon(false);
+                setTouches(null);
+                match.current?.demo();
+              }}
+              className="h-11 w-full max-w-[320px] rounded-full border border-white/60 text-[15px] font-semibold text-white"
+            >
+              IA contre IA
+            </button>
+          )}
           {isAdmin(me) && phase === "attente" && (
             <Link href="/jouer/studio" className="text-[13px] font-semibold uppercase tracking-[0.18em] text-white/50">
               Studio
@@ -279,6 +386,8 @@ export default function JouerPage() {
         @keyframes jeu-mot { from { transform: scale(.6); opacity: 0 } to { transform: none; opacity: 1 } }
         .jeu-fantome { animation: jeu-fantome 2.2s ease-in-out infinite; }
         .jeu-bande { animation: jeu-bande .35s ease-out both; }
+        .jeu-tactique { animation: jeu-tactique 2.8s ease-out both; }
+        @keyframes jeu-tactique { 0% { opacity: 0; transform: translateY(-4px) } 10% { opacity: 1; transform: none } 80% { opacity: 1 } 100% { opacity: 0 } }
         @keyframes jeu-bande { from { transform: scaleY(0) } to { transform: none } }
         @keyframes jeu-fantome {
           0% { transform: translate(0, 0); opacity: 0 }
@@ -287,7 +396,8 @@ export default function JouerPage() {
           62% { transform: translate(110px, 0); opacity: 0 }
           100% { opacity: 0 }
         }
-        @media (prefers-reduced-motion: reduce) { .jeu-mot, .jeu-fantome, .jeu-bande { animation: none } }
+        @media (prefers-reduced-motion: reduce) { .jeu-mot, .jeu-fantome, .jeu-bande { animation: none } .jeu-tactique { animation: jeu-tactique-r 2.8s step-end both } }
+        @keyframes jeu-tactique-r { 0% { opacity: 1 } 100% { opacity: 0 } }
       `}</style>
     </div>
   );
