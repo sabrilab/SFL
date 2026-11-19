@@ -101,9 +101,12 @@ function toucher(m, j, { possede = true } = {}) {
  */
 export function pasConduite(m, j, appui) {
   const b = m.balle, it = j.int, A = JEU.aimant;
-  if (b.p.y > 0.45 || !(libre(j) || j.mode === 'frein' || j.mode === 'pivot')) return;
+  // (correctifs #32) l'amorti de la prise sur ○ (gestePrise) tient aussi la balle : avant, l'aimant s'arrêtait pendant le
+  // geste et la balle « prise » s'en allait
+  const prise = j.g?.type === 'controle' && !!j.g.donnees?.prise;
+  if (b.p.y > 0.45 || !(libre(j) || j.mode === 'frein' || j.mode === 'pivot' || prise)) return;
   const rx = b.p.x - j.p.x, rz = b.p.z - j.p.z, d = hypot(rx, rz);
-  if (d > A.rayon) { j.aimA = null; return; }
+  if (d > A.rayon) { j.aimA = null; j.aimCote = null; return; }
   const s = hypot(j.v.x, j.v.z);
   let ux, uz, off;
   if (it?.protege) {
@@ -114,6 +117,9 @@ export function pasConduite(m, j, appui) {
   } else {
     if ((it?.allure ?? 0) > 0.05 && (it.dx || it.dz)) { const L = hypot(it.dx, it.dz) || 1; ux = it.dx / L; uz = it.dz / L; }
     else if (s > 0.5) { ux = j.v.x / s; uz = j.v.z / s; }
+    // (correctifs #32, D14) arrêté sans stick, la balle reste où elle est (le point ne suit plus le cap : le joueur arrêté
+    // regarde la balle, son cap tournait vers elle et la faisait tourner autour de lui à 1 m/s sans fin)
+    else if (j.aimA != null) { ux = sin(j.aimA); uz = cos(j.aimA); }
     else { ux = sin(j.cap); uz = cos(j.cap); }
     off = A.pres + A.loin * s;
   }
@@ -127,12 +133,22 @@ export function pasConduite(m, j, appui) {
   // qui suit parte du bon pied)
   const fa = sin(a), ga = cos(a);
   const lat0 = rx * ga - rz * fa;
-  const lat = (lat0 >= 0 ? 1 : -1) * clamp(Math.abs(lat0), 0.06, 0.14);
+  // (correctifs #32, D14 du contrôle du jeu) le côté ne change que si la balle passe franchement de l'autre (4 cm) : avant,
+  // une balle sur l'axe faisait sauter le point de 12 cm d'un pied à l'autre à chaque pas (balle qui tremble, ±1 m/s)
+  const c0 = j.aimCote ?? (lat0 >= 0 ? 1 : -1);
+  const cote = lat0 * c0 < -0.04 ? -c0 : c0;
+  j.aimCote = cote;
+  const lat = cote * clamp(lat0 * cote, 0.06, 0.14);
   j.aimLat = lat;
   const tx = j.p.x + j.v.x * PAS + fa * off + ga * lat, tz = j.p.z + j.v.z * PAS + ga * off - fa * lat;
-  const k = A.raideur, E = A.ecart;
-  b.v.x = j.v.x + clamp((tx - b.p.x) * k, -E, E);
-  b.v.z = j.v.z + clamp((tz - b.p.z) * k, -E, E);
+  // (correctifs #32) juste après une prise aimantée (prendreBalle), la balle vient au pied sans être « aspirée » : l'écart de
+  // vitesse permis monte de 1,5 à 5 m/s en 0,35 s, et la vitesse de la balle rejoint celle de la cible en 0,05 s puis de
+  // plus en plus vite (pas d'un coup)
+  const depuis = m.t - (j.priseT ?? -9);
+  const k = A.raideur, E = depuis < 0.35 ? A.ecart * (0.3 + 0.7 * depuis / 0.35) : A.ecart;
+  const vx = j.v.x + clamp((tx - b.p.x) * k, -E, E), vz = j.v.z + clamp((tz - b.p.z) * k, -E, E);
+  if (depuis < 0.35) { const a0 = Math.min(1, PAS / 0.05), a = a0 + (1 - a0) * (depuis / 0.35) ** 2; b.v.x += (vx - b.v.x) * a; b.v.z += (vz - b.v.z) * a; }
+  else { b.v.x = vx; b.v.z = vz; }
   if (b.p.y < R + 0.03) { b.v.y = Math.min(b.v.y, 0); rouler(b); }
   b.dernier = j.i; b.dernierT = m.t; b.possesseur = j.i;
   if (b.recepteur === j.i) b.recepteur = null;
@@ -315,8 +331,34 @@ export function gestePrise(m, j) {
   if (j.g || hypot(j.v.x, j.v.z) > 3.5) return;
   const c = clipControle(j, b, 'pied', 0, 9, true);
   if (!c) return;
-  lancerGeste(j, c.nom, { depuis: Math.max(0, c.impact - 0.08) / duree(c.nom), taux: 1.5, fin: Math.min(duree(c.nom), c.impact + 0.2), type: 'controle', donnees: { surface: 'pied', prise: true } });
+  lancerGeste(j, c.nom, { depuis: Math.max(0, c.impact - 0.1) / duree(c.nom), taux: 1.5, fin: Math.min(duree(c.nom), c.impact + 0.2), type: 'controle', donnees: { surface: 'pied', prise: true } });
   m.ev('prise', { j: j.i, clip: c.nom });
+}
+
+/**
+ * (correctifs #32, D1 du contrôle du code, D3 du contrôle du jeu) La prise aimantée d'une balle libre : ○ d'un humain (à
+ * 1,2 m au plus, la balle vient à lui), ou l'IA à la portée du pied (JEU.aimant.priseIA). Le joueur devient le porteur
+ * et pasConduite ramène la balle au pied (écart de vitesse borné juste après la prise : elle roule vers lui, elle n'est
+ * pas aspirée). Avant : pasControle donnait à la balle la sortie d'un contrôle orienté (3 à 4 m/s vers l'avant) pendant
+ * que l'amorti plantait le joueur ; la balle « prise » finissait à 2,3-2,8 m. L'amorti du pied (gestePrise) n'est lancé
+ * qu'à l'arrivée de la balle (monde.js, à 0,6 m), pour que son contact tombe sur elle.
+ */
+export function prendreBalle(m, j) {
+  const b = m.balle;
+  if (!libre(j) || b.garde != null || b.possesseur === j.i) return false;
+  if (b.dernier != null && b.dernier !== j.i && m.joueurs[b.dernier].e !== j.e && m.t - b.dernierT < 0.25) return false;
+  if (m.ecart?.e === j.e) return false;
+  const vin = hypot(b.v.x - j.v.x, b.v.z - j.v.z), sj = hypot(j.v.x, j.v.z);
+  const gauche = (b.p.x - j.p.x) * cos(j.cap) - (b.p.z - j.p.z) * sin(j.cap) > 0;
+  toucher(m, j);
+  j.priseT = m.t; j.aimA = null; j.aimCote = null; j.controleQ = 1; j.controleT = m.t;
+  m.ev('controle', { j: j.i, q: 1, vin, surface: 'pied', possede: true, rate: false, tir: false, clip: null, sj, gauche, prise: true });
+  // (le une-deux : la passe de j à X, puis la remise de X à j, reprise par j dans les 4,5 s)
+  const [p1, p2] = m.passes;
+  if (p1 && p2 && !p2.compte && p1.de === j.i && p2.de === p1.a && p2.a === j.i && m.t - p1.t < 4.5) {
+    p2.compte = true; m.stats.uneDeux++; m.ev('uneDeux', { j: j.i, o: p1.a });
+  }
+  return true;
 }
 
 /**
@@ -421,14 +463,7 @@ function clipFrappe(j, b, spec) {
   // la hauteur de la balle à l'impact (un premier jet à 0,22 s)
   const yb = hauteurDans(b, 0.22);
   if (yb > 0.3 || b.p.y > 0.45) {
-    const choix = [];
-    if (yb > 1.25 && ecart < 1.9) choix.push('head_std', 'header2');
-    if (yb > 0.7 && yb < 1.25 && ecart > 1.9 && CLIPS.bicycle) choix.push('bicycle');
-    // (correctifs #26) le ciseau (volley) seulement pour une frappe, de côté ou dos à la cible (un dégagement : volée basse ou tête) ; de face, la volée basse jusqu'à 1 m
-    if (yb > 0.9 && ecart > 1.0 && spec.type !== 'passe') choix.push('volley');
-    // (lot A) R2 + ○ en l'air : l'acrobatique d'abord (retournée dos au but, ciseau, demi-volée)
-    if (spec.acro) { if (yb > 0.7 && CLIPS.bicycle && ecart > 1.6) choix.unshift('bicycle'); if (yb > 0.8) choix.push('volley'); }
-    if (yb < 1.0) choix.push('shoot2');
+    const choix = choixAeriens(yb, ecart, spec);
     let best = null;
     for (const n0 of choix) {
       const tete = /^head/.test(n0);
@@ -590,15 +625,7 @@ function reprendre(m, j, dm, cible) {
   const cote = (P.x - j.p.x) * fz - (P.z - j.p.z) * fx;
   const hv = hypot(j.v.x, j.v.z) > 0.3 ? atan2(j.v.x, j.v.z) : j.cap;
   const ecart = Math.abs(enrouler(atan2(cible.x - P.x, cible.z - P.z) - hv));
-  const choix = [];
-  // (la tête debout jusqu'à 1,65 m ; au-dessus, la tête en extension, sautée)
-  if (P.y > 1.25 && ecart < 1.9) choix.push(P.y < 1.65 ? 'head_std' : 'header2');
-  if (P.y > 0.7 && P.y < 1.25 && ecart > 1.9 && CLIPS.bicycle) choix.push('bicycle');
-  // (correctifs #26) le ciseau (volley) seulement pour une frappe, de côté ou dos à la cible (un dégagement : volée basse ou tête) ; de face, la volée basse jusqu'à 1 m
-  if (P.y > 0.9 && P.y < 1.8 && ecart > 1.0 && dm.spec.type !== 'passe') choix.push('volley');
-  // (lot A) R2 + ○ : l'acrobatique, même de face (ciseau), retournée dos au but
-  if (dm.spec.acro) { if (P.y > 0.7 && P.y < 1.3 && CLIPS.bicycle && ecart > 1.6) choix.unshift('bicycle'); if (P.y > 0.8 && P.y < 1.8) choix.push('volley'); }
-  if (P.y < 1.0) choix.push('shoot2');
+  const choix = choixAeriens(P.y, ecart, dm.spec, true);
   let g = null;
   for (const n0 of choix) {
     const tete = /^head/.test(n0);
@@ -608,7 +635,8 @@ function reprendre(m, j, dm, cible) {
     const pied = tete ? 'tete' : CLIPS_PIED(n);
     for (let i = 3; i < (c.n * 2) / 3; i++) {
       const t = i / FPS_CLIPS, taux = t / tc;
-      if (taux < 0.8 || taux > 2.2) continue;
+      // (correctifs #32 : un humain peut reprendre plus tard, le geste joué jusqu'à 3 fois plus vite)
+      if (taux < 0.8 || taux > (dm.spec.humain ? 3 : 2.2)) continue;
       // (la tête doit être à la balle à 0,2 m près : sinon c'est la poitrine ou les mains qui la prennent)
       const err = Math.abs(surfaceA(n, t, pied, t1).y - P.y) * (tete ? 1.75 : 1);
       if (!g || err < g.err) g = { nom: n, impact: t, taux, pied, err };
@@ -622,8 +650,8 @@ function reprendre(m, j, dm, cible) {
     versMonde(hc, t1.x, t1.z, t2);
     const sx = P.x - sin(hc) * (R + 0.04) - t2.x, sz = P.z - cos(hc) * (R + 0.04) - t2.z;
     const ex = j.p.x + j.v.x * tc, ez = j.p.z + j.v.z * tc;
-    // (pasFrappe rattrape jusqu'à 1,2 m/s pendant l'élan)
-    if (hypot(sx - ex, sz - ez) < 0.2 + 1.1 * tc) {
+    // (pasFrappe rattrape jusqu'à 1,2 m/s pendant l'élan ; 2,5 m/s pour la reprise d'un humain, correctifs #32)
+    if (hypot(sx - ex, sz - ez) < 0.2 + (dm.spec.humain ? 2.3 : 1.1) * tc) {
       j.demande = null;
       j.cap = hc;
       dm.spec.commande ??= commandeDe(dm.spec);
@@ -641,6 +669,40 @@ function reprendre(m, j, dm, cible) {
   const dx = P.x - j.p.x, dz = P.z - j.p.z, L = hypot(dx, dz) || 1;
   if (L > 0.3) { it.dx = dx / L; it.dz = dz / L; it.allure = Math.max(it.allure, clamp(L / 1.2, 0.3, 1)); }
   return true;
+}
+
+/**
+ * Les gestes aériens possibles pour une balle à la hauteur y au contact, ecart l'angle entre la course et la cible (rad).
+ *   · l'IA, et la reprise d'une passe : la tête au-dessus de 1,25 m face au jeu (debout jusqu'à 1,65 m, sautée au-dessus
+ *     pour la reprise), le retourné dos au but de 0,7 à 1,25 m, le ciseau pour une frappe de côté ou dos à la cible de 0,9
+ *     à 1,8 m (correctifs #26), la jambe tendue (shoot2) sous 1 m ;
+ *   · (correctifs #32, D4 du contrôle du jeu, retour de Sabri de 21:19 : « une animation distincte par commande ») R2 + ○
+ *     d'un humain, l'acrobatique : au-dessus de 0,7 m, le retourné dos au but (ou de côté, à plus de 90°) et le ciseau
+ *     ailleurs, seulement eux ; en dessous, la demi-volée, la frappe sèche du cou-de-pied sur la balle qui retombe
+ *     (shoot) ; ○ seul d'un humain ne fait plus ni retourné ni ciseau : la volée jambe tendue jusqu'à 1,3 m, la tête
+ *     au-dessus (avant : les deux jouaient le même geste, shoot2 ou bicycle).
+ */
+function choixAeriens(y, ecart, spec, reprise = false) {
+  const choix = [];
+  if (spec.acro) {
+    if (y > 0.7) {
+      if (CLIPS.bicycle && ecart > 1.6 && y < 1.35) choix.push('bicycle');
+      if (y > 0.75 && y < 1.9) choix.push('volley');
+      if (!choix.length) choix.push('volley');
+    } else choix.push('shoot');
+    return choix;
+  }
+  const tete = reprise ? (y < 1.65 ? 'head_std' : 'header2') : null;
+  if (spec.humain && estFrappe(spec.type)) {
+    if (y > 1.25) { if (tete) choix.push(tete); else choix.push('head_std', 'header2'); }
+    if (y < 1.3) choix.push('shoot2');
+    return choix;
+  }
+  if (y > 1.25 && ecart < 1.9) { if (tete) choix.push(tete); else choix.push('head_std', 'header2'); }
+  if (y > 0.7 && y < 1.25 && ecart > 1.9 && CLIPS.bicycle) choix.push('bicycle');
+  if (y > 0.9 && (!reprise || y < 1.8) && ecart > 1.0 && spec.type !== 'passe') choix.push('volley');
+  if (y < 1.0) choix.push('shoot2');
+  return choix;
 }
 
 /** le pied qui frappe dans ce clip (0 = gauche, 1 = droit), mesuré par tools/jeu-clips.mjs */
@@ -676,8 +738,23 @@ export function pasFrappe(m, j, dt) {
     const hx = sin(hc), hz = cos(hc);
     // (lot A) la balle aimantée d'un humain : c'est elle qui est tenue au point de frappe, devant le pied qui arrive
     if (g.donnees.aimant && b.possesseur === j.i && b.p.y < 0.5) {
-      const qx = j.p.x + j.v.x * reste + t2.x + hx * (R + 0.04), qz = j.p.z + j.v.z * reste + t2.z + hz * (R + 0.04);
-      b.v.x = j.v.x + clamp((qx - b.p.x) * 20, -6, 6); b.v.z = j.v.z + clamp((qz - b.p.z) * 20, -6, 6);
+      // (correctifs #32, D2 du contrôle du jeu) où sera le corps à l'impact : en course, le root motion du clip (le corps ne
+      // garde pas sa vitesse : strike_run ralentit sur l'appui) ; avant, j.v × reste mettait la balle 0,34 m trop loin
+      // du pied, la frappe était effleurée (0,4 × la vitesse : 9 m/s au lieu de 22,6)
+      let cx = j.p.x + j.v.x * reste, cz = j.p.z + j.v.z * reste;
+      if (g.rm) {
+        racineA(g.nom, g.impact, t1); const ax = t1.x, az = t1.z;
+        racineA(g.nom, g.t, t1);
+        versMonde(g.cap0, (ax - t1.x) * g.echelle, (az - t1.z) * g.echelle, t1);
+        cx = j.p.x + t1.x; cz = j.p.z + t1.z;
+      }
+      const qx = cx + t2.x + hx * (R + 0.04), qz = cz + t2.z + hz * (R + 0.04);
+      // (le point de frappe est fixe sur le terrain : la balle y va, sans la vitesse du corps en plus, qui la faisait
+      // finir j.v / 20 devant le pied)
+      const vq = g.donnees.vq ??= { x: 0, z: 0, qx, qz, t: m.t };
+      if (m.t > vq.t) { vq.x = (qx - vq.qx) / (m.t - vq.t); vq.z = (qz - vq.qz) / (m.t - vq.t); }
+      vq.qx = qx; vq.qz = qz; vq.t = m.t;
+      b.v.x = clamp(vq.x, -8, 8) + clamp((qx - b.p.x) * 20, -7, 7); b.v.z = clamp(vq.z, -8, 8) + clamp((qz - b.p.z) * 20, -7, 7);
       if (b.p.y < R + 0.03) { b.v.y = Math.min(b.v.y, 0); rouler(b); }
       b.dernier = j.i; b.dernierT = m.t;
       return;
@@ -692,7 +769,10 @@ export function pasFrappe(m, j, dt) {
       qx = j.p.x + t1.x; qz = j.p.z + t1.z;
     }
     const ex = px - qx, ez = pz - qz;
-    const corr = Math.min(g.rm ? 2 : 1.2, hypot(ex, ez) / Math.max(reste, 0.05));
+    // (correctifs #32, D4 du contrôle du jeu : la reprise de volée d'un humain rattrape 2,5 m/s, sinon un centre repris
+    // était presque toujours effleuré, la balle à 0,3-0,45 m du pied, frappée à 8 m/s)
+    const vRattrape = g.rm ? 2 : spec.humain && (AERIENS.test(g.nom) || spec.acro) ? 2.5 : 1.2;
+    const corr = Math.min(vRattrape, hypot(ex, ez) / Math.max(reste, 0.05));
     const L = hypot(ex, ez) || 1;
     j.p.x += (ex / L) * corr * dt; j.p.z += (ez / L) * corr * dt;
     return;
@@ -933,7 +1013,10 @@ function syncCharge(j, spec) {
   spec.tenu = !!it?.tenir;
   if (it?.puissance != null) spec.pCharge = it.puissance;
   spec.bref = !!it?.bref;
-  if (it && (it.allure ?? 0) > 0.3 && (it.dx || it.dz)) {
+  // (correctifs #32, D8 du contrôle du jeu) le stick ne vise que pendant que la touche est tenue : relâchée, la direction
+  // lue à l'appui (ou au relâché) reste, même si la passe part plus tard (en file derrière un geste) ; avant, la passe
+  // partait vers le stick du moment, à 55° de celui de l'appui
+  if (spec.tenu && it && (it.allure ?? 0) > 0.3 && (it.dx || it.dz)) {
     if (estFrappe(spec.type)) { if (it.viseX != null) spec.x = it.viseX; }
     else { spec.dx = it.dx; spec.dz = it.dz; }
   }

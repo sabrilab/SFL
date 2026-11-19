@@ -96,7 +96,13 @@ export function pasGardien(m, k) {
     if (!k.lecture || k.lecture.t0 !== t.t0) {
       const tireur = m.joueurs[t.j];
       const pres = hypot(tireur.p.x - k.p.x, tireur.p.z - k.p.z) < 6 ? 0.06 : 0;
-      k.lecture = { t0: t.t0, reaction: m.rng.gardiens.entre(0.26, 0.36) + pres, prochaine: 0, fait: false, pred: null };
+      // (correctifs #32, D1 du contrôle du jeu) le temps de réaction laisse au moins 0,15 s de vol à la balle (0,12 s de
+      // réaction au moins) : sur une frappe de près, le gardien lit le geste du tireur et plonge, même court ; avant, une
+      // frappe à 7 m (0,32 s de vol) arrivait avant la fin de sa réaction : 0 plongeon sur 45, 45 buts. De plus loin, rien
+      // ne change (0,26 à 0,36 s)
+      const vol = (predire(b, (q) => (q.p.z - zb) * Math.sign(zb) >= 0, 2.2)?.t ?? 9) + (m.t - t.t0);
+      const base = m.rng.gardiens.entre(0.26, 0.36) + pres;
+      k.lecture = { t0: t.t0, reaction: Math.min(base, Math.max(0.12, vol - 0.15)), prochaine: 0, fait: false, pred: null };
     }
     const L = k.lecture;
     const age = m.t - t.t0;
@@ -209,10 +215,13 @@ function finPlongeon(m, k) {
 function decider(m, k, r) {
   const T = r.p, reste = r.t;
   const lat = T.x - k.p.x;
-  if (Math.abs(lat) < 0.6 && T.y < 2.1) {
+  // (correctifs #32, D1 du contrôle du jeu) une balle haute à moins de 0,9 m de lui : le saut bras levés (k_high), avec son
+  // appel de côté ; avant, seulement dans l'axe (0,6 m), et le saut n'était jamais joué
+  const haute = T.y > 1.45 && T.y < 2.3 && Math.abs(lat) < 0.9 && CLIPS.k_high;
+  if ((Math.abs(lat) < 0.6 && T.y < 2.1) || haute) {
     // (bola-app#26) dans l'axe : la parade couchée en bas (k_block), l'arrêt face à hauteur de poitrine
     // (k_catch_std), le saut sur une balle haute (k_high, sinon k_catch)
-    const nom = T.y <= 0.9 ? 'k_block' : T.y <= 1.55 && CLIPS.k_catch_std ? 'k_catch_std' : CLIPS.k_high ? 'k_high' : 'k_catch';
+    const nom = haute ? 'k_high' : T.y <= 0.9 ? 'k_block' : T.y <= 1.55 && CLIPS.k_catch_std ? 'k_catch_std' : CLIPS.k_high ? 'k_high' : 'k_catch';
     // l'image où les mains sont les plus proches de la hauteur visée, dans la première moitié du clip
     const c = CLIPS[nom];
     let f = 10, best = Infinity;
@@ -232,7 +241,10 @@ function decider(m, k, r) {
   // plongeon est vrai, mais court)
   const Tp = tard ? { x: k.p.x + (T.x - k.p.x) * 0.55, y: T.y, z: T.z } : T;
   const meilleur = chercherPlongeon(k, Tp, reste, tard);
-  if (!meilleur || (tard && meilleur.err > 1.2)) {
+  // (correctifs #32, D1 du contrôle du jeu) parti tard, il plonge quand même du côté de la balle, même court (un vrai
+  // plongeon, qui peut la manquer) ; battu debout (k_miss) seulement s'il n'a aucun plongeon de ce côté. Avant : k_miss
+  // dès que le plongeon ne menait pas les mains à 1,2 m de la balle, c'est-à-dire sur presque toutes les frappes proches
+  if (!meilleur || (tard && meilleur.err > 3)) {
     m.ev('battu', { j: k.i });
     // (bola-app#32, lot A2 : battu en pleine course — une sortie —, il ne pivote plus d'un coup face au jeu, jusqu'à 110° en
     // une image : il est battu dans sa course)
@@ -273,7 +285,9 @@ function chercherPlongeon(k, T, reste, tard = false) {
       const taux = (i / FPS_CLIPS - ELAN) / Math.max(0.05, reste - 0.02);
       const pTaux = taux > tmax ? (taux - tmax) * 2 : taux < 0.8 ? (0.8 - taux) : 0;
       const dy = clamp(T.y - hy, -0.4, 0.5);
-      const err = Math.max(0, Math.abs(rt - rho) - 0.5) + Math.abs(hy + dy - T.y) * 0.8 + pTaux + ecartFace * 0.05;
+      // (correctifs #32 : la parade basse sur le côté, k_low, pour les balles basses ; au-dessus de 0,45 m, le vrai plongeon
+      // k_dive l'emporte à erreur égale, à plus de 1 m de lui ; il n'était jamais joué)
+      const err = Math.max(0, Math.abs(rt - rho) - 0.5) + Math.abs(hy + dy - T.y) * 0.8 + pTaux + ecartFace * 0.05 + (nom.startsWith('k_low') && T.y > 0.45 && Math.abs(T.x - k.p.x) > 1 ? 0.3 : 0);
       if (!meilleur || err < meilleur.err) meilleur = { nom, i, cap, taux: clamp(taux, 0.8, tmax), err, appel: rt - rho, tx, tz, rt, dy, elan: ELAN };
     }
   }

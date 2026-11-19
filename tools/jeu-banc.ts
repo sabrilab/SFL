@@ -283,6 +283,12 @@ const totaux: Record<string, number> = {};
 const SM: Record<string, number> = { passes: 0, passesOk: 0, arrets: 0, fautes: 0, vols: 0, uneDeux: 0, aeriens: 0, avantages: 0, coupsFrancs: 0, tirages: 0, appels: 0, contresTacle: 0 };
 let bisN = 0, bisSomme = 0, fautesOuvertes = 0, ecartMin = Infinity;
 const surPlaceMax = { d: 0, ou: '' };
+// (correctifs #32, D6 du contrôle du jeu) une balle libre lente (moins de 1 m/s, au sol) sans personne qui va vers elle
+// (plus de 1 m/s dans sa direction) ni à moins de 1 m : au plus 1,5 s ; avant, 4 s (graine 11, receveur au sol)
+const ignoree = { max: 0, ou: '', n: 0 };
+// (correctifs #32, D7 du contrôle du jeu) la forme en attaque installée (porteur de champ, possession depuis 1,5 s) : un
+// joueur derrière la balle, de la largeur des deux côtés (à ±4,5 m), un pivot devant ; mesurée toutes les 0,05 s
+const forme = { n: 0, largeur: 0, tout: 0 };
 let cfPoses = 0, cfSous = 0;
 const { surAngle }: Any = Gar;
 for (let g = 1; g <= N; g++) {
@@ -290,6 +296,7 @@ for (let g = 1; g <= N; g++) {
   let immobile = 0, memePorteur = 0, dernierPorteur = -1;
   const surPlace = { x: 0, z: 0, t: 0 };
   const coince = new Float64Array(10), locoDepuis = new Float64Array(10);
+  let seule = 0;
   const m = matchIA(g, 150, (m: Any) => {
     for (const j of m.joueurs) {
       if (!Number.isFinite(j.p.x + j.p.z + j.v.x + j.v.z + j.cap + j.d)) nan++;
@@ -305,6 +312,30 @@ for (let g = 1; g <= N; g++) {
       const p = porteur(m);
       if (!p && b.garde == null && Math.hypot(b.v.x, b.v.z) < 0.2) immobile += PAS; else immobile = 0;
       if (immobile > 8) { blocages++; detailsBlocage.push(`g${g} balle immobile à ${m.t.toFixed(1)} s`); immobile = -1e9; }
+      if (!p && b.garde == null && !m.arret && b.p.y < 0.45 && Math.hypot(b.v.x, b.v.z) < 1) {
+        let enRoute = false;
+        for (const j of m.joueurs) {
+          if (j.absent || j.mode === 'sol') continue;
+          const dx = b.p.x - j.p.x, dz = b.p.z - j.p.z, d = Math.hypot(dx, dz) || 1;
+          if (d < 1 || (j.v.x * dx + j.v.z * dz) / d > 1) { enRoute = true; break; }
+        }
+        seule = enRoute ? 0 : seule + PAS;
+        if (seule > ignoree.max) { ignoree.max = seule; ignoree.ou = `g${g} à ${m.t.toFixed(1)} s (${b.p.x.toFixed(1)} ; ${b.p.z.toFixed(1)})`; }
+        if (seule > 1.5 && seule - PAS <= 1.5) ignoree.n++;
+      } else seule = 0;
+      if (p && !p.gardien && m.possession && m.possession.e === p.e && m.t - m.possession.t > 1.5 && m.pas % 6 === 0) {
+        const e = p.e, sg = e === 0 ? -1 : 1, ab = sg * b.p.z;
+        let xMax = p.p.x, xMin = p.p.x, fixo = false, piv = false;
+        for (const o of m.joueurs) {
+          if (o.e !== e || o.gardien || o.absent || o === p) continue;
+          xMax = Math.max(xMax, o.p.x); xMin = Math.min(xMin, o.p.x);
+          const ao = sg * o.p.z;
+          if (ao < ab - 3) fixo = true;
+          if (ab < 7 ? ao > ab + 4 : ao > 8) piv = true;
+        }
+        const larg = xMax >= 4.5 && xMin <= -4.5;
+        forme.n++; if (larg) forme.largeur++; if (larg && fixo && piv) forme.tout++;
+      }
       const id = p ? p.i : b.garde ?? -1;
       if (id >= 0 && id === dernierPorteur) memePorteur += PAS; else { memePorteur = 0; dernierPorteur = id; }
       if (memePorteur > 30) { blocages++; detailsBlocage.push(`g${g} même porteur ${id} à ${m.t.toFixed(1)} s`); memePorteur = -1e9; }
@@ -359,6 +390,11 @@ for (let g = 1; g <= N; g++) {
     `NaN ${nan}, blocages ${blocages}${detailsBlocage.length ? ' (' + detailsBlocage.slice(0, 4).join(', ') + ')' : ''}, corps hors du terrain ${dehorsCorps}, buts par match ${f2(mb)} (de ${Math.min(...buts)} à ${Math.max(...buts)}, ${(sansBut * 100).toFixed(0)} % sans but), relances de coin ${antiBlocages}`);
   verifier('Coup franc : balle à côté du joueur au sol', cfPoses > 10 && cfSous === 0, `${cfPoses} coups francs, ${cfSous} balle(s) posée(s) à moins de 0,45 m d'un corps au sol (31 sur 58 avant le correctif)`);
   verifier('Balle jamais coincée (correctifs #26)', surPlaceMax.d <= 15, `au plus ${surPlaceMax.d.toFixed(1)} s dans un rond de 2 m en jeu (${surPlaceMax.ou}) ; borne 15 s`);
+  // (l'objectif du contrôle, la forme complète la moitié du temps, n'est pas encore atteint : on garde la largeur, 47 % avant
+  // ces correctifs, au-dessus de 50 % ; la forme complète, 19 % avant, est relevée pour la suite)
+  verifier('Placements : largeur des deux côtés en attaque installée (correctifs #32)', forme.largeur / (forme.n || 1) >= 0.5,
+    `largeur des deux côtés ${((100 * forme.largeur) / (forme.n || 1)).toFixed(0)} % du temps (au moins 50 %) ; forme 1-2-1 complète ${((100 * forme.tout) / (forme.n || 1)).toFixed(0)} % (relevée, objectif 50 %) ; ${forme.n} relevés`);
+  verifier('Balle libre lente jamais ignorée (correctifs #32)', ignoree.n === 0, `${ignoree.n} fois plus de 1,5 s sans joueur qui va vers elle ; au plus ${ignoree.max.toFixed(2)} s (${ignoree.ou || '—'})`);
   const per = (k: string) => f2((totaux[k] ?? 0) / N);
   console.log(`      par match : passes ${per('passe')}, frappes ${per('frappe')}, tacles balle ${per('tacleBalle')}, tacles jambes ${per('tacleJambes')}, épaules ${per('epaule')}, chutes ${per('chute')}, plongeons ${per('plongeon')}, parades ${per('parade')}, captés ${per('capte')}, poteaux ${per('poteau')}`);
   {
@@ -493,8 +529,40 @@ function tacle(graine: number, deFace: boolean) {
   const tot = taux(() => true);
   const centre = taux((t) => Math.abs(t.x) < 0.7), coin = taux((t) => Math.abs(t.x) > 0.7);
   const faible = taux((t) => t.p <= 0.45), fort = taux((t) => t.p >= 0.75);
-  verifier('Gardiens (400 frappes)', tot >= 0.3 && tot <= 0.7 && centre > coin && faible > fort && racineBouge === 0 && mainPoteau === 0,
+  // (correctifs #32, point 13, D1 du contrôle du jeu : le gardien plonge pour de vrai — k_dive au-dessus de 0,45 m, k_high sur
+  // une balle haute à moins de 0,9 m de lui, un plongeon court quand il part tard — ; sur ces frappes de 11 m sans
+  // défenseur, ses arrêts passent de 67-68 % à 72 % : la borne haute passe de 70 à 75 %)
+  verifier('Gardiens (400 frappes)', tot >= 0.3 && tot <= 0.75 && centre > coin && faible > fort && racineBouge === 0 && mainPoteau === 0,
     `${cadres.length} cadrées sur ${tirs.length} ; arrêts ${(tot * 100).toFixed(0)} % (centre ${(centre * 100).toFixed(0)} %, coins ${(coin * 100).toFixed(0)} % ; p ≤ 0,45 : ${(faible * 100).toFixed(0)} %, p ≥ 0,75 : ${(fort * 100).toFixed(0)} %) ; racine qui bouge en plongeon ${racineBouge}, mains dans un poteau ${mainPoteau}`);
+  // (correctifs #32, D1 du contrôle du jeu) une frappe de près (7 m) dans un coin : il plonge (avant : 0 sur 45, il était
+  // battu avant même d'avoir réagi)
+  let pres = 0, plonges = 0;
+  for (const x of [-1.15, -0.95, 0.95, 1.15]) for (const y of [0.3, 0.9]) for (const x0 of [-2, 0, 2]) for (const p of [0.45, 0.7]) {
+    const m: Any = creerMonde({ graine: 500 + x0 * 7 + Math.round(x * 100) + Math.round(y * 10) + Math.round(p * 1000), humains: [true, false], aides: [0, 0], presents: [4, 5] });
+    demarrer(m, { intro: false });
+    const j = m.joueurs[4], g = m.joueurs[5];
+    j.p.x = x0; j.p.z = -LB + 7.6; j.cap = Math.PI;
+    const b = m.balle; b.p.x = x0; b.p.z = -LB + 7; b.v.x = 0; b.v.z = 0; b.possesseur = 4; b.dernier = 4; b.dernierT = 0;
+    g.p.x = x0 * 0.12; g.p.z = -LB + 1; g.cap = 0;
+    m.controle[0] = 4;
+    for (let i = 0; i < 30; i++) pas(m, [{ dx: 0, dz: 0, allure: 0 }, null]);
+    demanderFrappe(m, j, { type: 'frappe', p, x, y });
+    // (on ne compte que les frappes cadrées qui passent à plus de 0,8 m du gardien, dans son plan : un coin pour lui ;
+    // près de lui, il arrête dans l'axe, debout ou couché)
+    let plonge = false, loin: boolean | null = null;
+    for (let i = 0; i < 120 && m.phase === 'jeu'; i++) {
+      pas(m, [{ dx: 0, dz: 0, allure: 0 }, null]);
+      if (loin == null && m.evts.some((e: Any) => e.type === 'frappe')) {
+        const zk = g.p.z, rk = predire(m.balle, (q: Any) => q.p.z <= zk, 2), rl = predire(m.balle, (q: Any) => q.p.z <= -LB, 2);
+        loin = !!rk && !!rl && Math.abs(rl.p.x) < BUT_DL - R && rl.p.y < BUT_H - R && Math.abs(rk.p.x - g.p.x) > 0.8;
+      }
+      m.evts.length = 0;
+      if (g.g?.type === 'plongeon') plonge = true;
+    }
+    if (!loin) continue;
+    pres++; if (plonge) plonges++;
+  }
+  verifier('Gardien : frappe de près dans un coin (correctifs #32)', pres >= 12 && plonges >= 0.8 * pres, `frappes à 7 m cadrées loin de lui (plus de 0,8 m) : ${plonges}/${pres} plongeons (au moins 80 %)`);
 }
 
 // ─────────────────────────── les correctifs du contrôle (balle et corps, chutes, demi-tour, lob, gardien) ───────────

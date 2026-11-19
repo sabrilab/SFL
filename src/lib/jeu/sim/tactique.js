@@ -148,8 +148,10 @@ export function placePoste(m, e, poste, xB, aB, out = { x: 0, z: 0 }) {
   }
   else if (poste === 'aileBalle') { a = clamp(aB + 2, -7, 10.5); x = s * 7.2; }
   else {
+    // (correctifs #32, D7 du contrôle du jeu : l'ala côté faible garde la largeur, à 4,8 m au moins de l'axe, même près
+    // du but ; avant, il rentrait à 2,8 m et l'attaque n'avait plus qu'un côté : la forme 1-2-1 tenait 6 à 28 % du temps)
     const k = clamp((aB - 4) / 5, 0, 1);
-    a = clamp(aB + 3.5, -5, 10) * (1 - k) + 11 * k; x = -s * (5.2 - 2.4 * k);
+    a = clamp(aB + 3.5, -5, 10) * (1 - k) + 11 * k; x = -s * (5.6 - 0.8 * k);
   }
   out.x = x; out.z = zDe(e, a);
   return out;

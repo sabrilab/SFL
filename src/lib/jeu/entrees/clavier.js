@@ -8,7 +8,10 @@
 // d'écran qui va dans cette direction.
 // Le stick droit au clavier garde sa dernière direction 0,09 s après qu'on a lâché I J K L : deux touches enchaînées
 // sans se chevaucher font encore un quart de cercle (I puis L), trois un demi-cercle (K puis L puis I).
-// Les touches sont lues par leur caractère (e.key, en minuscule) : la même lettre sur un clavier AZERTY ou QWERTY.
+// Les touches sont lues par leur caractère (e.key, en minuscule) : la même lettre sur un clavier AZERTY ou QWERTY ;
+// (correctifs #32, D4 du contrôle du code) sauf les chiffres de la tactique, lus par leur place (e.code : Digit1 à
+// Digit3, Numpad1 à Numpad3) : sur un clavier AZERTY, la rangée des chiffres donne « & », « é », « " » sans Maj. Une
+// touche se relâche par sa place (e.code), pas par son caractère : Maj lâchée avant le chiffre ne laisse plus « 1 » tenu.
 // La pause (Échap, P) reste lue par match.js.
 
 // (bola-app#32 : Espace et E = ○ / B, la frappe ; S = □ / X, le centre et le tacle ; avant : Espace = X, S = B)
@@ -19,8 +22,9 @@ const DROIT = { i: [1, 0], k: [-1, 0], j: [0, 1], l: [0, -1] }; // [devant, gauc
 export const TOUCHES_JEU = new Set([...Object.keys(BOUTON), ...Object.keys(AXES), ...Object.keys(DROIT)]);
 const REMANENCE = 0.09;
 
-/** La clé d'une touche (e.key en minuscule ; ' ' pour Espace). */
-export const cleDe = (key) => (key === ' ' || key === 'Spacebar' ? ' ' : String(key ?? '').toLowerCase());
+/** La clé d'une touche (e.key en minuscule ; ' ' pour Espace) ; les chiffres de la tactique par leur place (code). */
+const CHIFFRES = { Digit1: '1', Digit2: '2', Digit3: '3', Numpad1: '1', Numpad2: '2', Numpad3: '3' };
+export const cleDe = (key, code) => CHIFFRES[code] ?? (key === ' ' || key === 'Spacebar' ? ' ' : String(key ?? '').toLowerCase());
 
 export function creerEtatClavier() {
   return { b: new Float64Array(17), ax: new Float64Array(4), rs: { x: 0, y: 0, t: -9 } };
@@ -65,16 +69,23 @@ export function etatDepuisTouches(tenues, t, etat, cap = null, versEcran = null)
 /** L'écoute du clavier (page) : les touches tenues, et l'heure du dernier vrai geste de jeu (vu, en ms). */
 export function creerClavier() {
   const c = { tenues: new Set(), vu: -1e9, utilise: false };
+  // (la clé retenue à l'appui, par place de touche : le relâché enlève celle-là, quel que soit le caractère qu'il porte)
+  const parCode = new Map();
   const bas = (e) => {
-    const k = cleDe(e.key);
+    const k = cleDe(e.key, e.code);
     if (!TOUCHES_JEU.has(k)) return;
     if (k.startsWith('arrow') || k === ' ') e.preventDefault();
     c.tenues.add(k);
+    if (e.code) parCode.set(e.code, k);
     // (Maj seule ne compte pas : c'est la touche qu'on presse pour autre chose)
     if (k !== 'shift') { c.utilise = true; c.vu = performance.now(); }
   };
-  const haut = (e) => { c.tenues.delete(cleDe(e.key)); };
-  const perdu = () => c.tenues.clear();
+  const haut = (e) => {
+    const k = e.code && parCode.has(e.code) ? parCode.get(e.code) : cleDe(e.key, e.code);
+    if (e.code) parCode.delete(e.code);
+    c.tenues.delete(k);
+  };
+  const perdu = () => { c.tenues.clear(); parCode.clear(); };
   addEventListener('keydown', bas);
   addEventListener('keyup', haut);
   addEventListener('blur', perdu);

@@ -44,6 +44,9 @@ const PARTIES_ = PARTIES as { id: string; titre: string }[];
 const CLAVIER = BOUTONS_CLAVIER as Record<string, string>;
 const MOD = /^(L1|R1|R2|L2) \+ /;
 
+/** (correctifs #32, D10 du contrôle du code) La touche du clavier qui masque le panneau, lue dans la table (« H »). */
+export const TOUCHE_PANNEAU = (LIGNES.find((l) => l.id === "touches")?.clavier ?? "H").toLowerCase();
+
 const colonne = (l: Ligne, a: InfoPanneau["appareil"]) => (a === "xbox" ? l.xbox : a === "playstation" ? l.ps : a === "clavier" ? l.clavier : l.pouce);
 
 /** Le nom du modificateur sur l'appareil, lu dans la table (la première variante qui le porte : « LB + A » → LB). */

@@ -38,22 +38,27 @@ export const GESTES = {
   pique: { arrete: 'kickup', course: 'strike_run', elanA: 0.25, elanC: 0.12, t: 0.12, apres: 0.12, surface: 'dessous', buste: -20, roulis: 0, suivi: 0.4 },
   // R2 + ○ au sol : frappe sèche à ras de terre, le buste au-dessus de la balle, la jambe qui ne remonte pas
   ras: { arrete: 'shoot', course: 'strike_run', elanA: null, elanC: 0.25, t: 0.12, apres: 0.2, surface: 'coudepied', buste: 18, roulis: 0, suivi: 0.3 },
-  // R2 + ○ en l'air : retournée, ciseau ou demi-volée (gestes.js, selon la hauteur) ; au sol, comme la frappe
-  acrobatique: { arrete: 'strike_run', course: 'strike_run', elanA: 0.2, elanC: null, pas: true, t: 0.15, apres: 0.25, surface: 'coudepied', buste: -6, roulis: 0, suivi: null },
+  // R2 + ○ en l'air : retournée, ciseau ou demi-volée (gestes.js, selon la hauteur) ; (correctifs #32, D3 du contrôle du
+  // code) quand aucun geste aérien ne tombe juste, la volée jambe tendue (shoot2), et non plus la frappe à l'identique
+  acrobatique: { arrete: 'shoot2', course: 'shoot2', elanA: null, elanC: null, t: 0.15, apres: 0.25, surface: 'coudepied', buste: 8, roulis: 6, suivi: null },
   // L2 + ○ : l'extérieur du pied, la hanche fermée, penché du côté du pied
   exterieur: { arrete: 'shoot', course: 'strike_run', elanA: null, elanC: null, t: 0.15, apres: 0.25, surface: 'exterieur', buste: 0, roulis: -10, suivi: 0.6 },
   // □ : le centre, cou-de-pied sous la balle, buste en arrière, bras ouvert
   centre: { arrete: 'shoot', course: 'strike_run', elanA: null, elanC: null, t: 0.16, apres: 0.25, surface: 'sous', buste: -14, roulis: 8, suivi: null, bras: 45 },
   // L1 + □ : le centre lobé, la jambe tendue sous la balle, buste très en arrière, plus lent
   centreLobe: { arrete: 'shoot2', course: 'strike_run', elanA: null, elanC: null, t: 0.2, apres: 0.3, surface: 'dessous', buste: -26, roulis: 10, suivi: null, bras: 60 },
-  // R1 + □ : le centre tendu, coup sec du cou-de-pied, buste droit
-  centreTendu: { arrete: 'shoot', course: 'strike_run', elanA: null, elanC: 0.25, t: 0.12, apres: 0.2, surface: 'coudepied', buste: 2, roulis: 0, suivi: 0.6, bras: 20 },
-  // △ : intérieur du pied dans la course du receveur, la tête relevée vers le jeu
-  profondeur: { arrete: 'pass', course: 'strike_run', elanA: 0.25, elanC: 0.12, t: 0.13, apres: 0.15, surface: 'interieur', buste: 6, roulis: 0, suivi: 0.5, regard: 1 },
+  // R1 + □ : le centre tendu, coup sec du cou-de-pied, buste droit ; (correctifs #32, D5 du contrôle du jeu) arrêté, le
+  // pas d'élan de la frappe en course (le centre arrêté joue shoot : les deux se confondaient)
+  centreTendu: { arrete: 'strike_run', course: 'strike_run', elanA: 0.15, elanC: 0.25, pas: true, t: 0.12, apres: 0.2, surface: 'coudepied', buste: 4, roulis: -4, suivi: 0.6, bras: 20 },
+  // △ : intérieur du pied dans la course du receveur, la tête relevée vers le jeu ; (correctifs #32, D3 du contrôle du
+  // code, D5 du contrôle du jeu) le corps ouvert vers le receveur (roulis du côté du pied qui frappe), le bras opposé
+  // ouvert, un élan plus long et la jambe qui accompagne : la passe et la profondeur étaient le même geste
+  profondeur: { arrete: 'pass', course: 'strike_run', elanA: 0.32, elanC: 0.2, t: 0.17, apres: 0.2, surface: 'interieur', buste: -4, roulis: -12, suivi: 0.8, regard: 1, bras: 35 },
   // L1 + △ : le petit lob par-dessus la défense, la pointe sous la balle
   profondeurLobee: { arrete: 'kickup', course: 'strike_run', elanA: 0.25, elanC: 0.12, t: 0.14, apres: 0.15, surface: 'dessous', buste: -18, roulis: 0, suivi: 0.45, regard: 1 },
-  // R1 + △ : la profondeur appuyée, coup sec de l'intérieur, buste en avant
-  profondeurTendue: { arrete: 'pass', course: 'strike_run', elanA: 0.15, elanC: 0.1, t: 0.11, apres: 0.15, surface: 'interieur', buste: 12, roulis: 0, suivi: 0.35, regard: 1 },
+  // R1 + △ : la profondeur appuyée, coup sec de l'intérieur sur le geste court du cou-de-pied (shoot, et non plus pass comme
+  // la passe), buste au-dessus de la balle, la jambe qui ne remonte pas, sans élan (correctifs #32)
+  profondeurTendue: { arrete: 'shoot', course: 'strike_run', elanA: null, elanC: 0.06, t: 0.1, apres: 0.15, surface: 'interieur', buste: 12, roulis: 9, suivi: 0.2, regard: 1 },
   // ○ en défense : récupérer du pied, debout, la jambe tendue vers la balle (tacle debout, contacts.js)
   recuperer: { arrete: 'shoot2', course: 'shoot2', elanA: null, elanC: null, t: 0.15, apres: 0.2, surface: 'pointe', buste: 12, roulis: 0, suivi: 0.3 },
 };

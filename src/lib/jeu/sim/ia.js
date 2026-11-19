@@ -44,6 +44,9 @@ export function intentionVide(it = {}) {
   it.dx = 0; it.dz = 0; it.allure = 0; it.sprint = 0; it.regard = null;
   it.contenir = false; it.protege = false; it.charge = false; it.vaBalle = false; it.action = null; it.recupere = false;
   it.tire = false;
+  // (correctifs #32, D6 du contrôle du code) la charge d'un humain : sans cela, un joueur repris par l'IA pendant qu'on
+  // chargeait (manette débranchée, « IA contre IA » depuis la pause) gardait la touche « tenue » et l'élan armé 1,25 s
+  it.tenir = false; it.bref = false; it.puissance = null; it.viseX = null; it.stickHumain = 0;
   return it;
 }
 
@@ -282,8 +285,14 @@ function tacleIA(m, j, it, p) {
  * joueurs de l'IA qui n'ont pas de rôle (presseur, couvreur, ligne, second presseur : rolesDefense) prennent les places
  * restantes, au plus court ; le gardien adverse qui tient la balle n'est pas pressé.
  */
+// (correctifs #32, D9 du contrôle du code : les tampons du bloc sont gardés d'un pas à l'autre — places, postes, files —
+// au lieu d'être recréés à chaque pas de 1/120 s pour les deux équipes)
+function blocVide() {
+  const pl = () => ({ nom: '', x: 0, z: 0 });
+  return { pas: -1, poste: new Array(16).fill(null), de: new Array(16).fill(null), deAvant: new Array(16).fill(null), pl: [pl(), pl(), pl(), pl()], places: null, pris: new Set(), occupe: new Set(), libres: [], restes: [], ordre: [] };
+}
 function defenseEquipe(m, e, p, notre) {
-  m._bloc ??= [{ pas: -1, poste: {} }, { pas: -1, poste: {} }];
+  m._bloc ??= [blocVide(), blocVide()];
   const D = m._bloc[e];
   if (D.pas === m.pas) return D;
   D.pas = m.pas;
@@ -296,12 +305,16 @@ function defenseEquipe(m, e, p, notre) {
   const aHaut = Math.min(aB - 1.8, plan.haut);
   const tH = clamp((aB - aHaut) / (aB + LB || 1), 0.05, 0.95);
   const zg = butDe(e);
-  const places = [
-    { nom: 'haut', x: xB + (0 - xB) * tH, z: zDe(e, aHaut) },
-    { nom: 'couverture', x: clamp(xB * 0.55, xB - L, xB + L), z: zDe(e, Math.max(-13, Math.min(aB - 5.5, aHaut - 3))) },
-    { nom: 'faible', x: clamp(xB * 0.25 - s * 3.2, xB - L, xB + L), z: zDe(e, Math.max(-13, Math.min(aB - 5, aHaut - 3.5))) },
-    { nom: 'bas', x: clamp(xB * 0.2, -3, 3), z: zDe(e, Math.max(-13, Math.min(aB - 7.5, plan.bas))) },
-  ];
+  // (correctifs #32, D9 du contrôle du jeu : en bloc bas, tant que la balle n'a pas passé le milieu, la couverture et le
+  // côté faible restent sous −8 m ; seul le haut du bloc attend le porteur ; avant, bloc bas et équilibre ne différaient que
+  // de 0,9 m en hauteur moyenne)
+  const plafond = plan.id === 'blocBas' && aB > -2 ? -8 : Infinity;
+  const places = D.pl;
+  const poser = (P, nom, x, z) => { P.nom = nom; P.x = x; P.z = z; };
+  poser(places[0], 'haut', xB + (0 - xB) * tH, zDe(e, aHaut));
+  poser(places[1], 'couverture', clamp(xB * 0.55, xB - L, xB + L), zDe(e, Math.max(-13, Math.min(aB - 5.5, aHaut - 3, plafond))));
+  poser(places[2], 'faible', clamp(xB * 0.25 - s * 3.2, xB - L, xB + L), zDe(e, Math.max(-13, Math.min(aB - 5, aHaut - 3.5, plafond))));
+  poser(places[3], 'bas', clamp(xB * 0.2, -3, 3), zDe(e, Math.max(-13, Math.min(aB - 7.5, plan.bas))));
   // (la zone côté faible : un attaquant qui y entre, plus bas qu'elle, est pris côté but)
   const F = places[2];
   let menace = null, am = Infinity;
@@ -315,29 +328,36 @@ function defenseEquipe(m, e, p, notre) {
   D.places = places;
   // qui prend quoi : les rôles d'abord (balle en jeu), puis les places libres au plus court
   const humain = m.controle[e];
-  const ia = [];
-  for (const o of m.joueurs) if (o.e === e && !o.gardien && !o.absent && o.i !== humain) ia.push(o);
-  const pris = new Set(), libres = [];
-  D.poste = {};
+  const pris = D.pris, libres = D.libres;
+  pris.clear(); libres.length = 0;
+  D.poste.fill(null);
+  const estIA = (o) => o.e === e && !o.gardien && !o.absent && o.i !== humain;
   if (b.garde == null && notre !== true) {
     const R = rolesDefense(m, e, p, notre);
     if (R.chasseur != null) pris.add('haut');
     if (R.couvreur != null && notre === false) pris.add('couverture');
     if (R.double != null) pris.add('haut');
-    for (const o of ia) if (o.i !== R.chasseur && !(o.i === R.couvreur && notre === false) && o.i !== R.double && !(o.i === R.ligne && notre === false)) libres.push(o);
+    for (const o of m.joueurs) if (estIA(o) && o.i !== R.chasseur && !(o.i === R.couvreur && notre === false) && o.i !== R.double && !(o.i === R.ligne && notre === false)) libres.push(o);
     // (celui qui coupe la ligne de passe tient la place la plus proche de son point)
     if (R.ligne != null && notre === false && R.lane) {
       let bk = null, bd = Infinity;
       for (const P of places) { if (pris.has(P.nom)) continue; const dd = hypot(P.x - R.lane.x, P.z - R.lane.z); if (dd < bd) { bd = dd; bk = P.nom; } }
       if (bk) pris.add(bk);
     }
-  } else libres.push(...ia);
-  const restes = places.filter((P) => !pris.has(P.nom));
+  } else for (const o of m.joueurs) if (estIA(o)) libres.push(o);
+  const restes = D.restes;
+  restes.length = 0;
+  for (const P of places) if (!pris.has(P.nom)) restes.push(P);
   // (au plus court, une place chacun ; celui qui la tenait déjà garde 1,5 m d'avance : pas de va-et-vient)
-  const avant = D.de ?? {};
-  D.de = {};
-  const ordre = libres.slice().sort((a, c) => a.i - c.i);
-  const occupe = new Set();
+  const avant = D.de;
+  D.de = D.deAvant; D.deAvant = avant;
+  D.de.fill(null);
+  const ordre = D.ordre;
+  ordre.length = 0;
+  for (const o of libres) ordre.push(o);
+  ordre.sort((a, c) => a.i - c.i);
+  const occupe = D.occupe;
+  occupe.clear();
   for (let n = 0; n < ordre.length; n++) {
     let best = null, bj = null, bd = Infinity;
     for (const o of ordre) {
@@ -760,7 +780,9 @@ function attaque(m, j, it, cx, cz, vmax, p) {
   const phase = phaseDe(m, j.e), poste = j.poste;
   // (lot B) le porteur sur un côté, près du but (là d'où il centre) : le pivot attaque le second poteau, l'ala côté
   // faible le point de pénalty ; ils vont au but, pas dans l'espace libre
-  if ((poste === 'pivot' || poste === 'aileFaible') && p && p.e === j.e && Math.abs(p.p.x) > 3.8 && Math.abs(butDe(1 - j.e) - p.p.z) < 10) {
+  // (correctifs #32, D7 : seulement quand le porteur est vraiment en position de centrer, à moins de 7 m de la ligne de
+  // but ; avant 10 m, et l'ala côté faible quittait sa largeur pour le point de pénalty dès le milieu de la moitié adverse)
+  if ((poste === 'pivot' || poste === 'aileFaible') && p && p.e === j.e && Math.abs(p.p.x) > 3.8 && Math.abs(butDe(1 - j.e) - p.p.z) < 7) {
     const sc = Math.sign(p.p.x) || 1, a = poste === 'pivot' ? 12.5 : 10.3, x = -sc * (poste === 'pivot' ? 1 : 2.6);
     it.regard = m.balle.p; j.intention = poste === 'pivot' ? 'poteau' : 'penalty';
     return { cx: x, cz: zDe(j.e, a), vmax: 6.4 };
@@ -769,7 +791,11 @@ function attaque(m, j, it, cx, cz, vmax, p) {
     const P = appelProfondeur(m, j, p, phase);
     if (P) { it.regard = m.balle.p; j.intention = 'profondeur'; return { cx: P.x, cz: P.z, vmax: 7.0 }; }
   }
-  const a = appel(m, j, cx, cz, p, poste === 'fixo');
+  // (correctifs #32, D7 du contrôle du jeu) les alas tiennent la largeur : leur appel reste dans le couloir de leur côté
+  // (à 1 m près de leur poste vers l'axe) ; ce sont le fixo et le pivot qui viennent en soutien du porteur pressé ; une ala
+  // marquée de près (à moins de 2,2 m) se démarque où elle peut
+  const ala = (poste === 'aileBalle' || poste === 'aileFaible') && p && p.e === j.e && adversaireProche(m, j).d > 2.2;
+  const a = appel(m, j, cx, cz, p, poste === 'fixo', ala);
   j.intention = poste === 'fixo' ? 'soutien' : poste === 'aileBalle' ? 'ecartement' : poste === 'pivot' ? 'pivot' : 'diagonale';
   if (!a) return { cx, cz, vmax };
   const tete = p && (hypot(p.v.x, p.v.z) < 3.5 || (p.decision ?? 1) < 0.2);
@@ -800,14 +826,15 @@ function appelProfondeur(m, j, p, phase) {
   for (const o of m.joueurs) if (o !== j && o.e === e && o.prof && m.t < o.prof.t) return null;
   j.profRepos = m.t + 0.6;
   if (m.rng.collectif.u() > 0.3 * styleDe(m, e).profondeur) return null;
-  const x = clamp(j.p.x * 0.7, -6.5, 6.5);
+  // (correctifs #32, D7 : une ala libre fait son appel dans son couloir ; le pivot, ou une ala marquée, vers l'axe)
+  const x = (j.poste === 'aileBalle' || j.poste === 'aileFaible') && adversaireProche(m, j).d > 2.2 ? clamp(j.p.x, -6.5, 6.5) : clamp(j.p.x * 0.7, -6.5, 6.5);
   j.prof = { x, z: zDe(e, cible), t: m.t + 1.6 };
   m.stats.profondeurs = (m.stats.profondeurs ?? 0) + 1;
   m.ev('appel', { j: j.i, x, z: j.prof.z, profondeur: true });
   return j.prof;
 }
 
-function appel(m, j, cx0, cz0, p, fixo = false) {
+function appel(m, j, cx0, cz0, p, fixo = false, largeur = false) {
   if (m.t < (j.appelT ?? -9) && j.appel) return j.appel;
   j.appelT = m.t + 0.25;
   const b = m.balle, s = sens(j.e), zg = butDe(1 - j.e);
@@ -818,6 +845,8 @@ function appel(m, j, cx0, cz0, p, fixo = false) {
     const x = clamp(cx0 + ix * 2, -BX + 1.2, BX - 1.2), z = clamp(cz0 + iz * 2, -LB + 1.5, LB - 1.5);
     // (le fixo reste derrière la balle : la passe en retrait, l'équilibre)
     if (fixo && av(j.e, z) > aB - 3.5) continue;
+    // (une ala tient son couloir)
+    if (largeur && (x * cx0 < 0 || Math.abs(x) < Math.abs(cx0) - 1)) continue;
     let dmin = 9, coupe = 0;
     for (const o of m.joueurs) {
       if (o.absent || o.e === j.e || o.mode === 'sol') continue;

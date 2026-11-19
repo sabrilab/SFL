@@ -55,7 +55,7 @@ export const CORPS = {
   retourDes: 1.5,                   // 1/s : le déséquilibre revient vers 0
   impDes: 1.6,                      // m/s : impulsion (par unité de masse) d'un déséquilibre complet
   trebuche: 0.65, chute: 1.0,       // seuils de déséquilibre
-  solChute: 0.9,                    // s au sol après une chute, avant le relevé
+  solChute: 0.6,                    // s au sol après une chute, avant le relevé (correctifs #32 : 0,9 ; relevé rapide)
   freinGlissade: 7.5,               // m/s² : le tacle glissé sur le gazon (bola-app#26 ; correctifs : 4,5 → 7,5, ~0,9 s et ~3 m au lieu de 1,3 s et 5,4 m)
   vGlissade: [3.2, 7.6],               // m/s : la vitesse de la glissade au départ (bornes ; bola-app#32, lot A2 : 1,2 + 0,95 × la course, 7 avant)
   forceEpaule: 900,                 // N
@@ -118,8 +118,10 @@ export const JEU = {
   passeArrivee: 9, passeRoule: 1.35, passeDose: [0.6, 1.0], passePuissante: 1.4,
   // (lot A) la balle aimantée : tenue à un point devant le pied (0,36 m arrêté + 0,06 s × v), dans la direction du
   // stick ; ce point tourne autour du joueur à 14 rad/s au plus, la balle y est ramenée par un ressort (16/s) ; elle se
-  // perd au-delà de 1,4 m ; une balle libre au sol se prend à 1,2 m (l'IA d'elle-même, l'humain avec ○ / B, 2,5 m)
-  aimant: { pres: 0.36, loin: 0.06, rotation: 14, raideur: 16, ecart: 5, rayon: 1.4, prise: 1.2, prendre: 2.5, garde: 1.0 },
+  // perd au-delà de 1,4 m ; une balle libre au sol se prend à 1,2 m par l'humain qui a appuyé sur ○ / B (qui va la
+  // chercher jusqu'à 2,5 m, pendant 1 s : prendreT), à la portée du pied par l'IA (priseIA, correctifs #32 : avant 1,2 m,
+  // la balle semblait aspirée)
+  aimant: { pres: 0.36, loin: 0.06, rotation: 14, raideur: 16, ecart: 5, rayon: 1.4, prise: 1.2, priseIA: 0.65, prendre: 2.5, prendreT: 1.0, garde: 1.0 },
   aide: { pouce: 1, manette: 0.5, ia: 0 },
   coneAide: { pouce: (45 * Math.PI) / 180, manette: (30 * Math.PI) / 180 },
   duree: 150,                       // s : un match

@@ -57,10 +57,13 @@ const APPUI = 0.5;
 export function commandeDe(k, { lb = false, rb = false, r2 = false, lt = false, flanc = false } = {}) {
   if (k === B.A) return lb ? { id: 'uneDeux', spec: { type: 'passe' } } : rb ? { id: 'passePuissante', spec: { type: 'passe', puissante: true } } : { id: 'passe', spec: { type: 'passe' } };
   if (k === B.B) {
-    if (r2) return { id: 'ras', spec: { type: 'frappe', r2: true } };
-    if (lb) return { id: 'pique', spec: { type: 'lobFrappe' } };
-    if (rb) return { id: 'finesse', spec: { type: 'finesse' } };
-    if (lt) return { id: 'exterieur', spec: { type: 'exterieur' } };
+    // (correctifs #32, D2 du contrôle du code) L1, R1 et L2 passent avant R2 : on sprinte (R2 tenu) et on pique, enroule ou
+    // frappe de l'extérieur ; R2 + ○ seulement sans autre modificateur (avant : R2 écrasait tout, le panneau disait l'inverse)
+    const mod = modificateur({ lb, rb, r2, lt });
+    if (mod === 'L1') return { id: 'pique', spec: { type: 'lobFrappe' } };
+    if (mod === 'R1') return { id: 'finesse', spec: { type: 'finesse' } };
+    if (mod === 'L2') return { id: 'exterieur', spec: { type: 'exterieur' } };
+    if (mod === 'R2') return { id: 'ras', spec: { type: 'frappe', r2: true } };
     return { id: 'frappe', spec: { type: 'frappe' } };
   }
   if (k === B.X) {
@@ -73,6 +76,46 @@ export function commandeDe(k, { lb = false, rb = false, r2 = false, lt = false, 
   return { id: 'profondeur', spec: { type: 'profondeur' } };
 }
 const estTir = (type) => type === 'frappe' || type === 'finesse' || type === 'lobFrappe' || type === 'exterieur';
+
+/**
+ * (correctifs #32, D2 et D10 du contrôle du code) Le modificateur qui compte quand plusieurs sont tenus : L1, puis R1,
+ * puis L2 ; R2 (le sprint) seulement s'il est seul. La seule règle : commandeDe et le panneau des touches (match.js) la
+ * lisent ici.
+ */
+export function modificateur({ lb = false, rb = false, r2 = false, lt = false } = {}) {
+  return lb ? 'L1' : rb ? 'R1' : lt ? 'L2' : r2 ? 'R2' : null;
+}
+/** Les modificateurs tenus d'un état de manette rangé dans l'ordre standard (b : boutons de 0 à 1). */
+export function modificateursDe(b) {
+  return { lb: (b[B.LB] ?? 0) > APPUI, rb: (b[B.RB] ?? 0) > APPUI, lt: gachette(b[B.LT] ?? 0) > 0.3, r2: gachette(b[B.RT] ?? 0) > 0.5 };
+}
+/**
+ * (correctifs #32) Une balle libre au sol à portée de prise du joueur j (de 0,9 m à JEU.aimant.prendre) : ○ la prend,
+ * avec ou sans R2 (D5 du contrôle du code : R2 tenu en courant vers elle, ○ frappait à ras de terre). Lu aussi par le
+ * panneau des touches (match.js) et le pouce.
+ */
+export function libreSol(M, j, dMin = 0.9) {
+  const bl = M.balle;
+  if (!j || porteur(M) || bl.garde != null || bl.p.y >= 0.45 || Math.abs(bl.v.y) >= 1.5) return false;
+  const d = Math.hypot(bl.p.x - j.p.x, bl.p.z - j.p.z);
+  return d > dMin && d < JEU.aimant.prendre;
+}
+/**
+ * (correctifs #32) La phase d'une équipe e, lue par la commande et par le panneau des touches (une seule règle, D10 du
+ * contrôle du code) : 'attaque' si elle a la balle, si son gardien la tient, ou si sa passe, son centre ou sa frappe est
+ * en route (receveur de l'équipe, tir de l'équipe, ou balle en l'air qu'elle vient de jouer : D4 du contrôle du jeu,
+ * ○ appuyé tôt sur un centre devenait « récupérer ») ; 'libre' si son joueur tenu est à moins de 3,5 m d'une balle
+ * libre ; 'defense' sinon.
+ */
+export function phaseDe(M, e) {
+  const p = porteur(M), bl = M.balle;
+  if (p) return p.e === e ? 'attaque' : 'defense';
+  if (bl.garde != null) return M.joueurs[bl.garde]?.e === e ? 'attaque' : 'defense';
+  if ((bl.recepteur != null && M.joueurs[bl.recepteur]?.e === e) || bl.tir?.e === e) return 'attaque';
+  if (bl.p.y > 0.45 && bl.dernier != null && M.joueurs[bl.dernier]?.e === e && M.t - bl.dernierT < 2) return 'attaque';
+  const j = M.controle[e] != null ? M.joueurs[M.controle[e]] : null;
+  return j && Math.hypot(bl.p.x - j.p.x, bl.p.z - j.p.z) < 3.5 ? 'libre' : 'defense';
+}
 
 
 /** Remet une intention de manette à zéro (mêmes champs que sim/ia.js intentionVide, plus ceux des humains). */
@@ -125,11 +168,9 @@ export function oublier(cmd) {
  * Lit l'état d'une manette pour l'équipe e, dans le monde M, à l'heure t (s).
  * versJeu(sx, sy) : l'écran (sx vers la droite, sy vers le haut) → le repère du jeu { x, z }, selon la caméra.
  */
-/** L'équipe e attaque-t-elle (elle a la balle, ou son joueur tenu est à moins de 3,5 m d'une balle libre) ? */
+/** L'équipe e attaque-t-elle (phaseDe : elle a la balle ou sa passe est en route, ou une balle libre est près d'elle) ? */
 export function enAttaque(M, e) {
-  const p = porteur(M), bl = M.balle;
-  const j = M.controle[e] != null ? M.joueurs[M.controle[e]] : null;
-  return p ? p.e === e : !!(j && Math.hypot(bl.p.x - j.p.x, bl.p.z - j.p.z) < 3.5 && bl.garde == null);
+  return phaseDe(M, e) !== 'defense';
 }
 
 /** (correctifs #26) Le joueur j est-il collé dans le dos du porteur p (à moins de 0,95 m, derrière sa course) ? */
@@ -178,12 +219,11 @@ export function lireManette(cmd, etat, t, M, e, versJeu) {
     // L2 / LT : sans stick, protéger la balle ; avec le stick, la conduite serrée (pas de sprint, allure tenue)
     it.protege = lt && p === j && st.amp < 0.2;
     if (lt && st.amp >= 0.2) { it.allure = Math.min(it.allure, 0.6); it.sprint = 0; }
-    const lb = tenu(B.LB), rb = tenu(B.RB), r2 = gachette(b[B.RT] ?? 0) > 0.5;
+    const { lb, rb, r2 } = modificateursDe(b);
     const viseX = dirStick ? Math.max(-1, Math.min(1, dirStick.x)) * (BUT_DL - 0.35) : 0;
-    // (bola-app#32) une balle libre au sol, à portée de prise : ○ / B la prend (elle vient au pied)
+    // (bola-app#32) une balle libre au sol, à portée de prise : ○ / B la prend (elle vient au pied), avec ou sans R2
     // (au pied, à moins de 0,9 m, elle se frappe : ○ est alors la frappe)
-    const dLibre = j ? Math.hypot(bl.p.x - j.p.x, bl.p.z - j.p.z) : 99;
-    const libreSol = !p && bl.garde == null && bl.p.y < 0.45 && Math.abs(bl.v.y) < 1.5 && dLibre > 0.9 && dLibre < JEU.aimant.prendre;
+    const prise = libreSol(M, j);
     if (bas(B.A) && (cmd.jauge?.type === 'frappe' || (!cmd.jauge && t - cmd.frappeT < 0.35))) {
       // la feinte de frappe : ✕ / A pendant qu'on charge la frappe, ou juste après l'avoir lâchée (avant l'impact)
       cmd.jauge = null; cmd.p = 0; cmd.frappeT = -9; cmd.lache = null;
@@ -198,7 +238,7 @@ export function lireManette(cmd, etat, t, M, e, versJeu) {
       // touche est tenue ; la combinaison (L1, R1, R2, L2) est lue à l'appui
       for (const k of [B.A, B.B, B.X, B.Y]) {
         if (!bas(k)) continue;
-        if (k === B.B && libreSol && !r2) { sortir({ type: 'prendre', commande: 'prendre' }); break; }
+        if (k === B.B && prise && !lb && !rb && !lt) { sortir({ type: 'prendre', commande: 'prendre' }); break; }
         const flanc = !!j && Math.abs(j.p.x) > 3.8 && Math.abs(butDe(1 - e) - j.p.z) < 10;
         const c = commandeDe(k, { lb, rb, r2, lt, flanc });
         const a = { ...c.spec, commande: c.id, charge: true, p: null };

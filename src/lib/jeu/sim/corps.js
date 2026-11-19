@@ -186,6 +186,9 @@ const TAUX_CHUTE = { fall_side: 1.5, fall_back: 1.45, fall_sweep: 1.35, fall_tri
 // (correctifs #26) balayé ou croché, le corps part tout de suite : ces deux clips restent debout près d'une seconde
 // avant de basculer (hanches à 0,8 m jusqu'à 1,1 s) ; ils sont pris à partir de 36 % (au sol en ~0,3 s)
 const DEPUIS_CHUTE = { fall_sweep: 0.36, fall_trip: 0.36 };
+// (correctifs #32, D6 du contrôle du jeu, point 15 « relevé rapide ») la chute s'arrête peu après que les hanches touchent
+// le sol (s de clip) : les clips restaient couchés 1,2 s de plus, et une collision gardait le joueur 3,3 s au sol
+const FIN_CHUTE = { fall_back: 2.1, fall_side: 1.9, fall_sweep: 1.95, fall_trip: 2.0 };
 
 /** Le genre de chute que donne une poussée (px, pz : la direction où le corps est poussé), dans son repère. */
 export function genreChute(j, px, pz) {
@@ -213,7 +216,7 @@ export function tomber(j, genre = 'avant') {
     lancerGeste(j, 'trip', { taux: 1.5, rm: true, echelle: clamp(s / 3.4, 0.5, 1.4), type: 'chute', donnees: { vLim: s + 0.5 } });
   } else {
     // (de côté ou en arrière : le corps garde son cap, il est emporté par sa course)
-    lancerGeste(j, nom, { taux: TAUX_CHUTE[nom] ?? 1.4, depuis: DEPUIS_CHUTE[nom] ?? 0, type: 'chute', donnees: { vLim: Math.min(6, s + 0.5), glisse: { x: s > 0.3 ? j.v.x / s : 0, z: s > 0.3 ? j.v.z / s : 0 } } });
+    lancerGeste(j, nom, { taux: TAUX_CHUTE[nom] ?? 1.4, depuis: DEPUIS_CHUTE[nom] ?? 0, fin: FIN_CHUTE[nom] != null ? Math.min(duree(nom), FIN_CHUTE[nom]) : null, type: 'chute', donnees: { vLim: Math.min(6, s + 0.5), glisse: { x: s > 0.3 ? j.v.x / s : 0, z: s > 0.3 ? j.v.z / s : 0 } } });
   }
   j.mode = 'sol';
   j.solT = 0;
@@ -319,7 +322,12 @@ export function pasCorps(j, dt, balle) {
           const om = Math.min(C.lacetMax, aLat / Math.max(0.1, s));
           h += clamp(delta, -om * dt, om * dt);
         }
-        if (s < vt) s = Math.min(vt, s + C.a0 * accF * Math.max(0.15, 1 - s / (1.08 * vt)) * dt);
+        // (correctifs #32, D10 du contrôle du jeu) le premier appui d'un départ arrêté, quand un humain pousse lui-même le
+        // stick, pousse fort (2,4 fois l'accélération jusqu'à 1,4 m/s) : le corps bouge de 3 cm dès la 3e image au lieu de la
+        // 5e ; l'élan d'ensemble ne change presque pas ; l'IA et les courses automatiques (au-devant d'une passe) gardent le
+        // leur
+        const premier = s < 1.4 && vt > 2 && (it.stickHumain ?? 0) > 0.5 ? 2.4 : 1;
+        if (s < vt) s = Math.min(vt, s + C.a0 * premier * accF * Math.max(0.15, 1 - s / (1.08 * vt)) * dt);
         else s = Math.max(vt, s - freinage * dt);
         j.v.x = sin(h) * s; j.v.z = cos(h) * s;
       }
@@ -412,9 +420,10 @@ function pasGeste(j, dt) {
   // fin du geste
   const fini = g.t >= g.fin - 1e-6 || (g.finApresImpact != null && g.fait && g.age >= g.impactAge + g.finApresImpact);
   if (j.mode === 'sol') {
-    if (g.t >= duree(g.nom)) {
+    const finSol = g.type === 'chute' ? Math.min(g.fin, duree(g.nom)) : duree(g.nom);
+    if (g.t >= finSol) {
       // au sol : la pose de fin tenue, frottement 7 m/s² (le root motion est fini), puis le relevé
-      g.t = duree(g.nom);
+      g.t = finSol;
       if (g.rm) g.rm = false;
       if (!g.donnees?.glisse) { const sv = hypot(j.v.x, j.v.z); if (sv > 0) { const ns = Math.max(0, sv - 7 * dt); j.v.x *= ns / sv; j.v.z *= ns / sv; } }
       j.solT += dt;

@@ -29,17 +29,6 @@ import { LB, BUT_DL, BUT_H, BUT_P, BUT_COIN, BALLON } from '../sim/constantes.js
 
 const clamp = THREE.MathUtils.clamp;
 
-// ─────────────────────────── l'onde du filet (le même calcul que le shader ; lu par le banc) ───────────────────────────
-export const FILET = { sigma: 0.45, omega: 13.8, tau: 0.3, max: 0.28, parMs: 0.018, vie: 2.2 };
-// le maximum de sin(ωt)·e^(−t/τ) (atteint quand tan(ωt) = ωτ) : la force est ramenée à « au plus FILET.max »
-const PIC = (() => { const t = Math.atan(FILET.omega * FILET.tau) / FILET.omega; return Math.sin(FILET.omega * t) * Math.exp(-t / FILET.tau); })();
-/** Le déplacement du filet (m) à d m du choc, age s après, pour un ballon à vn m/s. */
-export function ondeFilet(d, age, vn, F = FILET) {
-  if (age < 0 || age > F.vie) return 0;
-  const force = Math.min(F.max, vn * F.parMs) / PIC;
-  return force * Math.exp(-(d * d) / (2 * F.sigma * F.sigma)) * Math.sin(F.omega * age) * Math.exp(-age / F.tau);
-}
-
 // ─────────────────────────── les ombres de contact ───────────────────────────
 const PROJ = [{ x: -14, z: 0, h: 15.6 }, { x: 14, z: 0, h: 15.6 }]; // les deux projecteurs du portique (repère du jeu)
 
@@ -393,7 +382,10 @@ export function creerFilet(parent, scene) {
       const a = 3 * I[i], b = 3 * I[i + 1], c = 3 * I[i + 2];
       const ux = P[b] - P[a], uy = P[b + 1] - P[a + 1], uz = P[b + 2] - P[a + 2], vx = P[c] - P[a], vy = P[c + 1] - P[a + 1], vz = P[c + 2] - P[a + 2];
       const nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
-      for (const q of [a, b, c]) { nor[o0 + q] += nx; nor[o0 + q + 1] += ny; nor[o0 + q + 2] += nz; }
+      // (correctifs #32, D9 du contrôle du code : sans tableau créé par triangle, 912 par image quand la toile travaille)
+      nor[o0 + a] += nx; nor[o0 + a + 1] += ny; nor[o0 + a + 2] += nz;
+      nor[o0 + b] += nx; nor[o0 + b + 1] += ny; nor[o0 + b + 2] += nz;
+      nor[o0 + c] += nx; nor[o0 + c + 1] += ny; nor[o0 + c + 2] += nz;
     }
     for (let o = o0; o < o0 + 3 * T.n; o += 3) { const l = Math.hypot(nor[o], nor[o + 1], nor[o + 2]) || 1; nor[o] /= l; nor[o + 1] /= l; nor[o + 2] /= l; }
   };

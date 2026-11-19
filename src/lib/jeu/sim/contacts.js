@@ -30,7 +30,7 @@
 //     sinon coup franc au point de la faute.
 import { CORPS as C, BALLON, BALLE_CORPS as BC, BX, BZ, JEU, DUELS } from './constantes.js';
 import { lancerGeste, tomber, trebucher, genreChute, piedA, hancheA, duree, versMonde, clamp, enrouler, libre } from './corps.js';
-import { rouler, pasControle } from './gestes.js';
+import { rouler, pasControle, aimantee } from './gestes.js';
 import { sortirBalle } from './ballon.js';
 import { atan2, cos, hypot, sin } from './maths.js';
 import { CLIPS } from './clips.js';
@@ -529,6 +529,11 @@ const pc = { x: 0, y: 0, z: 0 };
 export function balleCorps(m) {
   const b = m.balle;
   if (b.garde != null || b.p.y > 1.6 + BALLON.R + 0.2) return -1;
+  // (correctifs #32, D11 du contrôle du jeu) la balle aimantée au pied d'un porteur debout ne rebondit sur aucun autre
+  // corps : un coéquipier ou un adversaire qui la frôle ne la libère pas (avant : trois pertes en une seconde contre un
+  // coéquipier collé, 4 pertes par match « au contact ») ; on la prend au tacle ou à la récupération (tacle debout)
+  const P = b.possesseur != null ? m.joueurs[b.possesseur] : null;
+  if (P && P.mode !== 'sol' && P.mode !== 'releve' && (libre(P) || P.mode === 'frein' || P.mode === 'pivot' || (P.g?.type === 'controle' && P.g.donnees?.prise)) && aimantee(m, P)) return -1;
   const R = BALLON.R;
   for (const j of m.joueurs) {
     if (j.absent || j.gardien) continue;

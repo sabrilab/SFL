@@ -77,7 +77,7 @@ import { SCENARIOS } from './sim/scenarios.js';
 import { chargerMesuresUrl } from './sim/clips.js';
 import { changerHumains } from './sim/monde.js';
 import { creerManettes, EFFETS } from './entrees/manettes.js';
-import { creerCommande, lireManette, intentionDe, oublier, enAttaque, gachette } from './entrees/commande.js';
+import { creerCommande, lireManette, intentionDe, oublier, enAttaque, modificateur, modificateursDe, phaseDe, libreSol } from './entrees/commande.js';
 import { creerClavier, creerEtatClavier, etatDepuisTouches } from './entrees/clavier.js';
 import { creerLecteur, oublierLecteur, lireGesteStick } from './entrees/geste-stick.js';
 import { creerCameraTele, majCameraTele, poserFoyer, duelPresDuBut } from './rendu/camera.js';
@@ -161,6 +161,14 @@ export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, 
   try {
     if (PE.fichier) { const f = new FontFace(PE.famille, `url(${PE.fichier})`); await f.load(); document.fonts.add(f); policeEcran = `${PE.famille}, system-ui, sans-serif`; }
     else { const v = getComputedStyle(document.body).getPropertyValue(PE.variable).trim(); if (v) policeEcran = `${v}, system-ui, sans-serif`; graisseEcran = `${PE.graisse} `; await document.fonts.load(`${graisseEcran}64px ${policeEcran}`).catch(() => {}); }
+  } catch {}
+  // (correctifs #32, D11 du contrôle du code) le numéro de manette au-dessus du chevron, en Inter, la police de l'app
+  // (--font-inter : next/font ne la nomme pas « Inter », le numéro tombait sur la police du système) ; chargée avant d'être
+  // peinte ; la graisse reste celle du lot C (800)
+  let policeNumero = 'system-ui, sans-serif';
+  try {
+    const v = getComputedStyle(document.body).getPropertyValue(POLICES.inter.variable).trim();
+    if (v) { policeNumero = `${v}, system-ui, sans-serif`; await document.fonts.load(`800 46px ${policeNumero}`).catch(() => {}); }
   } catch {}
   const facesCube = ['ecranN', 'ecranS', 'ecranE', 'ecranO'].map((k) => pl.emplacements[k]).filter(Boolean);
   for (const e of facesCube) e.poser(ecran);
@@ -247,7 +255,7 @@ export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, 
   const texNumero = (e, n) => {
     const k = `${e}:${n}`;
     if (!numeros.has(k)) numeros.set(k, toileRepere(48, 64, (g) => {
-      g.font = '800 46px Inter, system-ui, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+      g.font = `800 46px ${policeNumero}`; g.textAlign = 'center'; g.textBaseline = 'middle';
       g.lineJoin = 'round'; g.lineWidth = 8; g.strokeStyle = TEINTES[e].bord; g.strokeText(String(n), 24, 34); g.fillStyle = TEINTES[e].plein; g.fillText(String(n), 24, 34);
     }));
     return numeros.get(k);
@@ -408,8 +416,8 @@ export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, 
       return;
     }
     // (bola-app#32) une balle libre au sol, près de lui : il la prend (elle vient au pied)
-    const bl = m().balle;
-    if (!p && bl.garde == null && bl.p.y < 0.45 && Math.hypot(bl.p.x - j.p.x, bl.p.z - j.p.z) < 2.5) { actionPouce = { type: 'prendre', commande: 'prendre' }; return; }
+    // (correctifs #32, D10 du contrôle du code : la règle de commande.js, libreSol, et non des valeurs recopiées)
+    if (libreSol(m(), j, 0)) { actionPouce = { type: 'prendre', commande: 'prendre' }; return; }
     if (p && p.e !== j.e && Math.hypot(p.p.x - j.p.x, p.p.z - j.p.z) < 2.2) actionPouce = { type: 'tacle', glisse: false, commande: 'recuperer' };
   };
   // le second doigt touché sans bouger : la semelle (R3)
@@ -505,42 +513,55 @@ export async function creerMatch(conteneur, { photo = null, surEtat = () => {}, 
   // ── (bola-app#32, lot C) ce que montre le panneau des touches ──
   // L'appareil de chaque équipe humaine : sa manette (Xbox ou PlayStation ; une manette générique a la disposition
   // standard, celle de la Xbox), sinon, pour les Noirs, le clavier s'il sert, le pouce s'il a servi après lui, et avant
-  // tout geste, le pouce sur un écran tactile, le clavier ailleurs. La phase : attaque si l'équipe a la balle (ou si sa
-  // passe ou sa frappe est en l'air), balle libre si elle est à moins de 3,5 m du joueur tenu (○ la prend), défense
-  // sinon ; une phase nouvelle doit tenir 0,18 s (une passe qui part ne fait pas clignoter le panneau). Le modificateur
-  // tenu (L1, R1, R2, L2 ; Q, R, Maj, C au clavier) s'affiche tout de suite. La page n'est prévenue que d'un changement.
+  // tout geste, le pouce sur un écran tactile, le clavier ailleurs. La phase et le modificateur tenu sont ceux de la
+  // commande (entrees/commande.js phaseDe, modificateur : la même règle que le jeu, correctifs #32) : attaque si
+  // l'équipe a la balle (ou si sa passe ou sa frappe est en route), balle libre si elle est à moins de 3,5 m du joueur
+  // tenu (○ la prend), défense sinon ; une phase nouvelle doit tenir 0,18 s (une passe qui part ne fait pas clignoter le
+  // panneau). Le modificateur (L1, puis R1, puis L2 ; R2 seul ; au clavier par la table du clavier) s'affiche tout de
+  // suite ; en balle libre au sol, R2 n'est que le sprint (○ prend la balle) : pas de variante. La page n'est prévenue
+  // que d'un changement (comparé champ par champ, sans rien allouer à chaque image).
   const tactile = typeof matchMedia !== 'undefined' && matchMedia('(pointer: coarse)').matches;
   const phasesPanneau = [{ ph: null, cand: null, depuis: 0 }, { ph: null, cand: null, depuis: 0 }];
-  let clePanneau = '';
+  const etatPanneau = creerEtatClavier();
+  const vuPanneau = [{ on: false, appareil: null, phase: null, mod: null, numero: null }, { on: false, appareil: null, phase: null, mod: null, numero: null }];
   function majPanneau() {
-    const M = m(), liste = [];
-    if (!banc.auto && !demo && !scene && (M.phase === 'jeu' || M.phase === 'engagement')) {
-      const eq = manettes.equipes(), deux = !!(M.humains[0] && M.humains[1]);
-      const p = porteur(M), bl = M.balle, now = performance.now();
-      for (const e of [0, 1]) {
-        if (!M.humains[e]) continue;
+    const M = m();
+    let change = false;
+    const actif = !banc.auto && !demo && !scene && (M.phase === 'jeu' || M.phase === 'engagement');
+    const eq = actif ? manettes.equipes() : null, deux = !!(M.humains[0] && M.humains[1]);
+    const now = performance.now();
+    for (const e of [0, 1]) {
+      const V = vuPanneau[e];
+      let on = false, appareil = null, phase = null, mod = null, numero = null;
+      if (actif && M.humains[e]) {
         const pad = eq[e];
-        const appareil = pad ? (pad.marque === 'playstation' ? 'playstation' : 'xbox')
+        appareil = pad ? (pad.marque === 'playstation' ? 'playstation' : 'xbox')
           : e !== 0 ? null
           : clavierJoue() ? 'clavier' : pouce.utilise && pouce.vu >= clavier.vu ? 'pouce' : tactile ? 'pouce' : 'clavier';
-        if (!appareil) continue;
-        let mod = null;
-        if (pad) { const b = pad.etat.b; mod = b[4] > 0.5 ? 'L1' : b[5] > 0.5 ? 'R1' : gachette(b[7] ?? 0) > 0.5 ? 'R2' : gachette(b[6] ?? 0) > 0.3 ? 'L2' : null; }
-        else if (appareil === 'clavier') { const t = clavier.tenues; mod = t.has('q') ? 'L1' : t.has('r') ? 'R1' : t.has('shift') ? 'R2' : t.has('c') ? 'L2' : null; }
-        const j = M.controle[e] != null ? M.joueurs[M.controle[e]] : null;
-        let ph;
-        if (p) ph = p.e === e ? 'attaque' : 'defense';
-        else if (bl.garde != null) ph = M.joueurs[bl.garde]?.e === e ? 'attaque' : 'defense';
-        else if ((bl.recepteur != null && M.joueurs[bl.recepteur]?.e === e) || bl.tir?.e === e) ph = 'attaque';
-        else ph = j && Math.hypot(bl.p.x - j.p.x, bl.p.z - j.p.z) < 3.5 ? 'libre' : 'defense';
-        const H = phasesPanneau[e];
-        if (ph !== H.cand) { H.cand = ph; H.depuis = now; }
-        if (H.ph == null || (H.ph !== ph && now - H.depuis > 180)) H.ph = ph;
-        liste.push({ e, appareil, phase: H.ph, mod, numero: deux && pad ? pad.index + 1 : null });
+        if (appareil) {
+          on = true;
+          let b = null;
+          if (pad) b = pad.etat.b;
+          else if (appareil === 'clavier') { etatDepuisTouches(clavier.tenues, 0, etatPanneau); b = etatPanneau.b; }
+          const ph = phaseDe(M, e);
+          const j = M.controle[e] != null ? M.joueurs[M.controle[e]] : null;
+          mod = b ? modificateur(modificateursDe(b)) : null;
+          if (mod === 'R2' && ph === 'libre' && libreSol(M, j, 0)) mod = null;
+          const H = phasesPanneau[e];
+          if (ph !== H.cand) { H.cand = ph; H.depuis = now; }
+          if (H.ph == null || (H.ph !== ph && now - H.depuis > 180)) H.ph = ph;
+          phase = H.ph; numero = deux && pad ? pad.index + 1 : null;
+        }
       }
-    } else { phasesPanneau[0].ph = null; phasesPanneau[1].ph = null; }
-    const cle = JSON.stringify(liste);
-    if (cle !== clePanneau) { clePanneau = cle; etat.panneau = liste; signaler(); }
+      if (!on) phasesPanneau[e].ph = null;
+      if (V.on !== on || V.appareil !== appareil || V.phase !== phase || V.mod !== mod || V.numero !== numero) {
+        V.on = on; V.appareil = appareil; V.phase = phase; V.mod = mod; V.numero = numero; change = true;
+      }
+    }
+    if (change) {
+      etat.panneau = vuPanneau.flatMap((V, e) => (V.on ? [{ e, appareil: V.appareil, phase: V.phase, mod: V.mod, numero: V.numero }] : []));
+      signaler();
+    }
   }
 
   /** (lot B) Le libellé des plans des équipes données : [{ e, plan, nom, style }], numéroté pour que la page le relance. */

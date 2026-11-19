@@ -65,6 +65,7 @@ const SURFACES = {
   pointe: { lacet: 0, tangage: -58, recul: 0.2, cote: 0, y: 0.07 },
 };
 const AERIEN = /^(head|header|volley|bicycle)/;
+const BUSTE_MAX = 62 * Math.PI / 180;
 const lisse = (x) => { const u = x < 0 ? 0 : x > 1 ? 1 : x; return u * u * (3 - 2 * u); };
 const angle = (a) => { let d = a; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; return d; };
 
@@ -145,7 +146,7 @@ const HAUT = /^(spine\d?|neck|head|(left|right)(shoulder|arm|forearm|hand))$/;
  * appui, touche, choc, figure, balle…) ; versMonde3(jeu → monde three) pour la tête, la balle et les pieds.
  * diag : ce que le banc d'animation mesure (état du graphe, appuis tenus, couches).
  */
-export function creerAnimateur(perso, { gardien = false, reduit = false, versMonde3 } = {}) {
+export function creerAnimateur(perso, { gardien = false, reduit = false, versMonde3, diagnostic = false } = {}) {
   const { actions, mixer, os, corps, racine } = perso;
   const noms = (gardien ? LOCO_G : LOCO).filter((n) => actions[n]);
   for (const n of Object.keys(actions)) { const a = actions[n]; a.stop(); a.enabled = true; a.setEffectiveTimeScale(0); a.setEffectiveWeight(0); }
@@ -355,7 +356,10 @@ export function creerAnimateur(perso, { gardien = false, reduit = false, versMon
       os.hips.getWorldPosition(va); (os.spine2 ?? os.neck).getWorldPosition(vb);
       vb.sub(va);
       const tg = Math.atan2(vb.dot(avant), vb.y), rl = Math.atan2(vb.dot(lateral), vb.y) * sgP;
-      const dT = clamp(C.P.buste * DEG * k + tg * (1 - k) - tg, -40 * DEG - totT, 40 * DEG - totT);
+      // (correctifs #32, D5 du contrôle du jeu : jusqu'à 62° ; la frappe en course, au contact, a le dos penché de 38° en
+      // arrière, et 40° ne suffisaient pas à mettre le buste au-dessus de la balle : passe, puissante, ras de terre et
+      // profondeur en course finissaient tous à 0-1°)
+      const dT = clamp(C.P.buste * DEG * k + tg * (1 - k) - tg, -BUSTE_MAX - totT, BUSTE_MAX - totT);
       const dR = clamp((C.P.roulis ?? 0) * DEG * k + rl * (1 - k) - rl, -25 * DEG - totR, 25 * DEG - totR);
       if (Math.abs(dT) < 0.004 && Math.abs(dR) < 0.004) break;
       tournerMonde(os.spine, lateral, dT * 0.5); tournerMonde(os.spine, avant, -dR * sgP * 0.5);
@@ -464,11 +468,19 @@ export function creerAnimateur(perso, { gardien = false, reduit = false, versMon
     } else chaussures = null;
   }
   const vS = new THREE.Vector3();
+  // (correctifs #32, D8 du contrôle du code) les semelles sont mesurées une fois par pose : le skinning de 72 sommets par
+  // pied, en JS, était refait 7 fois par image (0,24 ms par gardien et par image, 5 fois un joueur de champ). Le cache
+  // suit le corps qui monte ou descend (corps.position.y : une translation) ; une IK de jambe ou une nouvelle image
+  // l'invalide (semVersion++).
+  const semC = [0, 0], semV = [-1, -1], semY = [0, 0];
+  let semVersion = 0;
   /** La hauteur (m, monde) du point le plus bas de la semelle du pied c. */
   function semelle(c) {
     if (chaussures) {
+      if (semV[c] === semVersion) return semC[c] + (corps.position.y - semY[c]);
       let lo = Infinity;
       for (const i of semelles[c]) { chaussures.getVertexPosition(i, vS); vS.applyMatrix4(chaussures.matrixWorld); if (vS.y < lo) lo = vS.y; }
+      semC[c] = lo; semV[c] = semVersion; semY[c] = corps.position.y;
       return lo;
     }
     const orteilC = c ? os.righttoebase : os.lefttoebase, pied = c ? os.rightfoot : os.leftfoot;
@@ -520,18 +532,21 @@ export function creerAnimateur(perso, { gardien = false, reduit = false, versMon
     const P = pieds[hi];
     if (P.haut && P.milieu && P.bout && ecart > 0.004 && ecart < 0.08 && solG.vit[hi] < 0.3) {
       P.bout.getWorldPosition(cible); cible.y -= ecart;
-      ik2(P.haut, P.milieu, P.bout, cible); racine.updateMatrixWorld(true);
+      ik2(P.haut, P.milieu, P.bout, cible); racine.updateMatrixWorld(true); semVersion++;
       // (le pied tourne avec la jambe pliée : son talon peut passer sous le gazon ; le pied est alors remonté d'autant)
       const sous = semelle(hi) - y0 - Math.max(0, solG.sem[lo]);
-      if (sous < -0.002) { cible.y -= sous; ik2(P.haut, P.milieu, P.bout, cible); racine.updateMatrixWorld(true); }
+      if (sous < -0.002) { cible.y -= sous; ik2(P.haut, P.milieu, P.bout, cible); racine.updateMatrixWorld(true); semVersion++; }
       pose = ecart;
     }
-    solG.diag.pose = pose; solG.diag.bas = Math.min(semelle(0), semelle(1)) - y0; solG.diag.haut = Math.max(solG.sem[0], solG.sem[1]) - pose;
+    solG.diag.pose = pose;
+    // (le diagnostic, pour le banc seulement : deux mesures de plus par image)
+    if (diagnostic) { solG.diag.bas = Math.min(semelle(0), semelle(1)) - y0; solG.diag.haut = Math.max(solG.sem[0], solG.sem[1]) - pose; }
   }
 
   let total = 0;
   function maj(e, dt) {
     total += dt;
+    semVersion++;
     const W = majCouches(e, dt);
     const lo = poserLoco(e, total, 1 - W, dt);
     dom = lo.dom;
@@ -672,7 +687,7 @@ export function creerAnimateur(perso, { gardien = false, reduit = false, versMon
       const off = vt.copy(P.cible).sub(cible);
       const L = off.length();
       if (L > P.plafond) off.multiplyScalar(P.plafond / L);
-      if (L > 0.002) ik2(P.haut, P.milieu, P.bout, cible.add(off.multiplyScalar(P.mix)));
+      if (L > 0.002) { ik2(P.haut, P.milieu, P.bout, cible.add(off.multiplyScalar(P.mix))); semVersion++; }
     }
     diag.pose[0] = bassin;
     if (gardien) poserSecondPied(dt);
@@ -730,7 +745,7 @@ export function creerAnimateur(perso, { gardien = false, reduit = false, versMon
         vt.set(bw.x - (dx / L) * 0.12, Math.max(cible.y, Math.min(bw.y - 0.02, cible.y + 0.15)), bw.z - (dz / L) * 0.12).sub(cible);
         const k = 1 - T.age / 0.12, Lc = vt.length();
         if (Lc > 0.3) vt.multiplyScalar(0.3 / Lc);
-        if (Lc > 0.005) ik2(best.haut, best.milieu, best.bout, cible.add(vt.multiplyScalar(k)));
+        if (Lc > 0.005) { ik2(best.haut, best.milieu, best.bout, cible.add(vt.multiplyScalar(k))); semVersion++; }
       }
       // (bola-app#32, lot A2) le gardien debout : la jambe tendue vers la balle peut enfoncer le talon de l'autre pied
       // ou le sien ; le corps est remonté d'autant (cette image seulement)

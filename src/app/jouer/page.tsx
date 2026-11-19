@@ -43,7 +43,7 @@ import { photoPerso, rafraichirPhotos } from "@/lib/sfl/photos";
 import { cn } from "@/lib/utils";
 import { EcranManettes, ManettesVues, type MagasinManettes } from "./manettes";
 import { SchemaTouches, type Appareil } from "./touches";
-import { PanneauTouches, type InfoPanneau } from "./panneau-touches";
+import { PanneauTouches, TOUCHE_PANNEAU, type InfoPanneau } from "./panneau-touches";
 // la police du score et de « BUT » : un mot à changer dans lib/jeu/police.js pour passer à Inter 800 (décision 1 de #25)
 import { CLASSE_SCORE } from "@/lib/jeu/police.js";
 
@@ -125,7 +125,7 @@ export default function JouerPage() {
   useEffect(() => {
     const touche = (e: KeyboardEvent) => {
       if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
-      if (e.key === "h" || e.key === "H") setPanneauCache((c) => !c);
+      if (e.key?.toLowerCase() === TOUCHE_PANNEAU) setPanneauCache((c) => !c);
     };
     addEventListener("keydown", touche);
     return () => removeEventListener("keydown", touche);

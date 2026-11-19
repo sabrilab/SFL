@@ -44,7 +44,7 @@ import { creerHasard, creerFlux } from './hasard.js';
 import { creerTactique, tactiqueTiree, majTactiques, choisirPlan } from './tactique.js';
 import { creerCorps, pasCorps, libre, lancerGeste, finirGeste, clamp, impactDe, duree } from './corps.js';
 import { creerBalle, pasBalle, antiBlocage, poserBalle } from './ballon.js';
-import { pasConduite, pasControle, demanderFrappe, pasDemande, pasFrappe, porteur, pasAnticipation, estFrappe, gestePrise } from './gestes.js';
+import { pasConduite, pasControle, demanderFrappe, pasDemande, pasFrappe, porteur, pasAnticipation, estFrappe, gestePrise, prendreBalle } from './gestes.js';
 import { pasCorpsACorps, demanderTacle, pasTacle, desequilibrer, demeler, balleCorps } from './contacts.js';
 import { pasGardien, pasCorpsGardien, contactGardien, tenirBalle } from './gardien.js';
 import { pasIA, intentionVide, conduire, aller, contourner, auDevant } from './ia.js';
@@ -210,6 +210,8 @@ function copierIntention(j, src) {
   const L = hypot(it.dx, it.dz);
   if (L > 1e-6 && Number.isFinite(L)) { it.dx /= L; it.dz /= L; } else { it.dx = 0; it.dz = 0; }
   it.allure = clamp(fini(src.allure), 0, 1); it.sprint = clamp(fini(src.sprint), 0, 1);
+  // (correctifs #32 : l'allure que donne le stick lui-même, avant les courses automatiques ; corps.js, le premier appui)
+  it.stickHumain = it.allure;
   it.recupere = false;
   it.regard = src.regard ?? null; it.contenir = !!src.contenir; it.protege = !!src.protege; it.charge = !!src.charge; it.vaBalle = true;
   it.tire = !!src.tire;
@@ -234,12 +236,16 @@ function agir(m, j) {
   if (!humain) j.file = null;
   if (!a && j.file) {
     const F = j.file;
-    if (m.t - F.t > 0.9) j.file = null;
-    else if (libre(j) || (j.mode === 'geste' && j.g && COUPABLES.has(j.g.type) && j.g.t >= COUPE * j.g.fin)) {
-      if (!libre(j)) { finirGeste(j); j.recup = 0; }
+    // (correctifs #32, D8 du contrôle du jeu) un appui reçu pendant un pivot, un amorti ou la reprise d'appuis attend
+    // (0,9 s ; une reprise sur une balle en route vers lui, jusqu'à son arrivée : 1,4 s) au lieu d'être perdu ; un pivot
+    // se coupe à 30 % comme un geste coupable (la réactivité avant la beauté du clip)
+    const coupable = j.g && (j.mode === 'geste' ? COUPABLES.has(j.g.type) : j.mode === 'pivot') && j.g.t >= COUPE * j.g.fin;
+    if (m.t - F.t > (F.attend ? 1.4 : 0.9)) j.file = null;
+    else if (libre(j) || coupable) {
+      if (!libre(j)) { const piv = j.mode === 'pivot'; finirGeste(j); if (piv) j.mode = 'loco'; j.recup = 0; }
       a = F.a; j.file = null;
       // (une frappe enchaînée sur un geste : frappée sur appuis, la balle est contre le pied, pas de course d'élan)
-      if (estFrappe(a.type) || a.type === 'passe') a = { ...a, enchaine: true };
+      if (!F.attend && (estFrappe(a.type) || a.type === 'passe')) a = { ...a, enchaine: true };
       m.ev('enchaine', { j: j.i, action: a.type });
     }
   }
@@ -248,15 +254,17 @@ function agir(m, j) {
   const p = porteur(m);
   // (bola-app#32, lot A) une action d'humain porte sa commande (id de touches.js) et se charge : la simulation le sait
   if (humain && a.type !== 'tacle' && !a.humain) a = { ...a, humain: true };
-  // (lot A) ○ / B sur une balle libre au sol : il va la chercher, elle vient au pied (aimantée) dans les 0,6 s
-  if (a.type === 'prendre') { j.prendreT = m.t + 0.6; m.ev('prendre', { j: j.i }); return; }
+  // (lot A) ○ / B sur une balle libre au sol : il va la chercher, elle vient au pied (aimantée) ; (correctifs #32) pendant
+  // 1 s (avant 0,6 s : trop court pour faire 1,5 m depuis l'arrêt)
+  if (a.type === 'prendre') { j.prendreT = m.t + JEU.aimant.prendreT; m.ev('prendre', { j: j.i }); return; }
   // (lot A, profondeur technique) le second appui de la frappe : parfait à 0,07 s de l'impact, sinon raté
   if (a.type === 'timing') { timing(m, j); return; }
   if (a.type === 'tacle') { if ((!p || p.e !== j.e) && m.ecart?.e !== j.e) demanderTacle(m, j, !!a.glisse); return; }
   // (la feinte de frappe annule l'élan d'une frappe déjà lancée : elle ne va pas en file derrière cette frappe)
   if (a.type === 'feinteFrappe' && (j.demande || (j.g && j.g.type === 'frappe' && !j.g.fait))) { feinteFrappe(m, j); return; }
-  // (un humain balle au pied, dans un geste : l'action attend son tour)
-  if (humain && !libre(j) && j.mode === 'geste' && enFile(a) && (p === j || p == null)) { j.file = { a, t: m.t }; return; }
+  // (un humain balle au pied, dans un geste, un pivot ou la reprise d'appuis après une touche : l'action attend son tour ;
+  // correctifs #32, D8 : avant, seulement dans un geste, l'appui pendant un demi-tour ou juste après une passe était perdu)
+  if (humain && !libre(j) && j.mode !== 'sol' && j.mode !== 'releve' && enFile(a) && (p === j || p == null)) { j.file = { a, t: m.t }; return; }
   // (lot A, profondeur technique) un geste technique raté coûte la balle : deux gestes à moins de 0,25 s, ou un geste
   // lancé à pleine vitesse (plus de 6,8 m/s) avec un défenseur à moins de 1,5 m
   if (humain && GESTES.has(a.type) && a.type !== 'jongle' && a.type !== 'feinteFrappe' && p === j) {
@@ -286,7 +294,15 @@ function agir(m, j) {
       a = { ...a, cible: X.i, dx: xx - j.p.x, dz: xz - j.p.z, v0, p: clamp((v0 - 6) / 12, 0.2, 1) };
     }
   }
-  if (demanderFrappe(m, j, a)) {
+  const demande = demanderFrappe(m, j, a);
+  // (correctifs #32, D4 du contrôle du jeu) ○ ou R2 + ○ appuyé tôt sur une passe ou un centre qui vient à lui (encore trop
+  // loin pour régler la reprise) : l'action attend la balle, elle n'est pas perdue
+  if (!demande && humain && estFrappe(a.type) && p == null && m.balle.garde == null && (m.balle.recepteur === j.i || (m.balle.dernier != null && m.joueurs[m.balle.dernier].e === j.e && m.balle.dernier !== j.i))) {
+    j.file = { a, t: a.t0File ?? m.t, attend: true };
+    if (a.t0File == null) a.t0File = m.t;
+    return;
+  }
+  if (demande) {
     m.stats.demandes++;
     if (a.uneDeux === 'appel') {
       // le passeur repart dans l'espace, devant, du côté opposé au défenseur le plus proche (l'IA le fait courir)
@@ -644,18 +660,37 @@ function coupFranc(m, A) {
   let pt = pointCoupFranc(A.x, A.z);
   // (correctifs #26) pas sous un corps au sol : la balle était posée sur le bassin du joueur fauté, encore couché ;
   // elle va à côté de lui (à 0,7 m de son corps, couché le long de son cap sur 0,8 m de part et d'autre des hanches)
-  for (let passe = 0; passe < 3; passe++) {
-    let bouge = false;
+  // (la distance au corps couché le plus proche, et ce corps)
+  const sousCorps = (x, z) => {
+    let pire = Infinity, q = null;
     for (const j of m.joueurs) {
       if (j.absent || (j.mode !== 'sol' && j.mode !== 'releve')) continue;
       const ux = sin(j.cap), uz = cos(j.cap);
-      const u = clamp((pt.x - j.p.x) * ux + (pt.z - j.p.z) * uz, -0.8, 0.8);
-      const qx = j.p.x + ux * u, qz = j.p.z + uz * u, dx = pt.x - qx, dz = pt.z - qz, d = hypot(dx, dz);
-      if (d >= 0.7) continue;
-      const nx = d > 1e-3 ? dx / d : uz, nz = d > 1e-3 ? dz / d : -ux;
-      pt = pointCoupFranc(qx + nx * 0.75, qz + nz * 0.75); bouge = true;
+      const u = clamp((x - j.p.x) * ux + (z - j.p.z) * uz, -0.8, 0.8);
+      const qx = j.p.x + ux * u, qz = j.p.z + uz * u, d = hypot(x - qx, z - qz);
+      if (d < pire) { pire = d; q = { qx, qz, ux, uz, d }; }
     }
-    if (!bouge) break;
+    return q;
+  };
+  for (let passe = 0; passe < 3; passe++) {
+    const q = sousCorps(pt.x, pt.z);
+    if (!q || q.d >= 0.7) break;
+    const dx = pt.x - q.qx, dz = pt.z - q.qz;
+    const nx = q.d > 1e-3 ? dx / q.d : q.uz, nz = q.d > 1e-3 ? dz / q.d : -q.ux;
+    pt = pointCoupFranc(q.qx + nx * 0.75, q.qz + nz * 0.75);
+  }
+  // (correctifs #32 : deux corps couchés l'un près de l'autre renvoyaient la balle de l'un à l'autre ; s'il en reste un à
+  // moins de 0,7 m, le point libre le plus proche sur des cercles de 1 à 2,5 m autour de la faute)
+  const q0 = sousCorps(pt.x, pt.z);
+  if (q0 && q0.d < 0.7) {
+    let best = null, bd = Infinity;
+    for (let r = 1; r <= 2.5 && !best; r += 0.5) for (let k = 0; k < 12; k++) {
+      const a = (k * Math.PI) / 6, c = pointCoupFranc(A.x + sin(a) * r, A.z + cos(a) * r), qc = sousCorps(c.x, c.z);
+      if (qc && qc.d < 0.7) continue;
+      const dd = hypot(c.x - A.x, c.z - A.z);
+      if (dd < bd) { bd = dd; best = c; }
+    }
+    if (best) pt = best;
   }
   // le joueur fauté s'il est debout, sinon le coéquipier debout le plus proche du point
   const debout = (j) => !j.absent && !j.gardien && j.mode !== 'sol' && j.mode !== 'releve';
@@ -873,7 +908,10 @@ export function pas(m, entrees = null) {
       // ralentit en arrivant, pour l'amorti du pied (gestes.js gestePrise)
       if (!p && j.prendreT > m.t && b.garde == null && b.p.y < 0.6) {
         const dx = b.p.x + b.v.x * 0.15 - j.p.x, dz = b.p.z + b.v.z * 0.15 - j.p.z, d = hypot(dx, dz);
-        if (d < JEU.aimant.prendre && d > 1e-6) { j.int.dx = dx / d; j.int.dz = dz / d; j.int.allure = clamp(d / 1.6, 0.45, 1); j.int.sprint = Math.max(j.int.sprint, d > 1.8 ? 0.5 : 0); }
+        // (correctifs #32 : le stick poussé à l'opposé de la balle annule la prise : on reprend la main)
+        const it0 = entrees[e];
+        if ((it0.allure ?? 0) > 0.5 && d > 1e-6 && (it0.dx * dx + it0.dz * dz) / d < -0.3) j.prendreT = 0;
+        else if (d < JEU.aimant.prendre + 1.5 && d > 1e-6) { j.int.dx = dx / d; j.int.dz = dz / d; j.int.allure = clamp(d / 1.6, 0.45, 1); j.int.sprint = Math.max(j.int.sprint, d > 1.8 ? 0.5 : 0); }
       }
       // (lot A) le receveur d'une passe de son équipe vient au-devant de la balle, comme sur console, tant que le stick
       // est au repos (le joueur reprend la main en le poussant)
@@ -912,27 +950,42 @@ export function pas(m, entrees = null) {
       const i = q.i, a = m._phases[i], c = q.phase;
       const appui = Math.floor(a * 2) !== Math.floor(c * 2);
       pasConduite(m, q, appui);
+      // (correctifs #32) la prise sur ○ d'un humain se voit : l'amorti du pied, lancé quand la balle arrive (0,6 m), pour
+      // que son contact tombe sur elle ; passé 0,8 s, plus d'amorti (la balle est déjà au pied)
+      if (q.priseGeste != null) {
+        if (m.t - q.priseGeste > 0.8) q.priseGeste = null;
+        else if (hypot(b.p.x - q.p.x, b.p.z - q.p.z) < 0.6) { q.priseGeste = null; gestePrise(m, q); }
+      }
     }
     // (bola-app#32, lot A) la balle libre au sol, lente (moins de 4 m/s, pas une passe en route) : elle vient au pied du
     // joueur de l'IA le plus proche à 1,2 m (prise automatique), ou de l'humain qui a appuyé sur ○ (6 m/s au plus) ; et
     // la passe vient au pied de son receveur, humain ou IA, qui est venu au-devant (10 m/s au plus) : elle arrive
     let touche = false;
+    // (correctifs #32, D6 du contrôle du jeu) le receveur désigné tombé, en train de se relever, ou que la balle lente
+    // n'atteint plus (arrêtée à plus de 0,8 m de lui) : elle n'est plus à lui, l'IA la reprend ; avant, une balle arrêtée
+    // à 1 m d'un receveur au sol restait 4 s immobile, les six autres joueurs plantés à 7-10 m
+    if (!q && b.recepteur != null) {
+      const Rc = m.joueurs[b.recepteur];
+      if (Rc.mode === 'sol' || Rc.mode === 'releve' || (hypot(b.v.x, b.v.z) < 1 && hypot(b.p.x - Rc.p.x, b.p.z - Rc.p.z) > 0.8)) b.recepteur = null;
+    }
     if (!q && b.p.y < 0.45 && b.garde == null) {
       const vb = hypot(b.v.x, b.v.z);
-      let best = null, bd = JEU.aimant.prise;
+      let best = null, bd = Infinity, bPour = false;
       for (const j of m.joueurs) {
         if (j.gardien || j.absent || !libre(j)) continue;
         const hum = m.humains[j.e] && m.controle[j.e] === j.i;
         const pourLui = b.recepteur === j.i && vb < 10;
         if (!pourLui && (hum ? !(j.prendreT > m.t && vb < 6) : !(vb < 4 && b.recepteur == null))) continue;
+        // (correctifs #32) la portée : 1,2 m pour la passe qui arrive et pour ○ d'un humain, la portée du pied pour l'IA
         const d = hypot(j.p.x - b.p.x, j.p.z - b.p.z);
-        if (d < bd) { bd = d; best = j; }
+        if (d < (pourLui || hum ? JEU.aimant.prise : JEU.aimant.priseIA) && d < bd) { bd = d; best = j; bPour = pourLui; }
       }
       if (best) {
-        // (lot A2) la prise sur ○ d'un humain se voit : l'amorti du pied (gestes.js gestePrise)
-        const priseHumaine = m.humains[best.e] && m.controle[best.e] === best.i && best.prendreT > m.t;
-        touche = pasControle(m, best, false, true);
-        if (touche) { best.prendreT = 0; if (priseHumaine) gestePrise(m, best); }
+        // (correctifs #32) la passe qui arrive à son receveur : le contrôle (orienté, il est venu au-devant) ; la balle
+        // libre prise sur ○ ou par l'IA : la prise aimantée (gestes.js prendreBalle), sans sortie de contrôle
+        const priseHumaine = !bPour && m.humains[best.e] && m.controle[best.e] === best.i && best.prendreT > m.t;
+        touche = bPour ? pasControle(m, best, false, true) : prendreBalle(m, best);
+        if (touche) { best.prendreT = 0; best.priseGeste = priseHumaine ? m.t : null; }
       }
     }
     // les autres : le plus proche d'abord

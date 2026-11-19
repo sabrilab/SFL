@@ -158,7 +158,7 @@ function persoReel(modele: Any, gardien: boolean) {
 
 /** Fait jouer un monde image par image avec ses animateurs ; chaque(k, M) après le rendu de l'image k. */
 function jouer(M: Any, persos: Any[], images: number, entrees: ((m: Any) => Any) | null, chaque: (k: number, M: Any, anims: Any[]) => boolean | void) {
-  const anims = persos.map((P: Any, i: number) => (P ? creerAnimateur(P, { gardien: M.joueurs[i].gardien, versMonde3: (q: Any, out: Any) => out.set(q.x, q.y ?? 0, q.z) }) : null));
+  const anims = persos.map((P: Any, i: number) => (P ? creerAnimateur(P, { gardien: M.joueurs[i].gardien, diagnostic: !!process.env.BANC_DETAIL, versMonde3: (q: Any, out: Any) => out.set(q.x, q.y ?? 0, q.z) }) : null));
   const caches = M.joueurs.map(() => ({})), interp = M.joueurs.map(() => ({ x: 0, z: 0, cap: 0 }));
   const bc = creerBoucle(M), bI = { x: 0, y: 0, z: 0 };
   M.evtsVus = [];
@@ -199,6 +199,9 @@ const PAIRES: Array<[string, string]> = [
   ['passe', 'passePuissante'],
   ['frappe', 'finesse'], ['frappe', 'pique'], ['frappe', 'ras'], ['frappe', 'acrobatique'], ['finesse', 'pique'], ['finesse', 'ras'], ['finesse', 'acrobatique'], ['pique', 'ras'], ['pique', 'acrobatique'], ['ras', 'acrobatique'],
   ['centre', 'centreLobe'], ['profondeur', 'profondeurLobee'], ['tacle', 'recuperer'],
+  // (correctifs #32, D3 du contrôle du code et D5 du contrôle du jeu) et celles de la disposition standard : passe /
+  // profondeur / profondeur appuyée, centre / centre tendu, frappe / extérieur, arrêté et en course
+  ['passe', 'profondeur'], ['passe', 'profondeurTendue'], ['profondeur', 'profondeurTendue'], ['centre', 'centreTendu'], ['frappe', 'exterieur'],
 ];
 
 const vA = new THREE.Vector3(), vB = new THREE.Vector3(), vC = new THREE.Vector3(), vD = new THREE.Vector3();
@@ -287,18 +290,24 @@ function scenesGestes(): Any {
     const j = M.joueurs[4];
     poser(j, 0, 4, Math.PI); balleA(M, 0.4, 0.11, 2.3, 0, 0, 0, null);
     const persos = M.joueurs.map((q: Any) => (q.i === 4 ? persoCanon(false) : null));
-    let fait = false, clip = '', kAppui = -1, kPrise = -1;
-    jouer(M, persos, 90, (m: Any) => {
+    // (correctifs #32, D1 du contrôle du code : la balle doit VENIR AU PIED — à moins de 0,6 m — et y rester ; avant, le
+    // banc ne relevait que possesseur === 4, et la balle « prise » s'en allait à 5,7 m)
+    let fait = false, clip = '', kAppui = -1, kPrise = -1, dMax = 0, dApres = 0, d0 = NaN;
+    jouer(M, persos, 110, (m: Any) => {
       const a = !fait && m.t > 0.05 ? { type: 'prendre', commande: 'prendre' } : null; if (a) fait = true;
       return [{ dx: 0, dz: 0, allure: 0, sprint: 0, action: a, regard: m.balle.p }, null];
     }, (k, Mm, anims) => {
       if (fait && kAppui < 0) kAppui = k;
       // (le geste de la simulation qui prend la balle : le contrôle, joué par le graphe)
       if (!clip && j.g && j.g.type === 'controle') clip = j.g.nom;
-      if (kPrise < 0 && Mm.balle.possesseur === 4) kPrise = k;
+      const dB = Math.hypot(Mm.balle.p.x - j.p.x, Mm.balle.p.z - j.p.z);
+      if (kAppui >= 0 && Number.isNaN(d0)) d0 = dB;
+      if (kAppui >= 0) dMax = Math.max(dMax, dB);
+      if (kPrise < 0 && Mm.balle.possesseur === 4 && dB < 0.6) kPrise = k;
+      if (kPrise >= 0 && k - kPrise <= 30) dApres = Math.max(dApres, dB);
       if (process.env.BANC_DETAIL && k < 40) console.log('  prendre', k, anims[4].etat, anims[4].geste, j.mode, j.g?.nom, j.g?.type, Mm.balle.possesseur, Math.hypot(Mm.balle.p.x - j.p.x, Mm.balle.p.z - j.p.z).toFixed(2));
     });
-    out.prendre = { id: 'prendre', course: false, clip, elan: kPrise >= 0 ? +((kPrise - kAppui + 1) / 60).toFixed(3) : null, yaw: NaN, tangagePied: NaN, buste: NaN, roulis: NaN, suivi: NaN };
+    out.prendre = { id: 'prendre', course: false, clip, elan: kPrise >= 0 ? +((kPrise - kAppui + 1) / 60).toFixed(3) : null, d0, dMax, dApres, yaw: NaN, tangagePied: NaN, buste: NaN, roulis: NaN, suivi: NaN };
   }
   return out;
 }
@@ -517,7 +526,9 @@ async function principal() {
     RES.gestes = G;
     console.log('commande            clip            élan (s)  clip avant contact  surface°  pied°  buste°  roulis°  suivi (m)');
     for (const [k, x] of Object.entries(G) as Array<[string, Any]>) console.log(process.env.BANC_DETAIL ? JSON.stringify([k, x.cmd, x.dg]) : '', `${k.padEnd(20)}${(x.clip || '—').padEnd(16)}${f2(x.elan).padStart(6)}  ${f2(x.elanClip).padStart(10)}       ${f1(x.yaw).padStart(7)}  ${f1(x.tangagePied).padStart(5)}  ${f1(x.buste).padStart(6)}  ${f1(x.roulis).padStart(6)}  ${f2(x.suivi).padStart(6)}`);
-    verifier('Gestes : la balle libre prise sur ○ vient au pied (amorti)', /^(trap|receive|stall|knee|chest)/.test(G.prendre.clip ?? '') && G.prendre.elan != null && G.prendre.elan < 0.9, `clip ${G.prendre.clip || 'aucun'}, balle au pied ${f2(G.prendre.elan)} s après l'appui`);
+    const P0 = G.prendre;
+    verifier('Gestes : la balle libre prise sur ○ vient au pied (amorti)', /^(trap|receive|stall|knee|chest)/.test(P0.clip ?? '') && P0.elan != null && P0.elan < 0.9 && P0.dApres < 0.7 && P0.dMax < P0.d0 + 0.1,
+      `clip ${P0.clip || 'aucun'} ; balle à ${f2(P0.d0)} m à l'appui, au pied (moins de 0,6 m) ${f2(P0.elan)} s après (seuil 0,9 s), puis à ${f2(P0.dApres)} m au plus pendant 0,5 s (seuil 0,7) ; jamais plus loin qu'à l'appui : ${f2(P0.dMax)} m`);
     const parties0 = Object.values(G).filter((x: Any) => x.id !== 'tacle' && x.id !== 'recuperer' && x.id !== 'prendre' && !x.part).map((x: Any) => `${x.id}${x.course ? ' (course)' : ''}`);
     verifier('Gestes : chaque commande part et touche la balle', !parties0.length, parties0.length ? `sans contact : ${parties0.join(', ')}` : `${Object.keys(G).length} gestes (arrêté et en course), contact relevé pour chacun`);
     const manquent: string[] = [], lignes: string[] = [];
