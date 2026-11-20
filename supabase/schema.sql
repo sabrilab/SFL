@@ -739,6 +739,7 @@ declare
   defauts  text[];
   tenues   text[];
   fins     jsonb;
+  mains    jsonb;
 begin
   if not public.is_league_admin() then
     raise exception 'Réservé à l''admin.' using errcode = '42501';
@@ -782,7 +783,16 @@ begin
     from public.saison s,
          jsonb_array_elements(case when jsonb_typeof(s.data -> 'journees') = 'array' then s.data -> 'journees' else '[]'::jsonb end) m
    where s.id = 1 and coalesce(m ->> 'j', '') <> '';
-  return jsonb_build_object('ok', true, 'version', nouvelle, 'fins', fins);
+  -- La main de l'admin sur le vote, telle que la base l'a gardée (15/11/2026 :
+  -- saison_fin_des_matchs remet celle d'une journée déjà révélée) : son
+  -- appareil l'adopte de même, sinon il afficherait un vote rouvert que la
+  -- base refuse. null : pas de geste.
+  select coalesce(jsonb_object_agg(m ->> 'j',
+           jsonb_build_object('votesOuvertsLe', m -> 'votesOuvertsLe', 'votesFermesLe', m -> 'votesFermesLe')), '{}'::jsonb) into mains
+    from public.saison s,
+         jsonb_array_elements(case when jsonb_typeof(s.data -> 'journees') = 'array' then s.data -> 'journees' else '[]'::jsonb end) m
+   where s.id = 1 and coalesce(m ->> 'j', '') <> '';
+  return jsonb_build_object('ok', true, 'version', nouvelle, 'fins', fins, 'mains', mains);
 end;
 $$;
 
@@ -3794,12 +3804,27 @@ declare
   propose    timestamptz;
   ecrit      text;
   ancien     jsonb;
+  avant      jsonb;
   change     boolean := false;
   aujourdhui date := (now() at time zone 'Europe/Paris')::date;
 begin
   if jsonb_typeof(js) is distinct from 'array' then
     return new;
   end if;
+  -- Le document d'avant, aux deux passages d'un insert … on conflict
+  -- (publier_saison) : au passage INSERT, c'est la ligne déjà en base (une
+  -- table vide : null). Sans lui, au passage INSERT, la main tardive n'était
+  -- pas encore remise, la révélation se lisait avec elle et une journée
+  -- rouverte perdait sa fin des matchs avant que la garde ne joue.
+  begin
+    if tg_op = 'UPDATE' then
+      avant := old.data;
+    else
+      select s.data into avant from public.saison s where s.id = new.id;
+    end if;
+  exception when others then
+    avant := null;
+  end;
   for i in 0 .. jsonb_array_length(js) - 1 loop
     m := js -> i;
     nj := public.entier_sur(m ->> 'j');
@@ -3815,19 +3840,23 @@ begin
       -- bouge plus une fois la journée révélée (15/11/2026) : une publication
       -- partie en retard d'un appareil (« Garder les votes ouverts » touché
       -- avant la révélation, envoyé après) ne décompte pas une journée déjà
-      -- comptée ; les gestes d'avant sont remis. Dans son propre bloc : un
-      -- défaut ici ne bloque jamais une publication.
-      if tg_op = 'UPDATE' and garde_fin is not null and garde_jour is not distinct from jour then
+      -- comptée ; les gestes d'avant sont remis. De même quand la main qui
+      -- arrive révélerait la journée sur-le-champ (un « Garder les votes
+      -- ouverts » annulé après l'heure de la règle) : la main d'avant reste,
+      -- l'admin ferme le vote et la révélation suit d'une heure. Dans son
+      -- propre bloc : un défaut ici ne bloque jamais une publication.
+      if avant is not null and garde_fin is not null and garde_jour is not distinct from jour then
         begin
           ancien := null;
           select o into ancien
-            from jsonb_array_elements(case when jsonb_typeof(old.data -> 'journees') = 'array' then old.data -> 'journees' else '[]'::jsonb end) o
+            from jsonb_array_elements(case when jsonb_typeof(avant -> 'journees') = 'array' then avant -> 'journees' else '[]'::jsonb end) o
            where o ->> 'j' = nj::text
            limit 1;
           if ancien is not null
-             and now() >= public.revelation_meta(ancien, jour, garde_fin)
              and ((m -> 'votesOuvertsLe') is distinct from (ancien -> 'votesOuvertsLe')
-               or (m -> 'votesFermesLe') is distinct from (ancien -> 'votesFermesLe')) then
+               or (m -> 'votesFermesLe') is distinct from (ancien -> 'votesFermesLe'))
+             and (now() >= public.revelation_meta(ancien, jour, garde_fin)
+               or now() >= public.revelation_meta(m, jour, garde_fin)) then
             m := (m - 'votesOuvertsLe' - 'votesFermesLe')
                  || jsonb_strip_nulls(jsonb_build_object('votesOuvertsLe', ancien -> 'votesOuvertsLe', 'votesFermesLe', ancien -> 'votesFermesLe'));
             js := jsonb_set(js, array[i::text], m);

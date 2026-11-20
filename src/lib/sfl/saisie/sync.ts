@@ -25,7 +25,7 @@ import { getSession } from "@/lib/sfl/auth/session";
 import { adoptSaison, CURRENT_SEED_VERSION, localStorageStore } from "./store";
 import type { Saison } from "./types";
 import { sansVitrine } from "../compte-vitrine";
-import { avecFinsDeLaBase, avecMainsDeLaBase, type MainSurLeVote } from "../revelation";
+import { avecFinsDeLaBase, avecMainsDeLaBase, mainsRemises, type MainSurLeVote } from "../revelation";
 
 // Même canal d'événement que SeasonProvider (littéral pour éviter le cycle
 // d'imports : season-provider importe store, qui importe ce module).
@@ -253,7 +253,10 @@ async function publierMaintenant(saison: Saison, forcer: boolean): Promise<Resul
     const r = data as { ok: boolean; version: number; fins?: Record<string, string | null>; mains?: Record<string, MainSurLeVote | null> };
     if (!r.ok) return { ok: false, raison: CONFLIT, conflit: true };
     retenir(r.version);
-    if (r.fins || r.mains) adopterFins(r.fins ?? {}, r.mains);
+    // De la main sur le vote, seulement ce que la base a remis par rapport
+    // à ce document-ci (mainsRemises) : un geste posé depuis sur l'appareil
+    // n'est pas effacé par la réponse d'une publication plus ancienne.
+    if (r.fins || r.mains) adopterFins(r.fins ?? {}, r.mains ? mainsRemises(saison, r.mains) : undefined);
     // Le bilan d'XP du serveur se refait (hooks/use-bilan-serveur.ts) : une journée publiée ouvre des paliers.
     window.dispatchEvent(new Event(SAISON_PUBLIEE_EVENT));
     return { ok: true };
