@@ -15,14 +15,19 @@
 // 02/11/2026) telles que la ligue les voit : lues dans la vue de la ligue
 // (hooks/use-titres-du-jour.ts), pas dans la saison qu'on édite ici, pour
 // ne rien montrer avant que le titre soit attribué.
+// Une carte tenue au-dessus du terrain (20/11/2026, bloc-venus.tsx) : ses deux
+// moitiés se dessinent, les Noirs au fond, les Blancs devant ; celle que le
+// doigt survole se remplit.
 
-import { useMemo } from "react";
+import { useMemo, type RefObject } from "react";
 import { TerrainPlaces, type Occupant } from "@/components/sfl/matchs/terrain-places";
 import { PastilleMaillot } from "@/components/sfl/point-maillot";
 import { placerTerrain } from "@/lib/sfl/places-terrain";
 import { computeJournees } from "@/lib/sfl/saisie/engine";
 import { libelleEcart, type Ecart } from "@/lib/sfl/saisie/integrite";
+import type { Camp } from "@/lib/sfl/saisie/equipes";
 import type { MatchDuJour, Saison } from "@/lib/sfl/saisie/types";
+import { cn } from "@/lib/utils";
 import { Etiquette, Pastille, Segmente } from "./ui";
 import { useTitresDuJour } from "@/hooks/use-titres-du-jour";
 import type { BoostType } from "@/lib/sfl/engine";
@@ -90,6 +95,8 @@ export function BlocMatchs({
   lieu,
   feuille,
   onFeuille,
+  zone,
+  survol,
 }: {
   saison: Saison;
   j: number;
@@ -112,6 +119,10 @@ export function BlocMatchs({
   /** La feuille en direct du match n (tenue par un joueur), et son score tant qu'elle est ouverte. */
   feuille?: (n: number) => { libelle: string; ouverte: boolean; score: [number, number] } | null;
   onFeuille?: (n: number) => void;
+  /** Le terrain, pour y lâcher une carte tenue. */
+  zone?: RefObject<HTMLDivElement | null>;
+  /** Une carte est tenue : le camp survolé (null : hors du terrain) ; undefined : rien n'est tenu. */
+  survol?: Camp | null;
 }) {
   const mv = matchs.find((x) => x.n === courant) ?? matchs[0];
   const titresDe = useTitresDuJour(j);
@@ -204,16 +215,32 @@ export function BlocMatchs({
               <PastilleMaillot camp="Blancs" />
             </div>
           )}
-          <p className="mono-label -mb-1 text-center text-encre-3">
+          <p className={cn("mono-label -mb-1 text-center", survol === "Noirs" ? "text-foreground" : "text-encre-3")}>
             {mv.m.equipes[0]} · {mv.noirs.length}
           </p>
-          <TerrainPlaces
-            places={places}
-            occupants={occupants}
-            onPlus={onPlus ? (_i, devant) => onPlus(devant ? mv.m.equipes[1] : mv.m.equipes[0]) : undefined}
-            onOccupant={onCarte ? (o) => onCarte(Number(o.cle)) : undefined}
-          />
-          <p className="mono-label -mt-1 text-center text-encre-3">
+          <div ref={zone} className="relative">
+            <TerrainPlaces
+              places={places}
+              occupants={occupants}
+              onPlus={onPlus ? (_i, devant) => onPlus(devant ? mv.m.equipes[1] : mv.m.equipes[0]) : undefined}
+              onOccupant={onCarte ? (o) => onCarte(Number(o.cle)) : undefined}
+            />
+            {survol !== undefined && (
+              <div aria-hidden className="pointer-events-none absolute inset-0 flex flex-col overflow-hidden rounded-[22px]">
+                {(["Noirs", "Blancs"] as const).map((camp) => (
+                  <div
+                    key={camp}
+                    className={cn(
+                      "flex-1 border-[1.5px] border-dashed border-contraste/35 transition-colors duration-150 motion-reduce:transition-none",
+                      camp === "Noirs" ? "rounded-t-[22px] border-b-0" : "rounded-b-[22px]",
+                      survol === camp && "border-solid border-contraste bg-contraste/15"
+                    )}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+          <p className={cn("mono-label -mt-1 text-center", survol === "Blancs" ? "text-foreground" : "text-encre-3")}>
             {mv.m.equipes[1]} · {mv.blancs.length}
           </p>
         </>

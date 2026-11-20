@@ -17,7 +17,9 @@
 // points décomposés, alertes), la Saisie (le direct de toujours), les Votes,
 // les Points d'un joueur, le Carton rouge direct (13/11/2026,
 // feuille-carton-rouge.tsx) et la Grille. Les « Je viens » de la convocation
-// se posent sur les terrains d'un geste (venus-sur-la-feuille.ts).
+// se posent sur les terrains d'un geste (venus-sur-la-feuille.ts) ; sous les
+// terrains, ils sont rangés par match et se glissent un par un dans un camp,
+// d'un appui long (20/11/2026, bloc-venus.tsx).
 // La feuille en direct d'un match tenue par un de ses joueurs (01/11/2026,
 // components/sfl/direct) se voit sur son terrain : qui la tient, son score ;
 // la toucher l'ouvre, pour la reprendre, la libérer ou la rouvrir.
@@ -47,7 +49,6 @@ import { PastilleSynchro, Synchro } from "@/components/sfl/admin/synchro";
 import { ResultatsVotes } from "@/components/sfl/admin/resultats-votes";
 import { GestesVote } from "@/components/sfl/admin/gestes-vote";
 import { DetailPoints } from "@/components/sfl/admin/detail-points";
-import { CarteDe, FORMAT_CARTE } from "@/components/sfl/mini-carte";
 import { usePresence } from "@/hooks/use-presence";
 import { useSaisieAdmin } from "@/hooks/use-saisie-admin";
 import { useFeuillesDirect } from "@/hooks/use-feuilles-direct";
@@ -67,13 +68,15 @@ import { aLHeure, libelleFinDuVote, libelleRevelation } from "@/lib/sfl/revelati
 import { maintenant as heureDeLaLigue } from "@/lib/sfl/horloge";
 import { verifierFeuille } from "@/lib/sfl/saisie/integrite";
 import { mvpAutomatique } from "@/lib/sfl/saisie/mvp";
-import { addEntry, ajouterMatch, ligneNeuve, matchsDeclares, memeDate, poserEquipes, retirerMatchVide } from "@/lib/sfl/saisie/mutations";
-import { equipesDesVenus, joueursPoses } from "@/lib/sfl/saisie/venus-sur-la-feuille";
+import { addEntry, ajouterMatch, changerEquipeAt, ligneNeuve, matchsDeclares, memeDate, poserEquipes, retirerMatchVide } from "@/lib/sfl/saisie/mutations";
+import { equipesDesVenus, joueursPoses, venusAPlacer, type VenuAPlacer } from "@/lib/sfl/saisie/venus-sur-la-feuille";
+import type { Camp } from "@/lib/sfl/saisie/equipes";
 import { saisieStore } from "@/lib/sfl/saisie/store";
 import type { MatchDuJour } from "@/lib/sfl/saisie/types";
 import { cn } from "@/lib/utils";
 import { BlocConvocation, FeuilleConvocation } from "./bloc-convocation";
 import { BlocMatchs, matchsVus } from "./bloc-matchs";
+import { BlocVenus } from "./bloc-venus";
 import { FeuilleArbitre } from "./feuille-arbitre";
 import { FeuilleCartonRouge } from "./feuille-carton-rouge";
 import { FeuilleConsulter } from "./feuille-consulter";
@@ -171,6 +174,16 @@ export function PageJournee() {
   const camps = new Set(declares.flatMap((m) => m.equipes));
   const horsCamps = j != null ? saison.entries.map((e, i) => ({ e, i })).filter((x) => x.e.j === j && !x.e.extraTime && (!x.e.team || !camps.has(x.e.team) || x.e.statut !== "Présent")) : [];
   const sansPlace = [...viens].filter((n) => !places.has(n.trim().toLowerCase()));
+  // Sous les terrains : à placer, rangés par match ; les lignes d'un autre statut restent à part.
+  const aPlacer = useMemo(
+    () => (j != null ? venusAPlacer(saison, j, declares, sansPlace, proposition, divisions) : { matchs: [], remplacants: [] }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- sansPlace : recalculé à chaque rendu, il suit viens et places
+    [saison, j, declares, viens, places, proposition, divisions]
+  );
+  const autresStatuts = horsCamps.filter((x) => x.e.statut !== "Présent");
+  // Le terrain affiché, où lâcher une carte tenue, et le camp qu'elle survole.
+  const zoneTerrain = useRef<HTMLDivElement>(null);
+  const [survol, setSurvol] = useState<Camp | null | undefined>(undefined);
 
   // La frise : la journée ouverte reste en vue.
   const frise = useRef<HTMLDivElement>(null);
@@ -209,6 +222,18 @@ export function PageJournee() {
     faire((s) => addEntry(s, ligneNeuve(s, j, nom, null)), `${nom} sur la J${j}`);
     const i = saisieStore.load().entries.findIndex((e) => e.j === j && e.player === nom && !e.extraTime);
     if (i >= 0) setLigne(i);
+  }
+
+  /** Une carte lâchée sur le terrain affiché : dans ce camp, de ce match. */
+  function poserSurLeTerrain(v: VenuAPlacer, camp: Camp) {
+    const m = matchs.find((x) => x.n === matchCourant) ?? matchs[0];
+    if (j == null || !m) return;
+    const equipe = m.m.equipes[camp === "Noirs" ? 0 : 1];
+    const libelle = `${v.nom} · ${equipe}`;
+    const { ligne } = v;
+    const fait = ligne != null ? faire((s) => changerEquipeAt(s, ligne, equipe), libelle) : faire((s) => addEntry(s, ligneNeuve(s, j, v.nom, equipe)), libelle);
+    if (fait) haptique.ajout();
+    else haptique.refus();
   }
 
   function placerLesVenus() {
@@ -386,6 +411,8 @@ export function PageJournee() {
                     : null;
                 }}
                 onFeuille={setFeuilleOuverte}
+                zone={zoneTerrain}
+                survol={etat === "brouillon" || etat === "en-ligne" ? survol : undefined}
               />
               {matchs.length > 0 && matchs.every((m) => !m.noirs.length && !m.blancs.length) === false && (
                 <p className="mono-label text-encre-3">{compteursEnMots(saison, j)}</p>
@@ -410,25 +437,18 @@ export function PageJournee() {
               )}
 
               {(horsCamps.length > 0 || sansPlace.length > 0) && (
-                <section className="flex flex-col gap-2">
-                  <Etiquette>Remplaçants · {horsCamps.length + sansPlace.length}</Etiquette>
-                  <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none]">
-                    {horsCamps.map(({ e, i }) => (
-                      <button key={`l${i}`} type="button" onClick={() => setLigne(i)} className="flex shrink-0 flex-col items-center gap-1">
-                        <CarteDe name={e.player} size={FORMAT_CARTE.petite} inerte />
-                        <span className="mono-label max-w-[72px] truncate text-micro text-encre-2">{e.statut === "Présent" ? e.player.split(" ")[0] : e.statut}</span>
-                      </button>
-                    ))}
-                    {sansPlace.map((nom) => (
-                      <button key={`v${nom}`} type="button" onClick={() => placerSansPlace(nom)} className="flex shrink-0 flex-col items-center gap-1 opacity-70">
-                        <span className="rounded-[13px] border-[1.5px] border-dashed border-foreground/40 p-[2px]">
-                          <CarteDe name={nom} size={FORMAT_CARTE.petite} inerte />
-                        </span>
-                        <span className="mono-label max-w-[72px] truncate text-micro text-encre-2">{nom.split(" ")[0]}</span>
-                      </button>
-                    ))}
-                  </div>
-                </section>
+                <BlocVenus
+                  matchs={aPlacer.matchs}
+                  remplacants={aPlacer.remplacants}
+                  autres={autresStatuts}
+                  courant={matchCourant}
+                  onCourant={setMatchCourant}
+                  zone={zoneTerrain}
+                  onSurvol={setSurvol}
+                  onPoser={poserSurLeTerrain}
+                  onToucher={(v) => (v.ligne != null ? setLigne(v.ligne) : placerSansPlace(v.nom))}
+                  onLigne={setLigne}
+                />
               )}
 
               <section className="flex flex-col gap-2">

@@ -3,8 +3,8 @@
 // journée qui a ses joueurs les garde et ne fait entrer que les nouveaux.
 //   npx tsx tools/venus-check.ts
 import assert from "node:assert/strict";
-import { equipesDesVenus, joueursPoses } from "../src/lib/sfl/saisie/venus-sur-la-feuille";
-import { ajouterMatch, newEntry, poserEquipes, preparerJournee } from "../src/lib/sfl/saisie/mutations";
+import { equipesDesVenus, joueursPoses, venusAPlacer } from "../src/lib/sfl/saisie/venus-sur-la-feuille";
+import { ajouterMatch, matchsDeclares, newEntry, poserEquipes, preparerJournee } from "../src/lib/sfl/saisie/mutations";
 import { TERRAINS_MAX } from "../src/lib/sfl/equipes-division";
 import type { Saison } from "../src/lib/sfl/saisie/types";
 
@@ -45,5 +45,23 @@ assert.equal(joueursPoses(encore), 15);
 assert.equal(equipesDesVenus(s, p.j, venus), null);
 // Un seul venu sur une journée vide : pas de match.
 assert.equal(equipesDesVenus(p.saison, p.j, [noms[0]]), null);
+
+// Sous les terrains (20/11/2026) : les trois nouveaux rangés sous le match et le camp proposés.
+const declares = matchsDeclares(s, p.j);
+const range = venusAPlacer(s, p.j, declares, noms.slice(12, 15), encore, null);
+assert.equal(range.matchs.reduce((n, m) => n + m.joueurs.length, 0), 3, "les trois nouveaux sous un match");
+assert.equal(range.remplacants.length, 0);
+for (const m of range.matchs)
+  for (const v of m.joueurs) {
+    const equipe: string = encore!.find((x) => x.players.includes(v.nom))!.name;
+    assert.equal(declares[m.n - 1].equipes[v.camp === "Noirs" ? 0 : 1], equipe, `${v.nom} sous son camp`);
+    assert.equal(v.ligne, null);
+  }
+// Sans proposition : tous remplaçants ; une ligne présente sans équipe y est, avec son index.
+const sansEquipe = { ...s, entries: [...s.entries, newEntry(p.j, noms[20], null)] };
+const libre = venusAPlacer(sansEquipe, p.j, declares, [noms[21], noms[20]], null, null);
+assert.equal(libre.matchs.length, 0);
+assert.deepEqual(new Set(libre.remplacants.map((v) => v.nom)), new Set([noms[20], noms[21]]));
+assert.equal(libre.remplacants.find((v) => v.nom === noms[20])!.ligne, sansEquipe.entries.length - 1);
 
 console.log("venus-check: ok");
