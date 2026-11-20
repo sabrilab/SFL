@@ -15,6 +15,14 @@
     {
       "path": "/api/entraineurs/calcul",
       "schedule": "30 4 * * *"
+    },
+    {
+      "path": "/api/journees/vendredi?ete=1",
+      "schedule": "0 17 * * 5"
+    },
+    {
+      "path": "/api/journees/vendredi",
+      "schedule": "0 18 * * 5"
     }
   ]
 }

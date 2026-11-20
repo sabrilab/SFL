@@ -7,7 +7,7 @@ import { computeJournees } from "./engine";
 import { labelDateFr, prochainDimanche } from "../convocation-temps";
 import { equipesDuMatch, equipesDuMatchSuivant } from "./equipes";
 import { dejaSurLaFeuille, jouable } from "./effectif";
-import { resteUnBrouillon } from "./brouillon";
+import { brouillonNeuf, resteUnBrouillon, suivreLaDate } from "./brouillon";
 import { resteUneJourneeEnSuspens } from "./suspens";
 import { revelationAttendue } from "../revelation";
 import { maintenant } from "../horloge";
@@ -210,7 +210,7 @@ export function preparerJournee(
           mvpAuto: true,
           ...(avant?.heure ? { heure: avant.heure } : {}),
           ...(avant?.terrainId != null ? { terrainId: avant.terrainId } : {}),
-          ...(opts.brouillon ? { brouillon: { depuis: opts.brouillon.le.toISOString(), par: opts.brouillon.par } } : {}),
+          ...(opts.brouillon ? { brouillon: brouillonNeuf(quand, opts.brouillon.par, opts.brouillon.le) } : {}),
         },
       ],
     },
@@ -318,7 +318,10 @@ export function updateJournee(
   const bascule = avant != null && patch.sflTime != null && !!patch.sflTime !== !!avant.sflTime;
   return {
     ...saison,
-    journees: saison.journees.map((m) => (m.j === j ? { ...m, ...patch } : m)),
+    // Un brouillon qui change de date garde sa mise en ligne d'office au vendredi d'avant (brouillon.ts).
+    journees: saison.journees.map((m) =>
+      m.j === j ? (patch.date != null && patch.date !== m.date ? suivreLaDate({ ...m, ...patch }, maintenant()) : { ...m, ...patch }) : m
+    ),
     ...(bascule ? { entries: saison.entries.map((e) => (e.j === j ? { ...e, sflTime: !!patch.sflTime } : e)) } : {}),
   };
 }
@@ -502,7 +505,7 @@ export function poserEquipes(
           sflTime: false,
           mvpAuto: true,
           ...(avant?.terrainId != null ? { terrainId: avant.terrainId } : {}),
-          ...(opts.brouillon ? { brouillon: { depuis: opts.brouillon.le.toISOString(), par: opts.brouillon.par } } : {}),
+          ...(opts.brouillon ? { brouillon: brouillonNeuf(date ?? dimancheDeJournee(new Date(), s), opts.brouillon.par, opts.brouillon.le) } : {}),
         },
       ],
     };

@@ -25,6 +25,10 @@
 // la toucher l'ouvre, pour la reprendre, la libérer ou la rouvrir.
 // Tout le reste de la ligue est derrière ≡ (Ligue), rien n'est perdu.
 //
+// Le brouillon se compose seul (20/11/2026) : chaque nouveau « Je viens »
+// entre sur un terrain sans rien déplacer, et la journée se met en ligne
+// d'elle-même le vendredi à 19 h (sa pastille le dit : « en ligne ven. 19:00 »).
+//
 // La journée en suspens (Ilyes, 12/11/2026, saisie/suspens.ts) : une fois le
 // coup d'envoi passé, « Suspendre » se tient à côté du geste du moment (avant,
 // dans Quand et Où, au-dessus de « Supprimer la journée ») ; suspendue, la
@@ -69,7 +73,8 @@ import { maintenant as heureDeLaLigue } from "@/lib/sfl/horloge";
 import { verifierFeuille } from "@/lib/sfl/saisie/integrite";
 import { mvpAutomatique } from "@/lib/sfl/saisie/mvp";
 import { addEntry, ajouterMatch, changerEquipeAt, ligneNeuve, matchsDeclares, memeDate, poserEquipes, retirerMatchVide } from "@/lib/sfl/saisie/mutations";
-import { equipesDesVenus, joueursPoses, venusAPlacer, type VenuAPlacer } from "@/lib/sfl/saisie/venus-sur-la-feuille";
+import { appliquerEntreesAuto, entreesAuto, equipesDesVenus, joueursPoses, posesAuto, venusAPlacer, type VenuAPlacer } from "@/lib/sfl/saisie/venus-sur-la-feuille";
+import { publicationEnAttente, pullSaison } from "@/lib/sfl/saisie/sync";
 import type { Camp } from "@/lib/sfl/saisie/equipes";
 import { saisieStore } from "@/lib/sfl/saisie/store";
 import type { MatchDuJour } from "@/lib/sfl/saisie/types";
@@ -88,6 +93,9 @@ import { FeuilleQuandOu } from "./feuille-quand-ou";
 import { Etiquette, Feuille, Pastille, PastilleEtat, Segmente } from "./ui";
 import { leverSuspension, suspendusPour } from "@/lib/sfl/cartons";
 
+/** « ven. 19:00 » : la mise en ligne d'office d'un brouillon (brouillon.ts). */
+const aLaMiseEnLigne = (iso: string) =>
+  new Date(iso).toLocaleString("fr-FR", { weekday: "short", hour: "2-digit", minute: "2-digit", timeZone: "Europe/Paris" });
 const heureDe = (iso?: string) => (iso ? new Date(iso).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) : null);
 
 export function PageJournee() {
@@ -184,6 +192,32 @@ export function PageJournee() {
   // Le terrain affiché, où lâcher une carte tenue, et le camp qu'elle survole.
   const zoneTerrain = useRef<HTMLDivElement>(null);
   const [survol, setSurvol] = useState<Camp | null | undefined>(undefined);
+
+  // La compo automatique du brouillon (20/11/2026, venus-sur-la-feuille.ts) :
+  // à l'ouverture et à chaque nouvelle réponse, les nouveaux « Je viens »
+  // entrent d'eux-mêmes, sans rien déplacer. Seulement sur la réponse du
+  // serveur (pas une liste locale), après avoir relu la base, et jamais par-
+  // dessus une écriture qui n'est pas encore partie. Le geste s'annule (↶).
+  const autoEnCours = useRef(false);
+  const venusDuServeur = presence.shared ? presence.ordreDesVenus : null;
+  const brouillonDuJour = j != null && !!meta && estBrouillon(meta) && convocationDuJour;
+  useEffect(() => {
+    if (!brouillonDuJour || j == null || !venusDuServeur || autoEnCours.current) return;
+    if (!entreesAuto(saison, j, venusDuServeur, presence.teams, divisions)) return;
+    autoEnCours.current = true;
+    void (async () => {
+      try {
+        await pullSaison();
+        if (publicationEnAttente()) return;
+        const r = entreesAuto(saisieStore.load(), j, venusDuServeur, presence.teams, divisions);
+        if (!r) return;
+        const n = posesAuto(r);
+        faire((s) => appliquerEntreesAuto(s, j, r), n ? `Compo auto · ${n} Je viens` : "Je viens vus");
+      } finally {
+        autoEnCours.current = false;
+      }
+    })();
+  }, [brouillonDuJour, j, venusDuServeur, presence.teams, divisions, saison, faire]);
 
   // La frise : la journée ouverte reste en vue.
   const frise = useRef<HTMLDivElement>(null);
@@ -323,11 +357,15 @@ export function PageJournee() {
             etat === "brouillon" ? "border-[1.5px] border-dashed border-foreground/30" : "glass"
           )}
         >
-          <div className="flex items-center justify-between gap-2">
+          {/* Une pastille trop longue pour la ligne (« brouillon · en ligne
+              ven. 19:00 ») envoie le choix Admin / Joueurs à la ligne. */}
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <PastilleEtat
               etat={etat}
               suffixe={
-                etat === "brouillon" && meta.publiee
+                etat === "brouillon" && meta.brouillon?.jusqua
+                  ? `en ligne ${aLaMiseEnLigne(meta.brouillon.jusqua)}`
+                  : etat === "brouillon" && meta.publiee
                   ? `en ligne à ${heureDe(meta.publiee.le)}`
                   : etat === "en-ligne"
                     ? heureDe(meta.publiee?.le)
@@ -347,7 +385,7 @@ export function PageJournee() {
               ]}
               valeur={vue}
               onChange={setVue}
-              className="w-[168px]"
+              className="ml-auto w-[168px]"
             />
           </div>
 
