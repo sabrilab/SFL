@@ -11,11 +11,20 @@
 // une ligne qui disent pourquoi. On glisse du doigt ou au bouton ; la
 // dernière ferme, ou mène où la nouveauté se trouve. Fermer d'une façon ou
 // d'une autre, c'est l'avoir vue : elle ne revient pas.
+//
+// Sur la dernière diapo, « C'est compris » est le geste principal et `aller`
+// le geste discret, dessous. Une nouveauté dont le but est d'y aller
+// (`aller.principal`, le parrainage : « Inviter ») les inverse : son geste
+// passe en principal, au ton mauve (la famille « les autres »), et « C'est
+// compris » en discret. Qui est principal, qui ferme, qui y mène : la règle
+// est pure (gestesDeFin, lib/sfl/nouveautes.ts, vérifiée au banc) ; ici, on
+// ne fait que brancher chaque geste sur son bouton.
 
 import { useEffect, useId, useState, type ReactNode } from "react";
 import { AnimatePresence, motion, useReducedMotion, type PanInfo } from "motion/react";
 import { useRouter } from "next/navigation";
 import { BoutonDiscret, BoutonPrincipal, Entete, Ligne, Titre } from "@/components/sfl/accueil/cadre";
+import { gestesDeFin, type Aller, type GesteNouveaute } from "@/lib/sfl/nouveautes";
 
 /** Un écran bas (iPhone SE, mini) : les diapos se resserrent pour tout tenir sans défiler. */
 export const COURT = "(max-height: 739px)";
@@ -44,8 +53,11 @@ export function Diaporama({
   onFini,
 }: {
   diapos: Diapo[];
-  /** Le second geste de la dernière diapo : là où la nouveauté se trouve. */
-  aller?: { label: string; href: string };
+  /**
+   * Le second geste de la dernière diapo : là où la nouveauté se trouve.
+   * `principal` : c'est lui le geste principal, « C'est compris » passe dessous.
+   */
+  aller?: Aller;
   onFini: () => void;
 }) {
   const reduit = useReducedMotion();
@@ -68,6 +80,14 @@ export function Diaporama({
   }
 
   const decale = reduit ? 0 : 70;
+
+  function yAller() {
+    onFini();
+    if (aller) router.push(aller.href);
+  }
+  // Les deux boutons du bas, et ce que fait chacun.
+  const { principal, discret } = gestesDeFin(derniere, aller);
+  const faire: Record<GesteNouveaute, () => void> = { suivant: () => vers(i + 1), fermer: onFini, aller: yAller };
 
   return (
     <motion.div
@@ -125,17 +145,12 @@ export function Diaporama({
         className="mx-auto flex w-full max-w-[420px] shrink-0 flex-col items-center gap-[5px] px-[21px] pt-[8px]"
         style={{ paddingBottom: "max(env(safe-area-inset-bottom), 21px)" }}
       >
-        <BoutonPrincipal onClick={derniere ? onFini : () => vers(i + 1)}>{derniere ? "C'est compris" : "Suivant"}</BoutonPrincipal>
+        <BoutonPrincipal ton={principal.ton} onClick={faire[principal.geste]}>
+          {principal.label}
+        </BoutonPrincipal>
         {/* La même hauteur à chaque diapo : le bouton ne saute pas. */}
-        <div className={derniere && aller ? undefined : "invisible"} aria-hidden={!(derniere && aller)}>
-          <BoutonDiscret
-            onClick={() => {
-              onFini();
-              if (aller) router.push(aller.href);
-            }}
-          >
-            {aller?.label ?? " "}
-          </BoutonDiscret>
+        <div className={discret ? undefined : "invisible"} aria-hidden={!discret}>
+          <BoutonDiscret onClick={discret ? faire[discret.geste] : () => {}}>{discret?.label ?? " "}</BoutonDiscret>
         </div>
       </div>
     </motion.div>
