@@ -38,7 +38,7 @@ import { generateBalancedTeams, libelleCourt, newEntry, poserEquipes } from "../
 import { remplacantsDe } from "../src/lib/sfl/presence-feuille";
 import type { MatchEntry, Saison } from "../src/lib/sfl/saisie/types";
 
-const niveau = (nom: string, division: Division, valeur: number, gardien = false): Niveau => ({ nom, division, note: 75, ppm: null, valeur, gardien });
+const niveau = (nom: string, division: Division, valeur: number, gardien = false): Niveau => ({ nom, division, note: 75, ppm: null, derniers: [], rang: null, valeur, gardien });
 
 // Les terrains, sans plafond : la D1 trop courte (6) rejoint la D2 (10), et
 // ces 16 prennent deux terrains, les meilleurs ensemble ; la D3 (20) en prend
