@@ -629,6 +629,44 @@ export async function ensureRemoteSaison(): Promise<void> {
 // vraiment retiré — chaque démarrage reçoit donc son propre nom.
 let saisonSeq = 0;
 
+/**
+ * Une relecture de la saison, groupée : les signaux d'une rafale (dix + en
+ * dix secondes) attendent un instant et ne tirent qu'une fois ; un signal
+ * arrivé pendant une relecture en refait une seule après elle. Une version
+ * que cet appareil a déjà (son propre envoi, qui lui revient en écho) ne
+ * relit rien.
+ */
+const GROUPER_MS = 400;
+let minuteurTirage = 0;
+let tirageEnCours: Promise<unknown> | null = null;
+let tirerApres = false;
+
+function dejaConnue(version: number): boolean {
+  const session = getSession();
+  if (!session?.server) return true;
+  const lecture = session.admin ? "entiere" : "publique";
+  return lectureLocale() === lecture && version <= localVersion() && !publicationEnAttente();
+}
+
+export function tirerBientot(version?: number) {
+  if (typeof window === "undefined") return;
+  if (version !== undefined && dejaConnue(version)) return;
+  window.clearTimeout(minuteurTirage);
+  minuteurTirage = window.setTimeout(() => {
+    if (tirageEnCours) {
+      tirerApres = true;
+      return;
+    }
+    tirageEnCours = pullSaison().finally(() => {
+      tirageEnCours = null;
+      if (tirerApres) {
+        tirerApres = false;
+        tirerBientot();
+      }
+    });
+  }, GROUPER_MS);
+}
+
 export function startSaisonSync(): () => void {
   const session = getSession();
   if (!session?.server) return () => {};
@@ -641,16 +679,18 @@ export function startSaisonSync(): () => void {
     .then(() => rattraperPublication());
   try {
     const sb = supabase();
-    // Un joueur suit aussi saison_signal (30/10/2026) : la seule version, qui
-    // lui fait relire saison_publique. Le jour où la lecture brute lui est
-    // fermée (L1b), c'est par là que le temps réel lui arrive.
+    // Le temps réel ne suit plus que saison_signal (22/11/2026) : une ligne,
+    // la seule version, posée par un déclencheur à chaque écriture de la
+    // saison. Suivre la table saison elle-même faisait arriver le document
+    // entier (125 ko de texte) dans chaque téléphone à chaque + ou − de la
+    // feuille en direct, puis deux relectures de plus (un événement par
+    // table). Une version déjà connue ne relit plus rien, et une rafale de
+    // signaux se tire en une fois (tirerBientot).
     const channel = sb
       .channel(`sfl-saison-${++saisonSeq}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "saison" }, () => {
-        void pullSaison();
-      })
-      .on("postgres_changes", { event: "*", schema: "public", table: "saison_signal" }, () => {
-        void pullSaison();
+      .on("postgres_changes", { event: "*", schema: "public", table: "saison_signal" }, (p) => {
+        const v = Number((p.new as { version?: unknown } | null)?.version);
+        tirerBientot(Number.isFinite(v) ? v : undefined);
       })
       .subscribe();
     return () => {

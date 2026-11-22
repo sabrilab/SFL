@@ -163,11 +163,17 @@ export function SeasonProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     // setState dans un callback d'événement (pas dans le corps de l'effet).
     const refresh = () => setVersion((v) => v + 1);
+    // Un autre onglet : seulement quand il touche la saison (22/11/2026).
+    // Chaque écriture du stockage (une vue, un réglage, un brouillon)
+    // refaisait sinon toute la saison et tout ce que les écrans en tirent.
+    const ailleurs = (e: StorageEvent) => {
+      if (e.key === null || e.key.startsWith("sfl-saisie") || e.key.startsWith("sfl-saison")) refresh();
+    };
     window.addEventListener(SAISIE_EVENT, refresh);
-    window.addEventListener("storage", refresh);
+    window.addEventListener("storage", ailleurs);
     return () => {
       window.removeEventListener(SAISIE_EVENT, refresh);
-      window.removeEventListener("storage", refresh);
+      window.removeEventListener("storage", ailleurs);
     };
   }, []);
 
