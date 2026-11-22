@@ -9,7 +9,14 @@
 // Un geste de comptage s'affiche tout de suite (le doigt n'attend pas le
 // réseau) puis la base répond avec la feuille telle qu'elle est ; les gestes
 // d'une même feuille partent l'un après l'autre, dans l'ordre. Un refus
-// recharge la feuille. Sans session serveur : rien (hors démonstration du
+// recharge la feuille.
+//
+// 22/11/2026 (J7, « une latence extrême » sur les + et les −) : les gestes
+// partis mais pas encore confirmés sont gardés à part (`attente`) et reposés
+// sur chaque feuille que la base rend. Avant, la réponse du premier geste
+// effaçait à l'écran les suivants, qui revenaient un par un avec le réseau.
+// Une feuille plus ancienne que celle à l'écran (un écho du temps réel en
+// retard) ne la remplace plus. Sans session serveur : rien (hors démonstration du
 // poste de dev, feuille-direct-demo.ts).
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -17,7 +24,7 @@ import { supabase } from "@/lib/supabase";
 import { useSession } from "@/hooks/use-session";
 import { useSeason } from "@/components/sfl/season-provider";
 import { useMyPlayer } from "@/components/sfl/player-provider";
-import { avecGestes, cleFeuille, type Equipes, type FeuilleDirect, type Geste, type RefusFeuille } from "@/lib/sfl/feuille-direct";
+import { avecAttente, avecFeuille, cleFeuille, type EntreeJournal, type Equipes, type FeuilleDirect, type Geste, type RefusFeuille } from "@/lib/sfl/feuille-direct";
 import {
   adminDemo,
   compterDemo,
@@ -53,6 +60,8 @@ export interface FeuillesDirect {
 
 let canalSeq = 0;
 
+const cleDe = (f: FeuilleDirect) => cleFeuille(f.j, [f.noirs, f.blancs]);
+
 interface Reponse {
   ok?: boolean;
   refus?: RefusFeuille | null;
@@ -71,6 +80,12 @@ export function useFeuillesDirect(j: number | null): FeuillesDirect {
   const [monId, setMonId] = useState<string | null>(null);
   const cle = j == null ? null : `${n}|${j}`;
   const file = useRef(new Map<string, Promise<unknown>>());
+  // Les gestes partis, pas encore rendus par la base, feuille par feuille.
+  const [attente, setAttente] = useState<ReadonlyMap<string, readonly EntreeJournal[]>>(() => new Map());
+  const enAttente = useRef(attente);
+  useEffect(() => {
+    enAttente.current = attente;
+  }, [attente]);
 
   const recharger = useCallback(async () => {
     if (j == null || !actif) return;
@@ -129,10 +144,10 @@ export function useFeuillesDirect(j: number | null): FeuillesDirect {
             void recharger();
             return;
           }
-          setLues((l) => {
-            const autres = (l?.cle === `${n}|${j}` ? l.feuilles : []).filter((x) => cleFeuille(x.j, [x.noirs, x.blancs]) !== cleFeuille(f.j, [f.noirs, f.blancs]));
-            return { cle: `${n}|${j}`, feuilles: [...autres, f] };
-          });
+          // L'écho de mes propres gestes : la réponse de la base les porte déjà,
+          // et l'écho, posé sous les gestes encore en vol, les compterait deux fois.
+          if (enAttente.current.has(cleDe(f))) return;
+          setLues((l) => ({ cle: `${n}|${j}`, feuilles: avecFeuille(l?.cle === `${n}|${j}` ? l.feuilles : [], f) }));
         })
         .subscribe();
     } catch {
@@ -151,36 +166,47 @@ export function useFeuillesDirect(j: number | null): FeuillesDirect {
 
   const feuilles = useMemo(() => {
     const m = new Map<string, FeuilleDirect>();
-    if (lues && lues.cle === cle) for (const f of lues.feuilles) m.set(cleFeuille(f.j, [f.noirs, f.blancs]), f);
+    if (lues && lues.cle === cle) for (const f of lues.feuilles) m.set(cleDe(f), avecAttente(f, attente.get(cleDe(f))));
     return m;
-  }, [lues, cle]);
+  }, [lues, cle, attente]);
 
   const poser = useCallback(
     (f: FeuilleDirect | null | undefined) => {
       if (!f || f.saison !== n || f.j !== j) return;
-      setLues((l) => {
-        const autres = (l?.cle === `${n}|${j}` ? l.feuilles : []).filter((x) => cleFeuille(x.j, [x.noirs, x.blancs]) !== cleFeuille(f.j, [f.noirs, f.blancs]));
-        return { cle: `${n}|${j}`, feuilles: [...autres, f] };
-      });
+      setLues((l) => ({ cle: `${n}|${j}`, feuilles: avecFeuille(l?.cle === `${n}|${j}` ? l.feuilles : [], f) }));
     },
     [n, j]
   );
 
   /** Un appel à la base, à la suite des précédents sur la même feuille. */
   const appeler = useCallback(
-    (e: Equipes, rpc: string, args: Record<string, unknown>, enDemo: () => ReturnType<typeof prendreDemo>): Promise<IssueFeuille> => {
+    (
+      e: Equipes,
+      rpc: string,
+      args: Record<string, unknown>,
+      enDemo: () => ReturnType<typeof prendreDemo>,
+      /** La base a répondu (ou pas) : juste avant de poser sa feuille. */
+      rendu?: () => void
+    ): Promise<IssueFeuille> => {
       if (j == null) return Promise.resolve({ ok: false, refus: "journee", feuille: null });
       const k = cleFeuille(j, e);
       const avant = file.current.get(k) ?? Promise.resolve();
       const tour = avant.then(async (): Promise<IssueFeuille> => {
         if (demo) {
           const r = enDemo();
+          rendu?.();
           poser(r.feuille);
           return r.ok ? { ok: true, feuille: r.feuille } : { ok: false, refus: r.refus, feuille: r.feuille ?? null };
         }
-        if (!session?.server) return { ok: false, refus: "hors-ligne", feuille: null };
+        if (!session?.server) {
+          rendu?.();
+          return { ok: false, refus: "hors-ligne", feuille: null };
+        }
+        let fait = false;
         try {
           const { data, error } = await supabase().rpc(rpc, { p_j: j, p_noirs: e[0], p_blancs: e[1], ...args });
+          fait = true;
+          rendu?.();
           if (error) {
             void recharger();
             // 42501 : pas membre de la ligue (ou pas admin) ; le reste : la base n'a pas répondu.
@@ -196,6 +222,7 @@ export function useFeuillesDirect(j: number | null): FeuillesDirect {
           if (!r.feuille) void recharger();
           return { ok: false, refus: r.refus ?? "geste", feuille: r.feuille ?? null };
         } catch {
+          if (!fait) rendu?.();
           void recharger();
           return { ok: false, refus: "hors-ligne", feuille: null };
         }
@@ -210,12 +237,22 @@ export function useFeuillesDirect(j: number | null): FeuillesDirect {
   const prendre = useCallback((e: Equipes) => appeler(e, "prendre_feuille", {}, () => prendreDemo(j!, e, moi)), [appeler, j, moi]);
   const compter = useCallback(
     (e: Equipes, gestes: Geste[]) => {
-      // Tout de suite à l'écran ; la base répond ensuite avec la feuille vraie.
-      const f = j != null ? feuilles.get(cleFeuille(j, e)) : undefined;
-      if (f && !f.fin) poser({ ...f, compteurs: avecGestes(f.compteurs, gestes), journal: [...f.journal, { le: new Date().toISOString(), gestes }] });
-      return appeler(e, "compter_feuille", { p_gestes: gestes }, () => compterDemo(j!, e, moi, gestes));
+      // Tout de suite à l'écran, et jusqu'à ce que la base rende ce geste-là.
+      if (j == null) return appeler(e, "compter_feuille", { p_gestes: gestes }, () => compterDemo(j!, e, moi, gestes));
+      const k = cleFeuille(j, e);
+      const entree: EntreeJournal = { le: new Date().toISOString(), gestes };
+      setAttente((a) => new Map(a).set(k, [...(a.get(k) ?? []), entree]));
+      const rendu = () =>
+        setAttente((a) => {
+          const reste = (a.get(k) ?? []).filter((x) => x !== entree);
+          const m = new Map(a);
+          if (reste.length) m.set(k, reste);
+          else m.delete(k);
+          return m;
+        });
+      return appeler(e, "compter_feuille", { p_gestes: gestes }, () => compterDemo(j!, e, moi, gestes), rendu);
     },
-    [appeler, j, moi, feuilles, poser]
+    [appeler, j, moi]
   );
   const passer = useCallback((e: Equipes, a: string) => appeler(e, "passer_feuille", { p_a: a }, () => passerDemo(j!, e, moi, a)), [appeler, j, moi]);
   const sceller = useCallback(

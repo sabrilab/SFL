@@ -168,6 +168,26 @@ export function avecGestes(c: Compteurs, gestes: readonly Geste[]): Compteurs {
   return out;
 }
 
+// L'écran de celui qui compte (22/11/2026, hooks/use-feuilles-direct.ts).
+
+/** La feuille reçue prend la place de celle qu'on a, sauf si elle est plus ancienne. */
+export function avecFeuille(feuilles: readonly FeuilleDirect[], f: FeuilleDirect): FeuilleDirect[] {
+  const k = cleFeuille(f.j, [f.noirs, f.blancs]);
+  const avant = feuilles.find((x) => cleFeuille(x.j, [x.noirs, x.blancs]) === k);
+  if (avant && Date.parse(f.maj_le) < Date.parse(avant.maj_le)) return feuilles as FeuilleDirect[];
+  return [...feuilles.filter((x) => cleFeuille(x.j, [x.noirs, x.blancs]) !== k), f];
+}
+
+/** La feuille de la base, avec dessus les gestes partis que la base n'a pas encore rendus. */
+export function avecAttente(f: FeuilleDirect, attente: readonly EntreeJournal[] | undefined): FeuilleDirect {
+  if (!attente?.length || f.fin) return f;
+  return {
+    ...f,
+    compteurs: attente.reduce((c, e) => avecGestes(c, e.gestes), f.compteurs),
+    journal: [...f.journal, ...attente],
+  };
+}
+
 /**
  * Le score en direct : les buts de chaque camp, ses buts d'équipe déjà
  * portés par la saison (teamScoreBonus), et les buts contre son camp de
