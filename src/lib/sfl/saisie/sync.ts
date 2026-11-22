@@ -346,8 +346,43 @@ export function dernierEnvoiAuto(): EnvoiAuto | null {
   return dernier;
 }
 
-/** Envoi automatique — appelé par saisieStore.save à chaque sauvegarde. */
-export async function pushSaison(saison: Saison, { forcer = false } = {}): Promise<boolean> {
+/**
+ * Envoi automatique — appelé par saisieStore.save à chaque sauvegarde.
+ *
+ * Un seul envoi en vol, et derrière lui seulement la DERNIÈRE saison
+ * (22/11/2026, J7 : la saisie en direct). Chaque + ou − enregistre la saison
+ * entière ; les envois partaient tous, l'un derrière l'autre, et dix gestes
+ * rapides mettaient dix allers-retours à atteindre la ligue (165 envois en
+ * un quart d'heure ce jour-là). Un document remplace l'autre : les états
+ * intermédiaires n'ont pas à partir.
+ */
+export function pushSaison(saison: Saison, { forcer = false } = {}): Promise<boolean> {
+  if (!enVol) {
+    enVol = envoyer(saison, forcer).finally(() => {
+      enVol = null;
+      const s = suivant;
+      suivant = null;
+      if (s) s.partir(pushSaison(s.saison, { forcer: s.forcer }));
+    });
+    return enVol;
+  }
+  if (suivant) {
+    suivant.saison = saison;
+    suivant.forcer = suivant.forcer || forcer;
+    return suivant.issue;
+  }
+  let partir!: (r: Promise<boolean>) => void;
+  const issue = new Promise<boolean>((resolve) => {
+    partir = resolve;
+  });
+  suivant = { saison, forcer, issue, partir };
+  return issue;
+}
+
+let enVol: Promise<boolean> | null = null;
+let suivant: { saison: Saison; forcer: boolean; issue: Promise<boolean>; partir: (r: Promise<boolean>) => void } | null = null;
+
+async function envoyer(saison: Saison, forcer: boolean): Promise<boolean> {
   const r = await publierSaison(saison, { forcer });
   dernier = {
     at: Date.now(),
@@ -359,7 +394,9 @@ export async function pushSaison(saison: Saison, { forcer = false } = {}): Promi
   // d'un admin. Un joueur (une présence posée en local avant le chargement de
   // la convocation, par exemple) ne publiera jamais : il restait figé sur de
   // vieux classements jusqu'à « Reprendre la base » (27/10).
-  marquerAPublier(!r.ok && !!getSession()?.admin);
+  // Une saison plus neuve attend derrière cet envoi : elle reste « à publier »
+  // tant qu'elle n'est pas partie (un onglet fermé entre-temps la garde).
+  marquerAPublier((!r.ok || !!suivant) && !!getSession()?.admin);
   signalerEnvoi();
   return r.ok;
 }
@@ -511,6 +548,24 @@ export async function diagnostic(): Promise<Etape[]> {
   return etapes;
 }
 
+/** La saisie de cet appareil que « Reprendre la base » vient de remplacer : { le, saison }. */
+export const COPIE_KEY = "sfl-saisie-avant-reprise";
+
+/**
+ * « Reprendre la base » efface une saisie que personne d'autre n'a (la J7 du
+ * 22/11/2026 : deux matchs saisis sur un ordinateur que la base refusait).
+ * On en garde la dernière copie sur l'appareil, pour pouvoir la relire.
+ */
+function garderCopie() {
+  try {
+    if (!publicationEnAttente()) return;
+    const brut = localStorage.getItem("sfl-saisie-v1");
+    if (brut) localStorage.setItem(COPIE_KEY, `{"le":${JSON.stringify(new Date().toISOString())},"saison":${brut}}`);
+  } catch {
+    /* stockage plein ou indisponible : la reprise passe quand même */
+  }
+}
+
 /**
  * Reprend la version en base, quoi qu'il arrive localement. C'est la sortie
  * de secours quand une saisie a dérapé : on ne répare pas à la main, on
@@ -522,6 +577,7 @@ export async function reprendreDeLaBase(): Promise<Resultat> {
   try {
     const doc = await lireDocument(!!session.admin);
     if (!doc) return { ok: false, raison: "Aucune saison lisible en base pour l'instant." };
+    garderCopie();
     adoptSaison(doc.data);
     retenirLecture(session.admin ? "entiere" : "publique");
     localStorage.setItem(VERSION_KEY, String(doc.version));

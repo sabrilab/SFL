@@ -4,6 +4,8 @@
 //   npx tsx tools/feuille-direct-check.ts
 import assert from "node:assert/strict";
 import {
+  avecAttente,
+  avecFeuille,
   annulation,
   appliquerFeuille,
   avecGestes,
@@ -171,3 +173,28 @@ assert.equal(peutPrendre(f({ preneur: "u1" }), null), false, "tenue");
 assert.equal(peutPrendre(f({ preneur: null, fin: t(3000) }), null), false, "scellée");
 
 console.log("feuille-direct-check : ok");
+
+// 22/11/2026 (J7) · L'écran de celui qui compte : les gestes en vol restent
+// posés sur la feuille que la base rend ; une feuille plus ancienne ne
+// remplace pas celle à l'écran.
+{
+  const f = (maj: string, buts: number): FeuilleDirect => ({
+    saison: 1, j: 4, noirs: "Noirs 1", blancs: "Blancs 1", preneur: "u", preneur_nom: "Théo", pris_le: maj, debut: maj, fin: null,
+    scelle_par: null, version: null, compteurs: buts ? { Ilyes: { buts } } : {}, journal: [], maj_le: maj,
+  });
+  const g = (joueur: string, d: 1 | -1 = 1) => ({ le: "2026-11-01T10:00:00.000Z", gestes: [{ joueur, quoi: "buts" as const, d }] });
+  // Trois + d'affilée : la base n'a rendu que le premier, l'écran dit 3.
+  const vue = avecAttente(f("2026-11-01T10:00:01+00:00", 1), [g("Ilyes"), g("Ilyes")]);
+  assert.equal(vue.compteurs.Ilyes.buts, 3);
+  assert.equal(vue.journal.length, 2);
+  assert.equal(avecAttente(f("2026-11-01T10:00:01+00:00", 1), []).compteurs.Ilyes.buts, 1);
+  // Un − en vol.
+  assert.equal(avecAttente(f("2026-11-01T10:00:01+00:00", 2), [g("Ilyes", -1)]).compteurs.Ilyes.buts, 1);
+  // Scellée : plus rien dessus.
+  assert.equal(avecAttente({ ...f("2026-11-01T10:00:01+00:00", 1), fin: "2026-11-01T11:00:00+00:00" }, [g("Ilyes")]).compteurs.Ilyes.buts, 1);
+  // Un écho en retard ne fait pas reculer le score ; une feuille plus neuve le remplace.
+  const neuve = f("2026-11-01T10:00:05.500000+00:00", 3);
+  assert.equal(avecFeuille([neuve], f("2026-11-01T10:00:04.100000+00:00", 2))[0].compteurs.Ilyes.buts, 3);
+  assert.equal(avecFeuille([neuve], f("2026-11-01T10:00:06+00:00", 4))[0].compteurs.Ilyes.buts, 4);
+  assert.equal(avecFeuille([neuve], { ...f("2026-11-01T10:00:00+00:00", 0), noirs: "Noirs 2", blancs: "Blancs 2" }).length, 2);
+}
