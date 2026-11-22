@@ -59,6 +59,17 @@
 // journée comptée ne se décompte pas), et aucun changement de main ne révèle
 // une journée sur-le-champ (tenirMainSurLeVote, et la base de même).
 //
+// L'heure de fin choisie (Sabri, 22/11/2026, J7 : « j'aimerais que les votes
+// se terminent à 19 h, pas à minuit […] un bouton déterminer l'heure de fin
+// de vote ») : « Garder les votes ouverts » et « Rouvrir les votes » tiennent
+// le vote jusqu'à 19 h (VOTE_TENU) quand 19 h est encore devant et plus tard
+// que la règle, jusqu'à minuit sinon ; « Heure de fin » pose l'heure que
+// l'admin veut, le jour même, minuit au plus tard (fixerFinDuVote). Une fin
+// choisie s'écrit avec les deux champs ensemble : votesOuvertsLe (l'instant
+// du geste) et votesFermesLe (l'heure choisie, après lui). La fermeture
+// l'emporte déjà sur l'ouverture, ici comme dans la base : rien à changer
+// côté SQL, et un téléphone pas encore à jour lit la bonne heure.
+//
 // L'heure, côté téléphone, est celle du serveur (horloge.ts) : un téléphone
 // à l'heure fausse ne révèle ni avant, ni après les autres.
 //
@@ -91,6 +102,8 @@ export const REGLES_REVELATION = {
   REVELATION: { h: 19, min: 0 },
   /** Au moins ce temps de vote après la dernière feuille remplie (Sabri, 02/11 : « une heure de vote minimum, jamais après minuit »). */
   VOTE_APRES_FEUILLE_MS: 60 * 60_000,
+  /** « Garder les votes ouverts » et « Rouvrir les votes » : jusqu'à cette heure (Sabri, 22/11 : « à 19 h, pas à minuit »), minuit si elle est passée. */
+  VOTE_TENU: { h: 19, min: 0 },
 } as const;
 
 const MINUTE = 60_000;
@@ -128,9 +141,31 @@ function gesteDuJour(meta: Pick<JourneeMeta, "date">, iso: string | undefined): 
   return d && estLeJour(meta.date, d) ? d : null;
 }
 
-/** L'instant où l'admin a fermé le vote à la main (JourneeMeta.votesFermesLe), le jour de la journée ; null sinon. */
+/**
+ * L'instant où le vote ferme de la main de l'admin (JourneeMeta.votesFermesLe),
+ * le jour de la journée ; null sinon. Passé : il l'a fermé à la main. À
+ * venir : c'est l'heure de fin qu'il a choisie (finChoisie).
+ */
 export function voteFermeALaMain(meta: Pick<JourneeMeta, "date" | "votesFermesLe">): Date | null {
   return gesteDuJour(meta, meta.votesFermesLe);
+}
+
+/**
+ * L'heure de fin que l'admin a choisie (fixerFinDuVote) : les deux champs
+ * posés ensemble, la fermeture après l'instant du geste ; null sinon (une
+ * fermeture à la main n'a pas d'ouverture avec elle).
+ */
+export function finChoisie(meta: Pick<JourneeMeta, "date" | "votesOuvertsLe" | "votesFermesLe">): Date | null {
+  const ferme = voteFermeALaMain(meta);
+  const pose = gesteDuJour(meta, meta.votesOuvertsLe);
+  return ferme && pose && ferme.getTime() > pose.getTime() ? ferme : null;
+}
+
+/** L'admin a-t-il fermé le vote, vu de l'instant t ? À la main : oui, quelle que soit la minute de l'écran ; une heure choisie : quand elle est passée. */
+function fermeDeSaMain(meta: Pick<JourneeMeta, "date" | "votesOuvertsLe" | "votesFermesLe">, t: Date): boolean {
+  if (!voteFermeALaMain(meta)) return false;
+  const choisie = finChoisie(meta);
+  return !choisie || t.getTime() >= choisie.getTime();
 }
 
 /** L'admin garde-t-il le vote ouvert jusqu'à minuit (JourneeMeta.votesOuvertsLe) ? Une fermeture à la main l'emporte. */
@@ -287,7 +322,7 @@ export function etatRevelation(s: SaisonLignes, j: number, t: Date): EtatRevelat
   const fin = finDuVote(meta, numero, t);
   if (finDesMatchs(meta)) return fin && t.getTime() < fin.getTime() ? "vote" : "attente";
   // Sans F, le vote tient jusqu'à minuit, sauf si l'admin l'a fermé à la main.
-  if (journeeTerminee(s, j)) return leJour && !voteFermeALaMain(meta) ? "vote" : "attente";
+  if (journeeTerminee(s, j)) return leJour && !fermeDeSaMain(meta, t) ? "vote" : "attente";
   return estLeJourOuSaNuit(meta.date, t) ? "en-direct" : "bloquee";
 }
 
@@ -427,9 +462,11 @@ export function avecFinsDeLaBase(s: Saison, fins: Record<string, string | null |
  * régime, publiée, pas en suspens, avec vote, le jour même, ses feuilles
  * finies, et pas encore comptée : passé la révélation, plus rien ne bouge
  * (une journée comptée ne se décompte pas).
- *   · garder : le vote est ouvert et fermera d'office avant minuit (la règle) ;
+ *   · garder : le vote est ouvert et fermera avant l'heure où « Garder » le tiendrait (finTenue) ;
  *   · fermer : le vote est ouvert ;
- *   · rouvrir : le vote est fermé (d'office ou à la main) ; il rouvre jusqu'à minuit.
+ *   · rouvrir : le vote est fermé (d'office, à la main, ou l'heure choisie passée) ;
+ *     il rouvre jusqu'à 19 h, ou minuit (finTenue).
+ * « Heure de fin » (fixerFinDuVote) se propose dès qu'il y a quelque chose à régler.
  * Un vote fermé à la main se rouvre aussi pendant qu'une feuille est reprise
  * (la journée rouverte, sans fin des matchs) : sinon la fermeture resterait
  * collée jusqu'à la fin de la feuille. Et il est fermé quelle que soit la
@@ -446,8 +483,9 @@ export function reglageDuVote(s: SaisonLignes, j: number, t: Date): { garder: bo
   const fin = finDuVote(meta, numero, t);
   const minuit = minuitDuSoir(meta.date, t);
   if (!fin || !minuit) return null;
-  const ouvert = !aLaMain && t.getTime() < fin.getTime();
-  return { garder: ouvert && fin.getTime() < minuit.getTime(), fermer: ouvert, rouvrir: !ouvert };
+  const ouvert = !fermeDeSaMain(meta, t) && t.getTime() < fin.getTime();
+  const tenue = finTenue(s, j, t) ?? minuit;
+  return { garder: ouvert && fin.getTime() < tenue.getTime(), fermer: ouvert, rouvrir: !ouvert };
 }
 
 /** Une journée sans les gestes de l'admin sur son vote. */
@@ -458,14 +496,66 @@ function sansMainSurLeVote(m: JourneeMeta): JourneeMeta {
 }
 
 /**
+ * Jusqu'où « Garder les votes ouverts » et « Rouvrir les votes » tiennent le
+ * vote de la journée j, à l'instant t : 19 h (VOTE_TENU) si 19 h est encore
+ * devant et plus tard que la fin de la règle (sans la main de l'admin),
+ * minuit sinon (la règle ferme déjà après 19 h, ou 19 h est passé). null
+ * sans date lisible.
+ */
+export function finTenue(s: SaisonHeures, j: number, t: Date): Date | null {
+  const meta = metaDe(s, j);
+  const minuit = meta ? minuitDuSoir(meta.date, t) : null;
+  if (!meta || !minuit) return null;
+  const { h, min } = REGLES_REVELATION.VOTE_TENU;
+  const tenu = heureDuJour(meta.date, t, h, min)!;
+  if (t.getTime() >= tenu.getTime()) return minuit;
+  // Tant que la fin des matchs est inconnue, la règle n'a pas d'heure : 19 h.
+  const regle = finDesMatchs(meta) ? finDuVote(sansMainSurLeVote(meta), numeroSaison(s), t) : null;
+  return regle && regle.getTime() >= tenu.getTime() ? minuit : tenu;
+}
+
+/**
+ * Une heure de Paris le jour de la journée j (« Heure de fin », l'heure que
+ * l'admin saisit) ; 0 h 00 est minuit, le soir même. null sans date lisible.
+ */
+export function heureDeLaJournee(s: SaisonHeures, j: number, t: Date, heure: number, minute = 0): Date | null {
+  const meta = metaDe(s, j);
+  if (!meta) return null;
+  return heure === 0 && minute === 0 ? minuitDuSoir(meta.date, t) : heureDuJour(meta.date, t, heure, minute);
+}
+
+/**
+ * « Heure de fin » : le vote de la journée j ferme à `fin`, la révélation
+ * une heure après (minuit au plus tard). `fin` est après t, le jour même,
+ * minuit au plus tard ; fermé, le vote rouvre jusque-là. Minuit s'écrit
+ * comme « gardé ouvert » (votesOuvertsLe seul), une autre heure avec les
+ * deux champs (finChoisie). Sans effet (même référence) si rien n'est à
+ * régler (reglageDuVote), si l'heure est passée ou après minuit, ou si
+ * c'est déjà la fin du vote ouvert.
+ */
+export function fixerFinDuVote(s: Saison, j: number, t: Date, fin: Date): Saison {
+  const r = reglageDuVote(s, j, t);
+  const meta = metaDe(s, j);
+  const minuit = meta ? minuitDuSoir(meta.date, t) : null;
+  if (!r || !meta || !minuit) return s;
+  if (fin.getTime() <= t.getTime() || fin.getTime() > minuit.getTime()) return s;
+  if (!r.rouvrir && finDuVote(meta, numeroSaison(s), t)?.getTime() === fin.getTime()) return s;
+  const main =
+    fin.getTime() === minuit.getTime() ? { votesOuvertsLe: t.toISOString() } : { votesOuvertsLe: t.toISOString(), votesFermesLe: fin.toISOString() };
+  return { ...s, journees: s.journees.map((m) => (m.j === j ? { ...sansMainSurLeVote(m), ...main } : m)) };
+}
+
+/**
  * « Garder les votes ouverts » et « Rouvrir les votes » : le vote de la
- * journée j tient jusqu'à minuit, la révélation avec lui. Sans effet (même
- * référence) si rien n'est à régler (reglageDuVote) ou si c'est déjà le cas.
+ * journée j tient jusqu'à 19 h, ou minuit (finTenue), la révélation une
+ * heure après, minuit au plus tard. Sans effet (même référence) si rien
+ * n'est à régler (reglageDuVote) ou si c'est déjà le cas.
  */
 export function garderLeVoteOuvert(s: Saison, j: number, t: Date): Saison {
   const r = reglageDuVote(s, j, t);
-  if (!r || (!r.garder && !r.rouvrir)) return s;
-  return { ...s, journees: s.journees.map((m) => (m.j === j ? { ...sansMainSurLeVote(m), votesOuvertsLe: t.toISOString() } : m)) };
+  const fin = finTenue(s, j, t);
+  if (!r || (!r.garder && !r.rouvrir) || !fin) return s;
+  return fixerFinDuVote(s, j, t, fin);
 }
 
 /**
@@ -535,6 +625,13 @@ export function avecMainsDeLaBase(s: Saison, mains: Record<string, MainSurLeVote
 }
 
 /* ------------------------------ Les libellés ------------------------------ */
+
+/** « 19:00 », « 00:00 », à Paris : la valeur d'un champ d'heure. */
+export function heureDeChamp(d: Date): string {
+  const parts = new Intl.DateTimeFormat("fr-FR", { timeZone: "Europe/Paris", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(d);
+  const de = (type: string) => (parts.find((p) => p.type === type)?.value ?? "00").padStart(2, "0");
+  return `${de("hour")}:${de("minute")}`;
+}
 
 /** « 18 h », « 18 h 40 », « minuit », à Paris. */
 export function heureLisible(d: Date): string {

@@ -134,8 +134,9 @@ export interface JourneeMeta {
   /**
    * L'instant (ISO) où l'admin a fermé le vote à la main : la révélation
    * tombe une heure après, minuit au plus tard. Ne vaut que le jour de la
-   * journée. Un seul des deux champs à la fois (garderLeVoteOuvert,
-   * fermerLeVote) ; si les deux y sont, la fermeture l'emporte.
+   * journée. Si les deux champs y sont, la fermeture l'emporte : c'est
+   * ainsi que s'écrit une heure de fin choisie (22/11/2026, fixerFinDuVote :
+   * votesOuvertsLe l'instant du geste, votesFermesLe l'heure à venir).
    */
   votesFermesLe?: string;
 }

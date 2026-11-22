@@ -400,7 +400,7 @@ export function PageJournee() {
             </Pastille>
             {meta.sflTime && <Pastille onClick={() => setQuandOu(null)}>SFL Time</Pastille>}
           </div>
-          {/* La main sur le vote : le garder ouvert jusqu'à minuit, le fermer, le rouvrir. */}
+          {/* La main sur le vote : le garder ouvert, le fermer, le rouvrir, choisir son heure de fin. */}
           {j != null && meta && <GestesVote j={j} t={maintenant} main={mainVote} className="-mt-2" />}
           {/* Le motif de la suspension, tel que les joueurs le lisent. */}
           {etat === "a-rattraper" && meta.suspens?.motif && <p className="mono-label -mt-2 text-encre-2">{meta.suspens.motif}</p>}
