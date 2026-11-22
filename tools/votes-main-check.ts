@@ -24,7 +24,9 @@
 //       feuille reprise après une fermeture à la main (« Rouvrir » reste
 //       proposé) ; l'écran en retard d'une minute ;
 //   9 · la main ne décale pas la fin des matchs (tenirFinDesMatchs) ;
-//   10 · la main que la base a gardée, reprise par l'appareil de l'admin.
+//   10 · la main que la base a gardée, reprise par l'appareil de l'admin,
+//        mais seulement ce qu'elle a remis par rapport à l'envoi (un geste
+//        posé pendant qu'une publication plus ancienne était en vol reste).
 // Aucune heure du jour n'est lue : tout instant est donné.
 //   npx tsx tools/votes-main-check.ts
 import assert from "node:assert/strict";
@@ -37,6 +39,7 @@ import {
   journeeComptee,
   libelleFinDuVote,
   libelleRevelation,
+  mainsRemises,
   prochaineTransition,
   reglageDuVote,
   revelation,
@@ -360,6 +363,26 @@ const h = (x: string) => hiver(`2026-11-15 ${x}`);
   assert.equal(avecMainsDeLaBase(garde, {}), garde);
   const sans = saison();
   assert.equal(avecMainsDeLaBase(sans, { "6": null, "5": {} }), sans, "sans geste des deux côtés : rien");
+
+  // Une publication plus ancienne encore en vol (relecture du 15/11) : un but corrigé part à 18 h 39 min 59 s (le
+  // document envoyé n'a pas de main) ; l'admin touche « Garder les votes ouverts » à 18 h 40 ; la réponse de la
+  // première publication dit « pas de main » — c'est ce qu'elle avait envoyé, la base n'a rien remis.
+  const envoyee = saison();
+  const appareil = garderLeVoteOuvert(envoyee, 6, h("18:40"));
+  const reponse = { "5": { votesOuvertsLe: null, votesFermesLe: null }, "6": { votesOuvertsLe: null, votesFermesLe: null } };
+  assert.deepEqual(mainsRemises(envoyee, reponse), {}, "la réponse égale à l'envoi : rien de remis");
+  assert.equal(avecMainsDeLaBase(appareil, mainsRemises(envoyee, reponse)), appareil, "le geste posé entre-temps reste sur l'appareil");
+  assert.equal(voteOuvertA(avecMainsDeLaBase(appareil, mainsRemises(envoyee, reponse)), 6, h("19:30")), true, "le vote reste ouvert à 19 h 30");
+  // La base a refusé la main envoyée (journée déjà révélée) : la réponse diffère de l'envoi, elle est reprise.
+  const refusee = saison({ j6: { votesOuvertsLe: h("20:11").toISOString() } });
+  assert.deepEqual(mainsRemises(refusee, reponse), { "6": { votesOuvertsLe: null, votesFermesLe: null } });
+  assert.equal(j6(avecMainsDeLaBase(refusee, mainsRemises(refusee, reponse))).votesOuvertsLe, undefined);
+  // La base a remis une fermeture que l'envoi n'avait plus.
+  const remise = { "6": { votesOuvertsLe: null, votesFermesLe: h("18:20").toISOString() } };
+  assert.deepEqual(mainsRemises(envoyee, remise), remise);
+  // La main envoyée et gardée telle quelle : rien ; une journée absente de la réponse : rien.
+  assert.deepEqual(mainsRemises(appareil, { "6": { votesOuvertsLe: h("18:40").toISOString(), votesFermesLe: null } }), {});
+  assert.deepEqual(mainsRemises(envoyee, {}), {});
 }
 
 console.log("votes-main-check : la règle sans geste, garder ouvert, fermer, rouvrir, ce qui se propose, jamais décomptée, le jour seulement, sans fin des matchs, la fin des matchs tenue, la main de la base reprise : ok");
