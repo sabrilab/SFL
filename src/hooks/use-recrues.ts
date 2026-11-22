@@ -9,7 +9,7 @@ import { useEffect, useSyncExternalStore } from "react";
 import { useSession } from "@/hooks/use-session";
 import { chargerRecrues, recruesEnMemoire, RECRUES_EVENT, type EtatRecrues } from "@/lib/sfl/recrues-store";
 
-const VIDE: EtatRecrues = { ligue: [], miennes: [], complet: false, charge: false };
+const VIDE: EtatRecrues = { ligue: [], miennes: [], plusHaut: 0, complet: false, charge: false };
 let abonnes = 0;
 let base = false;
 
