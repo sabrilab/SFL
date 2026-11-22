@@ -24,7 +24,11 @@
 //       feuille reprise après une fermeture à la main (« Rouvrir » reste
 //       proposé) ; l'écran en retard d'une minute ;
 //   9 · la main ne décale pas la fin des matchs (tenirFinDesMatchs) ;
-//   10 · la main que la base a gardée, reprise par l'appareil de l'admin.
+//   10 · la main que la base a gardée, reprise par l'appareil de l'admin ;
+//   11 · l'heure de fin (Sabri, 22/11/2026, J7 : F = 16 h 42, le vote fermé
+//       à 18 h) : « Rouvrir » et « Garder » tiennent jusqu'à 19 h, minuit
+//       passé 19 h ou quand la règle ferme déjà après ; « Heure de fin » pose
+//       l'heure choisie, la révélation une heure après, minuit au plus tard.
 // Aucune heure du jour n'est lue : tout instant est donné.
 //   npx tsx tools/votes-main-check.ts
 import assert from "node:assert/strict";
@@ -32,8 +36,13 @@ import {
   avecMainsDeLaBase,
   etatRevelation,
   fermerLeVote,
+  finChoisie,
   finDuVote,
+  finTenue,
+  fixerFinDuVote,
   garderLeVoteOuvert,
+  heureDeChamp,
+  heureDeLaJournee,
   journeeComptee,
   libelleFinDuVote,
   libelleRevelation,
@@ -362,4 +371,103 @@ const h = (x: string) => hiver(`2026-11-15 ${x}`);
   assert.equal(avecMainsDeLaBase(sans, { "6": null, "5": {} }), sans, "sans geste des deux côtés : rien");
 }
 
-console.log("votes-main-check : la règle sans geste, garder ouvert, fermer, rouvrir, ce qui se propose, jamais décomptée, le jour seulement, sans fin des matchs, la fin des matchs tenue, la main de la base reprise : ok");
+/* --------------------------- 11 · L'heure de fin --------------------------- */
+{
+  // La J7 du 22/11 rejouée sur la J6 : dernière feuille à 16 h 42, la règle ferme à 18 h, révèle à 19 h.
+  const base = () => saison({ f: h("16:42") });
+  assert.equal(fin(base(), h("17:00")), h("18:00").getTime());
+  assert.equal(finTenue(base(), 6, h("17:30"))!.getTime(), h("19:00").getTime(), "avant 19 h, la règle à 18 h : tenu jusqu'à 19 h");
+  assert.equal(finTenue(base(), 6, h("19:00"))!.getTime(), MINUIT.getTime(), "19 h passé : minuit");
+  assert.equal(finTenue(saison(), 6, h("18:30"))!.getTime(), MINUIT.getTime(), "la règle ferme après 19 h : minuit");
+  assert.equal(finTenue(saison({ f: null }), 6, h("17:30"))!.getTime(), h("19:00").getTime(), "la fin des matchs inconnue : 19 h");
+
+  // « Rouvrir les votes » à 18 h 17 : jusqu'à 19 h, la révélation à 20 h.
+  const t = h("18:17");
+  assert.deepEqual(reglageDuVote(base(), 6, t), { garder: false, fermer: false, rouvrir: true });
+  const rouvert = garderLeVoteOuvert(base(), 6, t);
+  assert.equal(j6(rouvert).votesOuvertsLe, t.toISOString(), "l'instant du geste");
+  assert.equal(j6(rouvert).votesFermesLe, h("19:00").toISOString(), "l'heure de fin");
+  assert.equal(finChoisie(j6(rouvert))!.getTime(), h("19:00").getTime());
+  assert.equal(voteGardeOuvert(j6(rouvert)), false, "pas « jusqu'à minuit »");
+  assert.equal(fin(rouvert, t), h("19:00").getTime());
+  assert.equal(rev(rouvert, t), h("20:00").getTime());
+  assert.equal(voteOuvertA(rouvert, 6, h("18:59")), true);
+  assert.equal(voteOuvertA(rouvert, 6, h("19:00")), false);
+  assert.equal(etatRevelation(rouvert, 6, h("18:30")), "vote");
+  assert.equal(etatRevelation(rouvert, 6, h("19:30")), "attente");
+  assert.equal(journeeComptee(rouvert, 6, h("19:59")), false);
+  assert.equal(journeeComptee(rouvert, 6, h("20:00")), true);
+  assert.equal(libelleFinDuVote(rouvert, 6, h("18:30")), "19 h");
+  assert.equal(libelleRevelation(rouvert, 6, h("18:30")), "20 h");
+  assert.equal(prochaineTransition(rouvert, h("18:30"))!.getTime(), h("19:00").getTime());
+  assert.deepEqual(reglageDuVote(rouvert, 6, h("18:30")), { garder: false, fermer: true, rouvrir: false }, "tenu jusqu'à 19 h : il reste à fermer (et l'heure)");
+  assert.deepEqual(reglageDuVote(rouvert, 6, h("19:30")), { garder: false, fermer: false, rouvrir: true }, "l'heure choisie passée : le rouvrir");
+  assert.equal(garderLeVoteOuvert(rouvert, 6, h("18:30")), rouvert, "déjà tenu jusqu'à 19 h : même référence");
+  // Rouvert de nouveau à 19 h 30 : minuit, comme avant.
+  const encore = garderLeVoteOuvert(rouvert, 6, h("19:30"));
+  assert.equal(j6(encore).votesFermesLe, undefined);
+  assert.equal(fin(encore, h("19:30")), MINUIT.getTime());
+
+  // « Garder les votes ouverts » à 17 h 30 : 19 h au lieu de 18 h.
+  assert.deepEqual(reglageDuVote(base(), 6, h("17:30")), { garder: true, fermer: true, rouvrir: false });
+  const garde = garderLeVoteOuvert(base(), 6, h("17:30"));
+  assert.equal(fin(garde, h("17:30")), h("19:00").getTime());
+
+  // « Heure de fin » : 21 h 30, choisie à 18 h 17, le vote fermé.
+  const choisie = heureDeLaJournee(base(), 6, t, 21, 30)!;
+  assert.equal(choisie.getTime(), h("21:30").getTime());
+  assert.equal(heureDeChamp(choisie), "21:30");
+  assert.equal(heureDeChamp(MINUIT), "00:00");
+  assert.equal(heureDeLaJournee(base(), 6, t, 0, 0)!.getTime(), MINUIT.getTime(), "0 h 00 : minuit, le soir même");
+  const regle = fixerFinDuVote(base(), 6, t, choisie);
+  assert.equal(fin(regle, t), h("21:30").getTime());
+  assert.equal(rev(regle, t), h("22:30").getTime());
+  assert.equal(voteOuvertA(regle, 6, h("21:29")), true);
+  assert.equal(voteOuvertA(regle, 6, h("21:30")), false);
+  assert.equal(journeeComptee(regle, 6, h("22:29")), false);
+  assert.equal(journeeComptee(regle, 6, h("22:30")), true);
+  assert.equal(libelleFinDuVote(regle, 6, h("19:00")), "21 h 30");
+  assert.equal(libelleRevelation(regle, 6, h("19:00")), "22 h 30");
+  // L'heure avancée, le vote ouvert : 20 h au lieu de 21 h 30.
+  const avance = fixerFinDuVote(regle, 6, h("19:10"), h("20:00"));
+  assert.equal(fin(avance, h("19:10")), h("20:00").getTime());
+  assert.equal(rev(avance, h("19:10")), h("21:00").getTime());
+  assert.equal(fixerFinDuVote(avance, 6, h("19:20"), h("20:00")), avance, "la même heure : même référence");
+  // 23 h 30 : la révélation à minuit, jamais après. Minuit : comme « gardé ouvert ».
+  assert.equal(rev(fixerFinDuVote(base(), 6, t, h("23:30")), t), MINUIT.getTime());
+  const aMinuit = fixerFinDuVote(base(), 6, t, MINUIT);
+  assert.equal(j6(aMinuit).votesFermesLe, undefined);
+  assert.equal(voteGardeOuvert(j6(aMinuit)), true);
+  assert.equal(fin(aMinuit, t), MINUIT.getTime());
+  // Refusé : une heure passée, l'instant même, après minuit ; rien à régler (révélée, un autre jour).
+  for (const [quand, vers, pourquoi] of [
+    [t, h("18:00"), "une heure passée"],
+    [t, t, "l'instant même"],
+    [t, hiver("2026-11-16 00:30"), "après minuit"],
+    [h("19:05"), h("21:00"), "la journée révélée (19 h)"],
+    [hiver("2026-11-14 18:00"), h("19:00"), "la veille"],
+  ] as const) {
+    const s = base();
+    assert.equal(fixerFinDuVote(s, 6, quand, vers), s, `${pourquoi} : même référence`);
+  }
+  // Fermé à la main avant l'heure choisie : la fermeture l'emporte, et se rouvre.
+  const coupe = fermerLeVote(regle, 6, h("19:00"));
+  assert.equal(j6(coupe).votesOuvertsLe, undefined);
+  assert.equal(finChoisie(j6(coupe)), null);
+  assert.equal(fin(coupe, h("19:10")), h("19:00").getTime());
+  assert.deepEqual(reglageDuVote(coupe, 6, h("18:59")), { garder: false, fermer: false, rouvrir: true }, "fermé à la main : fermé, l'écran en retard d'une minute compris");
+  // La fin des matchs inconnue (une feuille reprise) : l'heure choisie tient.
+  const reprise = saison({ finie: true, f: null });
+  const tenue = fixerFinDuVote(reprise, 6, t, h("20:00"));
+  assert.equal(fin(tenue, t), h("20:00").getTime());
+  assert.equal(etatRevelation(tenue, 6, h("19:00")), "vote");
+  assert.equal(etatRevelation(tenue, 6, h("20:30")), "attente");
+  assert.equal(libelleRevelation(tenue, 6, h("19:00")), "21 h");
+  // Une journée comptée ne se décompte pas : l'heure posée après la révélation est retirée.
+  const tardif: Saison = { ...base(), journees: base().journees.map((m) => (m.j === 6 ? { ...m, votesOuvertsLe: h("19:05").toISOString(), votesFermesLe: h("21:00").toISOString() } : m)) };
+  const tenu = tenirMainSurLeVote(base(), tardif, h("19:05"));
+  assert.equal(j6(tenu).votesFermesLe, undefined, "le geste tardif est retiré");
+  assert.equal(j6(tenu).votesOuvertsLe, undefined);
+}
+
+console.log("votes-main-check : la règle sans geste, garder ouvert, fermer, rouvrir, ce qui se propose, jamais décomptée, le jour seulement, sans fin des matchs, la fin des matchs tenue, la main de la base reprise, l'heure de fin : ok");
