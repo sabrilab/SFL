@@ -19,6 +19,15 @@
 // Une journée en suspens (12/11/2026, suspens.ts) ne se remet pas en
 // brouillon : elle reste visible, « à rattraper », jusqu'à sa reprise.
 //
+// La mise en ligne d'office (Sabri, 20/11/2026 : « tu ne le rends pas
+// accessible tant que je n'ai pas fait publier pour la ligue […] ou tant que
+// le vendredi soir n'est pas arrivé ») : un brouillon né depuis porte
+// `brouillon.jusqua`, le vendredi 19 h (heure de Paris) avant son dimanche,
+// l'heure où les équipes se révèlent. Passé cet instant, la base le publie
+// elle-même (public.publier_brouillons_echus, appelée par le cron du
+// vendredi, /api/journees/vendredi), comme « Publier pour tout le monde »,
+// sans prévenir personne. Changer la date d'un brouillon déplace l'heure.
+//
 // Pur : ni base, ni écran.
 
 import { computeJournees, journeeJouee } from "./engine";
@@ -89,6 +98,42 @@ export function publierJournee(s: Saison, j: number, par: string, le: Date): Sai
   };
 }
 
+/** Le jour et l'heure de la mise en ligne d'office : le vendredi d'avant, 19 h, heure de Paris. */
+export const MISE_EN_LIGNE = { jourIso: 5, heure: 19 } as const;
+
+/** L'instant `h:min`, heure de Paris, du jour (y, m, d) — d peut déborder du mois, comme pour Date.UTC. */
+function aParis(y: number, m: number, d: number, h: number, min: number): Date {
+  // Paris : UTC+1 en hiver, +2 en été ; l'écart exact se lit dans Intl.
+  const midi = new Date(Date.UTC(y, m, d, 12));
+  const paris = new Date(midi.toLocaleString("en-US", { timeZone: "Europe/Paris" }));
+  const utc = new Date(midi.toLocaleString("en-US", { timeZone: "UTC" }));
+  return new Date(Date.UTC(y, m, d, h, min) - (paris.getTime() - utc.getTime()));
+}
+
+/** Le vendredi 19 h (heure de Paris) avant le jour de la journée ; null si sa date est illisible. */
+export function miseEnLigneDOffice(date: string, maintenant: Date): Date | null {
+  const jour = dateDeJournee(date, maintenant);
+  if (!jour) return null;
+  const dow = new Date(Date.UTC(jour.y, jour.m, jour.d)).getUTCDay();
+  const recul = (dow - MISE_EN_LIGNE.jourIso + 7) % 7 || 7;
+  return aParis(jour.y, jour.m, jour.d - recul, MISE_EN_LIGNE.heure, 0);
+}
+
+/** Le champ `brouillon` d'une journée qui naît (ou redevient) brouillon : sa mise en ligne d'office si elle est encore à venir. */
+export function brouillonNeuf(date: string, par: string, le: Date): NonNullable<JourneeMeta["brouillon"]> {
+  const jusqua = miseEnLigneDOffice(date, le);
+  return { depuis: le.toISOString(), par, ...(jusqua && jusqua.getTime() > le.getTime() ? { jusqua: jusqua.toISOString() } : {}) };
+}
+
+/** Sa date change : un brouillon qui a une mise en ligne d'office la suit (jamais dans le passé). */
+export function suivreLaDate(meta: JourneeMeta, maintenant: Date): JourneeMeta {
+  if (!estBrouillon(meta) || !meta.brouillon?.jusqua) return meta;
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { jusqua, ...reste } = meta.brouillon;
+  const neuf = miseEnLigneDOffice(meta.date, maintenant);
+  return { ...meta, brouillon: neuf && neuf.getTime() > maintenant.getTime() ? { ...reste, jusqua: neuf.toISOString() } : reste };
+}
+
 /** L'heure du coup d'envoi d'une journée (« 12h30 » → 12:30 heure de Paris le jour de sa date), si on la connaît. */
 export function coupDEnvoi(meta: Pick<JourneeMeta, "date" | "heure">, maintenant: Date): Date | null {
   const jour = dateDeJournee(meta.date, maintenant);
@@ -96,12 +141,7 @@ export function coupDEnvoi(meta: Pick<JourneeMeta, "date" | "heure">, maintenant
   const h = /^(\d{1,2})\s*h\s*(\d{0,2})/i.exec(meta.heure ?? "");
   const heures = h ? Number(h[1]) : 23;
   const minutes = h && h[2] ? Number(h[2]) : h ? 0 : 59;
-  // Paris : UTC+1 en hiver, +2 en été ; l'écart exact se lit dans Intl.
-  const midi = new Date(Date.UTC(jour.y, jour.m, jour.d, 12));
-  const paris = new Date(midi.toLocaleString("en-US", { timeZone: "Europe/Paris" }));
-  const utc = new Date(midi.toLocaleString("en-US", { timeZone: "UTC" }));
-  const decalage = paris.getTime() - utc.getTime();
-  return new Date(Date.UTC(jour.y, jour.m, jour.d, heures, minutes) - decalage);
+  return aParis(jour.y, jour.m, jour.d, heures, minutes);
 }
 
 const MOIS: Record<string, number> = {
@@ -155,7 +195,7 @@ export function remettreEnBrouillon(
   return {
     saison: {
       ...s,
-      journees: s.journees.map((m) => (m.j === j ? { ...m, brouillon: { depuis: le.toISOString(), par } } : m)),
+      journees: s.journees.map((m) => (m.j === j ? { ...m, brouillon: brouillonNeuf(m.date, par, le) } : m)),
     },
   };
 }

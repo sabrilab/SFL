@@ -9975,6 +9975,69 @@ drop trigger if exists saison_reprise on public.saison;
 create trigger saison_reprise after update of data on public.saison
   for each row execute function public.saison_reprise();
 
+-- ─────────────── La mise en ligne du vendredi 19 h (20/11/2026) ───────────────
+-- Sabri, 20/11 : « tu ne le rends pas accessible tant que je n'ai pas fait
+-- publier pour la ligue […] ou tant que le vendredi soir n'est pas arrivé ».
+-- Un brouillon né depuis porte brouillon.jusqua (posé par l'app à sa
+-- création : le vendredi 19 h, heure de Paris, avant son dimanche,
+-- saisie/brouillon.ts). Une fois cet instant passé, cette fonction le publie
+-- comme « Publier pour tout le monde » : le champ brouillon part, publiee
+-- {le, par: « Vendredi 19 h »} arrive, la version monte (les téléphones
+-- relisent par saison_signal). Rien d'autre ne change dans le document. Un
+-- brouillon sans jusqua (ceux d'avant, ou remis en brouillon après son
+-- vendredi) attend l'admin. Une publication que feuille_saine refuserait
+-- n'est pas faite : le brouillon reste, l'admin le voit « à corriger ».
+-- Appelée par le cron du vendredi (/api/journees/vendredi), clé secrète
+-- seulement ; l'appeler plus tôt ne fait rien.
+create or replace function public.publier_brouillons_echus()
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  doc      jsonb;
+  js       jsonb;
+  m        jsonb;
+  i        int;
+  courante bigint;
+  nouvelle bigint;
+  echeance timestamptz;
+  publiees int[] := '{}';
+  defauts  text[];
+  le       text := to_char(now() at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"');
+begin
+  select s.data, s.version into doc, courante from public.saison s where s.id = 1 for update;
+  if doc is null or jsonb_typeof(doc -> 'journees') is distinct from 'array' then
+    return jsonb_build_object('ok', true, 'publiees', '[]'::jsonb);
+  end if;
+  js := doc -> 'journees';
+  for i in 0 .. jsonb_array_length(js) - 1 loop
+    m := js -> i;
+    continue when not public.est_brouillon(m) or jsonb_typeof(m -> 'brouillon') is distinct from 'object';
+    echeance := public.instant_sur(m -> 'brouillon' ->> 'jusqua');
+    continue when echeance is null or echeance > now();
+    js := jsonb_set(js, array[i::text],
+                    (m - 'brouillon') || jsonb_build_object('publiee', jsonb_build_object('le', le, 'par', 'Vendredi 19 h')));
+    publiees := publiees || coalesce(public.entier_sur(m ->> 'j'), 0);
+  end loop;
+  if cardinality(publiees) = 0 then
+    return jsonb_build_object('ok', true, 'publiees', '[]'::jsonb);
+  end if;
+  defauts := public.feuille_saine(doc || jsonb_build_object('journees', js), doc);
+  if cardinality(defauts) > 0 then
+    return jsonb_build_object('ok', false, 'publiees', '[]'::jsonb, 'refus', to_jsonb(defauts));
+  end if;
+  nouvelle := greatest((extract(epoch from clock_timestamp()) * 1000)::bigint, coalesce(courante, 0) + 1);
+  perform set_config('sfl.publication_saison', 'oui', true);
+  update public.saison s set data = doc || jsonb_build_object('journees', js), version = nouvelle, updated_at = now() where s.id = 1;
+  perform set_config('sfl.publication_saison', '', true);
+  return jsonb_build_object('ok', true, 'publiees', to_jsonb(publiees), 'version', nouvelle);
+end;
+$$;
+revoke execute on function public.publier_brouillons_echus() from public, anon, authenticated;
+grant execute on function public.publier_brouillons_echus() to service_role;
+
 -- ─────────────── Droits de table : pas plus que ce que l'API sert (03/11/2026) ───────────────
 -- Supabase donne d'office tous les droits de table à anon et authenticated, et
 -- la RLS filtre ensuite. Trois d'entre eux ne servent à rien ici : TRUNCATE,

@@ -15,11 +15,15 @@
 //      (incident de la J4, 29/10) : au-delà, les divisions voisines jouent
 //      ensemble au lieu d'ouvrir un terrain, et qui ne tient pas dans les
 //      places (TERRAINS_MAX × 15) reste remplaçant, dans l'ordre d'arrivée.
-//   2. Le niveau de chacun : la note de sa carte et ses points Pépite par
-//      match, à parts égales, en écarts à la moyenne de ceux qui viennent. Les
-//      points par match prennent la saison entière et les saisons d'avant pour
-//      moitié, tirés vers la moyenne de la ligue tant qu'il a peu joué. Qui
-//      n'a jamais joué compte sur sa note seule.
+//   2. Le niveau de chacun : la note de sa carte (OVR), ses points Pépite par
+//      match, sa forme (ses 3 derniers résultats) et son rang au classement
+//      Pépite d'Or (Sabri, 20/11/2026 : « en fonction de leurs stats, de leurs
+//      3 derniers résultats, de leur position dans le classement et de leur
+//      note OVR »), à parts égales, en écarts à la moyenne de ceux qui
+//      viennent. Les points par match prennent la saison entière et les
+//      saisons d'avant pour moitié, tirés vers la moyenne de la ligue tant
+//      qu'il a peu joué ; la forme remonte dans les saisons d'avant s'il le
+//      faut. Qui n'a jamais joué compte sur sa note seule.
 //   3. Sur chaque terrain, toutes les façons de faire deux équipes sont
 //      essayées. D'abord un gardien de chaque côté quand il y en a ; puis les
 //      plus équilibrées (à 0,05 près de la meilleure) ; parmi elles, celle qui
@@ -53,7 +57,7 @@ import { journeeDuJour } from "./presence-feuille";
 import { computeJournees, computeStandings, entryPP } from "./saisie/engine";
 import { equipesDuMatch } from "./saisie/equipes";
 import { journeeJouee, saisonDepuisArchive } from "./saisie/mutations";
-import type { ConvocationTeam, Saison } from "./saisie/types";
+import type { ConvocationTeam, MatchResult, Saison } from "./saisie/types";
 
 /**
  * Le nombre de terrains du dimanche, au plus (l'Hippodrome). Seul endroit à
@@ -77,6 +81,10 @@ export const REGLES_EQUIPES = {
   lissage: 2,
 } as const;
 
+/** La forme : combien de matchs, et ce que vaut chaque résultat. */
+const FORME_MATCHS = 3;
+const POINTS_FORME: Record<MatchResult, number> = { Victoire: 1, Nul: 0.5, Défaite: 0 };
+
 export interface Niveau {
   nom: string;
   division: Division;
@@ -84,6 +92,10 @@ export interface Niveau {
   note: number;
   /** Ses points Pépite par match, lissés ; null s'il n'a jamais joué. */
   ppm: number | null;
+  /** Ses 3 derniers résultats joués, le plus récent d'abord (toutes saisons) ; vide s'il n'a jamais joué. */
+  derniers: MatchResult[];
+  /** Son rang au classement Pépite d'Or de la saison ; null s'il n'y a pas encore de points. */
+  rang: number | null;
   /** Le niveau retenu, en écarts-types autour de la moyenne de ceux qui viennent. */
   valeur: number;
   gardien: boolean;
@@ -179,8 +191,23 @@ export function niveaux(saison: Saison, noms: string[], etat: EtatDivisions | nu
   }
   const ligue = matchs > 0 ? pts / matchs : 0;
 
+  // La forme : les 3 derniers résultats joués, de la saison en cours vers les plus anciennes.
+  const derniers = new Map<string, MatchResult[]>();
+  for (const s of [...saisons(saison)].reverse()) {
+    const jouees = new Set(s.journees.map((m) => m.j).filter((j) => journeeJouee(s, j)));
+    const lignes = s.entries.filter((e) => e.statut === "Présent" && !e.extraTime && e.result && jouees.has(e.j));
+    for (const e of [...lignes].sort((a, b) => b.j - a.j)) {
+      const x = derniers.get(e.player) ?? [];
+      if (x.length < FORME_MATCHS) x.push(e.result as MatchResult);
+      derniers.set(e.player, x);
+    }
+  }
+
   const fiche = new Map(saison.roster.map((r) => [r.name, r]));
-  const notes = new Map(computeStandings(saison).map((p) => [p.name, ovr(rareStats(p.stats))]));
+  const classement = computeStandings(saison);
+  const notes = new Map(classement.map((p) => [p.name, ovr(rareStats(p.stats))]));
+  // Le rang : la place au classement Pépite d'Or (computeStandings le trie), parmi ceux qui ont des points.
+  const rangs = new Map(classement.filter((p) => p.pp > 0).map((p, i) => [p.name, i + 1]));
   const connues = noms.map((n) => notes.get(n)).filter((n): n is number => n != null);
   const noteParDefaut = connues.length ? [...connues].sort((a, b) => a - b)[Math.floor(connues.length / 2)] : 75;
 
@@ -191,16 +218,28 @@ export function niveaux(saison: Saison, noms: string[], etat: EtatDivisions | nu
       division: etat ? divisionDe(etat, nom) : (3 as Division),
       note: notes.get(nom) ?? noteParDefaut,
       ppm: x && x.matchs > 0 ? (x.pts + lissage * ligue) / (x.matchs + lissage) : null,
+      derniers: derniers.get(nom) ?? [],
+      rang: rangs.get(nom) ?? null,
       gardien: /^G\b/.test(fiche.get(nom)?.poste ?? ""),
     };
   });
+  const forme = (b: { derniers: MatchResult[] }) =>
+    b.derniers.length ? b.derniers.reduce((t, r) => t + POINTS_FORME[r], 0) / b.derniers.length : null;
   const surNote = moyenneEt(bruts.map((b) => b.note));
   const surPoints = moyenneEt(bruts.flatMap((b) => (b.ppm == null ? [] : [b.ppm])));
+  const surForme = moyenneEt(bruts.flatMap((b) => (forme(b) == null ? [] : [forme(b)!])));
+  // Le rang se lit à l'envers : 1er, c'est le plus fort.
+  const surRang = moyenneEt(bruts.flatMap((b) => (b.rang == null ? [] : [-b.rang])));
   return new Map(
     bruts.map((b) => {
-      const n = centre(b.note, surNote);
-      const valeur = b.ppm == null ? n : (n + centre(b.ppm, surPoints)) / 2;
-      return [b.nom, { ...b, valeur }];
+      const f = forme(b);
+      const parts = [
+        centre(b.note, surNote),
+        ...(b.ppm == null ? [] : [centre(b.ppm, surPoints)]),
+        ...(f == null ? [] : [centre(f, surForme)]),
+        ...(b.rang == null ? [] : [centre(-b.rang, surRang)]),
+      ];
+      return [b.nom, { ...b, valeur: parts.reduce((t, x) => t + x, 0) / parts.length }];
     })
   );
 }

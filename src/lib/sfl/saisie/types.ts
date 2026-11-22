@@ -78,8 +78,25 @@ export interface JourneeMeta {
    * Absent (toutes les journées d'avant) : publiée. La même règle en base :
    * public.est_brouillon (supabase/schema.sql), saisie/brouillon.ts ici.
    */
-  brouillon?: { depuis: string; par: string };
+  brouillon?: {
+    depuis: string;
+    par: string;
+    /**
+     * Sa mise en ligne d'office (20/11/2026, brouillon.ts, miseEnLigneDOffice) :
+     * le vendredi 19 h, heure de Paris, avant son dimanche. Passé cet instant,
+     * la base la publie (public.publier_brouillons_echus, le cron du vendredi).
+     * Absent : seul « Publier pour tout le monde » la met en ligne.
+     */
+    jusqua?: string;
+  };
+  /**
+   * Les « Je viens » déjà proposés à la compo automatique de ce brouillon
+   * (20/11/2026, venus-sur-la-feuille.ts, entreesAuto) : chacun n'y entre
+   * qu'une fois. Un joueur que l'admin en a sorti n'y revient pas tout seul.
+   */
+  venusVus?: string[];
   /** Sa dernière publication (« En ligne · 18:42 »), gardée si on la remet en brouillon. */
+  // `par` vaut « Vendredi 19 h » quand la base l'a mise en ligne d'office.
   publiee?: { le: string; par: string };
   /**
    * La journée en suspens (12/11/2026, Ilyes : « que les joueurs puissent
