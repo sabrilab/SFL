@@ -215,8 +215,6 @@ import { useMatchsTeam, type MatchTeam } from "@/hooks/use-matchs-team";
 import type { FondCarte, PointPlan, PossiblePlan, ToiPlan } from "@/components/sfl/map/carte-map";
 import type { TeinteFantome } from "@/components/sfl/map/stade";
 import { idAdminLigue } from "@/lib/sfl/admin-ligue";
-import { useModeClair } from "@/hooks/use-mode-clair";
-import { estJour, estPelouse } from "@/lib/sfl/mode-pelouse";
 import "./animations.css";
 import "@/components/sfl/map/contrats-map.css";
 
@@ -235,29 +233,20 @@ const teinteFantome = (): TeinteFantome =>
   process.env.NEXT_PUBLIC_BOLA_ENV !== "production" && new URLSearchParams(window.location.search).get("fantome") === "ciel" ? "ciel" : "gris";
 
 /**
- * L'ambiance du plan : la Pelouse (Sabri, 14/11, « publier partout ») : la
- * nuit le plan numérique (nuit-numerique), le jour Craie (pelouse-craie),
- * selon l'apparence (lib/sfl/apparence.ts). Dans un aperçu, les autres restent
- * essayables par ?ambiance=… ou ?style=N.
+ * L'ambiance du plan : le plan classique (Sabri, 22/11 : « reviens à la map
+ * standard sans filtre par-dessus […] le truc gris […] tu mets la map
+ * classique pour l'instant »). Plus de Pelouse (Craie le jour, numérique la
+ * nuit) ni de voile gris hors des zones : le plan d'OpenStreetMap à nos
+ * couleurs (map/style-snap.ts), le même jour et nuit, avec les matchs, les
+ * joueurs et les terrains dessus. Dans un aperçu, les autres ambiances
+ * restent essayables par ?ambiance=… (plus par le style d'interface).
  */
 const ESSAIS = process.env.NEXT_PUBLIC_BOLA_ENV !== "production";
-/** Les styles d'interface à l'essai (?style=N, style-ui/essai.tsx) ont chacun leur plan ; sans style, le plan de l'app ne change pas. */
-const PLAN_DU_STYLE: Record<number, Ambiance> = { 12: "bulle", 13: "nuit-chaleur", 14: "trace", 15: "sticker", 16: "pelouse-craie", 17: "gravure", 18: "bulle-gomme", 19: "nuit-bulle", 20: "bulle-peche", 21: "bulle-lilas", 22: "bulle-encre", 23: "bulle-verre", 24: "pelouse-craie", 25: "pelouse-gazon", 26: "pelouse-tribune" };
-/** null : le plan de l'app, Pelouse (numérique la nuit, Craie le jour, selon l'apparence). */
+/** null : le plan classique. */
 const ambianceDeLAdresse = (): Ambiance | null => {
   if (!ESSAIS) return null;
-  const q = new URLSearchParams(window.location.search);
-  const a = q.get("ambiance");
-  if (TOUTES_AMBIANCES.includes(a as Ambiance)) return a as Ambiance;
-  let style = Number(q.get("style"));
-  if (!q.has("style")) {
-    try {
-      style = Number(localStorage.getItem("bola-style-ui-3") ?? 0);
-    } catch {}
-  }
-  if (style === 0 || style === 16) return null;
-  if (estPelouse(style) && !estJour()) return "nuit-numerique";
-  return PLAN_DU_STYLE[style] ?? null;
+  const a = new URLSearchParams(window.location.search).get("ambiance");
+  return TOUTES_AMBIANCES.includes(a as Ambiance) ? (a as Ambiance) : null;
 };
 /** Dans un aperçu, /?zones=demo ajoute une zone qui vient de s'ouvrir (Lens) et une zone fermée (Paris), pour voir le récit. */
 const zonesDemo = () => ESSAIS && new URLSearchParams(window.location.search).get("zones") === "demo";
@@ -1250,8 +1239,7 @@ export default function MapPage() {
   // ceux qui y jouent. La ligue ouvre la première ; chaque match ouvert ou
   // défi d'équipe loin de tout en ouvre une nouvelle.
   const ambianceEssai = useSyncExternalStore(rienAEcouter, ambianceDeLAdresse, (): Ambiance | null => null);
-  const planClair = useModeClair();
-  const ambiance: Ambiance = ambianceEssai ?? (planClair ? "pelouse-craie" : "nuit-numerique");
+  const ambiance: Ambiance = ambianceEssai ?? "classique";
   // Midi, aujourd'hui à Paris : l'âge des zones (une zone de moins de trois jours est nouvelle).
   const maintenant = aujourdhui ? Date.parse(`${aujourdhui}T12:00:00`) : 0;
   const demoZones = useZonesDemo();
