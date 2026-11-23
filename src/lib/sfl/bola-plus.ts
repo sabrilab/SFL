@@ -358,7 +358,7 @@ export const NOM_PART: Record<Part, string> = { plus: "Bola Plus", sfl: "SFL" };
  * Studio (components/sfl/studio-bola.tsx, ses templates et ses ballons dans
  * lib/sfl/studio.ts). Le carrousel, ses segments et sa palette suivent seuls.
  */
-export type ComposantAvantage = "carte" | "bola-plus" | "studio";
+export type ComposantAvantage = "carte" | "bola-plus" | "studio" | "bola-27";
 
 /** Le visuel d'un avantage : une image de public/bola-plus/, ou un composant de l'app. */
 export type VisuelAvantage = ({ genre: "image" } & Visuel) | { genre: "composant"; composant: ComposantAvantage };
@@ -376,18 +376,10 @@ export interface Avantage {
 /** L'ouverture : le stade de Bola, teint par la feuille de style. */
 export const AFFICHE: Visuel = { image: "affiche", alt: "", teinte: "#2a2440", rapport: RAPPORT_VISUEL };
 
+// L'ordre (Sabri, 23/11 : « mettre les maillots avant ta carte […] Bola Plus, un truc, et le jeu qui arrive
+// en dernier ») : d'abord ce que tu reçois en plus (les maillots), puis ta carte, Bola Plus, le studio, le
+// reste de la SFL, et Bola 27, discret, en dernier.
 export const AVANTAGES: readonly Avantage[] = [
-  { id: "carte", part: "plus", titre: "Ta carte continue.", sous: "Tes stats te suivent.", visuel: { genre: "composant", composant: "carte" } },
-  { id: "bola-plus", part: "plus", titre: "Bola Plus", visuel: { genre: "composant", composant: "bola-plus" } },
-  { id: "studio", part: "plus", titre: "Ton studio", visuel: { genre: "composant", composant: "studio" } },
-  {
-    // Le jeu (Sabri, 17/11 11:36) : l'accès anticipé, ton joueur modélisé à ton image et à ton niveau.
-    id: "bola-27",
-    part: "plus",
-    titre: "Bola 27",
-    sous: "Accès anticipé au jeu.",
-    visuel: { genre: "image", image: "bola-27", alt: "Image générée : un joueur en maillot noir frappe le ballon sous un projecteur, dans l'arène du jeu Bola", teinte: "#1a1d1a", rapport: RAPPORT_CARROUSEL },
-  },
   {
     id: "maillots",
     part: "sfl",
@@ -395,6 +387,9 @@ export const AVANTAGES: readonly Avantage[] = [
     visuel: { genre: "image", image: "maillots", alt: "Les deux maillots de la SFL, le noir et le blanc", teinte: "#1d2a25", rapport: RAPPORT_VISUEL, teindre: true },
     depose: { fichier: "/bola-plus/maillots-portes.webp", alt: "Image générée : trois joueurs de la SFL portent les maillots, le noir et le blanc" },
   },
+  { id: "carte", part: "plus", titre: "Ta carte continue.", sous: "Tes stats te suivent.", visuel: { genre: "composant", composant: "carte" } },
+  { id: "bola-plus", part: "plus", titre: "Bola Plus", visuel: { genre: "composant", composant: "bola-plus" } },
+  { id: "studio", part: "plus", titre: "Ton studio", visuel: { genre: "composant", composant: "studio" } },
   {
     id: "matchs-filmes",
     part: "sfl",
@@ -412,6 +407,15 @@ export const AVANTAGES: readonly Avantage[] = [
     part: "sfl",
     titre: "Les cérémonies officielles",
     visuel: { genre: "image", image: "ceremonies", alt: "Image générée : un joueur lève le trophée noir sur le podium de marbre, ses coéquipiers applaudissent", teinte: "#22243a", rapport: RAPPORT_CARROUSEL, voileCourt: true },
+  },
+  {
+    // Le jeu (Sabri, 17/11 11:36) : l'accès anticipé. Depuis le 23/11, discret : son logo seul (BOLA et un 27),
+    // les images dans sa fiche, au toucher.
+    id: "bola-27",
+    part: "plus",
+    titre: "Bola 27",
+    sous: "Accès anticipé au jeu.",
+    visuel: { genre: "composant", composant: "bola-27" },
   },
 ];
 

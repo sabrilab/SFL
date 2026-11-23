@@ -132,10 +132,16 @@
   border-radius: 999px;
   background: var(--bp-plus-vif);
 }
+/* L'écusson SFL, cousu comme un patch de maillot (23/11) : relief léger et une couture en pointillés. */
 .bp-part--sfl {
-  border-radius: 6px;
-  background: var(--bp-sfl-encre);
-  padding: 0 9px;
+  border-radius: 7px;
+  background: linear-gradient(160deg, color-mix(in srgb, var(--bp-sfl-encre) 78%, #fff), var(--bp-sfl-encre) 55%);
+  padding: 0 11px;
+  outline: 1px dashed rgb(255 255 255 / 0.55);
+  outline-offset: -4px;
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.25),
+    0 2px 6px rgb(0 0 0 / 0.35);
 }
 .bp-plus-signe {
   font-size: 15px;
@@ -210,8 +216,9 @@
   gap: 16px;
   padding-bottom: 8%;
 }
+/* BOLA petit au-dessus (30 %), la SFL en grand (64 %) : 23/11. */
 .bp-ouverture__logo {
-  width: 64%;
+  width: 30%;
   line-height: 0;
 }
 .bp-ouverture__logo img {
@@ -219,9 +226,14 @@
   height: auto;
   filter: drop-shadow(0 6px 24px rgb(0 0 0 / 0.45));
 }
-.bp-ouverture__sigle {
-  color: #fff;
-  opacity: 0.92;
+.bp-ouverture__sfl {
+  display: block;
+  width: 64%;
+  aspect-ratio: 735 / 237;
+  background: #fff;
+  mask: url(/bola/sfl.svg) center / contain no-repeat;
+  -webkit-mask: url(/bola/sfl.svg) center / contain no-repeat;
+  filter: drop-shadow(0 6px 24px rgb(0 0 0 / 0.45));
 }
 .bp-ouverture__bas {
   display: flex;
@@ -989,4 +1001,38 @@ html[data-clavier] .bp-barre {
   .bp-offre__face {
     transition: none;
   }
+}
+
+/* « Bola 27 », discret (23/11) : BOLA, et dessous un 27 en creux, au milieu de la carte. */
+.bp-texte--logo {
+  justify-content: center;
+}
+.bp-texte--logo > :first-child {
+  position: absolute;
+  top: 18px;
+  left: 18px;
+}
+.bp-bola27 {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  margin: 0 auto;
+  width: 72%;
+  line-height: 0;
+}
+.bp-bola27__logo {
+  width: 100%;
+  height: auto;
+}
+.bp-bola27__annee {
+  font-size: clamp(120px, 44vw, 176px);
+  line-height: 0.86;
+  letter-spacing: -0.02em;
+  font-style: italic;
+  color: transparent;
+  -webkit-text-stroke: 2px currentColor;
+}
+.bp-bola27__sous {
+  text-align: center;
 }

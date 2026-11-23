@@ -19,9 +19,9 @@
 //     (sfl-content, reseaux/kit-chrome, décision D5 : le direct sur Twitch et
 //     YouTube en même temps) ;
 //   - les pépites et les trophées : générés (Higgsfield, 16/11), sans joueur ;
-//   - Bola 27 (Sabri, 17/11 11:36 : l'accès anticipé au jeu, un joueur à ton
-//     image et à ton niveau) : des images de ce que sera le jeu, générées
-//     (Higgsfield, 17/11) d'après l'arène du prototype ; personne de réel.
+//   - Bola 27 : l'image du jeu (générée, Higgsfield, 17/11) et deux captures
+//     du prototype ;
+//   - Bola Plus : quatre images d'Ilyes (Seedream 5.0, son accord du 15/11).
 // Rien de payant, rien d'envoyé : de la lecture.
 
 /** Une vignette d'une fiche. */
@@ -53,20 +53,36 @@ export interface Fiche {
 
 const CARRE = { largeur: 896, hauteur: 1120 };
 const kit = (image: string, alt: string, nom: string, texte: string): CarteFiche => ({ image, alt, nom, texte, ...CARRE });
+const ilyes = (image: string, alt: string, nom: string, texte: string): CarteFiche => ({ image, alt, nom, texte, largeur: 1320, hauteur: 1650 });
 const trophee = (image: string, alt: string, nom: string, texte: string): CarteFiche => ({ image, alt, nom, texte, mention: "Trophée", ...CARRE });
 const etape = (n: number, nom: string, texte: string, pleins: number): CarteFiche => ({ alt: "", nom, detail: String(n).padStart(2, "0"), texte, pleins, largeur: 4, hauteur: 5 });
 
 export const FICHES: Record<string, Fiche> = {
+  // Bola Plus (Sabri, 23/11 : « il n'y a pas de badge à cliquer […] Le délire de ton équipe, le trash talk,
+  // on ne sait pas c'est quoi. Il faut montrer des choses ») : ses quatre fonctions, en images d'Ilyes
+  // (Seedream 5.0, Higgsfield, 16/11 ; son accord du 15/11), recadrées en 4:5.
+  "bola-plus": {
+    id: "bola-plus",
+    titre: "Bola Plus",
+    phrase: "Ton équipe, ta voix, ton style.",
+    cartes: [
+      ilyes("bp-equipe", "Image générée : Ilyes, bras croisés, devant les quatre joueurs de son équipe", "Ton équipe", "Tu montes ton équipe et tu la convoques."),
+      ilyes("bp-trash-talk", "Image générée : Ilyes rit et pointe l'adversaire du doigt", "Trash talk", "Tu provoques l'adversaire avant le match."),
+      ilyes("bp-skins", "Image générée : Ilyes sort de sa carte de joueur, ballon au pied", "Skins et aspects", "Ta carte change de peau."),
+      ilyes("bp-quetes", "Image générée : Ilyes assis sur le ballon, ses matchs de la saison dans le ciel", "Quêtes et missions", "Des missions, et ta saison qui avance."),
+    ],
+  },
+  // Bola 27 (23/11 : « la première image, le jeu, elle est bien », le reste « trop AI slop ») : l'image du
+  // jeu gardée, puis de vraies captures du prototype (dépôt SFL, /jouer, 18/11). Les joueurs à la tête des
+  // nôtres viendront quand leurs images seront faites.
   "bola-27": {
     id: "bola-27",
     titre: "Bola 27",
     phrase: "Le jeu, avant tout le monde.",
     cartes: [
       kit("b27-terrain", "Image générée : un match à cinq contre cinq dans l'arène de Bola 27, maillots noirs contre maillots blancs", "Le jeu", "Le five de la SFL, en jeu vidéo."),
-      kit("b27-scan", "Image générée : un selfie devient une tête en 3D, puis un joueur complet en maillot noir", "À ton image", "Ton visage et ta silhouette : ton joueur est modélisé d'après toi."),
-      kit("b27-niveau", "Image générée : un joueur en 3D, maillot blanc, et sa note 77", "À ton niveau", "Ta note dans l'app devient ton niveau dans le jeu."),
-      kit("b27-dribble", "Image générée : un joueur en noir dribble un défenseur en blanc, au ras du terrain", "Dans l'arène", "Les panneaux, les maillots, le terrain du dimanche."),
-      kit("b27-but", "Image générée : un joueur en noir célèbre un but à genoux, ses coéquipiers arrivent", "Accès anticipé", "Tu y joues avant sa sortie."),
+      { image: "b27-match", alt: "Capture du jeu : Noirs contre Blancs dans l'arène, vue de haut", largeur: 2560, hauteur: 1440, entiere: true, nom: "En vrai", texte: "Le prototype, Noirs contre Blancs.", mention: "Capture" },
+      { image: "b27-fin", alt: "Capture du jeu : la fiche de fin, 2 à 2, possession, frappes, balles reprises, arrêts", largeur: 780, hauteur: 1688, nom: "La fiche de fin", texte: "Le score et les stats du match.", mention: "Capture" },
     ],
   },
   maillots: {
