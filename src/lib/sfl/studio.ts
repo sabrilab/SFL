@@ -30,7 +30,9 @@
 //
 // La vignette de chaque template : une vraie image (retour de Sabri du
 // 15/11/2026 sur bola-app#22, « les vraies vignettes des 12 modèles »). Les
-// douze ont été générées hors de l'app, à sa demande : du noir et blanc, des
+// douze ont été générées hors de l'app, à sa demande. Depuis le 23/11 : la
+// version Ilyes en Seedream 5.0 Pro, en couleurs (son accord du 15/11 ;
+// tools/studio-vignettes.py). Avant : du noir et blanc, des
 // silhouettes sans visage dans le stade de colonnes de marbre, aucun joueur
 // réel, le tiers bas sombre. Elles sont dans public/bola-plus/studio/,
 // numérotées dans l'ordre du catalogue (« 01-ma-carte-en-vrai.webp »), en
@@ -44,7 +46,7 @@
 // tools/studio-check.ts : un fichier échangé, teint ou retouché arrête le
 // banc. Chaque template porte la sienne (Template.image).
 // L'écran les montre telles quelles : en 4:5, jamais recadrées en carré, ni
-// grossies, ni teintes (elles sont en noir et blanc par choix), ni animées ;
+// grossies, ni teintes, ni animées ;
 // il écrit le nom du modèle et son prix en ballons sur leur tiers bas. Elles
 // remplacent les vignettes composées du 14/11 (un visuel de Bola Plus
 // recadré et teint en violet, la carte « Toi » posée dessus).
