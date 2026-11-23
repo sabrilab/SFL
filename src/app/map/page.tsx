@@ -161,7 +161,7 @@ import { cleVille, type ContratPlan, type VillePlan } from "@/components/sfl/map
 import { useMaintenant, useMissionsDeLaLigue } from "@/hooks/use-missions";
 import { etatRevelation, finDuVote, libelleFinDuVote, libelleRevelation, nouveauRegime } from "@/lib/sfl/revelation";
 import { estEnSuspens, libelleSuspens, SIGNE_SUSPENS } from "@/lib/sfl/saisie/suspens";
-import { TOUTES_AMBIANCES, type Ambiance } from "@/components/sfl/map/ambiances";
+import { planClair, TOUTES_AMBIANCES, type Ambiance } from "@/components/sfl/map/ambiances";
 import { calculerZones, dansContour, numeroZone, type Foyer, type VilleZone, type Zone } from "@/lib/sfl/zones";
 import { maVille, villeDe, villeOuLigue } from "@/lib/sfl/villes";
 import { garderPosition, positionGardee } from "@/lib/sfl/activation";
@@ -1577,7 +1577,7 @@ export default function MapPage() {
   return (
     <AmbianceDuPlan.Provider value={ambiance}>
       {/* ─── Le plan, tout l'écran ─── */}
-      <section className="fixed inset-0 isolate overflow-hidden bg-[#e9eae6] [--sous-entete:0.75rem] lg:[--sous-entete:1.25rem]">
+      <section className={cn("fixed inset-0 isolate overflow-hidden bg-[#e9eae6] [--sous-entete:0.75rem] lg:[--sous-entete:1.25rem]", planClair(ambiance) && "plan-clair")}>
         <div className="absolute inset-0">
           <CarteMap
             fond={fond}
@@ -1835,7 +1835,16 @@ export default function MapPage() {
                   dans={m.joue ? null : ecartJours(m.dateLabel, aujourdhui)}
                   loin={toi && m.terrain ? `à ${distanceLisible(toi, m.terrain)}` : null}
                   nonLus={m.partie ? (apercus.get(m.partie.id)?.nonLus ?? 0) : 0}
-                  onToucher={() => (m.cle !== choisi?.cle || surCarte ? setChoix(m.cle) : ouvrirFiche())}
+                  onToucher={(e) => {
+                    if (m.cle === choisi?.cle && !surCarte) return ouvrirFiche();
+                    setChoix(m.cle);
+                    // À la souris ou au clavier (ordinateur), pas de glissé pour
+                    // amener la carte au centre : un clic l'ouvre tout de suite
+                    // (Sabri, 23/11 : la carte du dernier dimanche ne s'ouvrait
+                    // qu'au deuxième clic sur ordinateur). Au doigt, le premier
+                    // toucher la choisit, comme avant.
+                    if (!surCarte && !auDoigt(e)) ouvrirFiche();
+                  }}
                 />
               </div>
             ))}
@@ -2387,6 +2396,15 @@ function compteARebours(dans: number | null): string | null {
   return dans === 1 ? "demain" : `dans ${dans} j`;
 }
 
+/** Le clic vient-il d'un doigt ? (pointerType du clic ; sans lui, l'écran tactile sans souris) */
+function auDoigt(e: React.MouseEvent): boolean {
+  const type = (e.nativeEvent as PointerEvent).pointerType;
+  if (type) return type === "touch" || type === "pen";
+  // Entrée ou Espace sur le bouton : le clavier, donc un ordinateur.
+  if (e.detail === 0) return false;
+  return typeof window !== "undefined" && !window.matchMedia("(hover: hover) and (pointer: fine)").matches;
+}
+
 function CarteMatch({
   m,
   choisi,
@@ -2411,7 +2429,7 @@ function CarteMatch({
   loin: string | null;
   /** Les messages de sa discussion que je n'ai pas lus. */
   nonLus?: number;
-  onToucher: () => void;
+  onToucher: (e: React.MouseEvent<HTMLButtonElement>) => void;
 }) {
   const [c0, c1, c2] = COULEUR_LIGUE[m.ligue].fond;
   const complet = m.etat.genre === "complet";

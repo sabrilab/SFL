@@ -34,7 +34,16 @@
 :root[data-famille="pelouse"] .liquid-tabbar__onglet { color: var(--foreground) !important; }
 :root[data-famille="pelouse"] .liquid-tabbar__onglet[aria-current="page"] { color: var(--tabbar-sur-lentille) !important; }
 :root[data-famille="pelouse"] .liquid-tabbar__libelle { font-weight: 700 !important; letter-spacing: 0.06em; text-transform: uppercase; font-size: 9.5px; }
-:root[data-famille="pelouse"] .liquid-tabbar--rond[data-choisi] { background: var(--tabbar-lentille) !important; color: var(--tabbar-sur-lentille); }
+:root[data-famille="pelouse"] .liquid-tabbar--rond[data-choisi] { background: var(--tabbar-lentille) !important; color: var(--tabbar-sur-lentille) !important; }
+/* Harmonisation du 23/11 (Sabri : « les icônes ne s'affichent pas comme
+   elles devraient »). Le symbole plein de l'onglet choisi est percé
+   (le bonhomme de Ma carte, le triangle des Actus, le point de la Map) :
+   ses trous prennent la couleur de la lentille, comme un SF Symbol, et non
+   plus le gris de l'ancien verre fumé, qui effaçait le bonhomme. La bulle
+   du Vestiaire prend l'encre de la barre (sa couleur posée dans le code,
+   noire sur la Map, la rendait invisible sur la pelouse de nuit). */
+:root[data-famille="pelouse"] .liquid-tabbar { --tabbar-trou: var(--tabbar-lentille); }
+:root[data-famille="pelouse"] .liquid-tabbar--rond:not([data-choisi]) { color: var(--foreground) !important; }
 
 :root[data-famille="pelouse"] :is(.bouton-principal, .bouton-secondaire, .bouton-encre, .bouton-givre) { border-radius: 999px !important; }
 :root[data-famille="pelouse"] .tuile-match { border-radius: 22px !important; }
@@ -165,4 +174,26 @@
 :root[data-famille="pelouse"].dark .sc--c {
   background: radial-gradient(120% 85% at 50% 45%, transparent 55%, rgba(3, 10, 6, 0.6));
   box-shadow: none;
+}
+
+/* ───────────── La Map de nuit sur le plan classique ─────────────
+   Depuis le 22/11 le plan reste clair jour et nuit (« la map classique ») ;
+   les boutons de nuit, transparents cerclés de craie, faits pour un plan
+   noir, y disparaissaient (le « + », revenir sur soi, la recherche, les
+   calques). Sur un plan clair, la nuit, ils prennent le verre de la barre
+   d'onglets : pelouse fumée, trait de craie, encre craie ; le geste
+   principal (« + ») la lentille pleine de craie. .plan-clair est posé par
+   app/map/page.tsx quand l'ambiance du plan est claire. */
+:root[data-famille="pelouse"].dark .plan-clair :is(.bouton-givre, .bouton-encre, .bouton-secondaire) {
+  background: rgba(15, 38, 24, 0.82) !important;
+  color: #f3faf1 !important;
+  border: 1px solid rgba(243, 250, 241, 0.32) !important;
+  -webkit-backdrop-filter: blur(18px) saturate(190%);
+  backdrop-filter: blur(18px) saturate(190%);
+  box-shadow: inset 0 1px 0 rgba(243, 250, 241, 0.18), 0 8px 22px rgba(5, 18, 10, 0.28) !important;
+}
+:root[data-famille="pelouse"].dark .plan-clair :is(.bouton-principal, .bouton--vert) {
+  background: #f3faf1 !important;
+  color: #0f2618 !important;
+  border-color: #f3faf1 !important;
 }

@@ -335,6 +335,9 @@ const NUIT_VERRE: Palette = {
   bati: "#162b25", volume: "#1f3a33", rail: "#1d362f", ombre: "rgba(0, 0, 0, 0.55)",
   texte: "#a6cfbd", texteRues: "#7ea797", texteEau: "#79b6b0", halo: "#0a1613",
 };
+/** Le plan est-il clair ? (les boutons posés dessus en tiennent compte la nuit, styles-ui-4.css .plan-clair) */
+export const planClair = (a: Ambiance) => !a.startsWith("nuit");
+
 const PALETTES: Record<Ambiance, Palette> = { jour: JOUR, aube: AUBE, classique: SNAP, territoire: SNAP, nuit: NUIT, encre: ENCRE, brume: SNAP, rouge: SNAP, braise: SNAP, "nuit-brume": NUIT, "nuit-braise": NUIT, "nuit-encre": TABLEAU,
   bulle: BULLE, "nuit-chaleur": CHALEUR, trace: TRACE, sticker: STICKER, "nuit-pelouse": PELOUSE, gravure: GRAVURE,
   "bulle-gomme": BULLE_GOMME, "nuit-bulle": NUIT_BULLE, "bulle-peche": BULLE_PECHE, "bulle-lilas": BULLE_LILAS, "bulle-encre": BULLE_ENCRE, "bulle-verre": BULLE_VERRE, "nuit-verre": NUIT_VERRE,
