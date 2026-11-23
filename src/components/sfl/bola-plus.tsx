@@ -76,12 +76,10 @@ import { useSession } from "@/hooks/use-session";
 import { ovr } from "@/lib/sfl/engine";
 import {
   AFFICHE,
-  BOLA_PLUS_SEUL,
   BUNDLE,
   CARTE_TOI,
   FONCTIONS_BOLA_PLUS,
   FORMULES,
-  GRILLE_SFL,
   LARGEURS,
   NOM_BUNDLE,
   NOM_FORMULE,
@@ -89,7 +87,6 @@ import {
   PALETTE,
   PARRAINAGE,
   PRIX_FORMULE,
-  LIBELLE_ECONOMIE,
   VARIABLES_PLUS,
   diapos,
   voitBolaPlus,
@@ -205,11 +202,6 @@ function EtiquettePart({ part, className }: { part: Part; className?: string }) 
   );
 }
 
-/** Un prix barré : le montant, et le symbole. */
-function Barre({ somme, className }: { somme: string; className?: string }) {
-  return <s className={cn("bp-barre-prix tabular-nums", className)}>{somme}&nbsp;€</s>;
-}
-
 /** Un titre de la page, dans la police des titres. */
 function Titre({ niveau = 2, children, className }: { niveau?: 1 | 2; children: ReactNode; className?: string }) {
   const Balise = niveau === 1 ? "h1" : "h2";
@@ -303,13 +295,12 @@ export function OffreBolaPlus({
           const off = affichee !== f;
           return (
             <div key={f} className="bp-offre__face" data-off={off ? "" : undefined} aria-hidden={off || undefined}>
-              {f === "annuel" && <span className="bp-formule__economie tabular-nums">{LIBELLE_ECONOMIE}</span>}
+              <span className="bp-formule__economie tabular-nums">{p.economie}</span>
               <span className="flex items-baseline gap-2 whitespace-nowrap">
                 <span className="bp-formule__prix tabular-nums" style={{ fontFamily: ANTON }}>
                   {p.mois}&nbsp;€
                 </span>
                 <span className="bp-formule__par">/ mois</span>
-                <Barre somme={p.barre} />
               </span>
               <span className="bp-formule__mois tabular-nums">{p.facture}</span>
               <span className="bp-formule__sous tabular-nums">{p.sous}</span>
@@ -404,7 +395,6 @@ function DiapoOuverture() {
             {p.euros}&nbsp;€
           </span>
           <span className="bp-ouverture__par">/ {p.par}</span>
-          <Barre somme={p.barre} />
         </p>
         <CompteAReboursBolaPlus variante="grand" />
       </div>
@@ -460,7 +450,6 @@ function VisuelBolaPlus() {
       </ul>
       <EmblemeBolaPlus className="bp-visuel-plus__embleme" trait={0.8} fond={0.6} />
       <p className="bp-offert">
-        <Barre somme={BOLA_PLUS_SEUL} />
         <span className="bp-offert__mot">Offert</span>
       </p>
     </div>
@@ -602,20 +591,15 @@ function DiapoPrix({ plus, choix, onChoix, actionRef }: { plus: BolaPlus; choix:
           </li>
         ))}
       </ul>
-      <p className="bp-grille" aria-label={`Grille officielle de la ${NOM_PART.sfl}`}>
-        <SigleLigue ligue="sfl" hauteur={10} className="bp-grille__sigle" />
-        {GRILLE_SFL.map((g) => (
-          <s key={g.par} className="tabular-nums whitespace-nowrap">
-            {g.prix}&nbsp;€ / {g.par}
-          </s>
-        ))}
-      </p>
       </div>
-      <div className="flex items-center justify-between gap-2">
-        <Titre className="bp-etiquette-prix bp-prix__etiquette">Prix premiers joueurs</Titre>
-        <CompteAReboursBolaPlus variante="ligne" className="bp-prix__rebours" />
+      {/* Le bas : 1,618 fois le haut (nombre d'or, 23/11). */}
+      <div className="bp-prix__bas">
+        <div className="flex items-center justify-between gap-2">
+          <Titre className="bp-etiquette-prix bp-prix__etiquette">Prix premiers joueurs</Titre>
+          <CompteAReboursBolaPlus variante="ligne" className="bp-prix__rebours" />
+        </div>
+        <OffreBolaPlus plus={plus} choix={choix} onChoix={onChoix} actionRef={actionRef} />
       </div>
-      <OffreBolaPlus plus={plus} choix={choix} onChoix={onChoix} actionRef={actionRef} />
     </div>
   );
 }

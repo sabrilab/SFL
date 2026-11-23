@@ -73,7 +73,7 @@ import {
   GRILLE_SFL,
   LARGEURS,
   LIBELLE_ECHEANCES,
-  LIBELLE_ECONOMIE,
+  ECONOMIE_GRILLE,
   ANNUEL_PAR_MOIS,
   ECONOMIE_ANNUEL_CENTIMES,
   LIBELLE_REMISE,
@@ -126,7 +126,7 @@ assert.equal(LIBELLE_ECHEANCES, `4${NBSP}×${NBSP}42,23${NBSP}€ sans frais`);
 // L'annuel affiché au mois (choix de Sabri, 23/11) : 13,90 €, un prix d'affichage (168,90 / 12 = 14,08) ; l'économie se compte sur le prix facturé.
 assert.equal(ANNUEL_PAR_MOIS, "13,90");
 assert.equal(ECONOMIE_ANNUEL_CENTIMES, 6990);
-assert.equal(LIBELLE_ECONOMIE, `69,90${NBSP}€ économisés`);
+assert.deepEqual(ECONOMIE_GRILLE, { mensuel: 1510, annuel: 8100 }, "35 − 19,90 et 249,90 − 168,90 (23/11 : l'économie en positif, rien de barré)");
 // La remise et l'échéance, rejouées par des calculs qu'on peut fausser (les mutants, plus bas).
 const remiseJuste = (pourCent: (mois: number, an: number) => number) => {
   assert.equal(pourCent(1990, 16890), 29, "−29 % pour 19,90 € et 168,90 €");
@@ -580,9 +580,9 @@ async function banc() {
     { prix: "249,90", par: "an" },
   ]);
   assert.deepEqual(PRIX_FORMULE, {
-    mensuel: { euros: MENSUEL, par: "mois", mois: MENSUEL, barre: "35", facture: `Facturé 19,90${NBSP}€ chaque mois`, sous: "Sans engagement" },
-    // L'annuel au mois (bouton Mensuel / Annuel, 23/11) : 13,90 €, la grille de l'année barrée au mois (249,90 / 12 → 20,83).
-    annuel: { euros: ANNUEL, par: "an", mois: "13,90", barre: "20,83", facture: `Facturé 168,90${NBSP}€ par an`, sous: LIBELLE_ECHEANCES },
+    mensuel: { euros: MENSUEL, par: "mois", mois: MENSUEL, economie: `15,10${NBSP}€ économisés chaque mois`, facture: `Facturé 19,90${NBSP}€ chaque mois`, sous: "Sans engagement" },
+    // L'annuel au mois (bouton Mensuel / Annuel, 23/11) : 13,90 €, et 81 € économisés sur l'année de la grille.
+    annuel: { euros: ANNUEL, par: "an", mois: "13,90", economie: `81${NBSP}€ économisés sur l'année`, facture: `Facturé 168,90${NBSP}€ par an`, sous: LIBELLE_ECHEANCES },
   });
   // Le bundle : Bola Plus, les maillots, les stats, la carte, la SFL.
   const bundleJuste = (b: readonly string[]) => assert.deepEqual([...b], ["bola-plus", "maillots", "stats", "carte", "sfl"], "le bundle est complet, dans l'ordre");
@@ -824,7 +824,9 @@ async function banc() {
     assert.equal(offre.match(/disabled=\{occupe\}/g)?.length, 3, "l'offre : formules, bouton et « Annuler » gelés pendant l'envoi");
     assert.ok(/if \(!interet\) onChoix\(f\);\s*else if \(interet\.formule !== f\) noter\(f\);/.test(offre), "une fois noté, toucher une formule la change");
     // Les prix de l'offre : PRIX_FORMULE, avec le barré et la ligne dessous ; rien ne les cache.
-    assert.ok(/const p = PRIX_FORMULE\[f\];/.test(offre) && /<Barre somme=\{p\.barre\} \/>/.test(offre) && /\{p\.sous\}/.test(offre), "chaque formule : son prix, son barré, sa ligne");
+    assert.ok(/const p = PRIX_FORMULE\[f\];/.test(offre) && /\{p\.economie\}/.test(offre) && /\{p\.sous\}/.test(offre), "chaque formule : son prix, son économie, sa ligne");
+    // Rien de barré (Sabri, 23/11 : « des trucs que tu me donnes, pas des trucs que tu me barres »).
+    assert.ok(!/<s[\s>]|<del[\s>]|line-through/.test(sansCommentaire) && !/line-through/.test(css), "aucun prix barré sur la page");
     // Et ses ballons de Bola Studio (studio.ts), juste sous la ligne du dessous.
     assert.ok(/<span className="bp-formule__ballons tabular-nums">\{BALLONS_FORMULE\[f\]\}<\/span>/.test(offre) && offre.indexOf("{BALLONS_FORMULE[f]}") > offre.indexOf("{p.sous}"), "chaque formule porte ses ballons, sous sa ligne");
     assert.ok(/import \{ BALLONS_FORMULE \} from "@\/lib\/sfl\/studio";/.test(tsx), "les ballons des formules viennent de studio.ts");
@@ -928,7 +930,7 @@ async function banc() {
   refuse("les segments muets", () => ecranJuste(mute("segments", ecran, 'aria-current={i === actif ? "true" : undefined}', ""), style));
   refuse("un texte d'aide", () => ecranJuste(mute("aide", ecran, "      <div className=\"bp-pied\" aria-hidden />", "      <p>Glisse pour voir la suite.</p>\n      <div className=\"bp-pied\" aria-hidden />"), style));
   refuse("une fausse carte à la place de la vraie", () => ecranJuste(mute("carte", ecran, '<BolaCard name={CARTE_TOI.name} ', '<BolaCard name={CARTE_TOI.name} photo="/bola/joueur.jpg" '), style));
-  refuse("le barré retiré", () => ecranJuste(mute("barré", ecran, "                <Barre somme={p.barre} />\n", ""), style));
+  refuse("un prix barré", () => ecranJuste(mute("barré", ecran, '<span className="bp-formule__par">/ mois</span>\n', '<span className="bp-formule__par">/ mois</span>\n<s>{p.facture}</s>\n'), style));
   refuse("les 4 fois en dur", () => ecranJuste(mute("4 fois", ecran, "{p.sous}</span>", "4 × 42,23 € sans frais</span>"), style));
   refuse("les prix cachés sur petit écran", () => ecranJuste(mute("caché", ecran, 'className="bp-formule__sous tabular-nums"', 'className="bp-formule__sous tabular-nums max-[359px]:hidden"'), style));
   refuse("le visuel déposé avant d'être chargé", () => ecranJuste(mute("d'emblée", ecran, "useState(false);\n  const depose = deposeLa", "useState(true);\n  const depose = deposeLa"), style));
