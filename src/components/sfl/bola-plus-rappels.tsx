@@ -178,7 +178,6 @@ export function OuvertureBolaPlus() {
             {p.euros}&nbsp;€
           </span>
           <span className="bpr-ouverture__par">/ {p.par}</span>
-          {p.barre && <s className="bpr-ouverture__barre tabular-nums">{p.barre}&nbsp;€</s>}
         </p>
         <CompteARebours reste={reste} variante="grand" className="bpr-ouverture__temps" />
         <button

@@ -101,6 +101,19 @@ export const LIBELLE_REMISE = `−${REMISE_POUR_CENT}\u00a0%`;
 /** « 4 × 42,23 € sans frais » : sous la formule annuelle. */
 export const LIBELLE_ECHEANCES = `${ECHEANCES}\u00a0×\u00a0${montant(echeance(ANNUEL_CENTIMES, ECHEANCES))}\u00a0€ sans frais`;
 
+/**
+ * L'annuel affiché au mois sur le bouton Mensuel / Annuel : 13,90 €. Choix
+ * de Sabri (23/11/2026, sur la question posée) : afficher 13,90 € par mois et
+ * facturer 168,90 € par an, alors que 168,90 / 12 = 14,08 €. Ce n'est donc
+ * pas un calcul : c'est un prix d'affichage, écrit ici seulement, et la
+ * carte écrit toujours dessous ce qui est facturé (« Facturé 168,90 € par
+ * an »). Pour revenir au calcul exact : montant(echeance(ANNUEL_CENTIMES, 12)).
+ */
+export const ANNUEL_AFFICHE_PAR_MOIS_CENTIMES = 1390;
+export const ANNUEL_PAR_MOIS = montant(ANNUEL_AFFICHE_PAR_MOIS_CENTIMES);
+/** Ce que l'année fait économiser sur douze mois au mensuel, en centimes : 12 × 1 990 − 16 890 = 6 990 (sur le prix facturé). */
+export const ECONOMIE_ANNUEL_CENTIMES = 12 * MENSUEL_CENTIMES - ANNUEL_CENTIMES;
+
 /** L'intérêt d'un joueur : la formule qu'il a choisie (ou aucune), et quand. */
 export interface Interet {
   formule: Formule | null;
@@ -182,7 +195,7 @@ export const SFL_OFFICIEL = {
   annee: { prix: 24990, reference: 28000 },
 } as const;
 
-/** Ce que chaque formule « premiers joueurs » barre : le mois et l'année de la grille officielle. */
+/** La référence de chaque formule « premiers joueurs » : le mois et l'année de la grille officielle (jamais barrée à l'écran depuis le 23/11). */
 export const BARRE: Record<Formule, number> = { mensuel: SFL_OFFICIEL.mois, annuel: SFL_OFFICIEL.annee.prix };
 
 /** Un montant sans ses centimes s'ils sont nuls : 3500 → « 35 », 24990 → « 249,90 ». */
@@ -194,20 +207,50 @@ export const REMISE_GRILLE: Record<Formule, number> = {
   annuel: Math.floor(((BARRE.annuel - ANNUEL_CENTIMES) * 100) / BARRE.annuel),
 };
 
-/** La grille officielle, montrée barrée sur « Ton prix » : le prix et sa période. */
+/** La grille officielle, le prix et sa période (plus affichée depuis le 23/11 : rien de barré). */
 export const GRILLE_SFL: readonly { prix: string; par: string }[] = [
   { prix: prix(SFL_OFFICIEL.mois), par: "mois" },
   { prix: prix(SFL_OFFICIEL.saison.prix), par: "saison" },
   { prix: prix(SFL_OFFICIEL.annee.prix), par: "an" },
 ];
 
-/** Chaque formule : son prix, sa période, son barré, et la ligne dessous. */
-export const PRIX_FORMULE: Record<Formule, { euros: string; par: string; barre: string; sous: string }> = {
-  mensuel: { euros: MENSUEL, par: "mois", barre: prix(BARRE.mensuel), sous: "Sans engagement" },
-  annuel: { euros: ANNUEL, par: "an", barre: prix(BARRE.annuel), sous: LIBELLE_ECHEANCES },
+/**
+ * Ce que le prix « premiers joueurs » fait économiser sur la grille de la SFL,
+ * en centimes (Sabri, 23/11 : rien de barré, « je gagne des choses ») : le
+ * mois contre le mois de la grille (35 − 19,90 = 15,10), l'année contre
+ * l'année de la grille (249,90 − 168,90 = 81).
+ */
+export const ECONOMIE_GRILLE: Record<Formule, number> = {
+  mensuel: BARRE.mensuel - MENSUEL_CENTIMES,
+  annuel: BARRE.annuel - ANNUEL_CENTIMES,
 };
 
-/** Le prix de Bola Plus seul, barré sur sa carte : « 9,90 ». */
+/**
+ * Chaque formule : son prix et sa période (l'ouverture), son prix au mois
+ * (le bouton Mensuel / Annuel de « Ton prix », 23/11), ce qu'elle fait
+ * économiser sur la grille, ce qui est facturé, et la ligne dessous. Aucun
+ * prix barré (23/11) : l'économie se dit en positif.
+ */
+export const PRIX_FORMULE: Record<Formule, { euros: string; par: string; mois: string; economie: string; facture: string; sous: string }> = {
+  mensuel: {
+    euros: MENSUEL,
+    par: "mois",
+    mois: MENSUEL,
+    economie: `${prix(ECONOMIE_GRILLE.mensuel)}\u00a0€ économisés chaque mois`,
+    facture: `Facturé ${MENSUEL}\u00a0€ chaque mois`,
+    sous: "Sans engagement",
+  },
+  annuel: {
+    euros: ANNUEL,
+    par: "an",
+    mois: ANNUEL_PAR_MOIS,
+    economie: `${prix(ECONOMIE_GRILLE.annuel)}\u00a0€ économisés sur l'année`,
+    facture: `Facturé ${ANNUEL}\u00a0€ par an`,
+    sous: LIBELLE_ECHEANCES,
+  },
+};
+
+/** Le prix de Bola Plus seul : « 9,90 » (plus affiché depuis le 23/11 : la carte dit « Offert »). */
 export const BOLA_PLUS_SEUL = prix(BOLA_PLUS_SEUL_CENTIMES);
 
 /** Ce que contient le bundle, dans l'ordre : Bola Plus, les maillots, la prise de stats, la gamification (ta carte), la SFL. */

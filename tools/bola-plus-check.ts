@@ -73,6 +73,9 @@ import {
   GRILLE_SFL,
   LARGEURS,
   LIBELLE_ECHEANCES,
+  ECONOMIE_GRILLE,
+  ANNUEL_PAR_MOIS,
+  ECONOMIE_ANNUEL_CENTIMES,
   LIBELLE_REMISE,
   MENSUEL,
   MENSUEL_CENTIMES,
@@ -120,6 +123,10 @@ assert.ok(Math.abs(REMISE - (1 - 16890 / 23880)) < 1e-12, "la remise : 1 − 16 
 assert.equal(REMISE_POUR_CENT, 29, "29,27 % arrondis vers le bas");
 assert.equal(LIBELLE_REMISE, `−29${NBSP}%`);
 assert.equal(LIBELLE_ECHEANCES, `4${NBSP}×${NBSP}42,23${NBSP}€ sans frais`);
+// L'annuel affiché au mois (choix de Sabri, 23/11) : 13,90 €, un prix d'affichage (168,90 / 12 = 14,08) ; l'économie se compte sur le prix facturé.
+assert.equal(ANNUEL_PAR_MOIS, "13,90");
+assert.equal(ECONOMIE_ANNUEL_CENTIMES, 6990);
+assert.deepEqual(ECONOMIE_GRILLE, { mensuel: 1510, annuel: 8100 }, "35 − 19,90 et 249,90 − 168,90 (23/11 : l'économie en positif, rien de barré)");
 // La remise et l'échéance, rejouées par des calculs qu'on peut fausser (les mutants, plus bas).
 const remiseJuste = (pourCent: (mois: number, an: number) => number) => {
   assert.equal(pourCent(1990, 16890), 29, "−29 % pour 19,90 € et 168,90 €");
@@ -502,7 +509,7 @@ async function banc() {
   const tout = (d: string): string[] => readdirSync(d, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? tout(join(d, e.name)) : [join(d, e.name)]));
   for (const f of tout(SRC)) assert.ok(!/klarna/i.test(readFileSync(f, "utf8")), `${f} nomme Klarna`);
   // Les prix : une seule source. Aucun montant de l'offre ailleurs que dans lib/sfl/bola-plus.ts.
-  const MONTANTS = /(?<![\d,.])(19[,.]90?|168[,.]90?|42[,.]2[235]|1990|16890|4223)(?![\d,.])|[−-][\s\u00a0]?(29|30)[\s\u00a0]?%/;
+  const MONTANTS = /(?<![\d,.])(19[,.]90?|16[68][,.]80?|168[,.]90?|13[,.]90?|42[,.]2[235]|1990|16890|16680|4223|4170|1390)(?![\d,.])|[−-][\s\u00a0]?(29|30)[\s\u00a0]?%/;
   const uneSource = (f: string, texte: string) => {
     const sansNotes = texte.replace(/^\s*(\/\/|\*|\/\*).*$/gm, "");
     const trouve = MONTANTS.exec(sansNotes);
@@ -573,8 +580,9 @@ async function banc() {
     { prix: "249,90", par: "an" },
   ]);
   assert.deepEqual(PRIX_FORMULE, {
-    mensuel: { euros: MENSUEL, par: "mois", barre: "35", sous: "Sans engagement" },
-    annuel: { euros: ANNUEL, par: "an", barre: "249,90", sous: LIBELLE_ECHEANCES },
+    mensuel: { euros: MENSUEL, par: "mois", mois: MENSUEL, economie: `15,10${NBSP}€ économisés chaque mois`, facture: `Facturé 19,90${NBSP}€ chaque mois`, sous: "Sans engagement" },
+    // L'annuel au mois (bouton Mensuel / Annuel, 23/11) : 13,90 €, et 81 € économisés sur l'année de la grille.
+    annuel: { euros: ANNUEL, par: "an", mois: "13,90", economie: `81${NBSP}€ économisés sur l'année`, facture: `Facturé 168,90${NBSP}€ par an`, sous: LIBELLE_ECHEANCES },
   });
   // Le bundle : Bola Plus, les maillots, les stats, la carte, la SFL.
   const bundleJuste = (b: readonly string[]) => assert.deepEqual([...b], ["bola-plus", "maillots", "stats", "carte", "sfl"], "le bundle est complet, dans l'ordre");
@@ -779,7 +787,7 @@ async function banc() {
     const tuile = bloc("TuileBolaPlus");
     const sansCommentaire = tsx.replace(/^\s*\/\/.*$/gm, "").replace(/\{\/\*[\s\S]*?\*\/\}/g, "");
     // Aucun montant en dur, aucune couleur écrite : tout vient de lib/sfl/bola-plus.ts.
-    assert.ok(!/(?<![\w/[.-])(19|20|35|119|140|168|249|280|29|30|32|42|43|90|990|1990|16890|3500|4223)(?![\w\]])/.test(sansCommentaire.replace(/size-\[\d+px\]|\[\d+px\]/g, "")), "aucun prix écrit en dur dans l'écran");
+    assert.ok(!/(?<![\w/[.-])(19|20|35|119|140|168|249|280|29|30|32|42|43|90|990|1990|16890|16680|166|13|1390|3500|4223)(?![\w\]])/.test(sansCommentaire.replace(/size-\[\d+px\]|\[\d+px\]/g, "")), "aucun prix écrit en dur dans l'écran");
     assert.ok(!/sans frais|en \d+ fois|×/.test(sansCommentaire), "les 4 fois ne s'écrivent que dans la source");
     assert.ok(!/#[0-9a-f]{3,8}\b/i.test(sansCommentaire), "aucune teinte écrite dans l'écran (PALETTE)");
     assert.ok(/"--bp-prix": PALETTE\.prix/.test(tsx) && /style=\{COULEURS\}/.test(page), "la page pose la palette en variables");
@@ -816,7 +824,9 @@ async function banc() {
     assert.equal(offre.match(/disabled=\{occupe\}/g)?.length, 3, "l'offre : formules, bouton et « Annuler » gelés pendant l'envoi");
     assert.ok(/if \(!interet\) onChoix\(f\);\s*else if \(interet\.formule !== f\) noter\(f\);/.test(offre), "une fois noté, toucher une formule la change");
     // Les prix de l'offre : PRIX_FORMULE, avec le barré et la ligne dessous ; rien ne les cache.
-    assert.ok(/const p = PRIX_FORMULE\[f\];/.test(offre) && /<Barre somme=\{p\.barre\} \/>/.test(offre) && /\{p\.sous\}/.test(offre), "chaque formule : son prix, son barré, sa ligne");
+    assert.ok(/const p = PRIX_FORMULE\[f\];/.test(offre) && /\{p\.economie\}/.test(offre) && /\{p\.sous\}/.test(offre), "chaque formule : son prix, son économie, sa ligne");
+    // Rien de barré (Sabri, 23/11 : « des trucs que tu me donnes, pas des trucs que tu me barres »).
+    assert.ok(!/<s[\s>]|<del[\s>]|line-through/.test(sansCommentaire) && !/line-through/.test(css), "aucun prix barré sur la page");
     // Et ses ballons de Bola Studio (studio.ts), juste sous la ligne du dessous.
     assert.ok(/<span className="bp-formule__ballons tabular-nums">\{BALLONS_FORMULE\[f\]\}<\/span>/.test(offre) && offre.indexOf("{BALLONS_FORMULE[f]}") > offre.indexOf("{p.sous}"), "chaque formule porte ses ballons, sous sa ligne");
     assert.ok(/import \{ BALLONS_FORMULE \} from "@\/lib\/sfl\/studio";/.test(tsx), "les ballons des formules viennent de studio.ts");
@@ -832,7 +842,7 @@ async function banc() {
     assert.ok(/srcSet=\{sourcesVisuel\(/.test(photo) && /sizes=\{TAILLES\}/.test(photo) && /loading="lazy"/.test(photo), "les visuels : trois tailles, chargés quand on y arrive");
     // Les mots de l'écran : une liste fermée. Ni sous-titre, ni texte d'aide.
     const mots = [...new Set([...sansCommentaire.replace(/&apos;/g, "'").matchAll(/>\s*([^<>{}\n;()=]*[A-Za-zÀ-ÿ][^<>{}\n;()=]*?)\s*</g)].map((m) => m[1].trim()))].sort();
-    assert.deepEqual(mots, ["Annuler", "Bola Plus", "C'est noté", "Je suis intéressé", "Offert", "Prix premiers joueurs", "Toi"], "les mots de l'écran : une liste fermée");
+    assert.deepEqual(mots, ["/ mois", "Annuler", "Bola Plus", "C'est noté", "Je suis intéressé", "Offert", "Prix premiers joueurs", "Toi"], "les mots de l'écran : une liste fermée");
     // La feuille : aimantée, sans teinte écrite (seulement les variables de la page), le mouvement réduit traité.
     const sansNotes = css.replace(/\/\*[\s\S]*?\*\//g, "");
     assert.ok(/scroll-snap-type: x mandatory;/.test(sansNotes) && /scroll-snap-align: center;/.test(sansNotes) && /scroll-snap-stop: always;/.test(sansNotes), "le rail est aimanté, carte par carte");
@@ -920,13 +930,13 @@ async function banc() {
   refuse("les segments muets", () => ecranJuste(mute("segments", ecran, 'aria-current={i === actif ? "true" : undefined}', ""), style));
   refuse("un texte d'aide", () => ecranJuste(mute("aide", ecran, "      <div className=\"bp-pied\" aria-hidden />", "      <p>Glisse pour voir la suite.</p>\n      <div className=\"bp-pied\" aria-hidden />"), style));
   refuse("une fausse carte à la place de la vraie", () => ecranJuste(mute("carte", ecran, '<BolaCard name={CARTE_TOI.name} ', '<BolaCard name={CARTE_TOI.name} photo="/bola/joueur.jpg" '), style));
-  refuse("le barré retiré", () => ecranJuste(mute("barré", ecran, "                  <Barre somme={p.barre} />\n", ""), style));
+  refuse("un prix barré", () => ecranJuste(mute("barré", ecran, '<span className="bp-formule__par">/ mois</span>\n', '<span className="bp-formule__par">/ mois</span>\n<s>{p.facture}</s>\n'), style));
   refuse("les 4 fois en dur", () => ecranJuste(mute("4 fois", ecran, "{p.sous}</span>", "4 × 42,23 € sans frais</span>"), style));
   refuse("les prix cachés sur petit écran", () => ecranJuste(mute("caché", ecran, 'className="bp-formule__sous tabular-nums"', 'className="bp-formule__sous tabular-nums max-[359px]:hidden"'), style));
   refuse("le visuel déposé avant d'être chargé", () => ecranJuste(mute("d'emblée", ecran, "useState(false);\n  const depose = deposeLa", "useState(true);\n  const depose = deposeLa"), style));
-  refuse("les ballons des formules retirés", () => ecranJuste(mute("ballons retirés", ecran, '                <span className="bp-formule__ballons tabular-nums">{BALLONS_FORMULE[f]}</span>\n', ""), style));
+  refuse("les ballons des formules retirés", () => ecranJuste(mute("ballons retirés", ecran, '              <span className="bp-formule__ballons tabular-nums">{BALLONS_FORMULE[f]}</span>\n', ""), style));
   refuse("les ballons des formules cachés", () => ecranJuste(mute("ballons cachés", ecran, 'className="bp-formule__ballons tabular-nums"', 'className="bp-formule__ballons tabular-nums hidden"'), style));
-  refuse("les ballons des formules au-dessus des 4 fois", () => ecranJuste(mute("ballons avant", ecran, '                <span className="bp-formule__sous tabular-nums">{p.sous}</span>\n                <span className="bp-formule__ballons tabular-nums">{BALLONS_FORMULE[f]}</span>', '                <span className="bp-formule__ballons tabular-nums">{BALLONS_FORMULE[f]}</span>\n                <span className="bp-formule__sous tabular-nums">{p.sous}</span>'), style));
+  refuse("les ballons des formules au-dessus des 4 fois", () => ecranJuste(mute("ballons avant", ecran, '              <span className="bp-formule__sous tabular-nums">{p.sous}</span>\n              <span className="bp-formule__ballons tabular-nums">{BALLONS_FORMULE[f]}</span>', '              <span className="bp-formule__ballons tabular-nums">{BALLONS_FORMULE[f]}</span>\n              <span className="bp-formule__sous tabular-nums">{p.sous}</span>'), style));
   refuse("« Ton studio » sans ses ballons du mois", () => ecranJuste(mute("pied", ecran, "          {Pied && <Pied />}\n", ""), style));
   refuse("« Ton studio » dessiné par un autre visuel", () => ecranJuste(mute("visuel studio", ecran, "  studio: VisuelStudio,\n", "  studio: VisuelCarte,\n"), style));
   refuse("« Ton studio » retiré du carrousel", () => avantagesJustes(AVANTAGES.filter((a) => a.id !== "studio")));

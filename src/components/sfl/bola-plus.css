@@ -160,12 +160,6 @@
   font-style: normal;
   line-height: 1;
 }
-.bp-barre-prix {
-  font-size: 15px;
-  font-weight: 600;
-  color: color-mix(in srgb, currentColor 58%, transparent);
-  text-decoration-thickness: 1.5px;
-}
 
 /* ── 1 · L'ouverture : le stade gris, teint en violet en haut et en vert en
    bas (fusion « color »), puis la nuit sous les mots. ── */
@@ -353,9 +347,6 @@
   align-items: baseline;
   gap: 12px;
 }
-.bp-offert .bp-barre-prix {
-  font-size: 22px;
-}
 /* « Offert » : en lime sur la nuit violette ; en clair, l'étiquette lime à l'encre de nuit. */
 .bp-offert__mot {
   font-family: var(--font-barlow), "Barlow Condensed", sans-serif;
@@ -502,11 +493,13 @@
 
 /* ── 9 · Ton prix : la nuit en sombre, le blanc en clair. ── */
 .bp-prix {
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
-  gap: 12px;
-  padding: 18px 18px 18px;
+  /* Nombre d'or (Sabri, 23/11) : le haut (ce que tu reçois) et le bas (ton
+     prix) se partagent la carte 1 : 1,618 ; les écarts suivent Fibonacci
+     (8, 13, 21) et les tailles de l'offre 13 / 21 / 34. */
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) minmax(min-content, 1.618fr);
+  gap: 13px;
+  padding: 21px 21px 21px;
   background:
     radial-gradient(80% 36% at 20% 0%, color-mix(in srgb, var(--bp-plus-vif) 30%, transparent), transparent 70%),
     radial-gradient(80% 36% at 90% 18%, color-mix(in srgb, var(--bp-sfl-vif) 22%, transparent), transparent 70%),
@@ -522,14 +515,20 @@
     #fff;
   box-shadow: inset 0 0 0 1px rgb(10 11 13 / 0.08);
 }
-/* Le haut : le bundle et, juste dessous, la grille officielle barrée, ensemble au milieu de la place libre. */
+/* Le haut : le bundle, ce que tu reçois, au milieu de sa part. */
 .bp-prix__haut {
   display: flex;
-  flex: 1 0 auto;
   flex-direction: column;
   justify-content: center;
-  gap: 14px;
+  gap: 13px;
   min-height: 0;
+}
+/* Le bas : l'étiquette, le bouton Mensuel / Annuel, le prix, posés en bas de leur part. */
+.bp-prix__bas {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 13px;
 }
 /* Le bundle : ce que tu reçois, une pièce après l'autre. */
 .bp-bundle {
@@ -574,24 +573,6 @@
   background: rgb(10 11 13 / 0.05);
   box-shadow: inset 0 0 0 1px rgb(10 11 13 / 0.1);
 }
-.bp-grille {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: center;
-  gap: 4px 10px;
-  margin: 0;
-  font-size: 12px;
-  font-weight: 600;
-  color: color-mix(in srgb, currentColor 55%, transparent);
-}
-/* Le sigle SFL devant la grille : c'est la sienne, sans un mot de plus. */
-.bp-grille__sigle {
-  opacity: 0.8;
-}
-.bp-grille s {
-  text-decoration-thickness: 1.5px;
-}
 .bp-prix__etiquette {
   margin-top: 2px;
 }
@@ -624,16 +605,31 @@
   color: color-mix(in srgb, currentColor 60%, transparent);
 }
 .bp-formule__prix {
-  font-size: 30px;
+  font-size: 34px;
   line-height: 0.9;
 }
 .bp-formule__par {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   color: color-mix(in srgb, currentColor 72%, transparent);
 }
-.bp-formule .bp-barre-prix {
-  font-size: 14px;
+/* L'annuel ramené au mois, et ce qu'il fait économiser sur le mensuel (23/11). */
+.bp-formule__mois {
+  font-size: 13px;
+  font-weight: 700;
+}
+.bp-formule__economie {
+  display: inline-flex;
+  align-self: flex-start;
+  align-items: center;
+  height: 20px;
+  padding: 0 7px;
+  border-radius: 6px;
+  background: var(--bp-prix);
+  color: var(--bp-nuit);
+  font-size: 11px;
+  font-weight: 800;
+  white-space: nowrap;
 }
 .bp-formule__sous {
   font-size: 13px;
@@ -860,7 +856,6 @@ html[data-clavier] .bp-barre {
   .bp-formule__prix {
     font-size: 26px;
   }
-  .bp-formule .bp-barre-prix,
   .bp-formule__par {
     font-size: 13px;
   }
@@ -931,5 +926,67 @@ html[data-clavier] .bp-barre {
     color: var(--bp-nuit);
     border: 1.5px solid var(--bp-prix);
     background-color: var(--bp-prix);
+  }
+}
+
+/* Le bouton Mensuel / Annuel de « Ton prix » (23/11, « comme dans Wispr Flow »). */
+.bp-bascule {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.08);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.1);
+}
+.bp-bascule__choix {
+  height: 40px;
+  border-radius: 999px;
+  font-size: 15px;
+  font-weight: 700;
+  color: color-mix(in srgb, currentColor 72%, transparent);
+  transition:
+    background-color 0.2s ease,
+    color 0.2s ease;
+}
+.bp-bascule__choix--choisi {
+  background: var(--bp-prix);
+  color: var(--bp-nuit);
+}
+:root:not(.dark) .bp-bascule {
+  background: rgb(10 11 13 / 0.05);
+  box-shadow: inset 0 0 0 1px rgb(10 11 13 / 0.1);
+}
+:root:not(.dark) .bp-bascule__choix--choisi {
+  background: var(--bp-nuit);
+  color: #fff;
+}
+/* Les deux faces l'une sur l'autre : la carte prend la hauteur de la plus haute. */
+.bp-offre {
+  display: grid;
+  padding: 13px 21px;
+  border-radius: 20px;
+  background: rgb(255 255 255 / 0.06);
+  box-shadow: inset 0 0 0 2px var(--bp-prix);
+}
+:root:not(.dark) .bp-offre {
+  background: rgb(10 11 13 / 0.03);
+  box-shadow: inset 0 0 0 2px var(--bp-nuit);
+}
+.bp-offre__face {
+  grid-area: 1 / 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: opacity 0.2s ease;
+}
+.bp-offre__face[data-off] {
+  visibility: hidden;
+  opacity: 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  .bp-bascule__choix,
+  .bp-offre__face {
+    transition: none;
   }
 }
