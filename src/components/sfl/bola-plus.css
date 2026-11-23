@@ -80,25 +80,28 @@
   height: 100%;
 }
 
-/* Les titres de la page : Barlow Condensed 800 en capitales (la police des
-   cartes, déjà chargée). La piste B (Archivo large et penchée) ne s'applique
-   que si sa police est chargée ; sinon on retombe sur Barlow. */
-.bp-titre {
+/* Les titres de la page : Archivo Expanded 900, droite, en capitales (choix
+   de Sabri, 23/11, piste F). Barlow Condensed 800 reste la police de repli.
+   Le sélecteur est renforcé : les styles d'essai de l'interface
+   (styles-ui*.css, « :root[data-style] section h2 ») passent sinon les
+   titres en Anton. */
+:root:root .bp-titre.bp-titre {
   margin: 0;
-  font-family: var(--font-barlow), "Barlow Condensed", sans-serif;
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: -0.01em;
-  line-height: 0.92;
-  text-wrap: balance;
-}
-.bp[data-police="archivo"] .bp-titre {
-  font-family: var(--font-archivo, var(--font-barlow)), sans-serif;
+  font-family: var(--font-archivo, var(--font-barlow)), "Barlow Condensed", sans-serif;
   font-weight: 900;
-  font-style: italic;
   font-stretch: 125%;
+  text-transform: uppercase;
   letter-spacing: -0.02em;
   line-height: 0.95;
+  text-wrap: balance;
+}
+/* L'ancienne police, si on y revient (POLICE_TITRES = "barlow"). */
+.bp[data-police="barlow"] .bp-titre.bp-titre.bp-titre {
+  font-family: var(--font-barlow), "Barlow Condensed", sans-serif;
+  font-weight: 800;
+  font-stretch: normal;
+  letter-spacing: -0.01em;
+  line-height: 0.92;
 }
 .bp[data-police="archivo"] :is(.bp-photo-carte__titre, .bp-texte__titre) {
   font-size: clamp(24px, 7.8vw, 30px);
@@ -1035,4 +1038,19 @@ html[data-clavier] .bp-barre {
 }
 .bp-bola27__sous {
   text-align: center;
+}
+
+/* Archivo Expanded est plus large que Barlow Condensed : les titres des
+   feuilles (fiches, Bola Studio) et les noms des vignettes se resserrent
+   pour tenir sur une ligne ou deux. */
+.bp-titre.st-panneau__titre {
+  font-size: clamp(22px, 7vw, 28px);
+}
+.bp-titre.st-vignette__nom {
+  font-size: max(6.6cqw, 10px);
+}
+@supports not (width: 1cqw) {
+  .bp-titre.st-vignette__nom {
+    font-size: 12.5px;
+  }
 }

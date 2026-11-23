@@ -45,11 +45,9 @@
 // Aucun paiement, aucun formulaire, aucun texte d'aide. Les montants sont
 // écrits et calculés dans lib/sfl/bola-plus.ts, jamais ici ; les couleurs
 // aussi (PALETTE, posée en variables CSS sur la page). Les titres de la page
-// sont en Barlow Condensed (POLICE_TITRES, déjà chargée par layout.tsx pour les
-// cartes) ; la piste Archivo (téléchargée chez Google au build) n'est
-// branchée que si Sabri la retient : en développement, « ?police=b » la
-// demande à la feuille, qui retombe sur Barlow tant que la police n'est pas
-// chargée. Un avantage de plus s'ajoute dans AVANTAGES et, s'il dessine son
+// sont en Archivo Expanded 900 (POLICE_TITRES, choix de Sabri le 23/11 sur la
+// planche des six polices ; chargée par layout.tsx) ; la feuille retombe sur
+// Barlow Condensed tant qu'elle n'est pas chargée. Un avantage de plus s'ajoute dans AVANTAGES et, s'il dessine son
 // visuel, dans COMPOSANTS (et sa ligne sous le titre dans PIEDS) : rien
 // d'autre à toucher ici. Bola Studio est entré ainsi.
 //
@@ -650,8 +648,8 @@ function BarreInteret({ note, occupe, cachee, onNoter, onVoirOffre }: { note: bo
 
 /* ------------------------------ La page ------------------------------ */
 
-/** La police des titres de la page : Barlow Condensed (recommandée, déjà chargée) ; « archivo », la piste B. */
-export const POLICE_TITRES: "barlow" | "archivo" = "barlow";
+/** La police des titres de la page : Archivo Expanded 900 (choix de Sabri, 23/11) ; « barlow », l'ancienne. */
+export const POLICE_TITRES: "barlow" | "archivo" = "archivo";
 
 const sansAbonnement = () => () => {};
 /** La piste B, en développement seulement : « ?police=b ». */
