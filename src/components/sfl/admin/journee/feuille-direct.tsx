@@ -18,6 +18,16 @@
 // Sur une feuille ouverte il la scelle (ses chiffres entrent dans la
 // saison) ; sinon il pose le résultat comme toujours. La feuille s'ouvre par
 // sa ligne, dessous.
+//
+// Le soir de la J7, deux leçons de plus :
+//   · un match sans aucun chiffre (matchSansChiffre) ne se finit pas d'un
+//     toucher : « Fin du match » devient « Finir à 0 – 0 ? », et c'est le
+//     second toucher qui scelle. La feuille du match 3, prise puis scellée
+//     vide, avait posé 0 – 0 et onze MVP ;
+//   · quand la base refuse les envois de cet appareil, le Direct le dit en
+//     haut, en noir, avec la synchro dessous (Renvoyer, Reprendre la base).
+//     Le score affiché ici est celui de l'appareil : pendant une heure, les
+//     + et les − du Mac sont restés sur le Mac, et rien ne le montrait.
 
 import { useState } from "react";
 import { ChevronRight } from "lucide-react";
@@ -26,7 +36,8 @@ import { FeuilleDirecte } from "@/components/sfl/admin/feuille-directe";
 import { PastilleMaillot } from "@/components/sfl/point-maillot";
 import { FeuilleDuMatch } from "@/components/sfl/direct/feuille-du-match";
 import type { FeuillesDirect } from "@/hooks/use-feuilles-direct";
-import { MOTS_DU_REFUS, scoreDeLaFeuille } from "@/lib/sfl/feuille-direct";
+import { matchSansChiffre, MOTS_DU_REFUS, scoreDeLaFeuille } from "@/lib/sfl/feuille-direct";
+import { Synchro, useEtatSynchro } from "@/components/sfl/admin/synchro";
 import { finDuMatch } from "@/lib/sfl/saisie/mutations";
 import type { Saison } from "@/lib/sfl/saisie/types";
 import { haptique } from "@/lib/sfl/haptique";
@@ -55,6 +66,9 @@ export function FeuilleDirect({
 }) {
   const [ouverte, setOuverte] = useState<MatchVu | null>(null);
   const [envoi, setEnvoi] = useState<number | null>(null);
+  /** Le match vide dont « Fin du match » attend le second toucher. */
+  const [aConfirmer, setAConfirmer] = useState<number | null>(null);
+  const refus = useEtatSynchro() === "refus";
   async function sceller(m: MatchVu) {
     setEnvoi(m.n);
     const r = await direct.sceller(m.m.equipes);
@@ -73,6 +87,15 @@ export function FeuilleDirect({
   }
   return (
     <Feuille open={open} onOpenChange={onOpenChange} titre={`Direct · J${j}`} etat={<PastilleEtat etat="en-direct" />} haute>
+      {refus && (
+        <div role="alert" className="mb-3 rounded-[22px] bg-foreground px-4 py-3 text-background">
+          <p className="text-lecture font-semibold leading-snug">! La base refuse tes envois</p>
+          <p className="mono-label mt-1 opacity-80">Ces chiffres restent sur cet appareil</p>
+          <div className="mt-3 rounded-2xl bg-background p-3 text-foreground">
+            <Synchro saison={saison} nu />
+          </div>
+        </div>
+      )}
       <div className="flex flex-col gap-2">
         {matchs
           .filter((m) => m.noirs.length && m.blancs.length)
@@ -80,6 +103,8 @@ export function FeuilleDirect({
             const f = direct.feuilleDe(m.m.equipes);
             const score = f && !f.fin ? scoreDeLaFeuille(saison, j, m.m.equipes, f.compteurs) : m.score;
             const fini = f ? !!f.fin : saison.entries.some((e) => e.j === j && e.team === m.m.equipes[0] && e.result);
+            const vide = !fini && matchSansChiffre(saison, j, m.m.equipes, f && !f.fin ? f.compteurs : {});
+            const confirme = aConfirmer === m.n;
             return (
               <div key={m.n} className="glass flex flex-col gap-2 rounded-[22px] px-4 py-3">
                 <div className="flex items-center gap-3">
@@ -93,13 +118,20 @@ export function FeuilleDirect({
                     type="button"
                     disabled={envoi === m.n}
                     onClick={() => {
+                      // Un match sans aucun chiffre : le second toucher seulement.
+                      if (vide && !confirme) {
+                        haptique.refus();
+                        setAConfirmer(m.n);
+                        return;
+                      }
+                      setAConfirmer(null);
                       // Une feuille ouverte : c'est elle qui porte les chiffres du match, « Fin du match » la scelle.
                       if (f && !f.fin) void sceller(m);
                       else if (faire((s) => finDuMatch(s, j, m.m.equipes), `Fin du match ${m.n} · ${m.score[0]} – ${m.score[1]}`)) haptique.sceau();
                     }}
                     className={fini ? "bouton-secondaire h-11 px-4 text-corps font-semibold" : "bouton-principal h-11 px-4 text-corps font-semibold"}
                   >
-                    {fini ? "✓ Fin" : "Fin du match"}
+                    {fini ? "✓ Fin" : confirme ? "Finir à 0 – 0 ?" : "Fin du match"}
                   </button>
                 </div>
                 {f && (

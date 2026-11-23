@@ -157,6 +157,22 @@ export function compte(c: Compteurs, joueur: string, quoi: Compteur): number {
   return typeof v === "number" && Number.isFinite(v) ? Math.max(0, Math.trunc(v)) : 0;
 }
 
+/**
+ * Un match sans aucun chiffre : ni sur sa feuille (compteurs), ni sur ses
+ * lignes (buts, passes, arrêts, interceptions, csc). Le finir pose « 0 – 0,
+ * Nul » à tous et fait de chacun un MVP ex æquo : la J7 du 22/11/2026, une
+ * feuille du match 3 prise puis scellée vide, deux fois, pendant que la vraie
+ * saisie restait sur un autre appareil. « Fin du match » le demande donc deux
+ * fois (feuille-direct.tsx). Un vrai 0 – 0 reste possible.
+ */
+export function matchSansChiffre(saison: Pick<Saison, "entries">, j: number, equipes: Equipes, c: Compteurs = {}): boolean {
+  return lignesDuMatch(saison, j, equipes).every(
+    ({ e }) =>
+      COMPTEURS.every((q) => compte(c, e.player, q) === 0) &&
+      !(e.buts > 0 || e.passes > 0 || (e.arrets ?? 0) > 0 || (e.interceptions ?? 0) > 0 || (e.teamScoreBonus ?? 0) > 0)
+  );
+}
+
 /** Les compteurs avec quelques gestes de plus (0 à 99, comme public.compter_feuille). */
 export function avecGestes(c: Compteurs, gestes: readonly Geste[]): Compteurs {
   const out: Compteurs = { ...c };

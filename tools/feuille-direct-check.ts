@@ -13,6 +13,7 @@ import {
   etatDeLaFeuille,
   joueursDuMatch,
   libelleEntree,
+  matchSansChiffre,
   minuteDe,
   peutPrendre,
   pileDuJournal,
@@ -197,4 +198,17 @@ console.log("feuille-direct-check : ok");
   assert.equal(avecFeuille([neuve], f("2026-11-01T10:00:04.100000+00:00", 2))[0].compteurs.Ilyes.buts, 3);
   assert.equal(avecFeuille([neuve], f("2026-11-01T10:00:06+00:00", 4))[0].compteurs.Ilyes.buts, 4);
   assert.equal(avecFeuille([neuve], { ...f("2026-11-01T10:00:00+00:00", 0), noirs: "Noirs 2", blancs: "Blancs 2" }).length, 2);
+}
+
+// 22/11/2026 (J7, le soir) · Un match sans aucun chiffre : « Fin du match »
+// demande un second toucher (feuille-direct.tsx). Un chiffre, sur la feuille
+// ou sur une ligne, suffit à le rendre normal.
+{
+  const v: Pick<Saison, "entries"> = { entries: [L(9, "Ilyes", "Noirs 1"), L(9, "Théo", "Blancs 1"), L(9, "Anis", "Noirs 2", { buts: 3 })] };
+  assert.equal(matchSansChiffre(v, 9, N1), true);
+  assert.equal(matchSansChiffre(v, 9, N1, { Ilyes: { buts: 0 } }), true);
+  assert.equal(matchSansChiffre(v, 9, N1, { Théo: { arrets: 1 } }), false);
+  assert.equal(matchSansChiffre({ entries: [L(9, "Ilyes", "Noirs 1", { passes: 1 })] }, 9, N1), false);
+  // Les chiffres d'un autre match ne comptent pas.
+  assert.equal(matchSansChiffre(v, 9, N1, { Anis: { buts: 2 } }), true);
 }
