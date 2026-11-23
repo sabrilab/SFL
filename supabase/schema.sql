@@ -10038,6 +10038,144 @@ $$;
 revoke execute on function public.publier_brouillons_echus() from public, anon, authenticated;
 grant execute on function public.publier_brouillons_echus() to service_role;
 
+-- ─────────────── Le chrono du match (23/11/2026) ───────────────
+-- Sabri, 23/11 : « ce serait cool aussi de pouvoir avoir accès à un chrono.
+-- […] 2 mi-temps de 30 minutes, avec un chrono qui se lancerait dès que le
+-- match se lance, avec un coup de sifflet dès que c'est la mi-temps. Pouvoir
+-- rajouter des minutes additionnelles aussi […] ou retirer des minutes. »
+--
+-- Une ligne par match (saison, journée, Noirs N, Blancs N), à part de la
+-- saison : un geste sur le chrono ne publie pas la saison, ne se heurte à
+-- aucune version, et deux appareils de l'admin (la tablette et le Mac) ne
+-- peuvent pas se contredire. Le chrono ne garde que des instants de la base
+-- (now()), jamais l'heure d'un appareil : chaque écran recalcule le temps
+-- écoulé, et un rechargement le retrouve tel quel. Les minutes en plus ou en
+-- moins s'ajoutent (+1 sur deux appareils à la fois : +2), sans rien écraser.
+-- La même règle côté app : lib/sfl/chrono-match.ts. Lecture : la ligue ;
+-- écriture : l'admin, par chrono_direct seulement.
+create table if not exists public.chronos_direct (
+  saison   int  not null,
+  j        int  not null,
+  noirs    text not null,
+  blancs   text not null,
+  -- La mi-temps en cours : 1, puis 2.
+  mt       smallint not null default 1 check (mt in (1, 2)),
+  -- Son coup d'envoi ; null : le match n'est pas lancé.
+  lance_le timestamptz,
+  -- Les minutes ajoutées (ou retirées, en négatif) à chaque mi-temps de 30.
+  ajout1   smallint not null default 0 check (ajout1 between -29 and 30),
+  ajout2   smallint not null default 0 check (ajout2 between -29 and 30),
+  par      uuid references public.profiles(id) on delete set null,
+  par_nom  text,
+  maj_le   timestamptz not null default now(),
+  primary key (saison, j, noirs, blancs)
+);
+create index if not exists chronos_direct_par on public.chronos_direct (par);
+
+alter table public.chronos_direct enable row level security;
+drop policy if exists "chronos_direct: lecture ligue" on public.chronos_direct;
+create policy "chronos_direct: lecture ligue"
+  on public.chronos_direct for select
+  to authenticated
+  using ((select public.est_membre()));
+revoke insert, update, delete, truncate on public.chronos_direct from anon, authenticated;
+grant select on public.chronos_direct to authenticated;
+
+do $$
+begin
+  alter publication supabase_realtime add table public.chronos_direct;
+exception
+  when duplicate_object then null;
+  when undefined_object then null;
+end;
+$$;
+
+-- Un geste sur le chrono d'un match : « lancer » (le coup d'envoi), « seconde »
+-- (la 2e mi-temps), « ajout » (p_minutes, +1 ou −1, sur la mi-temps en
+-- cours), « remettre » (à zéro). Rend { ok, chrono, maintenant } :
+-- `maintenant`, l'heure de la base, recale l'horloge de l'appareil.
+create or replace function public.chrono_direct(p_j int, p_noirs text, p_blancs text, p_geste text, p_minutes int default 0)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  moi uuid := auth.uid();
+  nom text;
+  n   int;
+  c   public.chronos_direct;
+  d   int := greatest(-5, least(5, coalesce(p_minutes, 0)));
+begin
+  if not public.is_league_admin() then
+    raise exception 'Réservé à l''admin.' using errcode = '42501';
+  end if;
+  select p.name into nom from public.profiles p where p.id = moi;
+  select coalesce(public.entier_sur(s.data ->> 'numero'), 0) into n from public.saison s where s.id = 1;
+  n := coalesce(n, 0);
+  if p_geste = 'lancer' then
+    -- Lancé deux fois (deux appareils) : le premier coup d'envoi reste.
+    insert into public.chronos_direct (saison, j, noirs, blancs, mt, lance_le, par, par_nom)
+    values (n, p_j, p_noirs, p_blancs, 1, now(), moi, nom)
+    on conflict (saison, j, noirs, blancs) do update
+      set lance_le = now(), mt = 1, par = moi, par_nom = nom, maj_le = now()
+      where public.chronos_direct.lance_le is null
+    returning * into c;
+  elsif p_geste = 'seconde' then
+    update public.chronos_direct x
+       set mt = 2, lance_le = now(), par = moi, par_nom = nom, maj_le = now()
+     where x.saison = n and x.j = p_j and x.noirs = p_noirs and x.blancs = p_blancs
+       and x.mt = 1 and x.lance_le is not null
+    returning * into c;
+  elsif p_geste = 'ajout' and d <> 0 then
+    update public.chronos_direct x
+       set ajout1 = case when x.mt = 1 then greatest(-29, least(30, x.ajout1 + d)) else x.ajout1 end,
+           ajout2 = case when x.mt = 2 then greatest(-29, least(30, x.ajout2 + d)) else x.ajout2 end,
+           par = moi, par_nom = nom, maj_le = now()
+     where x.saison = n and x.j = p_j and x.noirs = p_noirs and x.blancs = p_blancs
+       and x.lance_le is not null
+    returning * into c;
+  elsif p_geste = 'remettre' then
+    delete from public.chronos_direct x
+     where x.saison = n and x.j = p_j and x.noirs = p_noirs and x.blancs = p_blancs;
+    return jsonb_build_object('ok', true, 'chrono', null, 'maintenant', now());
+  else
+    return jsonb_build_object('ok', false, 'refus', 'geste', 'maintenant', now());
+  end if;
+  if c.saison is null then
+    select * into c from public.chronos_direct x
+     where x.saison = n and x.j = p_j and x.noirs = p_noirs and x.blancs = p_blancs;
+    return jsonb_build_object('ok', false, 'refus', 'geste', 'maintenant', now(),
+                              'chrono', case when c.saison is not null then to_jsonb(c) end);
+  end if;
+  return jsonb_build_object('ok', true, 'chrono', to_jsonb(c), 'maintenant', now());
+end;
+$$;
+revoke execute on function public.chrono_direct(int, text, text, text, int) from public, anon;
+grant execute on function public.chrono_direct(int, text, text, text, int) to authenticated;
+
+-- Les chronos d'une journée, avec l'heure de la base (le recalage de
+-- l'appareil à l'ouverture) ; le temps réel suit ensuite la table.
+create or replace function public.chronos_du_jour(p_j int)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select jsonb_build_object(
+           'maintenant', now(),
+           'chronos', coalesce((
+             select jsonb_agg(to_jsonb(c))
+               from public.chronos_direct c
+              where (select public.est_membre())
+                and c.j = p_j
+                and c.saison = coalesce((select public.entier_sur(s.data ->> 'numero') from public.saison s where s.id = 1), 0)
+           ), '[]'::jsonb));
+$$;
+revoke execute on function public.chronos_du_jour(int) from public, anon;
+grant execute on function public.chronos_du_jour(int) to authenticated;
+
 -- ─────────────── Droits de table : pas plus que ce que l'API sert (03/11/2026) ───────────────
 -- Supabase donne d'office tous les droits de table à anon et authenticated, et
 -- la RLS filtre ensuite. Trois d'entre eux ne servent à rien ici : TRUNCATE,
