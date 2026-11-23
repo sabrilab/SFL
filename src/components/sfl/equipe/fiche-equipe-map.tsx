@@ -15,7 +15,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowUp, ChevronRight, Swords, X } from "lucide-react";
+import { ArrowUp, Swords, X } from "lucide-react";
 import { toast } from "sonner";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Ecusson } from "@/components/sfl/equipe/ecusson";
@@ -148,16 +148,15 @@ export function FicheEquipeMap({
             {/* L'équipe : son écusson, son nom, sa page. */}
             <Link
               href={`/bola-team/${equipe.id}`}
-              className="flex items-center gap-4 px-5 pt-6 pb-4 transition-transform active:scale-[0.99]"
+              className="flex items-center gap-4 pt-6 pr-16 pb-4 pl-5 transition-transform active:scale-[0.99]"
             >
               <Ecusson initiales={equipe.initiales} fond={equipe.fond} blason={equipe.blason} taille={76} />
               <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                 <span className="truncate text-[24px] leading-tight font-extrabold tracking-tight">{equipe.nom}</span>
                 <span className="truncate text-corps font-medium text-muted-foreground">
-                  {[equipe.ville, `${n} / ${MAX_EQUIPE}`].filter(Boolean).join(" · ")}
+                  {[equipe.ville, `${n} / ${MAX_EQUIPE}`].filter(Boolean).join(" · ")} · <span className="underline underline-offset-2">Sa page</span>
                 </span>
               </span>
-              <ChevronRight className="size-5 shrink-0 text-muted-foreground" strokeWidth={2.2} />
             </Link>
 
             {/* Le mur. */}

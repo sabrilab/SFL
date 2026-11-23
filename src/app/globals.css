@@ -501,7 +501,7 @@
   padding: 0;
   overflow: visible;
   cursor: pointer;
-  z-index: 3;
+  z-index: 1;
   filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.28));
   -webkit-tap-highlight-color: transparent;
 }
@@ -511,6 +511,16 @@
 }
 .maplibregl-map .maplibregl-marker.equipe-ancre:active > svg {
   transform: scale(0.9);
+}
+.maplibregl-map .maplibregl-marker.equipe-ancre--plus {
+  width: auto;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: #0a0b0d;
+  color: #f4f5f2;
+  font: 700 12px/26px var(--font-sans, system-ui), sans-serif;
+  box-shadow: 0 0 0 2px #f4f5f2;
 }
 .carte--matchs-en-retrait .maplibregl-marker.equipe-ancre {
   display: none;

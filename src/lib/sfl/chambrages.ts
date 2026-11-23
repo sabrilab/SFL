@@ -119,6 +119,8 @@ export function demoChambrages(cible: Equipe, equipes: Equipe[], maintenant = Da
   if (autres.length === 0) return [];
   const n = 3 + Math.floor(hasard() * 3);
   const minutes = [4, 38, 190, 620, 1500];
+  // Les phrases mélangées, sans redite.
+  const phrases = PHRASES_DEMO.map((p) => ({ p, k: hasard() })).sort((a, b) => a.k - b.k).map((x) => x.p);
   return Array.from({ length: n }, (_, i) => {
     const e = autres[Math.floor(hasard() * autres.length)];
     const m = e.membres[Math.floor(hasard() * e.membres.length)];
@@ -127,7 +129,7 @@ export function demoChambrages(cible: Equipe, equipes: Equipe[], maintenant = Da
       equipe: e.id,
       auteur: m.name,
       auteurId: m.id,
-      texte: PHRASES_DEMO[Math.floor(hasard() * PHRASES_DEMO.length)],
+      texte: phrases[i % phrases.length],
       le: new Date(maintenant - minutes[i] * 60_000).toISOString(),
     };
   });

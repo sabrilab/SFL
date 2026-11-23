@@ -60,7 +60,7 @@
 // Les équipes de Bola Team (23/11, Sabri : « avec les écussons de l'équipe,
 // sa position sur la carte ») : chacune à son écusson, posé au-dessus de la
 // ville de son capitaine (la page calcule le lieu) ; plusieurs dans la même
-// ville se rangent côte à côte. Des éléments HTML aussi, l'écusson dessiné
+// ville se rangent en tournesol, huit au plus (au-delà, « +N »). Des éléments HTML aussi, l'écusson dessiné
 // par React (equipe/ecusson.tsx, rendu dans le repère par un portail) ; le
 // toucher, la page ouvre la fenêtre de l'équipe.
 
@@ -149,6 +149,9 @@ const AUCUNE_EQUIPE: EquipePlan[] = [];
 /** L'écusson sur le plan, et l'écart entre deux équipes de la même ville. */
 const TAILLE_ECUSSON = 44;
 const PAS_EQUIPES = 50;
+/** Au-delà, au même endroit, un « +N ». */
+const EQUIPES_PAR_LIEU = 8;
+const ANGLE_OR_EQUIPES = Math.PI * (3 - Math.sqrt(5));
 
 export type FondCarte = "plan" | "satellite";
 /** Le centre quand rien n'est posé : la France entière. */
@@ -411,8 +414,11 @@ export function CarteMap({
   trajet = null,
   equipes = AUCUNE_EQUIPE,
   onEquipe,
+  onPlusEquipes,
   className,
 }: {
+  /** Toucher le « +N » d'un lieu trop chargé : toutes les équipes. */
+  onPlusEquipes?: () => void;
   /** Les équipes de Bola Team, à leur écusson. */
   equipes?: EquipePlan[];
   /** Toucher l'écusson d'une équipe : sa fenêtre. */
@@ -466,6 +472,7 @@ export function CarteMap({
   // Les écussons posés : leur repère, et l'élément où React dessine l'écusson.
   const [ecussons, setEcussons] = useState<{ e: EquipePlan; el: HTMLElement }[]>([]);
   const equipeRef = useRef(onEquipe);
+  const plusEquipesRef = useRef(onPlusEquipes);
   // Les stickers posés (leur rang : l'ordre du temps, le joué en dernier), et
   // le paquet que chacun mène quand des matchs se chevauchent (ses ids, et
   // les villes de joueurs rangées contre lui).
@@ -533,7 +540,8 @@ export function CarteMap({
     margeBasRef.current = margeBas;
     retraitRef.current = matchsEnRetrait;
     equipeRef.current = onEquipe;
-  }, [onChoisir, onBulle, onPoint, onVille, onJoueur, onPossible, onVue, margeBas, matchsEnRetrait, onEquipe]);
+    plusEquipesRef.current = onPlusEquipes;
+  }, [onChoisir, onBulle, onPoint, onVille, onJoueur, onPossible, onVue, margeBas, matchsEnRetrait, onEquipe, onPlusEquipes]);
 
   const pointsActifs = !!onPoint;
 
@@ -1082,7 +1090,7 @@ export function CarteMap({
   }, [villes]);
 
   // Les équipes : un repère par écusson, au-dessus de la ville ; celles d'une
-  // même ville côte à côte. L'écusson lui-même est dessiné plus bas (portail).
+  // même ville en tournesol. L'écusson lui-même est dessiné plus bas (portail).
   useEffect(() => {
     const map = carte.current;
     if (!map) return;
@@ -1092,8 +1100,17 @@ export function CarteMap({
       parLieu.set(k, [...(parLieu.get(k) ?? []), e]);
     }
     const poses: { e: EquipePlan; el: HTMLElement; m: Marker }[] = [];
+    const plus: Marker[] = [];
     for (const groupe of parLieu.values()) {
-      groupe.forEach((e, i) => {
+      const montres = groupe.length > EQUIPES_PAR_LIEU ? groupe.slice(0, EQUIPES_PAR_LIEU - 1) : groupe;
+      // En tournesol au-dessus de la ville (l'angle d'or), pour ne cacher ni sa pile ni son nom.
+      const place = (i: number): [number, number] => {
+        if (i === 0) return [0, -58];
+        const r = PAS_EQUIPES * Math.sqrt(i) * 0.82;
+        const a = i * ANGLE_OR_EQUIPES - Math.PI / 2;
+        return [Math.round(Math.cos(a) * r), Math.round(-58 + Math.sin(a) * r * 0.8)];
+      };
+      montres.forEach((e, i) => {
         const el = document.createElement("button");
         el.type = "button";
         el.className = "equipe-ancre";
@@ -1105,15 +1122,27 @@ export function CarteMap({
           navigator.vibrate?.(8);
           equipeRef.current?.(e.id);
         });
-        const dx = (i - (groupe.length - 1) / 2) * PAS_EQUIPES;
-        // Au-dessus de la pile des joueurs de la ville, pour ne pas la cacher.
-        const m = new maplibregl.Marker({ element: el, anchor: "bottom", offset: [dx, -58] }).setLngLat([e.lng, e.lat]).addTo(map);
+        const m = new maplibregl.Marker({ element: el, anchor: "bottom", offset: place(i) }).setLngLat([e.lng, e.lat]).addTo(map);
         poses.push({ e, el, m });
       });
+      // Trop d'équipes au même endroit : le reste en « +N », qui mène à la liste des équipes.
+      if (montres.length < groupe.length) {
+        const el = document.createElement("button");
+        el.type = "button";
+        el.className = "equipe-ancre equipe-ancre--plus";
+        el.textContent = `+${groupe.length - montres.length}`;
+        el.setAttribute("aria-label", `${groupe.length - montres.length} autres équipes`);
+        el.addEventListener("click", (ev) => {
+          ev.stopPropagation();
+          plusEquipesRef.current?.();
+        });
+        plus.push(new maplibregl.Marker({ element: el, anchor: "bottom", offset: place(montres.length) }).setLngLat([groupe[0].lng, groupe[0].lat]).addTo(map));
+      }
     }
     setEcussons(poses.map(({ e, el }) => ({ e, el })));
     return () => {
       for (const p of poses) p.m.remove();
+      for (const m of plus) m.remove();
     };
   }, [equipes]);
 

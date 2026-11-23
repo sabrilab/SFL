@@ -63,6 +63,7 @@
 
 import dynamic from "next/dynamic";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import {
   CalendarDays,
@@ -988,9 +989,11 @@ export default function MapPage() {
   // Les équipes de Bola Team sur la Map (Sabri, 23/11 : « avec les écussons
   // de l'équipe, sa position sur la carte ») : chacune au-dessus de la ville
   // de son capitaine (à défaut, d'un de ses joueurs qui a donné la sienne).
+  // Plusieurs équipes dans une ville : en tournesol (map/carte-map.tsx).
   // Une équipe en formation reste cachée aux autres (visible). Toucher
   // l'écusson ouvre sa fenêtre (equipe/fiche-equipe-map.tsx) : son mur, et
   // « Défier », le défi du mode Team, sans quitter la Map.
+  const routeur = useRouter();
   const { equipes: toutesEquipes, demo: equipesDemo } = useEquipes();
   const revEquipesVilles = useVillesRevision();
   const equipesVues = useMemo(() => toutesEquipes.filter((e) => visible(e, me, equipesDemo)), [toutesEquipes, me, equipesDemo]);
@@ -1600,6 +1603,7 @@ export default function MapPage() {
             onPossible={toucherPossible}
             equipes={enContrats || !calques.equipes ? SANS_EQUIPES : equipesPlan}
             onEquipe={ouvrirEquipeMap}
+            onPlusEquipes={() => routeur.push("/bola-team")}
             teinteFantome={tonFantomes}
             onVue={voirTerrains}
             zones={enContrats ? AUCUNE_ZONE : zones}
