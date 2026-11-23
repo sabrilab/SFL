@@ -89,6 +89,8 @@ import {
   PALETTE,
   PARRAINAGE,
   PRIX_FORMULE,
+  ANNUEL_PAR_MOIS,
+  LIBELLE_ECONOMIE,
   VARIABLES_PLUS,
   diapos,
   voitBolaPlus,
@@ -291,7 +293,10 @@ export function OffreBolaPlus({
               className={cn("bp-formule", choisie && "bp-formule--choisie")}
             >
               <span className="flex min-w-0 flex-1 flex-col gap-1.5">
-                <span className="mono-label bp-formule__nom">{NOM_FORMULE[f]}</span>
+                <span className="flex items-center gap-2">
+                  <span className="mono-label bp-formule__nom">{NOM_FORMULE[f]}</span>
+                  {f === "annuel" && <span className="bp-formule__economie tabular-nums">{LIBELLE_ECONOMIE}</span>}
+                </span>
                 <span className="flex items-baseline gap-2 whitespace-nowrap">
                   <span className="bp-formule__prix tabular-nums" style={{ fontFamily: ANTON }}>
                     {p.euros}&nbsp;€
@@ -299,6 +304,11 @@ export function OffreBolaPlus({
                   <span className="bp-formule__par">/ {p.par}</span>
                   <Barre somme={p.barre} />
                 </span>
+                {f === "annuel" && (
+                  <span className="bp-formule__mois tabular-nums">
+                    soit {ANNUEL_PAR_MOIS}&nbsp;€ / mois
+                  </span>
+                )}
                 <span className="bp-formule__sous tabular-nums">{p.sous}</span>
                 <span className="bp-formule__ballons tabular-nums">{BALLONS_FORMULE[f]}</span>
               </span>

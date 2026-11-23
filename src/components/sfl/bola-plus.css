@@ -635,6 +635,23 @@
 .bp-formule .bp-barre-prix {
   font-size: 14px;
 }
+/* L'annuel ramené au mois, et ce qu'il fait économiser sur le mensuel (23/11). */
+.bp-formule__mois {
+  font-size: 15px;
+  font-weight: 700;
+}
+.bp-formule__economie {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 7px;
+  border-radius: 6px;
+  background: var(--bp-prix);
+  color: var(--bp-nuit);
+  font-size: 11px;
+  font-weight: 800;
+  white-space: nowrap;
+}
 .bp-formule__sous {
   font-size: 13px;
   font-weight: 600;

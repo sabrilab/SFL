@@ -73,6 +73,9 @@ import {
   GRILLE_SFL,
   LARGEURS,
   LIBELLE_ECHEANCES,
+  LIBELLE_ECONOMIE,
+  ANNUEL_PAR_MOIS,
+  ECONOMIE_ANNUEL_CENTIMES,
   LIBELLE_REMISE,
   MENSUEL,
   MENSUEL_CENTIMES,
@@ -120,6 +123,11 @@ assert.ok(Math.abs(REMISE - (1 - 16890 / 23880)) < 1e-12, "la remise : 1 − 16 
 assert.equal(REMISE_POUR_CENT, 29, "29,27 % arrondis vers le bas");
 assert.equal(LIBELLE_REMISE, `−29${NBSP}%`);
 assert.equal(LIBELLE_ECHEANCES, `4${NBSP}×${NBSP}42,23${NBSP}€ sans frais`);
+// L'annuel ramené au mois (23/11) : 14,08 € (arrondi au centime supérieur : 12 × 14,08 ≥ 168,90), et 69,90 € économisés sur douze mensuels.
+assert.equal(ANNUEL_PAR_MOIS, "14,08");
+assert.ok(12 * 1408 >= ANNUEL_CENTIMES && 12 * 1407 < ANNUEL_CENTIMES, "le mois de l'annuel ne passe jamais sous l'année");
+assert.equal(ECONOMIE_ANNUEL_CENTIMES, 6990);
+assert.equal(LIBELLE_ECONOMIE, `69,90${NBSP}€ économisés`);
 // La remise et l'échéance, rejouées par des calculs qu'on peut fausser (les mutants, plus bas).
 const remiseJuste = (pourCent: (mois: number, an: number) => number) => {
   assert.equal(pourCent(1990, 16890), 29, "−29 % pour 19,90 € et 168,90 €");

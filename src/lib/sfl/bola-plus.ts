@@ -101,6 +101,18 @@ export const LIBELLE_REMISE = `−${REMISE_POUR_CENT}\u00a0%`;
 /** « 4 × 42,23 € sans frais » : sous la formule annuelle. */
 export const LIBELLE_ECHEANCES = `${ECHEANCES}\u00a0×\u00a0${montant(echeance(ANNUEL_CENTIMES, ECHEANCES))}\u00a0€ sans frais`;
 
+/**
+ * L'année ramenée au mois (Sabri, 23/11/2026 : « mettre l'équivalent par
+ * mois, et montrer l'économie ») : 16 890 / 12 = 1 407,5 centimes, arrondi au
+ * centime supérieur comme les échéances (douze de ces mois ne passent
+ * jamais sous le prix de l'année) : « 14,08 ».
+ */
+export const ANNUEL_PAR_MOIS = montant(echeance(ANNUEL_CENTIMES, 12));
+/** Ce que l'année fait économiser sur douze mois au mensuel, en centimes : 12 × 1 990 − 16 890 = 6 990. */
+export const ECONOMIE_ANNUEL_CENTIMES = 12 * MENSUEL_CENTIMES - ANNUEL_CENTIMES;
+/** « 69,90 € économisés » : l'étiquette de la formule annuelle. */
+export const LIBELLE_ECONOMIE = `${montant(ECONOMIE_ANNUEL_CENTIMES)}\u00a0€ économisés`;
+
 /** L'intérêt d'un joueur : la formule qu'il a choisie (ou aucune), et quand. */
 export interface Interet {
   formule: Formule | null;
