@@ -803,7 +803,10 @@ async function banc() {
     assert.ok(/aria-label=\{`\$\{i \+ 1\} sur \$\{n\} : \$\{d\.nom\}`\}/.test(page), "chaque diapositive dit sa place");
     assert.ok(/aria-current=\{i === actif \? "true" : undefined\}/.test(page) && /aria-label=\{`Aller à \$\{i \+ 1\} sur \$\{n\} : \$\{d\.nom\}`\}/.test(page), "les segments disent où l'on est");
     assert.ok(/e\.key === "ArrowRight"/.test(page) && /e\.key === "Home"/.test(page) && /e\.key === "End"/.test(page) && /onKeyDown=\{clavier\}/.test(page), "le clavier fait tourner le carrousel");
-    assert.ok(/e\.stopPropagation\(\);/.test(offre), "les flèches des formules ne font pas tourner le carrousel");
+    const bascule = bloc("BasculeFormule");
+    assert.ok(/e\.stopPropagation\(\);/.test(bascule), "les flèches des formules ne font pas tourner le carrousel");
+    // L'ouverture et « Ton prix » : le même bouton Mensuel / Annuel, sur le même choix (Sabri, 23/11).
+    assert.ok(/<BasculeFormule /.test(offre) && /<BasculeFormule /.test(ouverture) && /<DiapoOuverture plus=\{plus\} choix=\{choix\} onChoix=\{setChoix\} \/>/.test(tsx), "l'ouverture montre le bouton Mensuel / Annuel de « Ton prix »");
     assert.ok(/className="bp-rail" tabIndex=\{0\} aria-label="Cartes"/.test(page) && /role="group"[^>]*aria-roledescription="diapositive"/.test(page), "le rail et chaque diapositive ont un nom");
     assert.ok(/vise\.current = j;/.test(page) && /const depart = \(\) => vise\.current \?\? actif;/.test(page) && /aller\(depart\(\) \+ 1\)/.test(page), "plusieurs ← → rapides avancent d'autant");
     assert.ok(/threshold: 0\.6/.test(page) && /root: rail/.test(page), "la carte active : les trois cinquièmes du rail");
@@ -824,7 +827,8 @@ async function banc() {
     assert.ok(/aria-disabled=\{!note && occupe \? true : undefined\}/.test(barre) && /!occupe && onNoter\(\)/.test(barre), "la barre : bouton gelé pendant l'envoi");
     // Un seul bouton, jamais désactivé : le focus reste dessus quand « Je suis intéressé » devient « C'est noté ».
     assert.ok(!/(?<!-)\bdisabled=/.test(barre) && barre.match(/<button/g)?.length === 1, "la barre : un seul bouton, qui garde le focus");
-    assert.equal(offre.match(/disabled=\{occupe\}/g)?.length, 3, "l'offre : formules, bouton et « Annuler » gelés pendant l'envoi");
+    assert.equal(offre.match(/disabled=\{occupe\}/g)?.length, 2, "l'offre : bouton et « Annuler » gelés pendant l'envoi");
+    assert.ok(/occupe=\{occupe\}/.test(offre) && /disabled=\{occupe\}/.test(bloc("BasculeFormule")), "l'offre : formules gelées pendant l'envoi");
     assert.ok(/if \(!interet\) onChoix\(f\);\s*else if \(interet\.formule !== f\) noter\(f\);/.test(offre), "une fois noté, toucher une formule la change");
     // Les prix de l'offre : PRIX_FORMULE, avec le barré et la ligne dessous ; rien ne les cache.
     assert.ok(/const p = PRIX_FORMULE\[f\];/.test(offre) && /\{p\.economie\}/.test(offre) && /\{p\.sous\}/.test(offre), "chaque formule : son prix, son économie, sa ligne");
@@ -916,7 +920,7 @@ async function banc() {
   refuse("la braise", () => paletteJuste({ ...PALETTE, prix: "#FF8A4C" }));
   refuse("un vert illisible sur blanc", () => paletteJuste({ ...PALETTE, sfl: { ...PALETTE.sfl, encre: "#34D399" } }));
   // L'écran.
-  refuse("un prix en dur", () => ecranJuste(mute("prix", ecran, "{p.euros}&nbsp;€\n          </span>\n          <span className=\"bp-ouverture__par\">", "19,90&nbsp;€\n          </span>\n          <span className=\"bp-ouverture__par\">"), style));
+  refuse("un prix en dur", () => ecranJuste(mute("prix", ecran, "{p.mois}&nbsp;€\n          </span>\n          <span className=\"bp-ouverture__par\">", "13,90&nbsp;€\n          </span>\n          <span className=\"bp-ouverture__par\">"), style));
   refuse("une teinte dans l'écran", () => ecranJuste(mute("teinte", ecran, '"--bp-prix": PALETTE.prix,', '"--bp-prix": "#D9FF3F",'), style));
   refuse("une couleur dans la feuille", () => ecranJuste(ecran, mute("couleur", style, "background: var(--bp-prix);\n  color: var(--bp-nuit);", "background: #d9ff3f;\n  color: var(--bp-nuit);")));
   refuse("une couleur nommée", () => ecranJuste(ecran, mute("nommée", style, "color: var(--bp-prix);\n}", "color: lime;\n}")));
