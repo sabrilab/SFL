@@ -708,10 +708,21 @@ function CarteDeTuile({ nom }: { nom: string }) {
  * nom du bloc repris (« Ma saison », « Niveau XP ») redirait le titre : il ne
  * reste que pour le lecteur d'écran, la ligne d'à côté (« Saison 1 · après
  * J2 ») reste à sa place.
+ *
+ * `large` : la rubrique se met à la largeur des autres onglets sur ordinateur
+ * (celle de `.shell`) et ses blocs passent en deux colonnes au nombre d'or
+ * dès que la place le permet (requêtes de conteneur `@4xl`, soit 896 px :
+ * un iPad en largeur, un ordinateur). Au téléphone et sur iPad en hauteur,
+ * rien ne change : une seule colonne.
  */
-export function PageRubrique({ titre, children }: { titre: string; children: React.ReactNode }) {
+export function PageRubrique({ titre, large, children }: { titre: string; large?: boolean; children: React.ReactNode }) {
   return (
-    <div className="mx-auto flex w-full max-w-xl flex-col gap-[var(--fib-21)] px-5 py-4 sm:py-8 lg:max-w-2xl [&>section>div:first-child>h2.mono-label]:sr-only">
+    <div
+      className={cn(
+        "@container mx-auto flex w-full max-w-xl flex-col gap-[var(--fib-21)] px-5 py-4 sm:py-8 [&>section>div:first-child>h2.mono-label]:sr-only",
+        large ? "md:max-w-2xl lg:max-w-[1000px] xl:max-w-[1200px] lg:px-8" : "lg:max-w-2xl"
+      )}
+    >
       <div className="flex items-center gap-3">
         <BoutonRetour />
         <h1 className="text-[30px] font-bold tracking-tight">{titre}</h1>

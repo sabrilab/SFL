@@ -10,7 +10,7 @@ import { PageRubrique, useMaCarte } from "@/components/sfl/ma-carte/rubriques";
 export default function PageBadges() {
   const { player } = useMaCarte();
   return (
-    <PageRubrique titre="Badges">
+    <PageRubrique titre="Badges" large>
       <VitrineBadges nom={player.name} />
     </PageRubrique>
   );

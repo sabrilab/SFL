@@ -735,11 +735,16 @@ export function VitrineBadges({ nom }: { nom: string }) {
   const detailPalier = choix?.famille === "palier" ? paliers.find((e) => e.def.id === choix.id) ?? null : null;
 
   return (
-    <div className="flex flex-col gap-[18px]">
-      {suivant && <ProchainBadge e={suivant} onOpen={() => setChoix({ famille: "palier", id: suivant.def.id })} />}
+    // Une colonne au téléphone ; deux au nombre d'or dès qu'il y a la place
+    // (PageRubrique large) : le prochain badge et les trophées à gauche, les
+    // paliers à droite.
+    <div className="flex flex-col gap-[18px] @4xl:grid @4xl:grid-cols-[minmax(0,1fr)_minmax(0,1.618fr)] @4xl:items-start @4xl:gap-x-[var(--fib-34)]">
+      <div className="flex flex-col gap-[18px]">
+        {suivant && <ProchainBadge e={suivant} onOpen={() => setChoix({ famille: "palier", id: suivant.def.id })} />}
 
-      {/* 1. Les trophées de fin de saison */}
-      <VitrineTrophees nom={nom} />
+        {/* 1. Les trophées de fin de saison */}
+        <VitrineTrophees nom={nom} />
+      </div>
 
       {/* 2. Paliers : la médaille ronde */}
       <section aria-labelledby="paliers" className="glass rounded-[26px] px-2.5 pt-[18px] pb-5">

@@ -3,18 +3,7 @@
 import Link from "next/link";
 import { useApparence } from "@/components/layout/apparence";
 import { ecrireApparence } from "@/lib/sfl/apparence";
-import {
-  Moon,
-  Sun,
-  SunMoon,
-  ShieldCheck,
-  ChevronRight,
-  Settings,
-  FlaskConical,
-  ArrowUpRight,
-  Bell,
-  Palette,
-} from "lucide-react";
+import { Moon, Sun, SunMoon, ShieldCheck, ChevronRight, Settings, FlaskConical, ArrowUpRight, Bell, Palette } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { BoutonRetour } from "@/components/layout/bouton-retour";
 import { useIsClient } from "@/hooks/use-is-client";
@@ -44,8 +33,12 @@ export default function ReglagesPage() {
   const t = useT();
 
   return (
-    <div className="mx-auto flex max-w-2xl flex-col gap-7 px-5 py-4 sm:py-8">
-      <div className="flex items-center gap-2.5">
+    // Au téléphone et sur iPad en hauteur, une colonne. Sur un écran large
+    // (iPad en largeur, ordinateur), deux : le compte et l'apparence à gauche,
+    // les notifications, la confidentialité et l'admin à droite. Les colonnes
+    // sont « contents » en dessous : l'ordre et l'écart restent ceux d'avant.
+    <div className="mx-auto flex max-w-2xl flex-col gap-7 px-5 py-4 sm:py-8 lg:grid lg:max-w-[1000px] lg:grid-cols-2 lg:items-start lg:gap-x-[var(--fib-34)] lg:px-8">
+      <div className="flex items-center gap-2.5 lg:col-span-2">
         <BoutonRetour />
         <span className="glass flex size-11 items-center justify-center rounded-2xl">
           <Settings className="size-5" />
@@ -56,167 +49,159 @@ export default function ReglagesPage() {
         </div>
       </div>
 
-      <AccountCard />
+      <div className="contents lg:flex lg:flex-col lg:gap-7">
+        <AccountCard />
 
-      <section>
-        <h2 className="mb-3 px-1 text-sm font-semibold text-encre-3">{t("Apparence")}</h2>
-        <div role="radiogroup" aria-label={t("Apparence")} className="glass flex rounded-2xl p-1">
-          {THEME_OPTIONS.map(({ value, label, icon: Icon }) => {
-            const active = current === value;
-            return (
-              <button
-                key={value}
-                type="button"
-                role="radio"
-                aria-checked={active}
-                onClick={() => ecrireApparence(value)}
-                className={cn(
-                  "flex flex-1 flex-col items-center gap-1.5 rounded-xl py-3 text-xs font-semibold",
-                  active ? "bouton-principal" : "bouton-discret text-encre-3"
-                )}
-              >
-                <Icon className="relative size-5" />
-                <span className="relative">{t(label)}</span>
-              </button>
-            );
-          })}
-        </div>
-      </section>
+        <section>
+          <h2 className="mb-3 px-1 text-sm font-semibold text-encre-3">{t("Apparence")}</h2>
+          <div role="radiogroup" aria-label={t("Apparence")} className="glass flex rounded-2xl p-1">
+            {THEME_OPTIONS.map(({ value, label, icon: Icon }) => {
+              const active = current === value;
+              return (
+                <button
+                  key={value}
+                  type="button"
+                  role="radio"
+                  aria-checked={active}
+                  onClick={() => ecrireApparence(value)}
+                  className={cn(
+                    "flex flex-1 flex-col items-center gap-1.5 rounded-xl py-3 text-xs font-semibold",
+                    active ? "bouton-principal" : "bouton-discret text-encre-3",
+                  )}
+                >
+                  <Icon className="relative size-5" />
+                  <span className="relative">{t(label)}</span>
+                </button>
+              );
+            })}
+          </div>
+        </section>
 
-      <section>
-        <h2 className="mb-3 px-1 text-sm font-semibold text-encre-3">{t("Langue")}</h2>
-        <ReglageLangue />
-      </section>
+        <section>
+          <h2 className="mb-3 px-1 text-sm font-semibold text-encre-3">{t("Langue")}</h2>
+          <ReglageLangue />
+        </section>
+      </div>
 
-      <section>
-        <h2 className="mb-3 px-1 text-sm font-semibold text-encre-3">{t("Notifications")}</h2>
-        <ReglageNotifications />
-      </section>
+      <div className="contents lg:flex lg:flex-col lg:gap-7">
+        <section>
+          <h2 className="mb-3 px-1 text-sm font-semibold text-encre-3">{t("Notifications")}</h2>
+          <ReglageNotifications />
+        </section>
 
-      <section>
-        <h2 className="mb-3 px-1 text-sm font-semibold text-encre-3">{t("Confidentialité")}</h2>
-        <ReglageConfidentialite />
-      </section>
+        <section>
+          <h2 className="mb-3 px-1 text-sm font-semibold text-encre-3">{t("Confidentialité")}</h2>
+          <ReglageConfidentialite />
+        </section>
 
-      {/* Section « Profil » (accès à l'avatar 3D) masquée volontairement,
+        {/* Section « Profil » (accès à l'avatar 3D) masquée volontairement,
           comme dans Ma carte : la création d'avatar n'est pas encore prête
           à être montrée. L'écran reste accessible en direct sur /avatar. */}
 
-      {admin && (
-        <section>
-          <h2 className="mb-3 px-1 text-sm font-semibold text-encre-3">Général</h2>
-          <Link
-            href="/admin"
-            className="glass flex items-center gap-3 rounded-2xl px-4 py-3.5 transition-opacity active:opacity-70"
-          >
-            <span className="flex size-9 items-center justify-center rounded-full bg-foreground/10">
-              <ShieldCheck className="size-[18px]" />
-            </span>
-            <span className="flex-1">
-              <span className="block text-lecture font-semibold">Espace admin</span>
-              <span className="block text-petit text-encre-3">
-                Gérer les matchs, convocations et résultats
+        {admin && (
+          <section>
+            <h2 className="mb-3 px-1 text-sm font-semibold text-encre-3">Général</h2>
+            <Link
+              href="/admin"
+              className="glass flex items-center gap-3 rounded-2xl px-4 py-3.5 transition-opacity active:opacity-70"
+            >
+              <span className="flex size-9 items-center justify-center rounded-full bg-foreground/10">
+                <ShieldCheck className="size-[18px]" />
               </span>
-            </span>
-            <ChevronRight className="size-4 text-encre-3" />
-          </Link>
-          <Link
-            href="/admin/notifications"
-            className="glass mt-2.5 flex items-center gap-3 rounded-2xl px-4 py-3.5 transition-opacity active:opacity-70"
-          >
-            <span className="flex size-9 items-center justify-center rounded-full bg-foreground/10">
-              <Bell className="size-[18px]" />
-            </span>
-            <span className="flex-1">
-              <span className="block text-lecture font-semibold">Envoyer une notification</span>
-              <span className="block text-petit text-encre-3">
-                Sur le téléphone des joueurs qui les ont activées
+              <span className="flex-1">
+                <span className="block text-lecture font-semibold">Espace admin</span>
+                <span className="block text-petit text-encre-3">Gérer les matchs, convocations et résultats</span>
               </span>
-            </span>
-            <ChevronRight className="size-4 text-encre-3" />
-          </Link>
-          <Link
-            href="/admin/setup"
-            className="glass mt-2.5 flex items-center gap-3 rounded-2xl px-4 py-3.5 transition-opacity active:opacity-70"
-          >
-            <span className="flex size-9 items-center justify-center rounded-full bg-foreground/10">
-              <ShieldCheck className="size-[18px]" />
-            </span>
-            <span className="flex-1">
-              <span className="block text-lecture font-semibold">Installation Supabase</span>
-              <span className="block text-petit text-encre-3">
-                Les tables de la base, mises à jour à chaque mise en ligne
+              <ChevronRight className="size-4 text-encre-3" />
+            </Link>
+            <Link
+              href="/admin/notifications"
+              className="glass mt-2.5 flex items-center gap-3 rounded-2xl px-4 py-3.5 transition-opacity active:opacity-70"
+            >
+              <span className="flex size-9 items-center justify-center rounded-full bg-foreground/10">
+                <Bell className="size-[18px]" />
               </span>
-            </span>
-            <ChevronRight className="size-4 text-encre-3" />
-          </Link>
-          <Link
-            href="/admin/comptes"
-            className="glass mt-2.5 flex items-center gap-3 rounded-2xl px-4 py-3.5 transition-opacity active:opacity-70"
-          >
-            <span className="flex size-9 items-center justify-center rounded-full bg-foreground/10">
-              <ShieldCheck className="size-[18px]" />
-            </span>
-            <span className="flex-1">
-              <span className="block text-lecture font-semibold">Les accès</span>
-              <span className="block text-petit text-encre-3">
-                Identifiants des 71 joueurs, prêts à envoyer
+              <span className="flex-1">
+                <span className="block text-lecture font-semibold">Envoyer une notification</span>
+                <span className="block text-petit text-encre-3">Sur le téléphone des joueurs qui les ont activées</span>
               </span>
-            </span>
-            <ChevronRight className="size-4 text-encre-3" />
-          </Link>
-          <Link
-            href="/admin/activite"
-            className="glass mt-2.5 flex items-center gap-3 rounded-2xl px-4 py-3.5 transition-opacity active:opacity-70"
-          >
-            <span className="flex size-9 items-center justify-center rounded-full bg-foreground/10">
-              <ShieldCheck className="size-[18px]" />
-            </span>
-            <span className="flex-1">
-              <span className="block text-lecture font-semibold">Analytics</span>
-              <span className="block text-petit text-encre-3">
-                Acquisition, activation, rétention, revenu, recommandation
+              <ChevronRight className="size-4 text-encre-3" />
+            </Link>
+            <Link
+              href="/admin/setup"
+              className="glass mt-2.5 flex items-center gap-3 rounded-2xl px-4 py-3.5 transition-opacity active:opacity-70"
+            >
+              <span className="flex size-9 items-center justify-center rounded-full bg-foreground/10">
+                <ShieldCheck className="size-[18px]" />
               </span>
-            </span>
-            <ChevronRight className="size-4 text-encre-3" />
-          </Link>
-          <Link
-            href="/admin/design"
-            className="glass mt-2.5 flex items-center gap-3 rounded-2xl px-4 py-3.5 transition-opacity active:opacity-70"
-          >
-            <span className="flex size-9 items-center justify-center rounded-full bg-foreground/10">
-              <Palette className="size-[18px]" />
-            </span>
-            <span className="flex-1">
-              <span className="block text-lecture font-semibold">Design</span>
-              <span className="block text-petit text-encre-3">
-                Couleurs, tailles, boutons : les voir et les essayer
+              <span className="flex-1">
+                <span className="block text-lecture font-semibold">Installation Supabase</span>
+                <span className="block text-petit text-encre-3">Les tables de la base, mises à jour à chaque mise en ligne</span>
               </span>
-            </span>
-            <ChevronRight className="size-4 text-encre-3" />
-          </Link>
-          {/* Page statique servie depuis public/ : une vraie navigation, pas
+              <ChevronRight className="size-4 text-encre-3" />
+            </Link>
+            <Link
+              href="/admin/comptes"
+              className="glass mt-2.5 flex items-center gap-3 rounded-2xl px-4 py-3.5 transition-opacity active:opacity-70"
+            >
+              <span className="flex size-9 items-center justify-center rounded-full bg-foreground/10">
+                <ShieldCheck className="size-[18px]" />
+              </span>
+              <span className="flex-1">
+                <span className="block text-lecture font-semibold">Les accès</span>
+                <span className="block text-petit text-encre-3">Identifiants des 71 joueurs, prêts à envoyer</span>
+              </span>
+              <ChevronRight className="size-4 text-encre-3" />
+            </Link>
+            <Link
+              href="/admin/activite"
+              className="glass mt-2.5 flex items-center gap-3 rounded-2xl px-4 py-3.5 transition-opacity active:opacity-70"
+            >
+              <span className="flex size-9 items-center justify-center rounded-full bg-foreground/10">
+                <ShieldCheck className="size-[18px]" />
+              </span>
+              <span className="flex-1">
+                <span className="block text-lecture font-semibold">Analytics</span>
+                <span className="block text-petit text-encre-3">Acquisition, activation, rétention, revenu, recommandation</span>
+              </span>
+              <ChevronRight className="size-4 text-encre-3" />
+            </Link>
+            <Link
+              href="/admin/design"
+              className="glass mt-2.5 flex items-center gap-3 rounded-2xl px-4 py-3.5 transition-opacity active:opacity-70"
+            >
+              <span className="flex size-9 items-center justify-center rounded-full bg-foreground/10">
+                <Palette className="size-[18px]" />
+              </span>
+              <span className="flex-1">
+                <span className="block text-lecture font-semibold">Design</span>
+                <span className="block text-petit text-encre-3">Couleurs, tailles, boutons : les voir et les essayer</span>
+              </span>
+              <ChevronRight className="size-4 text-encre-3" />
+            </Link>
+            {/* Page statique servie depuis public/ : une vraie navigation, pas
               une route Next — d'où le <a> et non <Link>. Elle s'ouvre à qui a
               l'adresse, sans compte : c'est le lien qu'on transmet. */}
-          <a
-            href="/note-labo.html"
-            target="_blank"
-            rel="noreferrer"
-            className="glass mt-2.5 flex items-center gap-3 rounded-2xl px-4 py-3.5 transition-opacity active:opacity-70"
-          >
-            <span className="flex size-9 items-center justify-center rounded-full bg-foreground/10">
-              <FlaskConical className="size-[18px]" />
-            </span>
-            <span className="flex-1">
-              <span className="block text-lecture font-semibold">Note — Le Labo</span>
-              <span className="block text-petit text-encre-3">
-                Direction produit : la carte par les tests · lien partageable
+            <a
+              href="/note-labo.html"
+              target="_blank"
+              rel="noreferrer"
+              className="glass mt-2.5 flex items-center gap-3 rounded-2xl px-4 py-3.5 transition-opacity active:opacity-70"
+            >
+              <span className="flex size-9 items-center justify-center rounded-full bg-foreground/10">
+                <FlaskConical className="size-[18px]" />
               </span>
-            </span>
-            <ArrowUpRight className="size-4 text-encre-3" />
-          </a>
-        </section>
-      )}
+              <span className="flex-1">
+                <span className="block text-lecture font-semibold">Note — Le Labo</span>
+                <span className="block text-petit text-encre-3">
+                  Direction produit : la carte par les tests · lien partageable
+                </span>
+              </span>
+              <ArrowUpRight className="size-4 text-encre-3" />
+            </a>
+          </section>
+        )}
+      </div>
     </div>
   );
 }
