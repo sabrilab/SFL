@@ -70,6 +70,7 @@ const LECTEURS_DU_DIRECT = new Set([
   "components/sfl/vote-du-jour.tsx",
   "components/sfl/vote-figures.tsx",
   "hooks/use-feuilles-direct.ts",
+  "hooks/use-chronos-direct.ts",
   "hooks/use-presence.ts",
   "lib/sfl/revelation.ts", // ses commentaires
   "lib/sfl/saison-serveur.server.ts",

@@ -56,6 +56,7 @@ import { DetailPoints } from "@/components/sfl/admin/detail-points";
 import { usePresence } from "@/hooks/use-presence";
 import { useSaisieAdmin } from "@/hooks/use-saisie-admin";
 import { useFeuillesDirect } from "@/hooks/use-feuilles-direct";
+import { useChronosDirect } from "@/hooks/use-chronos-direct";
 import { useMaintenant } from "@/hooks/use-missions";
 import { FeuilleDuMatch } from "@/components/sfl/direct/feuille-du-match";
 import { scoreDeLaFeuille } from "@/lib/sfl/feuille-direct";
@@ -86,6 +87,7 @@ import { FeuilleArbitre } from "./feuille-arbitre";
 import { FeuilleCartonRouge } from "./feuille-carton-rouge";
 import { FeuilleConsulter } from "./feuille-consulter";
 import { FeuilleDirect } from "./feuille-direct";
+import { SiffletsDuDirect } from "./chrono-du-match";
 import { FeuilleLigne } from "./feuille-ligne";
 import { FeuillePreparer } from "./feuille-preparer";
 import { compteursEnMots, FeuillePublier, FeuilleRemettre, FeuilleReprendre, FeuilleSuspendre } from "./feuille-publier";
@@ -156,6 +158,22 @@ export function PageJournee() {
   // Les feuilles en direct tenues par les joueurs (01/11/2026) : une feuille
   // prise, c'est le coup d'envoi, la journée en ligne passe « en direct ».
   const direct = useFeuillesDirect(j ?? null);
+  // Le chrono de chaque match (23/11/2026) : ses coups de sifflet partent d'ici, Direct ouvert ou non.
+  const chronos = useChronosDirect(j ?? null);
+  const matchsSiffles = useMemo(
+    () =>
+      j == null
+        ? []
+        : matchs.map((m) => {
+            const f = direct.feuilleDe(m.m.equipes);
+            return {
+              n: m.n,
+              equipes: m.m.equipes,
+              fini: f ? !!f.fin : saison.entries.some((e) => e.j === j && e.team === m.m.equipes[0] && e.result),
+            };
+          }),
+    [j, matchs, direct, saison.entries]
+  );
   const etatSaisi = j != null && meta ? etatJournee(saison, j, maintenant) : "brouillon";
   const etat = etatSaisi === "en-ligne" && direct.feuilles.size > 0 ? "en-direct" : etatSaisi;
   const geste = gesteDuMoment(saison, meta ? j : null, maintenant);
@@ -706,7 +724,8 @@ export function PageJournee() {
               setQuandOu(null);
             }}
           />
-          <FeuilleDirect open={enDirect} onOpenChange={setEnDirect} saison={saison} j={j} matchs={matchs} commit={commit} faire={faire} direct={direct} />
+          <FeuilleDirect open={enDirect} onOpenChange={setEnDirect} saison={saison} j={j} matchs={matchs} commit={commit} faire={faire} direct={direct} chronos={chronos} />
+          <SiffletsDuDirect chronos={chronos} matchs={matchsSiffles} />
           {feuilleOuverte != null && declares[feuilleOuverte - 1] && (
             <FeuilleDuMatch
               open

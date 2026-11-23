@@ -18,6 +18,11 @@
 // Sur une feuille ouverte il la scelle (ses chiffres entrent dans la
 // saison) ; sinon il pose le résultat comme toujours. La feuille s'ouvre par
 // sa ligne, dessous.
+//
+// 23/11/2026 (Sabri : « je veux un chronomètre intégré à la feuille de match
+// en direct ») : sous le tableau d'affichage de chaque match, son chrono
+// (chrono-du-match.tsx) : coup d'envoi, 2 × 30 minutes, minutes en plus ou
+// en moins, coups de sifflet. Il disparaît une fois le match fini.
 
 import { useState } from "react";
 import { ChevronRight } from "lucide-react";
@@ -26,12 +31,14 @@ import { FeuilleDirecte } from "@/components/sfl/admin/feuille-directe";
 import { PastilleMaillot } from "@/components/sfl/point-maillot";
 import { FeuilleDuMatch } from "@/components/sfl/direct/feuille-du-match";
 import type { FeuillesDirect } from "@/hooks/use-feuilles-direct";
+import type { ChronosDirect } from "@/hooks/use-chronos-direct";
 import { MOTS_DU_REFUS, scoreDeLaFeuille } from "@/lib/sfl/feuille-direct";
 import { finDuMatch } from "@/lib/sfl/saisie/mutations";
 import type { Saison } from "@/lib/sfl/saisie/types";
 import { haptique } from "@/lib/sfl/haptique";
 import type { MatchVu } from "./bloc-matchs";
 import { Feuille, PastilleEtat } from "./ui";
+import { ChronoDuMatch } from "./chrono-du-match";
 
 export function FeuilleDirect({
   open,
@@ -42,6 +49,7 @@ export function FeuilleDirect({
   commit,
   faire,
   direct,
+  chronos,
 }: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
@@ -52,6 +60,8 @@ export function FeuilleDirect({
   faire: (f: (s: Saison) => Saison, label: string) => boolean;
   /** Les feuilles tenues par les joueurs (use-feuilles-direct). */
   direct: FeuillesDirect;
+  /** Le chrono de chaque match (use-chronos-direct, 23/11/2026). */
+  chronos: ChronosDirect;
 }) {
   const [ouverte, setOuverte] = useState<MatchVu | null>(null);
   const [envoi, setEnvoi] = useState<number | null>(null);
@@ -102,6 +112,7 @@ export function FeuilleDirect({
                     {fini ? "✓ Fin" : "Fin du match"}
                   </button>
                 </div>
+                {!fini && chronos.actif && <ChronoDuMatch chronos={chronos} equipes={m.m.equipes} />}
                 {f && (
                   <button
                     type="button"
