@@ -19,6 +19,14 @@ tools/studio-check.ts (EMPREINTES) : le script les affiche, prêtes à y être r
 Pillow 12.3 (libwebp 1.6) ; une autre version peut donner d'autres octets pour les copies légères.
 
   python3 -I tools/studio-vignettes.py <dossier des douze fichiers fournis> [public/bola-plus/studio]
+
+Depuis le 23/11/2026 (Sabri : « on avait fait d'autres images que t'as pas mises à jour »), les vignettes
+sont la version Ilyes en Seedream 5.0 Pro (16/11, bola-app, branche claude/project-thread-v8813n,
+passation/visuels/bola-studio/ilyes-seedream/, commit 94b6fa7 ; Ilyes a donné son accord le 15/11). Ces
+fichiers font 1320 × 1764 (3:4, le modèle n'a pas de 4:5) : le script les recadre en 4:5 sur toute la
+largeur, le haut de la coupe à 30 % de la hauteur retirée (les têtes restent entières, le tiers bas sombre
+aussi), puis les réduit à 978 × 1224 (qualité 86, celle des fichiers fournis) et 660 × 826 (qualité 82).
+Les fichiers de 980 × 1226 (la première série) passent toujours par le chemin d'origine, sans recodage.
 """
 import hashlib
 import io
@@ -32,6 +40,16 @@ FOURNI = (980, 1226)   # la taille des fichiers fournis (la capture)
 IMAGE = (978, 1224)    # l'image, sans la marge de la capture
 LEGERE = (660, 826)    # la copie légère : l'image entière, aux proportions de l'original
 QUALITE = 82
+SEEDREAM = (1320, 1764)  # la série Ilyes en Seedream 5.0 Pro (3:4)
+QUALITE_ORIGINAL = 86
+
+
+def en_4_5(image):
+    """Une image 3:4 recadrée en 4:5 sur toute sa largeur, le haut de la coupe à 30 % de ce qui est retiré."""
+    largeur, hauteur = image.size
+    garde = round(largeur * IMAGE[1] / IMAGE[0])
+    haut = round((hauteur - garde) * 0.3)
+    return image.crop((0, haut, largeur, haut + garde))
 
 
 def blocs(n):
@@ -64,6 +82,20 @@ def main():
     for nom in noms:
         with open(os.path.join(source, nom), "rb") as f:
             fourni = f.read()
+        if Image.open(io.BytesIO(fourni)).size == SEEDREAM:
+            image = en_4_5(Image.open(io.BytesIO(fourni)).convert("RGB")).resize(IMAGE, Image.LANCZOS)
+            tampon = io.BytesIO()
+            image.save(tampon, "WEBP", quality=QUALITE_ORIGINAL, method=6)
+            original = tampon.getvalue()
+            legere = image.resize(LEGERE, Image.LANCZOS)
+            tampon = io.BytesIO()
+            legere.save(tampon, "WEBP", quality=QUALITE, method=6)
+            for fichier, octets in ((nom, original), (f"{nom[:-5]}-{LEGERE[0]}.webp", tampon.getvalue())):
+                with open(os.path.join(sortie, fichier), "wb") as f:
+                    f.write(octets)
+                total += len(octets)
+                print(f'  "{fichier}": "{hashlib.sha256(octets).hexdigest()}",')
+            continue
         original = sans_marge(fourni, nom)
         # Les mêmes pixels que le fichier fourni, moins la marge.
         avant = Image.open(io.BytesIO(fourni)).convert("RGB").crop((0, 0, *IMAGE))

@@ -45,11 +45,9 @@
 // Aucun paiement, aucun formulaire, aucun texte d'aide. Les montants sont
 // écrits et calculés dans lib/sfl/bola-plus.ts, jamais ici ; les couleurs
 // aussi (PALETTE, posée en variables CSS sur la page). Les titres de la page
-// sont en Barlow Condensed (POLICE_TITRES, déjà chargée par layout.tsx pour les
-// cartes) ; la piste Archivo (téléchargée chez Google au build) n'est
-// branchée que si Sabri la retient : en développement, « ?police=b » la
-// demande à la feuille, qui retombe sur Barlow tant que la police n'est pas
-// chargée. Un avantage de plus s'ajoute dans AVANTAGES et, s'il dessine son
+// sont en Archivo Expanded 900 (POLICE_TITRES, choix de Sabri le 23/11 sur la
+// planche des six polices ; chargée par layout.tsx) ; la feuille retombe sur
+// Barlow Condensed tant qu'elle n'est pas chargée. Un avantage de plus s'ajoute dans AVANTAGES et, s'il dessine son
 // visuel, dans COMPOSANTS (et sa ligne sous le titre dans PIEDS) : rien
 // d'autre à toucher ici. Bola Studio est entré ainsi.
 //
@@ -376,10 +374,10 @@ function DiapoOuverture() {
       />
       <div className="bp-ouverture__marque">
         <Titre niveau={1} className="bp-ouverture__logo">
-          {/* eslint-disable-next-line @next/next/no-img-element -- le logo officiel, en SVG */}
-          <img src="/bola/logo-blanc.svg" alt="Bola" width={1000} height={237} draggable={false} />
+          <LogoBola />
         </Titre>
-        <SigleLigue ligue="sfl" hauteur={16} className="bp-ouverture__sigle" />
+        {/* Sabri, 23/11 : BOLA plus petit, la SFL en grand dessous. */}
+        <span role="img" aria-label={NOM_PART.sfl} className="bp-ouverture__sfl" />
       </div>
       <div className="bp-ouverture__bas">
         <div role="group" className="flex items-center gap-2" aria-label={`${NOM_PART.plus} et ${NOM_PART.sfl}`}>
@@ -456,10 +454,29 @@ function VisuelBolaPlus() {
   );
 }
 
+/** Le logo BOLA officiel, en blanc : l'ouverture et Bola 27. */
+function LogoBola({ className }: { className?: string }) {
+  // eslint-disable-next-line @next/next/no-img-element -- le logo officiel, en SVG
+  return <img src="/bola/logo-blanc.svg" alt="Bola" width={1000} height={237} draggable={false} className={className} />;
+}
+
+/** « Bola 27 », discret (23/11) : le logo BOLA et un 27 en creux ; ses images sont dans sa fiche. */
+function VisuelBola27() {
+  return (
+    <Titre className="bp-bola27">
+      <LogoBola className="bp-bola27__logo" />
+      <span className="bp-bola27__annee" style={{ fontFamily: ANTON }}>
+        27
+      </span>
+    </Titre>
+  );
+}
+
 /** Les visuels dessinés par le code. */
 const COMPOSANTS: Record<ComposantAvantage, () => ReactNode> = {
   carte: VisuelCarte,
   "bola-plus": VisuelBolaPlus,
+  "bola-27": VisuelBola27,
   studio: VisuelStudio,
 };
 
@@ -471,12 +488,15 @@ function DiapoComposant({ avantage, composant }: { avantage: Avantage; composant
   const Dessin = COMPOSANTS[composant];
   const Pied = PIEDS[composant];
   const titreEnHaut = composant === "bola-plus";
+  // Bola 27 : le logo est son titre ; seule sa ligne suit.
+  const logo = composant === "bola-27";
   return (
-    <div className={cn("bp-texte", `bp-texte--${avantage.part}`)}>
+    <div className={cn("bp-texte", `bp-texte--${avantage.part}`, logo && "bp-texte--logo")}>
       <EtiquettePart part={avantage.part} className="self-start" />
       {titreEnHaut && <Titre className="bp-texte__titre">{avantage.titre}</Titre>}
       <Dessin />
-      {!titreEnHaut && (
+      {logo && avantage.sous && <p className="bp-texte__sous bp-bola27__sous">{avantage.sous}</p>}
+      {!titreEnHaut && !logo && (
         <div>
           <Titre className="bp-texte__titre">{avantage.titre}</Titre>
           {avantage.sous && <p className="bp-texte__sous">{avantage.sous}</p>}
@@ -628,8 +648,8 @@ function BarreInteret({ note, occupe, cachee, onNoter, onVoirOffre }: { note: bo
 
 /* ------------------------------ La page ------------------------------ */
 
-/** La police des titres de la page : Barlow Condensed (recommandée, déjà chargée) ; « archivo », la piste B. */
-export const POLICE_TITRES: "barlow" | "archivo" = "barlow";
+/** La police des titres de la page : Archivo Expanded 900 (choix de Sabri, 23/11) ; « barlow », l'ancienne. */
+export const POLICE_TITRES: "barlow" | "archivo" = "archivo";
 
 const sansAbonnement = () => () => {};
 /** La piste B, en développement seulement : « ?police=b ». */

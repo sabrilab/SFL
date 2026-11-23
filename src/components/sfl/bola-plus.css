@@ -80,25 +80,28 @@
   height: 100%;
 }
 
-/* Les titres de la page : Barlow Condensed 800 en capitales (la police des
-   cartes, déjà chargée). La piste B (Archivo large et penchée) ne s'applique
-   que si sa police est chargée ; sinon on retombe sur Barlow. */
-.bp-titre {
+/* Les titres de la page : Archivo Expanded 900, droite, en capitales (choix
+   de Sabri, 23/11, piste F). Barlow Condensed 800 reste la police de repli.
+   Le sélecteur est renforcé : les styles d'essai de l'interface
+   (styles-ui*.css, « :root[data-style] section h2 ») passent sinon les
+   titres en Anton. */
+:root:root .bp-titre.bp-titre {
   margin: 0;
-  font-family: var(--font-barlow), "Barlow Condensed", sans-serif;
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: -0.01em;
-  line-height: 0.92;
-  text-wrap: balance;
-}
-.bp[data-police="archivo"] .bp-titre {
-  font-family: var(--font-archivo, var(--font-barlow)), sans-serif;
+  font-family: var(--font-archivo, var(--font-barlow)), "Barlow Condensed", sans-serif;
   font-weight: 900;
-  font-style: italic;
   font-stretch: 125%;
+  text-transform: uppercase;
   letter-spacing: -0.02em;
   line-height: 0.95;
+  text-wrap: balance;
+}
+/* L'ancienne police, si on y revient (POLICE_TITRES = "barlow"). */
+.bp[data-police="barlow"] .bp-titre.bp-titre.bp-titre {
+  font-family: var(--font-barlow), "Barlow Condensed", sans-serif;
+  font-weight: 800;
+  font-stretch: normal;
+  letter-spacing: -0.01em;
+  line-height: 0.92;
 }
 .bp[data-police="archivo"] :is(.bp-photo-carte__titre, .bp-texte__titre) {
   font-size: clamp(24px, 7.8vw, 30px);
@@ -132,10 +135,16 @@
   border-radius: 999px;
   background: var(--bp-plus-vif);
 }
+/* L'écusson SFL, cousu comme un patch de maillot (23/11) : relief léger et une couture en pointillés. */
 .bp-part--sfl {
-  border-radius: 6px;
-  background: var(--bp-sfl-encre);
-  padding: 0 9px;
+  border-radius: 7px;
+  background: linear-gradient(160deg, color-mix(in srgb, var(--bp-sfl-encre) 78%, #fff), var(--bp-sfl-encre) 55%);
+  padding: 0 11px;
+  outline: 1px dashed rgb(255 255 255 / 0.55);
+  outline-offset: -4px;
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.25),
+    0 2px 6px rgb(0 0 0 / 0.35);
 }
 .bp-plus-signe {
   font-size: 15px;
@@ -210,8 +219,9 @@
   gap: 16px;
   padding-bottom: 8%;
 }
+/* BOLA petit au-dessus (30 %), la SFL en grand (64 %) : 23/11. */
 .bp-ouverture__logo {
-  width: 64%;
+  width: 30%;
   line-height: 0;
 }
 .bp-ouverture__logo img {
@@ -219,9 +229,14 @@
   height: auto;
   filter: drop-shadow(0 6px 24px rgb(0 0 0 / 0.45));
 }
-.bp-ouverture__sigle {
-  color: #fff;
-  opacity: 0.92;
+.bp-ouverture__sfl {
+  display: block;
+  width: 64%;
+  aspect-ratio: 735 / 237;
+  background: #fff;
+  mask: url(/bola/sfl.svg) center / contain no-repeat;
+  -webkit-mask: url(/bola/sfl.svg) center / contain no-repeat;
+  filter: drop-shadow(0 6px 24px rgb(0 0 0 / 0.45));
 }
 .bp-ouverture__bas {
   display: flex;
@@ -988,5 +1003,54 @@ html[data-clavier] .bp-barre {
   .bp-bascule__choix,
   .bp-offre__face {
     transition: none;
+  }
+}
+
+/* « Bola 27 », discret (23/11) : BOLA, et dessous un 27 en creux, au milieu de la carte. */
+.bp-texte--logo {
+  justify-content: center;
+}
+.bp-texte--logo > :first-child {
+  position: absolute;
+  top: 18px;
+  left: 18px;
+}
+.bp-bola27 {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  margin: 0 auto;
+  width: 72%;
+  line-height: 0;
+}
+.bp-bola27__logo {
+  width: 100%;
+  height: auto;
+}
+.bp-bola27__annee {
+  font-size: clamp(120px, 44vw, 176px);
+  line-height: 0.86;
+  letter-spacing: -0.02em;
+  font-style: italic;
+  color: transparent;
+  -webkit-text-stroke: 2px currentColor;
+}
+.bp-bola27__sous {
+  text-align: center;
+}
+
+/* Archivo Expanded est plus large que Barlow Condensed : les titres des
+   feuilles (fiches, Bola Studio) et les noms des vignettes se resserrent
+   pour tenir sur une ligne ou deux. */
+.bp-titre.st-panneau__titre {
+  font-size: clamp(22px, 7vw, 28px);
+}
+.bp-titre.st-vignette__nom {
+  font-size: max(6.6cqw, 10px);
+}
+@supports not (width: 1cqw) {
+  .bp-titre.st-vignette__nom {
+    font-size: 12.5px;
   }
 }

@@ -594,16 +594,18 @@ async function banc() {
   );
 
   // Les avantages : une part et un identifiant chacun ; les six attendus, dans l'ordre ; un de plus permis (Bola Studio).
+  // L'ordre de Sabri (23/11) : « Tu payes ça, mais t'as les maillots », puis ta carte continue, Bola Plus,
+  // le studio, la SFL, et le jeu en dernier, discret.
   const ATTENDUS = [
+    ["maillots", "sfl", "Tes maillots"],
     ["carte", "plus", "Ta carte continue."],
     ["bola-plus", "plus", "Bola Plus"],
     ["studio", "plus", "Ton studio"],
-    // Le jeu (Sabri, 17/11) : son nom porte son année, le seul chiffre admis dans un titre.
-    ["bola-27", "plus", "Bola 27"],
-    ["maillots", "sfl", "Tes maillots"],
     ["matchs-filmes", "sfl", "Tes matchs filmés"],
     ["cadeaux", "sfl", "Des cadeaux"],
     ["ceremonies", "sfl", "Les cérémonies officielles"],
+    // Le jeu (Sabri, 17/11) : son nom porte son année, le seul chiffre admis dans un titre.
+    ["bola-27", "plus", "Bola 27"],
   ] as const;
   const INTERDIT = /\d|€|%|gratuit|illimit|inclus|garanti|chaque|toujours|bientôt/i;
   const DEPOSE = "/bola-plus/maillots-portes.webp";
@@ -623,9 +625,10 @@ async function banc() {
     const studio = liste.find((a) => a.id === "studio");
     assert.deepEqual(studio?.visuel, { genre: "composant", composant: "studio" }, "« Ton studio » : l'éventail de Bola Studio");
     assert.ok(!studio?.sous, "« Ton studio » : ses ballons viennent de studio.ts, pas d'une ligne écrite ici");
-    // Les violettes d'abord, puis les vertes : on glisse de Bola Plus à la SFL.
-    const parts = liste.map((a) => a.part);
-    assert.deepEqual(parts, [...parts].sort((x, y) => (x === y ? 0 : x === "plus" ? -1 : 1)), "les avantages de Bola Plus avant ceux de la SFL");
+    // Bola 27, discret : son logo dessiné par le code, en dernier.
+    const jeu = liste.find((a) => a.id === "bola-27");
+    assert.deepEqual(jeu?.visuel, { genre: "composant", composant: "bola-27" }, "« Bola 27 » : son logo, pas une image");
+    assert.equal(liste[liste.length - 1].id, "bola-27", "« Bola 27 » arrive en dernier");
     for (const a of liste) {
       assert.ok(a.part === "plus" || a.part === "sfl", `« ${a.titre} » : une part connue`);
       assert.ok(!INTERDIT.test(a.titre.replace(/^Bola 27$/, "Bola")) && !(a.sous && INTERDIT.test(a.sous)), `« ${a.titre} » : ni chiffre, ni prix, ni promesse`);
@@ -725,7 +728,7 @@ async function banc() {
     return total;
   };
   const IMAGES = [AFFICHE.image, ...AVANTAGES.flatMap((a) => (a.visuel.genre === "image" ? [a.visuel.image] : []))];
-  assert.equal(new Set(IMAGES).size, 6, "six visuels distincts");
+  assert.equal(new Set(IMAGES).size, 5, "cinq visuels distincts");
   const total = visuelsLa(IMAGES);
   assert.ok(total <= 2_000_000, `les visuels pèsent ${total} octets, au plus 2 Mo`);
   // La taille d'un WebP, lue dans son en-tête (VP8X, VP8 ou VP8L).
@@ -765,7 +768,7 @@ async function banc() {
   assert.deepEqual(
     dossier,
     [...IMAGES.flatMap((i) => LARGEURS.map((l) => `${i}-${l}.webp`)), ...(depose ? [DEPOSE.split("/").pop()!] : []), STUDIO].sort(),
-    "public/bola-plus : les dix-huit visuels (et le visuel déposé), le dossier des vignettes de Bola Studio, rien d'autre"
+    "public/bola-plus : les quinze visuels (et le visuel déposé), le dossier des vignettes de Bola Studio, rien d'autre"
   );
   assert.ok(dossier.every((f) => (f === STUDIO ? statSync(join(PUBLIC, "bola-plus", f)).isDirectory() : statSync(join(PUBLIC, "bola-plus", f)).isFile())));
 
@@ -896,8 +899,8 @@ async function banc() {
   refuse("deux avantages de plus", () => avantagesJustes([...AVANTAGES, { ...AVANTAGES[0], id: "x" }, { ...AVANTAGES[0], id: "y" }]));
   refuse("un identifiant en double", () => avantagesJustes([...AVANTAGES, AVANTAGES[1]]));
   refuse("un avantage sans part connue", () => avantagesJustes(AVANTAGES.map((a, i) => (i === 0 ? ({ ...a, part: "club" } as unknown as Avantage) : a))));
-  const iSfl = AVANTAGES.findIndex((a) => a.part === "sfl");
-  refuse("une part SFL avant Bola Plus", () => avantagesJustes([AVANTAGES[iSfl], ...AVANTAGES.filter((_, i) => i !== iSfl)]));
+  refuse("le jeu qui n'est plus en dernier", () => avantagesJustes([AVANTAGES[AVANTAGES.length - 1], ...AVANTAGES.slice(0, -1)]));
+  refuse("les maillots après ta carte", () => avantagesJustes([AVANTAGES[1], AVANTAGES[0], ...AVANTAGES.slice(2)]));
   refuse("une promesse chiffrée", () => avantagesJustes(AVANTAGES.map((a) => (a.id === "cadeaux" ? { ...a, titre: "3 cadeaux par saison" } : a))));
   // La même promesse dans la ligne du dessous, que le titre exact ne garde pas : seul le garde « ni chiffre » la refuse.
   refuse("une promesse chiffrée sous le titre", () => avantagesJustes(AVANTAGES.map((a) => (a.id === "cadeaux" ? { ...a, sous: "3 cadeaux par saison" } : a))));

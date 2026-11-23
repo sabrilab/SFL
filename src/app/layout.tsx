@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, Anton, Barlow_Condensed } from "next/font/google";
+import { Inter, Anton, Barlow_Condensed, Archivo } from "next/font/google";
 import "./globals.css";
 import "@/components/sfl/actus/lune.css";
 
@@ -63,6 +63,14 @@ const barlow = Barlow_Condensed({
   subsets: ["latin"],
 });
 
+// Les titres de Bola Plus (Sabri, 23/11 : la piste F de la planche, Archivo
+// Expanded 900) : police variable, largeur poussée à 125 % par la feuille.
+const archivo = Archivo({
+  variable: "--font-archivo",
+  subsets: ["latin"],
+  axes: ["wdth"],
+});
+
 export const metadata: Metadata = {
   metadataBase: new URL("https://getbola.app"),
   title: {
@@ -95,7 +103,7 @@ export default function RootLayout({
     <html
       lang="fr"
       suppressHydrationWarning
-      className={`${inter.variable} ${anton.variable} ${barlow.variable} h-full antialiased`}
+      className={`${inter.variable} ${anton.variable} ${barlow.variable} ${archivo.variable} h-full antialiased`}
     >
       {/* La langue (français, ou arabe de droite à gauche) posée avant le
           premier rendu : lib/i18n/langue.tsx. */}
