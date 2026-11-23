@@ -9,7 +9,7 @@ import { PageRubrique, useMaCarte } from "@/components/sfl/ma-carte/rubriques";
 export default function PageMaSaison() {
   const { saison, dimanches, fiche, rangs } = useMaCarte();
   return (
-    <PageRubrique titre="Ma saison">
+    <PageRubrique titre="Ma saison" large>
       <MaSaison saison={`Saison ${saison.numero ?? 0}`} dimanches={dimanches} forts={fiche.forts} rangs={rangs} />
     </PageRubrique>
   );

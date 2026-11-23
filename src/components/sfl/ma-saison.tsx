@@ -234,8 +234,15 @@ export function MaSaison({
   const montres = tout ? autres : autres.slice(0, D_EMBLEE);
 
   return (
-    <section aria-labelledby="ma-saison" className="flex flex-col gap-2.5">
-      <div className="flex items-baseline justify-between px-1">
+    // Au téléphone, une colonne. Dès qu'il y a la place (iPad en largeur,
+    // ordinateur : PageRubrique large), deux colonnes au nombre d'or : à
+    // gauche le dernier dimanche, qui reste en vue, à droite les points forts
+    // (à l'aise sur la grande colonne) et tous les autres dimanches.
+    <section
+      aria-labelledby="ma-saison"
+      className="flex flex-col gap-2.5 @4xl:grid @4xl:grid-cols-[minmax(0,1fr)_minmax(0,1.618fr)] @4xl:items-start @4xl:gap-x-[var(--fib-34)]"
+    >
+      <div className="flex items-baseline justify-between px-1 @4xl:col-span-2">
         <h2 id="ma-saison" className="mono-label text-muted-foreground">
           Ma saison
         </h2>
@@ -244,35 +251,39 @@ export function MaSaison({
           {apres > 0 && ` · après J${apres}`}
         </span>
       </div>
-      <MarqueSuspens className="-mt-1 px-1" />
+      <MarqueSuspens className="-mt-1 px-1 @4xl:col-span-2" />
 
-      <DernierDimanche d={dernier} rang={rangs.get(dernier.j)} />
+      <div className="colonne-fixe">
+        <DernierDimanche d={dernier} rang={rangs.get(dernier.j)} />
+      </div>
 
-      {forts.length > 0 && (
-        <div className="grid grid-cols-3 gap-2">
-          {forts.map((f) => (
-            <Fort key={f.classement} f={f} />
-          ))}
-        </div>
-      )}
+      <div className="flex flex-col gap-2.5">
+        {forts.length > 0 && (
+          <div className="grid grid-cols-3 gap-2">
+            {forts.map((f) => (
+              <Fort key={f.classement} f={f} />
+            ))}
+          </div>
+        )}
 
-      {autres.length > 0 && (
-        <div className="glass flex flex-col overflow-hidden rounded-[22px]">
-          {montres.map((d, i) => (
-            <LigneDimanche key={d.j} d={d} premiere={i === 0} />
-          ))}
-          {autres.length > D_EMBLEE && (
-            <button
-              type="button"
-              onClick={() => setTout((t) => !t)}
-              aria-expanded={tout}
-              className="border-t border-foreground/8 py-3.5 text-corps font-semibold text-encre-2 active:bg-foreground/[0.04]"
-            >
-              {tout ? "Moins" : "Tous mes dimanches"}
-            </button>
-          )}
-        </div>
-      )}
+        {autres.length > 0 && (
+          <div className="glass flex flex-col overflow-hidden rounded-[22px]">
+            {montres.map((d, i) => (
+              <LigneDimanche key={d.j} d={d} premiere={i === 0} />
+            ))}
+            {autres.length > D_EMBLEE && (
+              <button
+                type="button"
+                onClick={() => setTout((t) => !t)}
+                aria-expanded={tout}
+                className="border-t border-foreground/8 py-3.5 text-corps font-semibold text-encre-2 active:bg-foreground/[0.04]"
+              >
+                {tout ? "Moins" : "Tous mes dimanches"}
+              </button>
+            )}
+          </div>
+        )}
+      </div>
     </section>
   );
 }
