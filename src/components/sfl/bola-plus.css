@@ -642,6 +642,7 @@
 }
 .bp-formule__economie {
   display: inline-flex;
+  align-self: flex-start;
   align-items: center;
   height: 20px;
   padding: 0 7px;
@@ -948,5 +949,67 @@ html[data-clavier] .bp-barre {
     color: var(--bp-nuit);
     border: 1.5px solid var(--bp-prix);
     background-color: var(--bp-prix);
+  }
+}
+
+/* Le bouton Mensuel / Annuel de « Ton prix » (23/11, « comme dans Wispr Flow »). */
+.bp-bascule {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.08);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.1);
+}
+.bp-bascule__choix {
+  height: 40px;
+  border-radius: 999px;
+  font-size: 15px;
+  font-weight: 700;
+  color: color-mix(in srgb, currentColor 72%, transparent);
+  transition:
+    background-color 0.2s ease,
+    color 0.2s ease;
+}
+.bp-bascule__choix--choisi {
+  background: var(--bp-prix);
+  color: var(--bp-nuit);
+}
+:root:not(.dark) .bp-bascule {
+  background: rgb(10 11 13 / 0.05);
+  box-shadow: inset 0 0 0 1px rgb(10 11 13 / 0.1);
+}
+:root:not(.dark) .bp-bascule__choix--choisi {
+  background: var(--bp-nuit);
+  color: #fff;
+}
+/* Les deux faces l'une sur l'autre : la carte prend la hauteur de la plus haute. */
+.bp-offre {
+  display: grid;
+  padding: 14px 16px;
+  border-radius: 20px;
+  background: rgb(255 255 255 / 0.06);
+  box-shadow: inset 0 0 0 2px var(--bp-prix);
+}
+:root:not(.dark) .bp-offre {
+  background: rgb(10 11 13 / 0.03);
+  box-shadow: inset 0 0 0 2px var(--bp-nuit);
+}
+.bp-offre__face {
+  grid-area: 1 / 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  transition: opacity 0.2s ease;
+}
+.bp-offre__face[data-off] {
+  visibility: hidden;
+  opacity: 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  .bp-bascule__choix,
+  .bp-offre__face {
+    transition: none;
   }
 }

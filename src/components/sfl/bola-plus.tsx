@@ -89,7 +89,6 @@ import {
   PALETTE,
   PARRAINAGE,
   PRIX_FORMULE,
-  ANNUEL_PAR_MOIS,
   LIBELLE_ECONOMIE,
   VARIABLES_PLUS,
   diapos,
@@ -235,6 +234,8 @@ export function OffreBolaPlus({
 }) {
   const { interet, noter, annuler, occupe } = plus;
   const formule = interet ? interet.formule : choix;
+  // Sans formule choisie (un intérêt noté sans formule), le bouton montre l'annuel.
+  const affichee: Formule = formule ?? "annuel";
   const interneRef = useRef<HTMLDivElement | null>(null);
   const blocRef = actionRef ?? interneRef;
   // Le bouton touché ici vient de laisser sa place : le focus va à ce qui le remplace.
@@ -278,44 +279,42 @@ export function OffreBolaPlus({
 
   return (
     <div className="flex flex-col gap-3">
-      <div role="radiogroup" aria-label="Formule" onKeyDown={fleches} className="flex flex-col gap-2">
+      {/* Le bouton Mensuel / Annuel (Sabri, 23/11 : « comme dans Wispr Flow »), sur l'annuel au départ. */}
+      <div role="radiogroup" aria-label="Formule" onKeyDown={fleches} className="bp-bascule">
+        {FORMULES.map((f) => (
+          <button
+            key={f}
+            type="button"
+            role="radio"
+            aria-checked={affichee === f}
+            tabIndex={affichee === f ? 0 : -1}
+            disabled={occupe}
+            onClick={() => choisir(f)}
+            className={cn("bp-bascule__choix", affichee === f && "bp-bascule__choix--choisi")}
+          >
+            {NOM_FORMULE[f]}
+          </button>
+        ))}
+      </div>
+      {/* Les deux faces au même endroit : la carte garde sa hauteur quand on bascule. */}
+      <div className="bp-offre">
         {FORMULES.map((f) => {
           const p = PRIX_FORMULE[f];
-          const choisie = formule === f;
+          const off = affichee !== f;
           return (
-            <button
-              key={f}
-              type="button"
-              role="radio"
-              aria-checked={choisie}
-              disabled={occupe}
-              onClick={() => choisir(f)}
-              className={cn("bp-formule", choisie && "bp-formule--choisie")}
-            >
-              <span className="flex min-w-0 flex-1 flex-col gap-1.5">
-                <span className="flex items-center gap-2">
-                  <span className="mono-label bp-formule__nom">{NOM_FORMULE[f]}</span>
-                  {f === "annuel" && <span className="bp-formule__economie tabular-nums">{LIBELLE_ECONOMIE}</span>}
+            <div key={f} className="bp-offre__face" data-off={off ? "" : undefined} aria-hidden={off || undefined}>
+              {f === "annuel" && <span className="bp-formule__economie tabular-nums">{LIBELLE_ECONOMIE}</span>}
+              <span className="flex items-baseline gap-2 whitespace-nowrap">
+                <span className="bp-formule__prix tabular-nums" style={{ fontFamily: ANTON }}>
+                  {p.mois}&nbsp;€
                 </span>
-                <span className="flex items-baseline gap-2 whitespace-nowrap">
-                  <span className="bp-formule__prix tabular-nums" style={{ fontFamily: ANTON }}>
-                    {p.euros}&nbsp;€
-                  </span>
-                  <span className="bp-formule__par">/ {p.par}</span>
-                  <Barre somme={p.barre} />
-                </span>
-                {f === "annuel" && (
-                  <span className="bp-formule__mois tabular-nums">
-                    soit {ANNUEL_PAR_MOIS}&nbsp;€ / mois
-                  </span>
-                )}
-                <span className="bp-formule__sous tabular-nums">{p.sous}</span>
-                <span className="bp-formule__ballons tabular-nums">{BALLONS_FORMULE[f]}</span>
+                <span className="bp-formule__par">/ mois</span>
+                <Barre somme={p.barre} />
               </span>
-              <span aria-hidden className="bp-formule__rond">
-                {choisie && <Check className="size-3.5" strokeWidth={3.5} />}
-              </span>
-            </button>
+              <span className="bp-formule__mois tabular-nums">{p.facture}</span>
+              <span className="bp-formule__sous tabular-nums">{p.sous}</span>
+              <span className="bp-formule__ballons tabular-nums">{BALLONS_FORMULE[f]}</span>
+            </div>
           );
         })}
       </div>
@@ -334,8 +333,8 @@ export function OffreBolaPlus({
             </button>
           </div>
         ) : PAIEMENT_ACTIF ? (
-          // Le paiement branché (bola-plus-paiement.tsx) : on s'abonne pour de bon, la formule choisie ou le mensuel.
-          <BoutonSAbonner formule={choix ?? "mensuel"} />
+          // Le paiement branché (bola-plus-paiement.tsx) : on s'abonne pour de bon, la formule choisie ou l'annuel.
+          <BoutonSAbonner formule={choix ?? "annuel"} />
         ) : (
           <button type="button" onClick={interesser} disabled={occupe} className="bouton-principal h-[52px] w-full text-lecture font-bold disabled:opacity-40">
             Je suis intéressé
@@ -670,7 +669,8 @@ const COULEURS = {
 /** La page Bola Plus : le carrousel, ses segments, et le bouton toujours sous le pouce. */
 export function PageBolaPlus() {
   const plus = useBolaPlus();
-  const [choix, setChoix] = useState<Formule | null>(null);
+  // L'annuel est choisi au départ (Sabri, 23/11 : « par défaut, il est en mode annuel »).
+  const [choix, setChoix] = useState<Formule | null>("annuel");
   const actionRef = useRef<HTMLDivElement | null>(null);
   const railRef = useRef<HTMLDivElement>(null);
   // La carte visée par le dernier saut (flèches, segments) : plusieurs ← → rapides avancent d'autant, sans attendre la fin du défilement doux.

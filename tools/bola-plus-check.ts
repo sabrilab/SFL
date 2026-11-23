@@ -110,24 +110,24 @@ import { abonnementRequis } from "../src/lib/sfl/sfl-payant";
 // 1 · L'offre.
 const NBSP = "\u00a0";
 assert.equal(MENSUEL_CENTIMES, 1990);
-assert.equal(ANNUEL_CENTIMES, 16890);
+assert.equal(ANNUEL_CENTIMES, 16680, "13,90 € × 12 (23/11)");
 assert.equal(ECHEANCES, 4);
 assert.equal(MENSUEL, "19,90");
-assert.equal(ANNUEL, "168,90");
+assert.equal(ANNUEL, "166,80");
 assert.equal(montant(5), "0,05");
 assert.equal(montant(100), "1,00");
 assert.equal(montant(100000), "1\u202f000,00");
 assert.throws(() => montant(42.225), "un montant n'est fait que de centimes entiers");
 assert.throws(() => montant(-1));
-assert.ok(Math.abs(REMISE - (1 - 16890 / 23880)) < 1e-12, "la remise : 1 − 16 890 / (12 × 1 990)");
-assert.equal(REMISE_POUR_CENT, 29, "29,27 % arrondis vers le bas");
-assert.equal(LIBELLE_REMISE, `−29${NBSP}%`);
-assert.equal(LIBELLE_ECHEANCES, `4${NBSP}×${NBSP}42,23${NBSP}€ sans frais`);
-// L'annuel ramené au mois (23/11) : 14,08 € (arrondi au centime supérieur : 12 × 14,08 ≥ 168,90), et 69,90 € économisés sur douze mensuels.
-assert.equal(ANNUEL_PAR_MOIS, "14,08");
-assert.ok(12 * 1408 >= ANNUEL_CENTIMES && 12 * 1407 < ANNUEL_CENTIMES, "le mois de l'annuel ne passe jamais sous l'année");
-assert.equal(ECONOMIE_ANNUEL_CENTIMES, 6990);
-assert.equal(LIBELLE_ECONOMIE, `69,90${NBSP}€ économisés`);
+assert.ok(Math.abs(REMISE - (1 - 16680 / 23880)) < 1e-12, "la remise : 1 − 16 680 / (12 × 1 990)");
+assert.equal(REMISE_POUR_CENT, 30, "30,15 % arrondis vers le bas");
+assert.equal(LIBELLE_REMISE, `−30${NBSP}%`);
+assert.equal(LIBELLE_ECHEANCES, `4${NBSP}×${NBSP}41,70${NBSP}€ sans frais`);
+// L'annuel ramené au mois (23/11) : 13,90 € pile (12 × 13,90 = 166,80), et 72 € économisés sur douze mensuels.
+assert.equal(ANNUEL_PAR_MOIS, "13,90");
+assert.ok(12 * 1390 >= ANNUEL_CENTIMES && 12 * 1389 < ANNUEL_CENTIMES, "le mois de l'annuel ne passe jamais sous l'année");
+assert.equal(ECONOMIE_ANNUEL_CENTIMES, 7200);
+assert.equal(LIBELLE_ECONOMIE, `72${NBSP}€ économisés`);
 // La remise et l'échéance, rejouées par des calculs qu'on peut fausser (les mutants, plus bas).
 const remiseJuste = (pourCent: (mois: number, an: number) => number) => {
   assert.equal(pourCent(1990, 16890), 29, "−29 % pour 19,90 € et 168,90 €");
@@ -510,7 +510,7 @@ async function banc() {
   const tout = (d: string): string[] => readdirSync(d, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? tout(join(d, e.name)) : [join(d, e.name)]));
   for (const f of tout(SRC)) assert.ok(!/klarna/i.test(readFileSync(f, "utf8")), `${f} nomme Klarna`);
   // Les prix : une seule source. Aucun montant de l'offre ailleurs que dans lib/sfl/bola-plus.ts.
-  const MONTANTS = /(?<![\d,.])(19[,.]90?|168[,.]90?|42[,.]2[235]|1990|16890|4223)(?![\d,.])|[−-][\s\u00a0]?(29|30)[\s\u00a0]?%/;
+  const MONTANTS = /(?<![\d,.])(19[,.]90?|16[68][,.]80?|168[,.]90?|13[,.]90?|42[,.]2[235]|1990|16890|16680|4223|4170|1390)(?![\d,.])|[−-][\s\u00a0]?(29|30)[\s\u00a0]?%/;
   const uneSource = (f: string, texte: string) => {
     const sansNotes = texte.replace(/^\s*(\/\/|\*|\/\*).*$/gm, "");
     const trouve = MONTANTS.exec(sansNotes);
@@ -533,7 +533,7 @@ async function banc() {
   const sourceJuste = (texte: string) => {
     const code = texte.replace(/^\s*(\/\/|\*|\/\*).*$/gm, "");
     assert.equal(code.match(/\b1990\b/g)?.length, 1, "1990 écrit une fois");
-    assert.equal(code.match(/\b16890\b/g)?.length, 1, "16890 écrit une fois");
+    assert.equal(code.match(/\b16680\b/g)?.length, 1, "16680 écrit une fois");
     assert.ok(!/toFixed|parseFloat|toLocaleString|Intl\./.test(code), "les montants se calculent en centimes entiers");
     assert.ok(/export const REMISE_POUR_CENT = Math\.floor\(\(\(12 \* MENSUEL_CENTIMES - ANNUEL_CENTIMES\) \* 100\) \/ \(12 \* MENSUEL_CENTIMES\)\);/.test(code), "la remise s'arrondit vers le bas, en entiers, dans la source");
     assert.ok(/export const LIBELLE_REMISE = `−\$\{REMISE_POUR_CENT\}\\u00a0%`;/.test(code), "« −29 % » lit la remise arrondie de la source");
@@ -571,7 +571,7 @@ async function banc() {
   assert.equal(BOLA_PLUS_SEUL_CENTIMES, 990);
   assert.deepEqual(SFL_OFFICIEL, { mois: 3500, saison: { prix: 11990, reference: 14000 }, annee: { prix: 24990, reference: 28000 } });
   grilleJuste(SFL_OFFICIEL, BARRE, MENSUEL_CENTIMES, ANNUEL_CENTIMES);
-  assert.deepEqual(REMISE_GRILLE, { mensuel: 43, annuel: 32 }, "−43 % et −32 % contre la grille, arrondis vers le bas");
+  assert.deepEqual(REMISE_GRILLE, { mensuel: 43, annuel: 33 }, "−43 % et −33 % contre la grille, arrondis vers le bas");
   assert.equal(prix(3500), "35");
   assert.equal(prix(24990), "249,90");
   assert.equal(BOLA_PLUS_SEUL, "9,90");
@@ -581,8 +581,9 @@ async function banc() {
     { prix: "249,90", par: "an" },
   ]);
   assert.deepEqual(PRIX_FORMULE, {
-    mensuel: { euros: MENSUEL, par: "mois", barre: "35", sous: "Sans engagement" },
-    annuel: { euros: ANNUEL, par: "an", barre: "249,90", sous: LIBELLE_ECHEANCES },
+    mensuel: { euros: MENSUEL, par: "mois", mois: MENSUEL, barre: "35", facture: `Facturé 19,90${NBSP}€ chaque mois`, sous: "Sans engagement" },
+    // L'annuel au mois (bouton Mensuel / Annuel, 23/11) : 13,90 €, la grille de l'année barrée au mois (249,90 / 12 → 20,83).
+    annuel: { euros: ANNUEL, par: "an", mois: "13,90", barre: "20,83", facture: `Facturé 166,80${NBSP}€ par an`, sous: LIBELLE_ECHEANCES },
   });
   // Le bundle : Bola Plus, les maillots, les stats, la carte, la SFL.
   const bundleJuste = (b: readonly string[]) => assert.deepEqual([...b], ["bola-plus", "maillots", "stats", "carte", "sfl"], "le bundle est complet, dans l'ordre");
@@ -787,7 +788,7 @@ async function banc() {
     const tuile = bloc("TuileBolaPlus");
     const sansCommentaire = tsx.replace(/^\s*\/\/.*$/gm, "").replace(/\{\/\*[\s\S]*?\*\/\}/g, "");
     // Aucun montant en dur, aucune couleur écrite : tout vient de lib/sfl/bola-plus.ts.
-    assert.ok(!/(?<![\w/[.-])(19|20|35|119|140|168|249|280|29|30|32|42|43|90|990|1990|16890|3500|4223)(?![\w\]])/.test(sansCommentaire.replace(/size-\[\d+px\]|\[\d+px\]/g, "")), "aucun prix écrit en dur dans l'écran");
+    assert.ok(!/(?<![\w/[.-])(19|20|35|119|140|168|249|280|29|30|32|42|43|90|990|1990|16890|16680|166|13|1390|3500|4223)(?![\w\]])/.test(sansCommentaire.replace(/size-\[\d+px\]|\[\d+px\]/g, "")), "aucun prix écrit en dur dans l'écran");
     assert.ok(!/sans frais|en \d+ fois|×/.test(sansCommentaire), "les 4 fois ne s'écrivent que dans la source");
     assert.ok(!/#[0-9a-f]{3,8}\b/i.test(sansCommentaire), "aucune teinte écrite dans l'écran (PALETTE)");
     assert.ok(/"--bp-prix": PALETTE\.prix/.test(tsx) && /style=\{COULEURS\}/.test(page), "la page pose la palette en variables");
@@ -840,7 +841,7 @@ async function banc() {
     assert.ok(/srcSet=\{sourcesVisuel\(/.test(photo) && /sizes=\{TAILLES\}/.test(photo) && /loading="lazy"/.test(photo), "les visuels : trois tailles, chargés quand on y arrive");
     // Les mots de l'écran : une liste fermée. Ni sous-titre, ni texte d'aide.
     const mots = [...new Set([...sansCommentaire.replace(/&apos;/g, "'").matchAll(/>\s*([^<>{}\n;()=]*[A-Za-zÀ-ÿ][^<>{}\n;()=]*?)\s*</g)].map((m) => m[1].trim()))].sort();
-    assert.deepEqual(mots, ["Annuler", "Bola Plus", "C'est noté", "Je suis intéressé", "Offert", "Prix premiers joueurs", "Toi"], "les mots de l'écran : une liste fermée");
+    assert.deepEqual(mots, ["/ mois", "Annuler", "Bola Plus", "C'est noté", "Je suis intéressé", "Offert", "Prix premiers joueurs", "Toi"], "les mots de l'écran : une liste fermée");
     // La feuille : aimantée, sans teinte écrite (seulement les variables de la page), le mouvement réduit traité.
     const sansNotes = css.replace(/\/\*[\s\S]*?\*\//g, "");
     assert.ok(/scroll-snap-type: x mandatory;/.test(sansNotes) && /scroll-snap-align: center;/.test(sansNotes) && /scroll-snap-stop: always;/.test(sansNotes), "le rail est aimanté, carte par carte");
@@ -928,13 +929,13 @@ async function banc() {
   refuse("les segments muets", () => ecranJuste(mute("segments", ecran, 'aria-current={i === actif ? "true" : undefined}', ""), style));
   refuse("un texte d'aide", () => ecranJuste(mute("aide", ecran, "      <div className=\"bp-pied\" aria-hidden />", "      <p>Glisse pour voir la suite.</p>\n      <div className=\"bp-pied\" aria-hidden />"), style));
   refuse("une fausse carte à la place de la vraie", () => ecranJuste(mute("carte", ecran, '<BolaCard name={CARTE_TOI.name} ', '<BolaCard name={CARTE_TOI.name} photo="/bola/joueur.jpg" '), style));
-  refuse("le barré retiré", () => ecranJuste(mute("barré", ecran, "                  <Barre somme={p.barre} />\n", ""), style));
+  refuse("le barré retiré", () => ecranJuste(mute("barré", ecran, "                <Barre somme={p.barre} />\n", ""), style));
   refuse("les 4 fois en dur", () => ecranJuste(mute("4 fois", ecran, "{p.sous}</span>", "4 × 42,23 € sans frais</span>"), style));
   refuse("les prix cachés sur petit écran", () => ecranJuste(mute("caché", ecran, 'className="bp-formule__sous tabular-nums"', 'className="bp-formule__sous tabular-nums max-[359px]:hidden"'), style));
   refuse("le visuel déposé avant d'être chargé", () => ecranJuste(mute("d'emblée", ecran, "useState(false);\n  const depose = deposeLa", "useState(true);\n  const depose = deposeLa"), style));
-  refuse("les ballons des formules retirés", () => ecranJuste(mute("ballons retirés", ecran, '                <span className="bp-formule__ballons tabular-nums">{BALLONS_FORMULE[f]}</span>\n', ""), style));
+  refuse("les ballons des formules retirés", () => ecranJuste(mute("ballons retirés", ecran, '              <span className="bp-formule__ballons tabular-nums">{BALLONS_FORMULE[f]}</span>\n', ""), style));
   refuse("les ballons des formules cachés", () => ecranJuste(mute("ballons cachés", ecran, 'className="bp-formule__ballons tabular-nums"', 'className="bp-formule__ballons tabular-nums hidden"'), style));
-  refuse("les ballons des formules au-dessus des 4 fois", () => ecranJuste(mute("ballons avant", ecran, '                <span className="bp-formule__sous tabular-nums">{p.sous}</span>\n                <span className="bp-formule__ballons tabular-nums">{BALLONS_FORMULE[f]}</span>', '                <span className="bp-formule__ballons tabular-nums">{BALLONS_FORMULE[f]}</span>\n                <span className="bp-formule__sous tabular-nums">{p.sous}</span>'), style));
+  refuse("les ballons des formules au-dessus des 4 fois", () => ecranJuste(mute("ballons avant", ecran, '              <span className="bp-formule__sous tabular-nums">{p.sous}</span>\n              <span className="bp-formule__ballons tabular-nums">{BALLONS_FORMULE[f]}</span>', '              <span className="bp-formule__ballons tabular-nums">{BALLONS_FORMULE[f]}</span>\n              <span className="bp-formule__sous tabular-nums">{p.sous}</span>'), style));
   refuse("« Ton studio » sans ses ballons du mois", () => ecranJuste(mute("pied", ecran, "          {Pied && <Pied />}\n", ""), style));
   refuse("« Ton studio » dessiné par un autre visuel", () => ecranJuste(mute("visuel studio", ecran, "  studio: VisuelStudio,\n", "  studio: VisuelCarte,\n"), style));
   refuse("« Ton studio » retiré du carrousel", () => avantagesJustes(AVANTAGES.filter((a) => a.id !== "studio")));

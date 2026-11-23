@@ -67,8 +67,12 @@ export function voitBolaPlus(nom: string | null | undefined): boolean {
 
 /** Le prix du mois, en centimes : 19,90 €. */
 export const MENSUEL_CENTIMES = 1990;
-/** Le prix de l'année, en centimes : 168,90 €. */
-export const ANNUEL_CENTIMES = 16890;
+/**
+ * Le prix de l'année, en centimes : 166,80 €, soit 13,90 € par mois (Sabri,
+ * 23/11/2026 : « on peut mettre 13,90 par mois », payé à l'année ; c'était
+ * 168,90 €, soit 14,08 €, du 13/11 au 23/11).
+ */
+export const ANNUEL_CENTIMES = 16680;
 /** L'annuel se paie en autant de fois, sans frais. */
 export const ECHEANCES = 4;
 
@@ -84,7 +88,7 @@ export const echeance = (centimes: number, n: number) => Math.ceil(centimes / n)
 
 /** « 19,90 », affiché suivi de « € ». */
 export const MENSUEL = montant(MENSUEL_CENTIMES);
-/** « 168,90 », affiché suivi de « € ». */
+/** « 166,80 », affiché suivi de « € ». */
 export const ANNUEL = montant(ANNUEL_CENTIMES);
 
 export type Formule = "mensuel" | "annuel";
@@ -98,20 +102,20 @@ export const REMISE = 1 - ANNUEL_CENTIMES / (12 * MENSUEL_CENTIMES);
 export const REMISE_POUR_CENT = Math.floor(((12 * MENSUEL_CENTIMES - ANNUEL_CENTIMES) * 100) / (12 * MENSUEL_CENTIMES));
 /** « −29 % ». */
 export const LIBELLE_REMISE = `−${REMISE_POUR_CENT}\u00a0%`;
-/** « 4 × 42,23 € sans frais » : sous la formule annuelle. */
+/** « 4 × 41,70 € sans frais » : sous la formule annuelle. */
 export const LIBELLE_ECHEANCES = `${ECHEANCES}\u00a0×\u00a0${montant(echeance(ANNUEL_CENTIMES, ECHEANCES))}\u00a0€ sans frais`;
 
 /**
  * L'année ramenée au mois (Sabri, 23/11/2026 : « mettre l'équivalent par
- * mois, et montrer l'économie ») : 16 890 / 12 = 1 407,5 centimes, arrondi au
- * centime supérieur comme les échéances (douze de ces mois ne passent
- * jamais sous le prix de l'année) : « 14,08 ».
+ * mois, et montrer l'économie ») : 16 680 / 12 = 1 390 centimes (arrondi au
+ * centime supérieur comme les échéances si le prix change : douze de ces
+ * mois ne passent jamais sous le prix de l'année) : « 13,90 ».
  */
 export const ANNUEL_PAR_MOIS = montant(echeance(ANNUEL_CENTIMES, 12));
-/** Ce que l'année fait économiser sur douze mois au mensuel, en centimes : 12 × 1 990 − 16 890 = 6 990. */
+/** Ce que l'année fait économiser sur douze mois au mensuel, en centimes : 12 × 1 990 − 16 680 = 7 200. */
 export const ECONOMIE_ANNUEL_CENTIMES = 12 * MENSUEL_CENTIMES - ANNUEL_CENTIMES;
-/** « 69,90 € économisés » : l'étiquette de la formule annuelle. */
-export const LIBELLE_ECONOMIE = `${montant(ECONOMIE_ANNUEL_CENTIMES)}\u00a0€ économisés`;
+/** « 72 € économisés » : l'étiquette de la formule annuelle (sans « ,00 »). */
+export const LIBELLE_ECONOMIE = `${montant(ECONOMIE_ANNUEL_CENTIMES).replace(/,00$/, "")}\u00a0€ économisés`;
 
 /** L'intérêt d'un joueur : la formule qu'il a choisie (ou aucune), et quand. */
 export interface Interet {
@@ -213,10 +217,15 @@ export const GRILLE_SFL: readonly { prix: string; par: string }[] = [
   { prix: prix(SFL_OFFICIEL.annee.prix), par: "an" },
 ];
 
-/** Chaque formule : son prix, sa période, son barré, et la ligne dessous. */
-export const PRIX_FORMULE: Record<Formule, { euros: string; par: string; barre: string; sous: string }> = {
-  mensuel: { euros: MENSUEL, par: "mois", barre: prix(BARRE.mensuel), sous: "Sans engagement" },
-  annuel: { euros: ANNUEL, par: "an", barre: prix(BARRE.annuel), sous: LIBELLE_ECHEANCES },
+/**
+ * Chaque formule : son prix et sa période (l'ouverture), son prix au mois et
+ * son barré au mois (le bouton Mensuel / Annuel de « Ton prix », 23/11 : la
+ * grille de l'année ramenée au mois, 249,90 / 12 = 20,83 au centime
+ * supérieur), ce qui est facturé, et la ligne dessous.
+ */
+export const PRIX_FORMULE: Record<Formule, { euros: string; par: string; mois: string; barre: string; facture: string; sous: string }> = {
+  mensuel: { euros: MENSUEL, par: "mois", mois: MENSUEL, barre: prix(BARRE.mensuel), facture: `Facturé ${MENSUEL}\u00a0€ chaque mois`, sous: "Sans engagement" },
+  annuel: { euros: ANNUEL, par: "an", mois: ANNUEL_PAR_MOIS, barre: prix(echeance(BARRE.annuel, 12)), facture: `Facturé ${ANNUEL}\u00a0€ par an`, sous: LIBELLE_ECHEANCES },
 };
 
 /** Le prix de Bola Plus seul, barré sur sa carte : « 9,90 ». */
