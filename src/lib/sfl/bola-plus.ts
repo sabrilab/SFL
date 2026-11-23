@@ -67,12 +67,8 @@ export function voitBolaPlus(nom: string | null | undefined): boolean {
 
 /** Le prix du mois, en centimes : 19,90 €. */
 export const MENSUEL_CENTIMES = 1990;
-/**
- * Le prix de l'année, en centimes : 166,80 €, soit 13,90 € par mois (Sabri,
- * 23/11/2026 : « on peut mettre 13,90 par mois », payé à l'année ; c'était
- * 168,90 €, soit 14,08 €, du 13/11 au 23/11).
- */
-export const ANNUEL_CENTIMES = 16680;
+/** Le prix de l'année, en centimes : 168,90 €. */
+export const ANNUEL_CENTIMES = 16890;
 /** L'annuel se paie en autant de fois, sans frais. */
 export const ECHEANCES = 4;
 
@@ -88,7 +84,7 @@ export const echeance = (centimes: number, n: number) => Math.ceil(centimes / n)
 
 /** « 19,90 », affiché suivi de « € ». */
 export const MENSUEL = montant(MENSUEL_CENTIMES);
-/** « 166,80 », affiché suivi de « € ». */
+/** « 168,90 », affiché suivi de « € ». */
 export const ANNUEL = montant(ANNUEL_CENTIMES);
 
 export type Formule = "mensuel" | "annuel";
@@ -102,19 +98,22 @@ export const REMISE = 1 - ANNUEL_CENTIMES / (12 * MENSUEL_CENTIMES);
 export const REMISE_POUR_CENT = Math.floor(((12 * MENSUEL_CENTIMES - ANNUEL_CENTIMES) * 100) / (12 * MENSUEL_CENTIMES));
 /** « −29 % ». */
 export const LIBELLE_REMISE = `−${REMISE_POUR_CENT}\u00a0%`;
-/** « 4 × 41,70 € sans frais » : sous la formule annuelle. */
+/** « 4 × 42,23 € sans frais » : sous la formule annuelle. */
 export const LIBELLE_ECHEANCES = `${ECHEANCES}\u00a0×\u00a0${montant(echeance(ANNUEL_CENTIMES, ECHEANCES))}\u00a0€ sans frais`;
 
 /**
- * L'année ramenée au mois (Sabri, 23/11/2026 : « mettre l'équivalent par
- * mois, et montrer l'économie ») : 16 680 / 12 = 1 390 centimes (arrondi au
- * centime supérieur comme les échéances si le prix change : douze de ces
- * mois ne passent jamais sous le prix de l'année) : « 13,90 ».
+ * L'annuel affiché au mois sur le bouton Mensuel / Annuel : 13,90 €. Choix
+ * de Sabri (23/11/2026, sur la question posée) : afficher 13,90 € par mois et
+ * facturer 168,90 € par an, alors que 168,90 / 12 = 14,08 €. Ce n'est donc
+ * pas un calcul : c'est un prix d'affichage, écrit ici seulement, et la
+ * carte écrit toujours dessous ce qui est facturé (« Facturé 168,90 € par
+ * an »). Pour revenir au calcul exact : montant(echeance(ANNUEL_CENTIMES, 12)).
  */
-export const ANNUEL_PAR_MOIS = montant(echeance(ANNUEL_CENTIMES, 12));
-/** Ce que l'année fait économiser sur douze mois au mensuel, en centimes : 12 × 1 990 − 16 680 = 7 200. */
+export const ANNUEL_AFFICHE_PAR_MOIS_CENTIMES = 1390;
+export const ANNUEL_PAR_MOIS = montant(ANNUEL_AFFICHE_PAR_MOIS_CENTIMES);
+/** Ce que l'année fait économiser sur douze mois au mensuel, en centimes : 12 × 1 990 − 16 890 = 6 990 (sur le prix facturé). */
 export const ECONOMIE_ANNUEL_CENTIMES = 12 * MENSUEL_CENTIMES - ANNUEL_CENTIMES;
-/** « 72 € économisés » : l'étiquette de la formule annuelle (sans « ,00 »). */
+/** « 69,90 € économisés » : l'étiquette de la formule annuelle (sans « ,00 » si le compte est rond). */
 export const LIBELLE_ECONOMIE = `${montant(ECONOMIE_ANNUEL_CENTIMES).replace(/,00$/, "")}\u00a0€ économisés`;
 
 /** L'intérêt d'un joueur : la formule qu'il a choisie (ou aucune), et quand. */

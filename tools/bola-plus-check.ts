@@ -110,24 +110,23 @@ import { abonnementRequis } from "../src/lib/sfl/sfl-payant";
 // 1 · L'offre.
 const NBSP = "\u00a0";
 assert.equal(MENSUEL_CENTIMES, 1990);
-assert.equal(ANNUEL_CENTIMES, 16680, "13,90 € × 12 (23/11)");
+assert.equal(ANNUEL_CENTIMES, 16890);
 assert.equal(ECHEANCES, 4);
 assert.equal(MENSUEL, "19,90");
-assert.equal(ANNUEL, "166,80");
+assert.equal(ANNUEL, "168,90");
 assert.equal(montant(5), "0,05");
 assert.equal(montant(100), "1,00");
 assert.equal(montant(100000), "1\u202f000,00");
 assert.throws(() => montant(42.225), "un montant n'est fait que de centimes entiers");
 assert.throws(() => montant(-1));
-assert.ok(Math.abs(REMISE - (1 - 16680 / 23880)) < 1e-12, "la remise : 1 − 16 680 / (12 × 1 990)");
-assert.equal(REMISE_POUR_CENT, 30, "30,15 % arrondis vers le bas");
-assert.equal(LIBELLE_REMISE, `−30${NBSP}%`);
-assert.equal(LIBELLE_ECHEANCES, `4${NBSP}×${NBSP}41,70${NBSP}€ sans frais`);
-// L'annuel ramené au mois (23/11) : 13,90 € pile (12 × 13,90 = 166,80), et 72 € économisés sur douze mensuels.
+assert.ok(Math.abs(REMISE - (1 - 16890 / 23880)) < 1e-12, "la remise : 1 − 16 890 / (12 × 1 990)");
+assert.equal(REMISE_POUR_CENT, 29, "29,27 % arrondis vers le bas");
+assert.equal(LIBELLE_REMISE, `−29${NBSP}%`);
+assert.equal(LIBELLE_ECHEANCES, `4${NBSP}×${NBSP}42,23${NBSP}€ sans frais`);
+// L'annuel affiché au mois (choix de Sabri, 23/11) : 13,90 €, un prix d'affichage (168,90 / 12 = 14,08) ; l'économie se compte sur le prix facturé.
 assert.equal(ANNUEL_PAR_MOIS, "13,90");
-assert.ok(12 * 1390 >= ANNUEL_CENTIMES && 12 * 1389 < ANNUEL_CENTIMES, "le mois de l'annuel ne passe jamais sous l'année");
-assert.equal(ECONOMIE_ANNUEL_CENTIMES, 7200);
-assert.equal(LIBELLE_ECONOMIE, `72${NBSP}€ économisés`);
+assert.equal(ECONOMIE_ANNUEL_CENTIMES, 6990);
+assert.equal(LIBELLE_ECONOMIE, `69,90${NBSP}€ économisés`);
 // La remise et l'échéance, rejouées par des calculs qu'on peut fausser (les mutants, plus bas).
 const remiseJuste = (pourCent: (mois: number, an: number) => number) => {
   assert.equal(pourCent(1990, 16890), 29, "−29 % pour 19,90 € et 168,90 €");
@@ -533,7 +532,7 @@ async function banc() {
   const sourceJuste = (texte: string) => {
     const code = texte.replace(/^\s*(\/\/|\*|\/\*).*$/gm, "");
     assert.equal(code.match(/\b1990\b/g)?.length, 1, "1990 écrit une fois");
-    assert.equal(code.match(/\b16680\b/g)?.length, 1, "16680 écrit une fois");
+    assert.equal(code.match(/\b16890\b/g)?.length, 1, "16890 écrit une fois");
     assert.ok(!/toFixed|parseFloat|toLocaleString|Intl\./.test(code), "les montants se calculent en centimes entiers");
     assert.ok(/export const REMISE_POUR_CENT = Math\.floor\(\(\(12 \* MENSUEL_CENTIMES - ANNUEL_CENTIMES\) \* 100\) \/ \(12 \* MENSUEL_CENTIMES\)\);/.test(code), "la remise s'arrondit vers le bas, en entiers, dans la source");
     assert.ok(/export const LIBELLE_REMISE = `−\$\{REMISE_POUR_CENT\}\\u00a0%`;/.test(code), "« −29 % » lit la remise arrondie de la source");
@@ -571,7 +570,7 @@ async function banc() {
   assert.equal(BOLA_PLUS_SEUL_CENTIMES, 990);
   assert.deepEqual(SFL_OFFICIEL, { mois: 3500, saison: { prix: 11990, reference: 14000 }, annee: { prix: 24990, reference: 28000 } });
   grilleJuste(SFL_OFFICIEL, BARRE, MENSUEL_CENTIMES, ANNUEL_CENTIMES);
-  assert.deepEqual(REMISE_GRILLE, { mensuel: 43, annuel: 33 }, "−43 % et −33 % contre la grille, arrondis vers le bas");
+  assert.deepEqual(REMISE_GRILLE, { mensuel: 43, annuel: 32 }, "−43 % et −32 % contre la grille, arrondis vers le bas");
   assert.equal(prix(3500), "35");
   assert.equal(prix(24990), "249,90");
   assert.equal(BOLA_PLUS_SEUL, "9,90");
@@ -583,7 +582,7 @@ async function banc() {
   assert.deepEqual(PRIX_FORMULE, {
     mensuel: { euros: MENSUEL, par: "mois", mois: MENSUEL, barre: "35", facture: `Facturé 19,90${NBSP}€ chaque mois`, sous: "Sans engagement" },
     // L'annuel au mois (bouton Mensuel / Annuel, 23/11) : 13,90 €, la grille de l'année barrée au mois (249,90 / 12 → 20,83).
-    annuel: { euros: ANNUEL, par: "an", mois: "13,90", barre: "20,83", facture: `Facturé 166,80${NBSP}€ par an`, sous: LIBELLE_ECHEANCES },
+    annuel: { euros: ANNUEL, par: "an", mois: "13,90", barre: "20,83", facture: `Facturé 168,90${NBSP}€ par an`, sous: LIBELLE_ECHEANCES },
   });
   // Le bundle : Bola Plus, les maillots, les stats, la carte, la SFL.
   const bundleJuste = (b: readonly string[]) => assert.deepEqual([...b], ["bola-plus", "maillots", "stats", "carte", "sfl"], "le bundle est complet, dans l'ordre");
