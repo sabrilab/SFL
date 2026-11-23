@@ -56,8 +56,16 @@
 // joueurs et toi, et s'effacent l'un devant l'autre quand ils se
 // chevauchent. Toucher un terrain lâche l'onde et le lève en mini-stade,
 // son nom à côté, au-dessus de la fiche que la page ouvre.
+//
+// Les équipes de Bola Team (23/11, Sabri : « avec les écussons de l'équipe,
+// sa position sur la carte ») : chacune à son écusson, posé au-dessus de la
+// ville de son capitaine (la page calcule le lieu) ; plusieurs dans la même
+// ville se rangent côte à côte. Des éléments HTML aussi, l'écusson dessiné
+// par React (equipe/ecusson.tsx, rendu dans le repère par un portail) ; le
+// toucher, la page ouvre la fenêtre de l'équipe.
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import maplibregl, { type LngLatBoundsLike, type Map as PlanMap, type Marker, type PaddingOptions } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { SPLASH_FINI } from "@/components/sfl/app-splash";
@@ -96,6 +104,9 @@ import { gestesOrdinateur } from "./gestes-ordinateur";
 import { FONDU, LIBELLES, styleSnap } from "./style-snap";
 import { couleurLibelle, majZones, peindre, poserZones, teinterZones, type Ambiance } from "./ambiances";
 import { dansContour, numeroZone, type Zone } from "@/lib/sfl/zones";
+import { Ecusson } from "@/components/sfl/equipe/ecusson";
+import type { Blason } from "@/lib/sfl/blason";
+import type { Fond } from "@/lib/sfl/equipes";
 
 export interface PointPlan {
   id: string;
@@ -122,6 +133,22 @@ export interface PossiblePlan {
   /** Hors des zones Bola : son premier match ouvre une zone (en vert, 30/10). */
   horsZone?: boolean;
 }
+
+/** Une équipe de Bola Team, posée à son écusson. */
+export interface EquipePlan {
+  id: number;
+  lat: number;
+  lng: number;
+  nom: string;
+  initiales: string;
+  fond: Fond;
+  blason: Blason | null;
+}
+
+const AUCUNE_EQUIPE: EquipePlan[] = [];
+/** L'écusson sur le plan, et l'écart entre deux équipes de la même ville. */
+const TAILLE_ECUSSON = 44;
+const PAS_EQUIPES = 50;
 
 export type FondCarte = "plan" | "satellite";
 /** Le centre quand rien n'est posé : la France entière. */
@@ -382,8 +409,14 @@ export function CarteMap({
   ambiance = "classique",
   onZone,
   trajet = null,
+  equipes = AUCUNE_EQUIPE,
+  onEquipe,
   className,
 }: {
+  /** Les équipes de Bola Team, à leur écusson. */
+  equipes?: EquipePlan[];
+  /** Toucher l'écusson d'une équipe : sa fenêtre. */
+  onEquipe?: (id: number) => void;
   /** Ton chemin jusqu'au match choisi (lon, lat), qui brille sur le plan (31/10, le tableau de bord). */
   trajet?: [number, number][] | null;
   /** Les zones Bola (lib/sfl/zones.ts) : ouvertes, puis en attente. */
@@ -430,6 +463,9 @@ export function CarteMap({
   const carte = useRef<PlanMap | null>(null);
   const reperes = useRef<Marker[]>([]);
   const joueursReperes = useRef<Marker[]>([]);
+  // Les écussons posés : leur repère, et l'élément où React dessine l'écusson.
+  const [ecussons, setEcussons] = useState<{ e: EquipePlan; el: HTMLElement }[]>([]);
+  const equipeRef = useRef(onEquipe);
   // Les stickers posés (leur rang : l'ordre du temps, le joué en dernier), et
   // le paquet que chacun mène quand des matchs se chevauchent (ses ids, et
   // les villes de joueurs rangées contre lui).
@@ -496,7 +532,9 @@ export function CarteMap({
     vueRef.current = onVue;
     margeBasRef.current = margeBas;
     retraitRef.current = matchsEnRetrait;
-  }, [onChoisir, onBulle, onPoint, onVille, onJoueur, onPossible, onVue, margeBas, matchsEnRetrait]);
+    equipeRef.current = onEquipe;
+  }, [onChoisir, onBulle, onPoint, onVille, onJoueur, onPossible, onVue, margeBas, matchsEnRetrait, onEquipe]);
+
   const pointsActifs = !!onPoint;
 
   // La carte, une fois.
@@ -1043,6 +1081,42 @@ export function CarteMap({
     };
   }, [villes]);
 
+  // Les équipes : un repère par écusson, au-dessus de la ville ; celles d'une
+  // même ville côte à côte. L'écusson lui-même est dessiné plus bas (portail).
+  useEffect(() => {
+    const map = carte.current;
+    if (!map) return;
+    const parLieu = new Map<string, EquipePlan[]>();
+    for (const e of equipes) {
+      const k = `${e.lat.toFixed(3)},${e.lng.toFixed(3)}`;
+      parLieu.set(k, [...(parLieu.get(k) ?? []), e]);
+    }
+    const poses: { e: EquipePlan; el: HTMLElement; m: Marker }[] = [];
+    for (const groupe of parLieu.values()) {
+      groupe.forEach((e, i) => {
+        const el = document.createElement("button");
+        el.type = "button";
+        el.className = "equipe-ancre";
+        el.setAttribute("aria-label", e.nom);
+        el.style.width = `${TAILLE_ECUSSON}px`;
+        el.style.height = `${Math.round(TAILLE_ECUSSON * 1.06)}px`;
+        el.addEventListener("click", (ev) => {
+          ev.stopPropagation();
+          navigator.vibrate?.(8);
+          equipeRef.current?.(e.id);
+        });
+        const dx = (i - (groupe.length - 1) / 2) * PAS_EQUIPES;
+        // Au-dessus de la pile des joueurs de la ville, pour ne pas la cacher.
+        const m = new maplibregl.Marker({ element: el, anchor: "bottom", offset: [dx, -58] }).setLngLat([e.lng, e.lat]).addTo(map);
+        poses.push({ e, el, m });
+      });
+    }
+    setEcussons(poses.map(({ e, el }) => ({ e, el })));
+    return () => {
+      for (const p of poses) p.m.remove();
+    };
+  }, [equipes]);
+
   // Aller voir une ville choisie dans le catalogue : ses rues, sa pile.
   useEffect(() => {
     const map = carte.current;
@@ -1076,7 +1150,14 @@ export function CarteMap({
     cadrer(map, b, marge, ZOOM_OUVERTURE_CONTRATS + 1, duree);
   }, [cadrerSur]);
 
-  return <div ref={conteneur} className={className} role="region" aria-label="La Map des matchs" />;
+  return (
+    <>
+      <div ref={conteneur} className={className} role="region" aria-label="La Map des matchs" />
+      {ecussons.map(({ e, el }) =>
+        createPortal(<Ecusson initiales={e.initiales} fond={e.fond} blason={e.blason} taille={TAILLE_ECUSSON} />, el, `equipe-${e.id}`)
+      )}
+    </>
+  );
 }
 
 /**

@@ -493,6 +493,28 @@
   border: 0;
   overflow: visible;
 }
+/* Les équipes de Bola Team, à leur écusson (carte-map.tsx) : une ombre qui
+   le décolle du plan, un ressort au toucher. */
+.maplibregl-map .maplibregl-marker.equipe-ancre {
+  background: none;
+  border: 0;
+  padding: 0;
+  overflow: visible;
+  cursor: pointer;
+  z-index: 3;
+  filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.28));
+  -webkit-tap-highlight-color: transparent;
+}
+.maplibregl-map .maplibregl-marker.equipe-ancre > svg {
+  display: block;
+  transition: transform 180ms cubic-bezier(0.3, 1.6, 0.5, 1);
+}
+.maplibregl-map .maplibregl-marker.equipe-ancre:active > svg {
+  transform: scale(0.9);
+}
+.carte--matchs-en-retrait .maplibregl-marker.equipe-ancre {
+  display: none;
+}
 /* Sur ordinateur, les rangées transparentes posées sur le plan le laissent
    saisir (map/gestes-ordinateur.ts) : la main du plan, pas la flèche. Ce
    qu'elles portent (cartes, boutons) garde son curseur. */

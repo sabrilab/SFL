@@ -10038,6 +10038,94 @@ $$;
 revoke execute on function public.publier_brouillons_echus() from public, anon, authenticated;
 grant execute on function public.publier_brouillons_echus() to service_role;
 
+-- ─────────────── Bola Team sur la Map : le mur d'une équipe (23/11/2026) ───────────────
+-- Sabri, 23/11 : sur la Map, les équipes à leur écusson ; le toucher ouvre
+-- leur fenêtre, avec « le trash talk, le clash, la provocation » et la
+-- demande de confrontation (le défi, equipe_defier). Le mur d'une équipe :
+-- des phrases courtes laissées par les joueurs des AUTRES équipes. Le lit
+-- tout joueur connecté ; y écrit un membre d'une équipe active, jamais sur la
+-- sienne ; 140 signes, 6 par heure et par joueur. Retire un message : son
+-- auteur, ou le capitaine de l'équipe visée (la modération de son mur).
+create table if not exists public.equipe_chambrages (
+  id          bigint generated always as identity primary key,
+  cible       bigint not null references public.equipes(id) on delete cascade,
+  equipe      bigint not null references public.equipes(id) on delete cascade,
+  auteur      uuid   not null references public.profiles(id) on delete cascade,
+  texte       text   not null check (char_length(btrim(texte)) between 1 and 140),
+  created_at  timestamptz not null default now(),
+  check (cible <> equipe)
+);
+create index if not exists equipe_chambrages_cible on public.equipe_chambrages (cible, created_at desc);
+create index if not exists equipe_chambrages_auteur on public.equipe_chambrages (auteur, created_at desc);
+
+alter table public.equipe_chambrages enable row level security;
+drop policy if exists "equipe_chambrages: lecture" on public.equipe_chambrages;
+create policy "equipe_chambrages: lecture" on public.equipe_chambrages for select to authenticated
+  using ((select public.est_membre()));
+revoke insert, update, delete on public.equipe_chambrages from anon, authenticated;
+
+create or replace function public.equipe_chambrer(cible bigint, texte text)
+returns bigint
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  mienne bigint;
+  c bigint;
+  t text := btrim(coalesce(equipe_chambrer.texte, ''));
+begin
+  if not public.est_membre() then
+    raise exception 'Connecte-toi.' using errcode = '42501';
+  end if;
+  select m.equipe_id into mienne
+    from public.equipe_membres m join public.equipes q on q.id = m.equipe_id
+   where m.joueur = (select auth.uid()) and m.statut = 'membre' and m.depart_le is null and q.dissoute_le is null
+   limit 1;
+  if mienne is null or public.equipe_effectif(mienne) < 5 then
+    raise exception 'Il faut une équipe active.' using errcode = 'P0001';
+  end if;
+  if mienne = equipe_chambrer.cible then
+    raise exception 'Pas sur ton propre mur.' using errcode = 'P0001';
+  end if;
+  if not exists (select 1 from public.equipes q where q.id = equipe_chambrer.cible and q.dissoute_le is null)
+     or public.equipe_effectif(equipe_chambrer.cible) < 5 then
+    raise exception 'Cette équipe n''existe plus.' using errcode = 'P0001';
+  end if;
+  if char_length(t) < 1 or char_length(t) > 140 then
+    raise exception '140 signes au plus.' using errcode = '22023';
+  end if;
+  if (select count(*) from public.equipe_chambrages x
+       where x.auteur = (select auth.uid()) and x.created_at > now() - interval '1 hour') >= 6 then
+    raise exception 'Doucement : 6 messages par heure.' using errcode = 'P0001';
+  end if;
+  insert into public.equipe_chambrages (cible, equipe, auteur, texte)
+  values (equipe_chambrer.cible, mienne, (select auth.uid()), t)
+  returning id into c;
+  return c;
+end;
+$$;
+revoke execute on function public.equipe_chambrer(bigint, text) from public, anon;
+grant execute on function public.equipe_chambrer(bigint, text) to authenticated;
+
+create or replace function public.equipe_chambrage_retirer(c bigint)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  delete from public.equipe_chambrages x
+   where x.id = equipe_chambrage_retirer.c
+     and (x.auteur = (select auth.uid()) or public.equipe_droit(x.cible, 'direction'));
+  if not found then
+    raise exception 'Ce message n''est pas à toi.' using errcode = '42501';
+  end if;
+end;
+$$;
+revoke execute on function public.equipe_chambrage_retirer(bigint) from public, anon;
+grant execute on function public.equipe_chambrage_retirer(bigint) to authenticated;
+
 -- ─────────────── Droits de table : pas plus que ce que l'API sert (03/11/2026) ───────────────
 -- Supabase donne d'office tous les droits de table à anon et authenticated, et
 -- la RLS filtre ensuite. Trois d'entre eux ne servent à rien ici : TRUNCATE,
