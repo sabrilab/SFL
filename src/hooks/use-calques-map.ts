@@ -3,7 +3,7 @@
 // Ce que la Map montre en plus des matchs (Sabri, 24/10 : « On a trop de
 // cartes […] ça cache la visibilité quand on veut vraiment jouer et trouver
 // un match ») : les joueurs dans leur ville, et les terrains libres où ouvrir
-// un match. Les deux se masquent depuis le menu de la Map
+// un match. Depuis le 23/11, les équipes de Bola Team à leur écusson. Tous se masquent depuis le menu de la Map
 // (map/menu-map.tsx) ; le téléphone garde le choix d'une visite à l'autre.
 // Sans stockage (navigation privée), il tient jusqu'à la fermeture de l'app.
 
@@ -12,11 +12,12 @@ import { useSyncExternalStore } from "react";
 export interface CalquesMap {
   joueurs: boolean;
   terrains: boolean;
+  equipes: boolean;
 }
 
 const CLE = "bola-map-calques";
 const EVENEMENT = "bola-map-calques";
-const TOUT: CalquesMap = { joueurs: true, terrains: true };
+const TOUT: CalquesMap = { joueurs: true, terrains: true, equipes: true };
 
 /** Le choix en mémoire ; undefined tant qu'il n'a pas été lu. */
 let courant: CalquesMap | undefined;
@@ -25,7 +26,7 @@ function lire(): CalquesMap {
   if (courant === undefined) {
     try {
       const lu = JSON.parse(localStorage.getItem(CLE) ?? "{}") as Partial<CalquesMap>;
-      courant = { joueurs: lu.joueurs !== false, terrains: lu.terrains !== false };
+      courant = { joueurs: lu.joueurs !== false, terrains: lu.terrains !== false, equipes: lu.equipes !== false };
     } catch {
       courant = TOUT;
     }
@@ -48,7 +49,7 @@ function abonner(onChange: () => void) {
   };
 }
 
-/** Ce que la Map montre : les joueurs, les terrains libres (tout, par défaut). */
+/** Ce que la Map montre : les joueurs, les terrains libres, les équipes (tout, par défaut). */
 export function useCalquesMap(): CalquesMap {
   return useSyncExternalStore(abonner, lire, () => TOUT);
 }

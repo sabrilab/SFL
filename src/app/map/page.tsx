@@ -63,6 +63,7 @@
 
 import dynamic from "next/dynamic";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import {
   CalendarDays,
@@ -73,6 +74,7 @@ import {
   ClipboardPen,
   Crosshair,
   IdCard,
+  Shield,
   MessageCircle,
   Layers,
   LocateFixed,
@@ -161,7 +163,7 @@ import { etatRevelation, finDuVote, libelleFinDuVote, libelleRevelation, nouveau
 import { estEnSuspens, libelleSuspens, SIGNE_SUSPENS } from "@/lib/sfl/saisie/suspens";
 import { TOUTES_AMBIANCES, type Ambiance } from "@/components/sfl/map/ambiances";
 import { calculerZones, dansContour, numeroZone, type Foyer, type VilleZone, type Zone } from "@/lib/sfl/zones";
-import { maVille, villeOuLigue } from "@/lib/sfl/villes";
+import { maVille, villeDe, villeOuLigue } from "@/lib/sfl/villes";
 import { garderPosition, positionGardee } from "@/lib/sfl/activation";
 import { photoMiniature, photoPerso } from "@/lib/sfl/photos";
 import { nomAffiche } from "@/lib/sfl/identites";
@@ -181,7 +183,11 @@ import {
   useTerrainsRecenses,
   type TerrainPropose,
 } from "@/lib/sfl/terrains";
-import { active, droitDe, signataires } from "@/lib/sfl/equipes";
+import { active, droitDe, enCours, listerDefis, signataires, type Defi, type Equipe } from "@/lib/sfl/equipes";
+import { useEquipes, visible } from "@/hooks/use-equipes";
+import { demoEquipes } from "@/lib/sfl/equipes-demo";
+import { FicheEquipeMap, type DefiPossible } from "@/components/sfl/equipe/fiche-equipe-map";
+import { Defier } from "@/components/sfl/equipe/defier";
 import type { LieuChoisi } from "@/components/sfl/matchs/choisir-terrain";
 import { useVillesRevision } from "@/hooks/use-villes";
 import { useJoueursDeLaMap } from "@/hooks/use-joueurs-de-la-map";
@@ -212,7 +218,7 @@ import { Visages } from "@/components/sfl/suivre";
 import { afficheDe, parNote, useAffiches, type Affiche } from "@/lib/sfl/affiche";
 import { Ecusson } from "@/components/sfl/equipe/ecusson";
 import { useMatchsTeam, type MatchTeam } from "@/hooks/use-matchs-team";
-import type { FondCarte, PointPlan, PossiblePlan, ToiPlan } from "@/components/sfl/map/carte-map";
+import type { EquipePlan, FondCarte, PointPlan, PossiblePlan, ToiPlan } from "@/components/sfl/map/carte-map";
 import type { TeinteFantome } from "@/components/sfl/map/stade";
 import { idAdminLigue } from "@/lib/sfl/admin-ligue";
 import "./animations.css";
@@ -222,6 +228,7 @@ import "@/components/sfl/map/contrats-map.css";
 const AUCUN_POINT: PointPlan[] = [];
 /** Le filtre Contrats (ou le menu) ôte les terrains possibles du plan. */
 const SANS_POSSIBLES: PossiblePlan[] = [];
+const SANS_EQUIPES: EquipePlan[] = [];
 /** Les joueurs masqués depuis le menu de la Map. */
 const AUCUNE_VILLE: VillePlan[] = [];
 const AUCUNE_ZONE: Zone[] = [];
@@ -979,6 +986,70 @@ export default function MapPage() {
         ? "defier"
         : null;
 
+  // Les équipes de Bola Team sur la Map (Sabri, 23/11 : « avec les écussons
+  // de l'équipe, sa position sur la carte ») : chacune au-dessus de la ville
+  // de son capitaine (à défaut, d'un de ses joueurs qui a donné la sienne).
+  // Plusieurs équipes dans une ville : en tournesol (map/carte-map.tsx).
+  // Une équipe en formation reste cachée aux autres (visible). Toucher
+  // l'écusson ouvre sa fenêtre (equipe/fiche-equipe-map.tsx) : son mur, et
+  // « Défier », le défi du mode Team, sans quitter la Map.
+  const routeur = useRouter();
+  const { equipes: toutesEquipes, demo: equipesDemo } = useEquipes();
+  const revEquipesVilles = useVillesRevision();
+  const equipesVues = useMemo(() => toutesEquipes.filter((e) => visible(e, me, equipesDemo)), [toutesEquipes, me, equipesDemo]);
+  const equipesPlan = useMemo<EquipePlan[]>(
+    () =>
+      equipesVues.flatMap((e) => {
+        const joueurs = signataires(e);
+        const ordre = [...joueurs.filter((x) => x.id === e.capitaine), ...joueurs.filter((x) => x.id !== e.capitaine)];
+        for (const x of ordre) {
+          const v = villeDe(x.name);
+          if (v) return [{ id: e.id, lat: v.lat, lng: v.lng, nom: e.nom, initiales: e.initiales, fond: e.fond, blason: e.blason }];
+        }
+        return [];
+      }),
+    // revVilles : les villes relues, les écussons se reposent.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [equipesVues, revEquipesVilles]
+  );
+  // Mon équipe : celle de la base, ou, en démonstration, celle où je joue.
+  const mienneMap: Equipe | null = equipesDemo ? (toutesEquipes.find((e) => e.membres.some((x) => x.statut === "membre" && x.name === me)) ?? null) : monEquipe;
+  const moiMap = equipesDemo ? (mienneMap?.membres.find((x) => x.name === me)?.id ?? null) : moi;
+  const moiDansMienne = mienneMap?.membres.find((x) => x.id === moiMap && x.statut === "membre") ?? null;
+  const [equipeOuverteId, setEquipeOuverteId] = useState<number | null>(null);
+  const equipeOuverte = equipeOuverteId == null ? null : (equipesVues.find((e) => e.id === equipeOuverteId) ?? null);
+  const [defisLus, setDefisLus] = useState<Defi[]>([]);
+  const [adversaireMap, setAdversaireMap] = useState<Equipe | null>(null);
+  const [defiMapN, setDefiMapN] = useState(0);
+  const defisDemo = useMemo(
+    () => (equipesDemo && me ? demoEquipes(toutesEquipes.flatMap((e) => e.membres.map((x) => x.name)), me).defis : null),
+    [equipesDemo, me, toutesEquipes]
+  );
+  const defisTeam = defisDemo ?? defisLus;
+  const relireDefis = useCallback(() => {
+    listerDefis()
+      .then(setDefisLus)
+      .catch(() => {});
+  }, []);
+  // Une équipe ouverte : les défis en cours (« Défi en cours » plutôt que « Défier »).
+  useEffect(() => {
+    if (equipeOuverteId != null && !equipesDemo) relireDefis();
+  }, [equipeOuverteId, equipesDemo, relireDefis]);
+  const defiEquipe: DefiPossible = (() => {
+    const e = equipeOuverte;
+    if (!e || !partiesActives) return null;
+    if (!mienneMap) return "monter";
+    if (mienneMap.id === e.id) return null;
+    const dejaDefie = defisTeam.some((d) => enCours(d) && ((d.de === mienneMap.id && d.a === e.id) || (d.a === mienneMap.id && d.de === e.id)));
+    if (dejaDefie) return "en-cours";
+    return active(mienneMap) && active(e) && droitDe(moiDansMienne, "defier") ? "defier" : null;
+  })();
+  const capitaineIci = !!equipeOuverte && !!moiDansMienne && mienneMap?.id === equipeOuverte.id && droitDe(moiDansMienne, "direction");
+  const ouvrirEquipeMap = (id: number) => {
+    logActivity("map", { path: "/", meta: { geste: "equipe" } });
+    setEquipeOuverteId(id);
+  };
+
   // Le carrousel et le plan vont ensemble : faire glisser les cartes choisit
   // celle qui s'arrête au centre (le plan suit), et choisir sur le plan amène
   // sa carte au centre.
@@ -1530,6 +1601,9 @@ export default function MapPage() {
             possibles={enContrats ? SANS_POSSIBLES : calques.terrains ? possiblesZones : surCarte ? seulPropose : SANS_POSSIBLES}
             possibleChoisi={enContrats ? null : (leve ?? (surCarte ? (ouPropose?.id ?? null) : null))}
             onPossible={toucherPossible}
+            equipes={enContrats || !calques.equipes ? SANS_EQUIPES : equipesPlan}
+            onEquipe={ouvrirEquipeMap}
+            onPlusEquipes={() => routeur.push("/bola-team")}
             teinteFantome={tonFantomes}
             onVue={voirTerrains}
             zones={enContrats ? AUCUNE_ZONE : zones}
@@ -1585,7 +1659,7 @@ export default function MapPage() {
             <Search className="size-[18px]" strokeWidth={2.2} />
           </Link>
           <MenuMap
-            filtre={!calques.joueurs || (libres.length > 0 && (!calques.terrains || formatTerrain != null)) || fond === "satellite" || enContrats}
+            filtre={(!calques.equipes && equipesPlan.length > 0) || !calques.joueurs || (libres.length > 0 && (!calques.terrains || formatTerrain != null)) || fond === "satellite" || enContrats}
             bascules={[
               {
                 id: "joueurs",
@@ -1603,6 +1677,17 @@ export default function MapPage() {
                       actif: calques.terrains,
                       onChange: (v: boolean) => montrerCalque("terrains", v),
                       dessous: <PucesFormat sur="plan" comptes={comptesFormats} />,
+                    },
+                  ]
+                : []),
+              ...(equipesPlan.length > 0
+                ? [
+                    {
+                      id: "equipes",
+                      libelle: "Les équipes",
+                      icone: <Shield className="size-[18px]" strokeWidth={2.2} />,
+                      actif: calques.equipes,
+                      onChange: (v: boolean) => montrerCalque("equipes", v),
                     },
                   ]
                 : []),
@@ -2121,6 +2206,34 @@ export default function MapPage() {
         onVoir={(v) => {
           setPile(null);
           setViser((x) => ({ lat: v.lat, lng: v.lng, n: (x?.n ?? 0) + 1 }));
+        }}
+      />
+
+      {/* ─── Une équipe touchée sur la Map : son mur, et la défier ─── */}
+      <FicheEquipeMap
+        equipe={adversaireMap ? null : equipeOuverte}
+        equipes={toutesEquipes}
+        mienne={mienneMap}
+        moiId={moiMap}
+        capitaineIci={capitaineIci}
+        defi={defiEquipe}
+        demo={equipesDemo}
+        onOpenChange={(o) => !o && setEquipeOuverteId(null)}
+        onDefier={() => {
+          setDefiMapN((n) => n + 1);
+          setAdversaireMap(equipeOuverte);
+        }}
+      />
+      <Defier
+        key={defiMapN}
+        mienne={mienneMap}
+        adversaire={adversaireMap}
+        onOpenChange={(o) => !o && setAdversaireMap(null)}
+        apercu={equipesDemo}
+        onDefie={() => {
+          setAdversaireMap(null);
+          setEquipeOuverteId(null);
+          if (!equipesDemo) relireDefis();
         }}
       />
 
