@@ -5,6 +5,7 @@
 
 const couper = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
 
-export function texteAnnonceVideo(v: { titre: string; legende: string | null }): { titre: string; texte: string } {
-  return { titre: couper(v.titre, 60), texte: couper(v.legende?.trim() || "Nouvelle vidéo dans les Actus.", 180) };
+export function texteAnnonceVideo(v: { titre: string; legende: string | null; photos?: string[] | null }): { titre: string; texte: string } {
+  const defaut = v.photos?.length ? "Nouvelles photos dans les Actus." : "Nouvelle vidéo dans les Actus.";
+  return { titre: couper(v.titre, 60), texte: couper(v.legende?.trim() || defaut, 180) };
 }

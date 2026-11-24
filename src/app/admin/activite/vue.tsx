@@ -81,6 +81,7 @@ import { BoutonRetour } from "@/components/layout/bouton-retour";
 import { Acquisition, chiffresAcquisition, type Canal, type SiteVisite } from "./acquisition";
 import { ActivationEntonnoir, analyserActivation } from "./activation";
 import { Chapitre, Section } from "./cadre";
+import { Rubriques } from "./rubriques";
 import { Barres, CarteHoraire, Cohortes, Comparaison, Courbe, encre } from "./graphiques";
 
 /** Une photo du studio (studio, drapeau, manga) ; `pays`, celui du drapeau, manque avant le 22/10. */
@@ -959,6 +960,9 @@ export function ActiviteVue({
           </Section>
           <Section titre="Pages les plus vues">
             <Barres lignes={a.pages} />
+          </Section>
+          <Section id="rubriques" titre="Fréquentation des rubriques" sous="Ce qui prend, semaine après semaine.">
+            <Rubriques evenements={vu.evenements} effectif={vu.profiles.length} now={data.now} />
           </Section>
 
           {blocs?.videos(public_, vu.ensembleAdmins)}

@@ -52,6 +52,11 @@ export interface Video {
   duree: number | null;
   /** null : brouillon, que l'admin seul voit. */
   publiee_le: string | null;
+  /**
+   * Une publication en photos (24/11) : leurs chemins dans le bucket, dans
+   * l'ordre ; fichier et affiche y sont la première. null : une vidéo.
+   */
+  photos?: string[] | null;
   created_at?: string;
 }
 
@@ -69,7 +74,14 @@ export interface Commentaire {
   at: number;
 }
 
-const COLONNES = "id, titre, legende, fichier, affiche, largeur, hauteur, duree, publiee_le, created_at";
+const COLONNES = "id, titre, legende, fichier, affiche, largeur, hauteur, duree, publiee_le, created_at, photos";
+/** Avant la colonne photos en base (schema.sql) : la même lecture, sans elle. */
+const COLONNES_AVANT = "id, titre, legende, fichier, affiche, largeur, hauteur, duree, publiee_le, created_at";
+
+/** Une publication en photos, et non une vidéo. */
+export function estEnPhotos(v: Pick<Video, "photos">): boolean {
+  return !!v.photos && v.photos.length > 0;
+}
 
 export const VIDEO_FACTICE: Video = {
   id: "j3-entree",
@@ -86,24 +98,29 @@ export const VIDEO_FACTICE: Video = {
 // ───────────────────────────── Lire ─────────────────────────────
 
 /** Les vidéos publiées, de la plus récente ; [] sans tables (la vidéo factice dans un aperçu). */
-export async function lireVideos(): Promise<Video[]> {
-  const { data, error } = await supabase()
-    .from("videos")
-    .select(COLONNES)
-    .not("publiee_le", "is", null)
-    .lte("publiee_le", new Date().toISOString())
-    .order("publiee_le", { ascending: false })
-    .limit(5);
+export async function lireVideos(combien = 5): Promise<Video[]> {
+  const lire = (colonnes: string) =>
+    supabase()
+      .from("videos")
+      .select(colonnes)
+      .not("publiee_le", "is", null)
+      .lte("publiee_le", new Date().toISOString())
+      .order("publiee_le", { ascending: false })
+      .limit(combien);
+  let { data, error } = await lire(COLONNES);
+  // La colonne photos pas encore en base (42703) : on relit sans elle.
+  if (error?.code === "42703") ({ data, error } = await lire(COLONNES_AVANT));
   if (error) {
     if (DEMO_VIDEOS && erreurSansTable(error.code)) return [VIDEO_FACTICE];
     throw error;
   }
-  return (data ?? []) as Video[];
+  return (data ?? []) as unknown as Video[];
 }
 
 /** Une vidéo, publiée (ou brouillon pour l'admin) ; null : inconnue ou pas pour moi. */
 export async function lireVideo(id: string): Promise<Video | null> {
-  const { data, error } = await supabase().from("videos").select(COLONNES).eq("id", id).maybeSingle();
+  let { data, error } = await supabase().from("videos").select(COLONNES).eq("id", id).maybeSingle();
+  if (error?.code === "42703") ({ data, error } = await supabase().from("videos").select(COLONNES_AVANT).eq("id", id).maybeSingle());
   if (error) {
     if (DEMO_VIDEOS && erreurSansTable(error.code)) return id === VIDEO_FACTICE.id ? VIDEO_FACTICE : null;
     throw error;
