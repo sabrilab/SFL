@@ -79,6 +79,12 @@ export interface PresenceView {
   mine: Reponse | null;
   presents: string[];
   /**
+   * Ceux qui ont répondu eux-mêmes « Je viens », sans les joueurs que l'admin
+   * a posés sur la feuille (que `presents` compte avec eux) : la pastille
+   * verte de leur carte sur le terrain d'un brouillon (24/11/2026).
+   */
+  jeViens: string[];
+  /**
    * Ceux qui ont dit « Je viens » sans être dans une équipe (celles de la
    * feuille, ou celles de la convocation une fois visibles, vendredi 19 h) :
    * les remplaçants. Ils ne sont pas dans `presents` dès que la feuille a ses
@@ -379,6 +385,7 @@ export function usePresence(): PresenceView {
       rendezVous: rendezVousDuDimanche(server.convocation.heure, server.convocation.lieu),
       mine: surLaFeuille ? "present" : (rep[player.name] ?? null),
       ...reponses,
+      jeViens,
       // Un retiré passe remplaçant ; un suspendu (carton rouge) jamais.
       remplacants: sansSuspendus(saison, jDeLaConvocation, remplacantsDe(jeViens, saison, jDuJour, revele ? server.convocation.teams : null, isHidden)),
       ordreDesVenus: ordreDArrivee(reponses.presents, feuille.noms, (n) => server.quand[n]).filter((n) => reponses.presents.includes(n)),
@@ -409,6 +416,7 @@ export function usePresence(): PresenceView {
     rendezVous: rendezVousDuDimanche(localConv?.heure ?? NEXT_MATCH.heure, localConv?.lieu ?? NEXT_MATCH.lieu),
     mine: surLaFeuille ? "present" : localConv ? ((localConv.reponses[player.name] as Reponse | undefined) ?? null) : null,
     ...reponsesLocales,
+    jeViens: sansSuspendus(saison, jDeLaConvocation, local.presents),
     remplacants: sansSuspendus(saison, jDeLaConvocation, remplacantsDe(local.presents, saison, jDuJour, revele ? (localConv?.teams ?? null) : null, isHidden)),
     ordreDesVenus: ordreDArrivee(reponsesLocales.presents, feuille.noms, () => null).filter((n) => reponsesLocales.presents.includes(n)),
     reponsesOuvertes: ouvert,

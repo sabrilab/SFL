@@ -18,6 +18,9 @@
 // Une carte tenue au-dessus du terrain (20/11/2026, bloc-venus.tsx) : ses deux
 // moitiés se dessinent, les Noirs au fond, les Blancs devant ; celle que le
 // doigt survole se remplit.
+// Tant que la journée est en brouillon (24/11/2026), la carte d'un joueur qui
+// a lui-même dit « Je viens » porte une pastille verte cochée : on y voit qui
+// a répondu parmi ceux qu'on a posés pour soi (`vient`).
 
 import { useMemo, type RefObject } from "react";
 import { TerrainPlaces, type Occupant } from "@/components/sfl/matchs/terrain-places";
@@ -61,6 +64,7 @@ export function matchsVus(saison: Saison, j: number, declares: MatchDuJour[]): M
 function occupantsDe(
   mv: MatchVu,
   titresDe: (nom: string, equipes: readonly [string, string]) => BoostType[],
+  vient?: (nom: string) => boolean,
 ): { places: number; occupants: Occupant[] } {
   const cote = Math.max(5, mv.noirs.length, mv.blancs.length);
   const places = cote * 2;
@@ -68,11 +72,17 @@ function occupantsDe(
   const devant = dispo.filter((p) => p.chezMoi).map((p) => p.i);
   const fond = dispo.filter((p) => !p.chezMoi).map((p) => p.i);
   const occupants: Occupant[] = [];
+  const occupant = (x: MatchVu["noirs"][number]): Occupant => ({
+    cle: String(x.i),
+    nom: x.nom,
+    titres: x.extraTime ? [] : titresDe(x.nom, mv.m.equipes),
+    ...(vient?.(x.nom) ? { vient: true } : {}),
+  });
   mv.blancs.forEach((x, k) => {
-    if (devant[k] != null) occupants[devant[k]] = { cle: String(x.i), nom: x.nom, titres: x.extraTime ? [] : titresDe(x.nom, mv.m.equipes) };
+    if (devant[k] != null) occupants[devant[k]] = occupant(x);
   });
   mv.noirs.forEach((x, k) => {
-    if (fond[k] != null) occupants[fond[k]] = { cle: String(x.i), nom: x.nom, titres: x.extraTime ? [] : titresDe(x.nom, mv.m.equipes) };
+    if (fond[k] != null) occupants[fond[k]] = occupant(x);
   });
   return { places, occupants };
 }
@@ -97,6 +107,7 @@ export function BlocMatchs({
   onFeuille,
   zone,
   survol,
+  vient,
 }: {
   saison: Saison;
   j: number;
@@ -123,10 +134,12 @@ export function BlocMatchs({
   zone?: RefObject<HTMLDivElement | null>;
   /** Une carte est tenue : le camp survolé (null : hors du terrain) ; undefined : rien n'est tenu. */
   survol?: Camp | null;
+  /** Brouillon : a-t-il lui-même dit « Je viens » ? Sa carte porte alors la pastille verte. */
+  vient?: (nom: string) => boolean;
 }) {
   const mv = matchs.find((x) => x.n === courant) ?? matchs[0];
   const titresDe = useTitresDuJour(j);
-  const { places, occupants } = useMemo(() => (mv ? occupantsDe(mv, titresDe) : { places: 10, occupants: [] }), [mv, titresDe]);
+  const { places, occupants } = useMemo(() => (mv ? occupantsDe(mv, titresDe, vient) : { places: 10, occupants: [] }), [mv, titresDe, vient]);
   // L'index de la ligne d'un joueur de la journée, et le match où il joue (son camp) : une alerte
   // sur un joueur marque SON match (02/11 : « Moussa · SFL Time manquante » sous M1, Moussa en M2).
   const ligneDe = (nom: string) => saison.entries.findIndex((x) => x.j === j && x.player.toLowerCase() === nom.toLowerCase());
