@@ -17,6 +17,13 @@
 //     gagnait, et un appareil resté sur une vieille copie effaçait les
 //     journées saisies ailleurs (la J11 de la saison 0, le 17/10).
 //
+//   · FUSIONNER (22/11/2026, après la J7) : deux appareils d'admin qui
+//     saisissent en même temps. Chaque appareil garde le document de sa
+//     dernière synchro (`sfl-saisie-base`) ; au conflit, il relit la base et
+//     y repose ce qu'il a saisi depuis, champ par champ (fusion.ts), puis
+//     publie. Avant, il restait figé sur sa copie jusqu'à ce que l'admin
+//     choisisse laquelle des deux saisies perdre.
+//
 // Tout est silencieux et non bloquant : sans session serveur, l'app reste
 // exactement ce qu'elle était (stockage local seul).
 
@@ -26,6 +33,9 @@ import { adoptSaison, CURRENT_SEED_VERSION, localStorageStore } from "./store";
 import type { Saison } from "./types";
 import { sansVitrine } from "../compte-vitrine";
 import { avecFinsDeLaBase, avecMainsDeLaBase, type MainSurLeVote } from "../revelation";
+import { fusionnerSaisons } from "./fusion";
+import { appliquerMvpAuto } from "./mvp";
+import { bloquantsEcriture, nouveauxEcarts } from "./integrite";
 
 // Même canal d'événement que SeasonProvider (littéral pour éviter le cycle
 // d'imports : season-provider importe store, qui importe ce module).
@@ -80,6 +90,33 @@ function localVersion(): number {
   return Number.isFinite(n) ? n : 0;
 }
 
+// Le document de la dernière synchro de cet appareil (lu ou publié), avec sa
+// version : le point de départ d'une fusion. Sans lui, pas de fusion.
+const BASE_KEY = "sfl-saisie-base";
+
+function retenirBase(saison: Saison, version: number) {
+  try {
+    localStorage.setItem(BASE_KEY, `{"version":${version},"saison":${JSON.stringify(saison)}}`);
+  } catch {
+    try {
+      localStorage.removeItem(BASE_KEY);
+    } catch {
+      /* stockage indisponible */
+    }
+  }
+}
+
+function lireBase(): Saison | null {
+  try {
+    const brut = localStorage.getItem(BASE_KEY);
+    if (!brut) return null;
+    const b = JSON.parse(brut) as { version: number; saison: Saison };
+    return b.version === localVersion() && b.saison ? b.saison : null;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Le document distant doit-il remplacer la copie locale ? PUR, testable :
  * plus récent que ce qu'on a déjà adopté, et bâti sur un seed au moins aussi
@@ -110,9 +147,19 @@ export async function pullSaison(): Promise<boolean> {
   // libère (les téléphones déjà figés repartent de la base).
   if (publicationEnAttente() && !session.admin) marquerAPublier(false);
   if (publicationEnAttente()) return false;
+  // Une saisie est en train de partir : adopter la base maintenant effacerait
+  // ce qui vient d'être tapé ici. On relira quand l'envoi sera fini.
+  if (enVol) {
+    relireApres = true;
+    return false;
+  }
   try {
     const doc = await lireDocument(!!session.admin);
     if (!doc) return false;
+    if (enVol) {
+      relireApres = true;
+      return false;
+    }
     // Un admin sur un appareil qui n'avait que la saison des joueurs (sans
     // brouillons) reprend le document entier, même à version égale.
     const lecture = session.admin ? "entiere" : "publique";
@@ -121,6 +168,7 @@ export async function pullSaison(): Promise<boolean> {
     retenirLecture(lecture);
     adoptSaison(doc.data);
     localStorage.setItem(VERSION_KEY, String(doc.version));
+    if (session.admin) retenirBase(doc.data, doc.version);
     window.dispatchEvent(new Event(SAISIE_EVENT));
     return true;
   } catch {
@@ -253,6 +301,9 @@ async function publierMaintenant(saison: Saison, forcer: boolean): Promise<Resul
     const r = data as { ok: boolean; version: number; fins?: Record<string, string | null>; mains?: Record<string, MainSurLeVote | null> };
     if (!r.ok) return { ok: false, raison: CONFLIT, conflit: true };
     retenir(r.version);
+    // Le point de départ de la prochaine fusion : ce que la base vient de prendre.
+    const prise = avecFinsDeLaBase(saison, r.fins ?? {});
+    retenirBase(r.mains ? avecMainsDeLaBase(prise, r.mains) : prise, r.version);
     if (r.fins || r.mains) adopterFins(r.fins ?? {}, r.mains);
     // Le bilan d'XP du serveur se refait (hooks/use-bilan-serveur.ts) : une journée publiée ouvre des paliers.
     window.dispatchEvent(new Event(SAISON_PUBLIEE_EVENT));
@@ -363,6 +414,10 @@ export function pushSaison(saison: Saison, { forcer = false } = {}): Promise<boo
       const s = suivant;
       suivant = null;
       if (s) s.partir(pushSaison(s.saison, { forcer: s.forcer }));
+      else if (relireApres) {
+        relireApres = false;
+        void pullSaison();
+      }
     });
     return enVol;
   }
@@ -382,8 +437,53 @@ export function pushSaison(saison: Saison, { forcer = false } = {}): Promise<boo
 let enVol: Promise<boolean> | null = null;
 let suivant: { saison: Saison; forcer: boolean; issue: Promise<boolean>; partir: (r: Promise<boolean>) => void } | null = null;
 
+let relireApres = false;
+
+/**
+ * Au conflit : la base d'aujourd'hui, avec dessus ce que cet appareil a saisi
+ * depuis sa dernière synchro (fusion.ts). L'appareil adopte le résultat et
+ * repart de la version de la base. null : pas de fusion possible (pas de
+ * point de départ, base illisible, résultat que l'intégrité refuse).
+ */
+async function fusionnerAvecLaBase(): Promise<{ saison: Saison; change: boolean } | null> {
+  try {
+    if (!getSession()?.admin || lectureLocale() === "publique") return null;
+    if (!lireBase()) return null;
+    const doc = await lireDocument(true);
+    if (!doc || doc.seed < CURRENT_SEED_VERSION) return null;
+    // Relus après l'attente : ce qui a été tapé pendant la lecture en fait partie.
+    const base = lireBase();
+    if (!base) return null;
+    const f = fusionnerSaisons(base, sansVitrine(localStorageStore.load()), doc.data);
+    const saison = f.change ? appliquerMvpAuto(f.saison) : doc.data;
+    if (f.change && bloquantsEcriture(nouveauxEcarts(doc.data, saison, {})).length) return null;
+    adoptSaison(saison);
+    retenirLecture("entiere");
+    localStorage.setItem(VERSION_KEY, String(doc.version));
+    retenirBase(doc.data, doc.version);
+    window.dispatchEvent(new Event(SAISIE_EVENT));
+    return { saison, change: f.change };
+  } catch {
+    return null;
+  }
+}
+
 async function envoyer(saison: Saison, forcer: boolean): Promise<boolean> {
-  const r = await publierSaison(saison, { forcer });
+  let r = await publierSaison(saison, { forcer });
+  // Un autre appareil a publié entre-temps : fusionner et renvoyer, plutôt
+  // que de figer celui-ci (trois essais : l'autre peut publier encore).
+  for (let essai = 0; essai < 3 && !r.ok && r.conflit && !forcer; essai++) {
+    const f = await fusionnerAvecLaBase();
+    if (!f) break;
+    // Une saison attendait derrière cet envoi : elle date d'avant la fusion,
+    // elle effacerait ce que l'autre appareil a publié. La fusion la contient.
+    if (suivant) suivant.saison = f.saison;
+    if (!f.change) {
+      r = { ok: true };
+      break;
+    }
+    r = await publierSaison(f.saison);
+  }
   dernier = {
     at: Date.now(),
     ok: r.ok,
@@ -579,6 +679,7 @@ export async function reprendreDeLaBase(): Promise<Resultat> {
     if (!doc) return { ok: false, raison: "Aucune saison lisible en base pour l'instant." };
     garderCopie();
     adoptSaison(doc.data);
+    if (session.admin) retenirBase(doc.data, doc.version);
     retenirLecture(session.admin ? "entiere" : "publique");
     localStorage.setItem(VERSION_KEY, String(doc.version));
     // Plus rien n'attend de partir : ce qui restait ici a été remplacé.
