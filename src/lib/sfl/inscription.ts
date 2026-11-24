@@ -6,8 +6,8 @@
 // photos en pied (face, droite, gauche, dos) qui serviront de personnage de
 // référence aux skins — la photo de carte, elle, ne vient que du studio, une
 // fois le compte accepté (22/10/2026). Le compte naît EN ATTENTE : il se
-// connecte, voit sa carte, et l'admin l'accepte d'un geste (Admin → Vue
-// d'ensemble → Inscriptions), ce qui l'ajoute à l'effectif.
+// connecte, voit sa carte, et l'admin l'accepte d'un geste (Admin → Joueurs
+// → À valider), ce qui l'ajoute à l'effectif.
 //
 // Ce module est PUR (aucun accès réseau, aucun navigateur) : la route serveur
 // refait exactement les mêmes contrôles que l'écran, l'écran ne sert qu'à

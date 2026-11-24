@@ -29,7 +29,7 @@ export const NAV_ITEMS: NavItem[] = [
 // la barre et on ne savait plus où on était.
 const SOUS_PAGES: Record<string, string[]> = {
   "/": ["/map"],
-  "/profil": ["/carte", "/collection", "/duel", "/reglages", "/avatar", "/boutique", "/admin", "/parrainage"],
+  "/profil": ["/carte", "/collection", "/duel", "/reglages", "/avatar", "/boutique", "/parrainage"],
   "/ligue": ["/palmares", "/saisons", "/stats", "/ligue-vierge", "/bola-team"],
 };
 
@@ -65,6 +65,8 @@ export interface Parent {
 
 const MA_CARTE: Parent = { href: "/profil", titre: "Ma carte" };
 const REGLAGES: Parent = { href: "/reglages", titre: "Réglages" };
+const JOUEURS_ADMIN: Parent = { href: "/admin/joueurs", titre: "Joueurs" };
+const PLUS_ADMIN: Parent = { href: "/admin/plus", titre: "Plus" };
 
 /** Les pages enfants, de la plus précise à la plus large (la première qui va l'emporte). */
 const PARENTS: [string, Parent][] = [
@@ -84,9 +86,18 @@ const PARENTS: [string, Parent][] = [
   ["/parrainage", MA_CARTE],
   ["/avatar", REGLAGES],
   ["/boutique", { href: "/collection", titre: "Collection" }],
-  ["/admin/activite", MA_CARTE],
-  ["/admin/design", REGLAGES],
-  ["/admin", REGLAGES],
+  // L'admin (refonte du 24/11/2026) : quatre racines, Journée (/admin),
+  // Joueurs, Analytics et Plus, sans retour (on change de racine par la
+  // barre admin, components/sfl/admin/coquille.tsx). Leurs sous-pages
+  // reviennent à leur onglet ; « Retour à l'app » (colonne d'ordinateur,
+  // dernière ligne de Plus) mène aux Réglages.
+  ["/admin/comptes", JOUEURS_ADMIN],
+  ["/admin/ligue/effectif", JOUEURS_ADMIN],
+  ["/admin/tableau", PLUS_ADMIN],
+  ["/admin/notifications", PLUS_ADMIN],
+  ["/admin/setup", PLUS_ADMIN],
+  ["/admin/design", PLUS_ADMIN],
+  ["/admin/ligue", PLUS_ADMIN],
   ["/ligue/journee", { href: "/ligue", titre: "Actus" }],
   ["/discussions", { href: "/vestiaire", titre: "Vestiaire" }],
   // La liste des messages privés (une conversation donne son parent elle-même : messages/conversation.tsx).
@@ -96,6 +107,7 @@ const PARENTS: [string, Parent][] = [
 
 /** Le parent d'une page enfant ; null pour une racine. */
 export function parentDe(pathname: string): Parent | null {
+  if (ongletAdmin(pathname) && RACINES_ADMIN.includes(pathname)) return null;
   return PARENTS.find(([r]) => pathname === r || pathname.startsWith(`${r}/`))?.[1] ?? null;
 }
 
@@ -123,9 +135,16 @@ const TITRES: [string, string][] = [
   ["/vestiaire", "Vestiaire"],
   ["/messages", "Messages"],
   ["/agent", "Bola Agent"],
-  ["/admin/activite", "Activité"],
+  ["/admin/activite", "Analytics"],
+  ["/admin/joueurs", "Joueurs"],
+  ["/admin/comptes", "Les accès"],
+  ["/admin/ligue/effectif", "Effectif"],
+  ["/admin/plus", "Plus"],
+  ["/admin/tableau", "Tableau complet"],
+  ["/admin/notifications", "Notification"],
+  ["/admin/setup", "Installation Supabase"],
   ["/admin/design", "Design"],
-  ["/admin", "Admin"],
+  ["/admin", "Journée"],
   ["/map", "Map"],
 ];
 
@@ -140,7 +159,36 @@ export function titreDe(url: string): string | null {
  * revenir par la barre d'onglets retrouve sa place (memoire-navigation.tsx).
  * Pas la Map, plein écran, qui ne défile pas.
  */
-export const RACINES_MEMOIRE = ["/profil", "/ligue"];
+export const RACINES_MEMOIRE = ["/profil", "/ligue", "/admin", "/admin/joueurs", "/admin/activite", "/admin/plus"];
+
+// ───────────── L'admin : quatre onglets (refonte du 24/11/2026) ─────────────
+// La demande du 24/11 : « trop d'informations, trop de boutons ». Les traces
+// d'usage (activity, 30 j) ont donné l'ordre : la journée d'abord, puis
+// Analytics et les accès. Sur téléphone, une capsule en bas ; sur
+// ordinateur, une colonne à gauche (components/sfl/admin/coquille.tsx).
+
+export type OngletAdmin = "journee" | "joueurs" | "analytics" | "plus";
+
+export const ONGLETS_ADMIN: { id: OngletAdmin; href: string; libelle: string }[] = [
+  { id: "journee", href: "/admin", libelle: "Journée" },
+  { id: "joueurs", href: "/admin/joueurs", libelle: "Joueurs" },
+  { id: "analytics", href: "/admin/activite", libelle: "Analytics" },
+  { id: "plus", href: "/admin/plus", libelle: "Plus" },
+];
+
+/** Les quatre racines de l'admin : jamais de retour, la barre suffit. */
+export const RACINES_ADMIN = ONGLETS_ADMIN.map((o) => o.href);
+
+const sous = (pathname: string, r: string) => pathname === r || pathname.startsWith(`${r}/`);
+
+/** L'onglet admin d'une page ; null hors de l'admin. */
+export function ongletAdmin(pathname: string): OngletAdmin | null {
+  if (!sous(pathname, "/admin")) return null;
+  if (pathname === "/admin") return "journee";
+  if (["/admin/joueurs", "/admin/comptes", "/admin/ligue/effectif"].some((r) => sous(pathname, r))) return "joueurs";
+  if (sous(pathname, "/admin/activite")) return "analytics";
+  return "plus";
+}
 
 // Une seule ligue : la SFL. Le choix de ligue est retiré — choisir une
 // autre ligue masquait tout le fil. La clé reste pour effacer l'ancien choix.

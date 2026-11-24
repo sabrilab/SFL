@@ -18,7 +18,7 @@
 // (cf. lib/sfl/activity.ts). Sa durée est le temps passé au premier plan,
 // mesuré par les battements réguliers de l'app (cf. lib/sfl/retention.ts).
 
-import { useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
 import { useSession } from "@/hooks/use-session";
 import { isAdmin } from "@/lib/sfl/admin";
 import { emailsDeContact } from "@/lib/sfl/contacts";
@@ -217,7 +217,7 @@ export default function ActivitePage() {
           <>
             Ton compte est administrateur dans l&apos;app, mais la base ne le sait pas encore.
             Déconnecte-toi puis reconnecte-toi — si ça ne suffit pas, passe une fois par
-            Réglages → Installation Supabase.
+            Admin → Plus → Installation Supabase.
           </>
         ) : (
           <>Cette page est réservée à l&apos;admin de la ligue.</>
@@ -233,7 +233,9 @@ export default function ActivitePage() {
     );
   }
 
+  // La vue lit sa partie dans l'adresse (useSearchParams) : sous un Suspense.
   return (
+    <Suspense fallback={null}>
     <ActiviteVue
       data={data}
       loading={loading}
@@ -247,5 +249,6 @@ export default function ActivitePage() {
         accords: (public_, admins) => <AccordsStats public={public_} admins={admins} />,
       }}
     />
+    </Suspense>
   );
 }

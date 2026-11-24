@@ -11,19 +11,23 @@
 // ligue en ce moment, par la même fonction que les téléphones). Dedans : la
 // convocation (la vraie, en cartes ; « Il manque N » en braise), les matchs
 // un par un sur leur terrain, les remplaçants. En bas, sous le pouce, le
-// geste du moment — il n'y en a jamais qu'un (etat-journee.ts) — et ↶ ↷.
+// geste du moment — il n'y en a jamais qu'un (etat-journee.ts) — et ↶ ↷,
+// sur une rangée posée au-dessus de la barre admin (refonte du 24/11/2026,
+// components/sfl/admin/coquille.tsx ; la page n'a plus ni retour ni ≡).
 // Sous les matchs, les outils de la journée, à toute heure (31/10/2026 :
 // Sabri ne les trouvait plus derrière ≡) : la Feuille à consulter (lignes,
-// points décomposés, alertes), la Saisie (le direct de toujours), les Votes,
-// les Points d'un joueur, le Carton rouge direct (13/11/2026,
-// feuille-carton-rouge.tsx) et la Grille. Les « Je viens » de la convocation
+// points décomposés, alertes) et la Saisie (le direct de toujours), puis
+// derrière « Outils » les Votes, les Points d'un joueur et le Carton rouge
+// direct (13/11/2026, feuille-carton-rouge.tsx). Sur ordinateur, deux
+// colonnes : la journée à gauche ; à droite le geste du moment et la liste
+// des outils, Grille comprise. Les « Je viens » de la convocation
 // se posent sur les terrains d'un geste (venus-sur-la-feuille.ts) ; sous les
 // terrains, ils sont rangés par match et se glissent un par un dans un camp,
 // d'un appui long (20/11/2026, bloc-venus.tsx).
 // La feuille en direct d'un match tenue par un de ses joueurs (01/11/2026,
 // components/sfl/direct) se voit sur son terrain : qui la tient, son score ;
 // la toucher l'ouvre, pour la reprendre, la libérer ou la rouvrir.
-// Tout le reste de la ligue est derrière ≡ (Ligue), rien n'est perdu.
+// Tout le reste de la ligue est dans les onglets Joueurs et Plus, rien n'est perdu.
 //
 // Le brouillon se compose seul (20/11/2026) : chaque nouveau « Je viens »
 // entre sur un terrain sans rien déplacer, et la journée se met en ligne
@@ -41,9 +45,7 @@
 // qu'à « Il manque N ».
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
-import { Lock, Menu, Redo2, Undo2 } from "lucide-react";
-import { BoutonRetour } from "@/components/layout/bouton-retour";
+import { Ellipsis, Lock, Redo2, Undo2 } from "lucide-react";
 import { CarteJournee } from "@/components/sfl/carte-journee";
 import { useMyPlayer } from "@/components/sfl/player-provider";
 import { useSeason } from "@/components/sfl/season-provider";
@@ -94,6 +96,7 @@ import { compteursEnMots, FeuillePublier, FeuilleRemettre, FeuilleReprendre, Feu
 import { FeuilleQuandOu } from "./feuille-quand-ou";
 import { Etiquette, Feuille, Pastille, PastilleEtat, Segmente } from "./ui";
 import { leverSuspension, suspendusPour } from "@/lib/sfl/cartons";
+import { Entete, Ligne, Liste } from "../ui-admin";
 
 /** « ven. 19:00 » : la mise en ligne d'office d'un brouillon (brouillon.ts). */
 const aLaMiseEnLigne = (iso: string) =>
@@ -140,6 +143,8 @@ export function PageJournee() {
   const [consulter, setConsulter] = useState(false);
   const [points, setPoints] = useState(false);
   const [cartonRouge, setCartonRouge] = useState(false);
+  // Sur téléphone, Votes, Points et Carton rouge sont derrière « Outils » (24/11/2026).
+  const [outils, setOutils] = useState(false);
   // Une ligne ouverte depuis la Feuille y ramène en se fermant.
   const [retourFeuille, setRetourFeuille] = useState(false);
   const [ajouterA, setAjouterA] = useState<string | null | false>(false);
@@ -305,20 +310,110 @@ export function PageJournee() {
     }
   }
 
+  /** Un outil touché : un petit retour au doigt, puis sa feuille. */
+  function toucherOutil(ouvrir: (o: boolean) => void) {
+    haptique.choix();
+    ouvrir(true);
+  }
+
+  /** Depuis la feuille Outils : elle se ferme, l'outil s'ouvre à sa place. */
+  function depuisOutils(ouvrir: (o: boolean) => void) {
+    haptique.choix();
+    setOutils(false);
+    ouvrir(true);
+  }
+
+  /**
+   * Le geste du moment (il n'y en a jamais qu'un, etat-journee.ts), puis ↶ ↷
+   * sur la même rangée (24/11/2026). L'état lui-même (● en ligne, ‖ à
+   * rattraper) est dit par la pastille de la journée. `court` : la colonne
+   * de droite de l'ordinateur.
+   */
+  function gesteDuMomentUI(court: boolean) {
+    const plein = "bouton-principal flex h-12 min-w-0 flex-1 items-center justify-center px-4 text-lecture font-semibold";
+    const second = "bouton-secondaire flex h-12 min-w-0 flex-1 items-center justify-center px-4 text-lecture font-semibold";
+    const texte = (t: string) => <span className="truncate">{t}</span>;
+    const bouton =
+      geste.t === "preparer" || geste.t === "apres" ? (
+        <button type="button" onClick={() => setPreparer(true)} className={plein}>
+          {texte(
+            `Préparer la J${geste.t === "apres" ? geste.suivante.j : geste.j}${court ? "" : ` · dim ${geste.t === "apres" ? geste.suivante.date : geste.date}`}`
+          )}
+        </button>
+      ) : geste.t === "corriger" ? (
+        <button type="button" onClick={() => setPublier(true)} className={second}>
+          {texte(`${geste.ecarts.length} à corriger`)}
+        </button>
+      ) : geste.t === "publier" ? (
+        <button type="button" onClick={() => setPublier(true)} className={plein}>
+          {texte(court ? "Publier" : "Publier pour tout le monde")}
+        </button>
+      ) : geste.t === "revelation" ? (
+        <span className="mono-label flex h-12 min-w-0 flex-1 items-center justify-center gap-2 rounded-full bg-foreground px-3 text-background">
+          {texte(`◐ Révélation ${aLHeure(geste.heure)}`)}
+        </span>
+      ) : geste.t === "bloquee" ? (
+        <button type="button" onClick={() => setEnDirect(true)} className={plein}>
+          {texte(`${geste.equipes.join(" · ")} sans résultat`)}
+        </button>
+      ) : geste.t === "a-rattraper" ? (
+        <button type="button" onClick={() => setReprendre(true)} className={plein}>
+          {texte(`Reprendre la J${geste.j}`)}
+        </button>
+      ) : geste.t === "en-ligne" ? (
+        <button type="button" onClick={() => setRemettre(true)} className={second}>
+          {texte("Remettre en brouillon")}
+        </button>
+      ) : (
+        <button type="button" onClick={() => setEnDirect(true)} className={plein}>
+          {texte(`Direct · Match ${geste.match}${geste.heure ? ` · ${geste.heure}` : ""}`)}
+        </button>
+      );
+    const annuler = dernierPas ? `Annuler : ${dernierPas.label}` : "Annuler";
+    return (
+      <div className="flex items-center gap-1">
+        {bouton}
+        {peutSuspendre && (
+          <button type="button" onClick={() => setSuspendre(true)} className="bouton-discret h-12 shrink-0 px-3 text-ligne font-semibold">
+            Suspendre
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={undo}
+          disabled={!history.length}
+          aria-label={annuler}
+          title={annuler}
+          className="bouton-discret grid size-11 shrink-0 place-items-center text-encre-2 disabled:opacity-30"
+        >
+          <Undo2 className="size-[18px]" strokeWidth={1.75} />
+        </button>
+        <button
+          type="button"
+          onClick={redo}
+          disabled={!future.length}
+          aria-label="Rétablir"
+          title="Rétablir"
+          className="bouton-discret grid size-11 shrink-0 place-items-center text-encre-2 disabled:opacity-30"
+        >
+          <Redo2 className="size-[18px]" strokeWidth={1.75} />
+        </button>
+      </div>
+    );
+  }
+
   return (
-    <div className="shell flex flex-col gap-4 pt-4 pb-[calc(env(safe-area-inset-bottom,0px)+168px)] sm:max-w-[600px]">
-      {/* En-tête : le retour, la synchro, la Ligue. */}
-      <header className="flex items-center gap-2">
-        <BoutonRetour />
-        <h1 className="titre-lettrage flex-1 text-titre-m">SFL</h1>
-        <PastilleSynchro onClick={() => setSynchro(true)} />
-        <Link href="/admin/ligue" aria-label="Ligue" className="bouton-secondaire grid size-11 place-items-center">
-          <Menu className="size-5" />
-        </Link>
-      </header>
+    // Sur téléphone, une colonne, et le geste du moment posé au-dessus de la
+    // barre admin (--admin-barre, coquille.tsx). Sur ordinateur, deux : la
+    // journée à gauche, le geste et les outils à droite (24/11/2026).
+    <div className="mx-auto w-full max-w-[600px] px-5 pt-3 pb-[calc(var(--admin-barre,0px)+12px)] lg:max-w-[1176px] lg:px-12 lg:pt-5 lg:pb-0">
+    <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_320px] lg:gap-10">
+    <div className="flex min-w-0 flex-col gap-4">
+      {/* En-tête : le titre de l'onglet et la synchro (la barre admin remplace le retour et ≡). */}
+      <Entete titre="Journée" droite={<PastilleSynchro onClick={() => setSynchro(true)} />} />
 
       {/* La frise des journées. */}
-      <div ref={frise} className="-mx-5 flex gap-1.5 overflow-x-auto px-5 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" role="tablist" aria-label="Journées">
+      <div ref={frise} className="-mx-5 flex gap-1.5 overflow-x-auto px-5 pb-1 [scrollbar-width:none] lg:mx-0 lg:px-0 [&::-webkit-scrollbar]:hidden" role="tablist" aria-label="Journées">
         {triees.map((m) => {
           const actif = m.j === j;
           // « ! » : un défaut de la feuille, ou une journée bloquée (une équipe sans résultat, la nuit passée).
@@ -507,19 +602,24 @@ export function PageJournee() {
                 />
               )}
 
-              <section className="flex flex-col gap-2">
-                <Etiquette>Outils</Etiquette>
-                <div className="flex flex-wrap gap-1.5">
-                  <Pastille onClick={() => setConsulter(true)}>Feuille{ecarts.length ? ` · ${ecarts.length} !` : ""}</Pastille>
-                  <Pastille onClick={() => setEnDirect(true)}>Saisie</Pastille>
-                  <Pastille onClick={() => setVotes(true)}>Votes</Pastille>
-                  <Pastille onClick={() => setPoints(true)}>Points</Pastille>
-                  <Pastille onClick={() => setCartonRouge(true)}>Carton rouge</Pastille>
-                  <Link href="/admin/tableau?onglet=grille" className="mono-label inline-flex h-9 shrink-0 items-center rounded-full bg-secondary px-3.5 text-encre-2">
-                    Grille
-                  </Link>
-                </div>
-              </section>
+              {/* Les outils de la journée, sur téléphone : les deux de tous
+                  les dimanches, le reste derrière « Outils » (sur ordinateur,
+                  la liste de droite). */}
+              <div className="flex items-center gap-2 lg:hidden">
+                <button type="button" onClick={() => toucherOutil(setConsulter)} className="bouton-secondaire h-9 px-4 text-corps font-semibold">
+                  Feuille{ecarts.length ? ` · ${ecarts.length} !` : ""}
+                </button>
+                <button type="button" onClick={() => toucherOutil(setEnDirect)} className="bouton-secondaire h-9 px-4 text-corps font-semibold">
+                  Saisie
+                </button>
+                <button
+                  type="button"
+                  onClick={() => toucherOutil(setOutils)}
+                  className="bouton-discret ml-auto flex h-9 items-center gap-1.5 px-3 text-corps font-medium text-encre-2"
+                >
+                  Outils <Ellipsis className="size-4" aria-hidden />
+                </button>
+              </div>
             </>
           )}
         </section>
@@ -535,78 +635,33 @@ export function PageJournee() {
       )}
       {/* Sans journée ouverte, le carton rouge reste à portée (13/11/2026). */}
       {!(meta && j != null) && (
-        <div className="flex">
+        <div className="flex lg:hidden">
           <Pastille onClick={() => setCartonRouge(true)}>Carton rouge</Pastille>
         </div>
       )}
+    </div>
 
-      {/* Le geste du moment, sous le pouce. */}
-      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border/50 bg-background/95 pb-[calc(env(safe-area-inset-bottom,0px)+10px)] backdrop-blur-xl">
-        <div className="shell flex flex-col gap-2 pt-3 sm:max-w-[600px]">
-          <div className="flex items-center gap-2">
-            <div className="flex min-w-0 flex-1 flex-col">
-              {geste.t === "preparer" || geste.t === "apres" ? (
-                <button type="button" onClick={() => setPreparer(true)} className="bouton-principal h-12 text-lecture font-semibold">
-                  Préparer la J{geste.t === "apres" ? geste.suivante.j : geste.j} · dim {geste.t === "apres" ? geste.suivante.date : geste.date}
-                </button>
-              ) : geste.t === "corriger" ? (
-                <button type="button" onClick={() => setPublier(true)} className="bouton-secondaire h-12 text-lecture font-semibold">
-                  {geste.ecarts.length} à corriger
-                </button>
-              ) : geste.t === "publier" ? (
-                <button type="button" onClick={() => setPublier(true)} className="bouton-principal h-12 text-lecture font-semibold">
-                  Publier pour tout le monde
-                </button>
-              ) : geste.t === "revelation" ? (
-                <span className="mono-label flex h-12 items-center justify-center gap-2 rounded-full bg-foreground text-background">
-                  ◐ Révélation {aLHeure(geste.heure)}
-                </span>
-              ) : geste.t === "bloquee" ? (
-                <button type="button" onClick={() => setEnDirect(true)} className="bouton-principal h-12 text-lecture font-semibold">
-                  {geste.equipes.join(" · ")} sans résultat
-                </button>
-              ) : geste.t === "a-rattraper" ? (
-                <div className="flex items-center gap-2">
-                  <span className="mono-label flex h-12 min-w-0 flex-1 items-center justify-center gap-2 rounded-full bg-foreground px-3 text-background">
-                    <span aria-hidden>{SIGNE_SUSPENS}</span>
-                    <span className="truncate">À rattraper</span>
-                  </span>
-                  <button type="button" onClick={() => setReprendre(true)} className="bouton-principal h-12 shrink-0 px-5 text-lecture font-semibold">
-                    Reprendre la J{geste.j}
-                  </button>
-                </div>
-              ) : geste.t === "en-ligne" ? (
-                <div className="flex items-center gap-2">
-                  <span className="mono-label flex h-12 flex-1 items-center justify-center gap-2 rounded-full bg-foreground text-background">
-                    ● En ligne{geste.le ? ` · ${heureDe(geste.le)}` : ""}
-                  </span>
-                  <button type="button" onClick={() => setRemettre(true)} className="bouton-discret h-12 px-3 text-ligne font-semibold">
-                    Remettre en brouillon
-                  </button>
-                </div>
-              ) : (
-                <button type="button" onClick={() => setEnDirect(true)} className="bouton-principal h-12 text-lecture font-semibold">
-                  Direct · Match {geste.match}
-                  {geste.heure ? ` · ${geste.heure}` : ""}
-                </button>
-              )}
-            </div>
-            {peutSuspendre && (
-              <button type="button" onClick={() => setSuspendre(true)} className="bouton-discret h-12 shrink-0 px-3 text-ligne font-semibold">
-                Suspendre
-              </button>
-            )}
-          </div>
-          <div className="flex items-center justify-between">
-            <button type="button" onClick={undo} disabled={!history.length} aria-label="Annuler" className="bouton-discret flex h-10 items-center gap-1.5 px-3 disabled:opacity-30">
-              <Undo2 className="size-4" />
-              <span className="mono-label max-w-[150px] truncate">{dernierPas?.label ?? ""}</span>
-            </button>
-            <button type="button" onClick={redo} disabled={!future.length} aria-label="Rétablir" className="bouton-discret flex h-10 items-center px-3 disabled:opacity-30">
-              <Redo2 className="size-4" />
-            </button>
-          </div>
-        </div>
+      {/* Sur ordinateur, la colonne de droite : le geste du moment, puis les outils. */}
+      <aside className="hidden flex-col gap-6 pt-[120px] lg:flex">
+        {gesteDuMomentUI(true)}
+        <Liste titre="Outils de la journée">
+          {meta && j != null && (
+            <>
+              <Ligne titre="Feuille" droite={ecarts.length ? `${ecarts.length} !` : undefined} onClick={() => toucherOutil(setConsulter)} />
+              <Ligne titre="Saisie" onClick={() => toucherOutil(setEnDirect)} />
+            </>
+          )}
+          <Ligne titre="Votes" onClick={() => toucherOutil(setVotes)} />
+          <Ligne titre="Points" onClick={() => toucherOutil(setPoints)} />
+          <Ligne titre="Carton rouge" onClick={() => toucherOutil(setCartonRouge)} />
+          <Ligne titre="Grille" href="/admin/tableau?onglet=grille" />
+        </Liste>
+      </aside>
+    </div>
+
+      {/* Le geste du moment, sous le pouce, au-dessus de la barre admin. */}
+      <div className="publier-admin fixed inset-x-0 z-[35] lg:hidden" style={{ bottom: "calc(var(--admin-barre, 0px) + 12px)" }}>
+        <div className="mx-auto max-w-[600px] px-5">{gesteDuMomentUI(false)}</div>
       </div>
 
       {/* Les feuilles. */}
@@ -772,6 +827,13 @@ export function PageJournee() {
       <FeuilleConvocation open={convocation} onOpenChange={setConvocation} presence={presence} />
       <Feuille open={synchro} onOpenChange={setSynchro} titre="Synchro">
         <Synchro saison={saison} nu />
+      </Feuille>
+      <Feuille open={outils} onOpenChange={setOutils} titre="Outils">
+        <Liste>
+          <Ligne titre="Votes" onClick={() => depuisOutils(setVotes)} />
+          <Ligne titre="Points" onClick={() => depuisOutils(setPoints)} />
+          <Ligne titre="Carton rouge" onClick={() => depuisOutils(setCartonRouge)} />
+        </Liste>
       </Feuille>
       <Feuille open={votes} onOpenChange={setVotes} titre="Votes" haute>
         <ResultatsVotes key={j ?? 0} j={j ?? undefined} main={mainVote} />

@@ -1,5 +1,5 @@
 // Mise à jour de la base à la demande — ADMIN SEUL, appelée par la page
-// d'installation (Réglages → Installation Supabase).
+// d'installation (Admin → Plus → Installation Supabase).
 //
 // POST applique le schéma embarqué au build (généré depuis supabase/schema.sql)
 // si son empreinte a changé. Sans SUPABASE_DB_URL dans l'environnement,

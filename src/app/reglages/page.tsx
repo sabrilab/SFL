@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useApparence } from "@/components/layout/apparence";
 import { ecrireApparence } from "@/lib/sfl/apparence";
-import { Moon, Sun, SunMoon, ShieldCheck, ChevronRight, Settings, FlaskConical, ArrowUpRight, Bell, Palette } from "lucide-react";
+import { Moon, Sun, SunMoon, ShieldCheck, ChevronRight, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { BoutonRetour } from "@/components/layout/bouton-retour";
 import { useIsClient } from "@/hooks/use-is-client";
@@ -34,8 +34,8 @@ export default function ReglagesPage() {
 
   return (
     // Au téléphone et sur iPad en hauteur, une colonne. Sur un écran large
-    // (iPad en largeur, ordinateur), deux : le compte et l'apparence à gauche,
-    // les notifications, la confidentialité et l'admin à droite. Les colonnes
+    // (iPad en largeur, ordinateur), deux : l'entrée de l'admin, le compte et
+    // l'apparence à gauche, les notifications et la confidentialité à droite. Les colonnes
     // sont « contents » en dessous : l'ordre et l'écart restent ceux d'avant.
     <div className="mx-auto flex max-w-2xl flex-col gap-7 px-5 py-4 sm:py-8 lg:grid lg:max-w-[1000px] lg:grid-cols-2 lg:items-start lg:gap-x-[var(--fib-34)] lg:px-8">
       <div className="flex items-center gap-2.5 lg:col-span-2">
@@ -50,6 +50,23 @@ export default function ReglagesPage() {
       </div>
 
       <div className="contents lg:flex lg:flex-col lg:gap-7">
+        {/* L'admin : une seule entrée, en tête (refonte du 24/11/2026) ; le
+          reste (notification, base, design, note du Labo) est dans son
+          onglet Plus, les accès dans Joueurs. */}
+        {admin && (
+          <section>
+            <h2 className="mb-3 px-1 text-sm font-semibold text-encre-3">Admin</h2>
+            <Link
+              href="/admin"
+              className="glass flex min-h-14 items-center gap-3 rounded-2xl px-4 py-3 transition-opacity active:opacity-70"
+            >
+              <ShieldCheck className="size-5 text-encre-2" strokeWidth={1.75} />
+              <span className="flex-1 text-lecture font-semibold">Espace admin</span>
+              <ChevronRight className="size-4 text-encre-3" />
+            </Link>
+          </section>
+        )}
+
         <AccountCard />
 
         <section>
@@ -98,109 +115,6 @@ export default function ReglagesPage() {
           comme dans Ma carte : la création d'avatar n'est pas encore prête
           à être montrée. L'écran reste accessible en direct sur /avatar. */}
 
-        {admin && (
-          <section>
-            <h2 className="mb-3 px-1 text-sm font-semibold text-encre-3">Général</h2>
-            <Link
-              href="/admin"
-              className="glass flex items-center gap-3 rounded-2xl px-4 py-3.5 transition-opacity active:opacity-70"
-            >
-              <span className="flex size-9 items-center justify-center rounded-full bg-foreground/10">
-                <ShieldCheck className="size-[18px]" />
-              </span>
-              <span className="flex-1">
-                <span className="block text-lecture font-semibold">Espace admin</span>
-                <span className="block text-petit text-encre-3">Gérer les matchs, convocations et résultats</span>
-              </span>
-              <ChevronRight className="size-4 text-encre-3" />
-            </Link>
-            <Link
-              href="/admin/notifications"
-              className="glass mt-2.5 flex items-center gap-3 rounded-2xl px-4 py-3.5 transition-opacity active:opacity-70"
-            >
-              <span className="flex size-9 items-center justify-center rounded-full bg-foreground/10">
-                <Bell className="size-[18px]" />
-              </span>
-              <span className="flex-1">
-                <span className="block text-lecture font-semibold">Envoyer une notification</span>
-                <span className="block text-petit text-encre-3">Sur le téléphone des joueurs qui les ont activées</span>
-              </span>
-              <ChevronRight className="size-4 text-encre-3" />
-            </Link>
-            <Link
-              href="/admin/setup"
-              className="glass mt-2.5 flex items-center gap-3 rounded-2xl px-4 py-3.5 transition-opacity active:opacity-70"
-            >
-              <span className="flex size-9 items-center justify-center rounded-full bg-foreground/10">
-                <ShieldCheck className="size-[18px]" />
-              </span>
-              <span className="flex-1">
-                <span className="block text-lecture font-semibold">Installation Supabase</span>
-                <span className="block text-petit text-encre-3">Les tables de la base, mises à jour à chaque mise en ligne</span>
-              </span>
-              <ChevronRight className="size-4 text-encre-3" />
-            </Link>
-            <Link
-              href="/admin/comptes"
-              className="glass mt-2.5 flex items-center gap-3 rounded-2xl px-4 py-3.5 transition-opacity active:opacity-70"
-            >
-              <span className="flex size-9 items-center justify-center rounded-full bg-foreground/10">
-                <ShieldCheck className="size-[18px]" />
-              </span>
-              <span className="flex-1">
-                <span className="block text-lecture font-semibold">Les accès</span>
-                <span className="block text-petit text-encre-3">Identifiants des 71 joueurs, prêts à envoyer</span>
-              </span>
-              <ChevronRight className="size-4 text-encre-3" />
-            </Link>
-            <Link
-              href="/admin/activite"
-              className="glass mt-2.5 flex items-center gap-3 rounded-2xl px-4 py-3.5 transition-opacity active:opacity-70"
-            >
-              <span className="flex size-9 items-center justify-center rounded-full bg-foreground/10">
-                <ShieldCheck className="size-[18px]" />
-              </span>
-              <span className="flex-1">
-                <span className="block text-lecture font-semibold">Analytics</span>
-                <span className="block text-petit text-encre-3">Acquisition, activation, rétention, revenu, recommandation</span>
-              </span>
-              <ChevronRight className="size-4 text-encre-3" />
-            </Link>
-            <Link
-              href="/admin/design"
-              className="glass mt-2.5 flex items-center gap-3 rounded-2xl px-4 py-3.5 transition-opacity active:opacity-70"
-            >
-              <span className="flex size-9 items-center justify-center rounded-full bg-foreground/10">
-                <Palette className="size-[18px]" />
-              </span>
-              <span className="flex-1">
-                <span className="block text-lecture font-semibold">Design</span>
-                <span className="block text-petit text-encre-3">Couleurs, tailles, boutons : les voir et les essayer</span>
-              </span>
-              <ChevronRight className="size-4 text-encre-3" />
-            </Link>
-            {/* Page statique servie depuis public/ : une vraie navigation, pas
-              une route Next — d'où le <a> et non <Link>. Elle s'ouvre à qui a
-              l'adresse, sans compte : c'est le lien qu'on transmet. */}
-            <a
-              href="/note-labo.html"
-              target="_blank"
-              rel="noreferrer"
-              className="glass mt-2.5 flex items-center gap-3 rounded-2xl px-4 py-3.5 transition-opacity active:opacity-70"
-            >
-              <span className="flex size-9 items-center justify-center rounded-full bg-foreground/10">
-                <FlaskConical className="size-[18px]" />
-              </span>
-              <span className="flex-1">
-                <span className="block text-lecture font-semibold">Note — Le Labo</span>
-                <span className="block text-petit text-encre-3">
-                  Direction produit : la carte par les tests · lien partageable
-                </span>
-              </span>
-              <ArrowUpRight className="size-4 text-encre-3" />
-            </a>
-          </section>
-        )}
       </div>
     </div>
   );

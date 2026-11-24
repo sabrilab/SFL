@@ -1,8 +1,7 @@
-import type { Metadata } from "next";
-import { PageLigue } from "@/components/sfl/admin/ligue/page-ligue";
+import { redirect } from "next/navigation";
 
-export const metadata: Metadata = { title: "Admin · Ligue" };
-
+// L'ancien écran ≡ de l'admin est devenu l'onglet Plus (24/11/2026) ; son
+// Effectif est passé dans Joueurs (/admin/ligue/effectif reste ouvert).
 export default function LiguePage() {
-  return <PageLigue />;
+  redirect("/admin/plus");
 }

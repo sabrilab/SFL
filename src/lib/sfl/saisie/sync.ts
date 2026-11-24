@@ -355,7 +355,7 @@ async function ecrireDocument(saison: Saison): Promise<Resultat> {
 
 function motif(message: string): string {
   return /relation .*saison.* does not exist|schema cache/i.test(message)
-    ? "La table « saison » n'existe pas encore en base. Passe une fois par Réglages → Installation Supabase."
+    ? "La table « saison » n'existe pas encore en base. Passe une fois par Admin → Plus → Installation Supabase."
     : message;
 }
 
@@ -638,7 +638,7 @@ export async function diagnostic(): Promise<Etape[]> {
       detail: !error
         ? "18 h et 19 h tenues par la base."
         : absente
-          ? "La base n'a pas encore l'heure du vote : il faut appliquer le schéma (Réglages → Installation Supabase)."
+          ? "La base n'a pas encore l'heure du vote : il faut appliquer le schéma (Admin → Plus → Installation Supabase)."
           : error.message,
     });
   } catch (e) {

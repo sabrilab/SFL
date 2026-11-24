@@ -1,27 +1,36 @@
 "use client";
 
 // Les inscriptions à valider — les joueurs qui ont créé leur compte eux-mêmes
-// (/inscription) et attendent l'accord de l'admin.
+// (/inscription) et attendent l'accord de l'admin. Dans l'onglet Joueurs de
+// l'admin, sous « À valider » (refonte du 24/11/2026, maquette v3) : la vraie
+// carte de l'app, le nom, « POSTE · jj/mm », ✕ et Accepter. Toucher la ligne
+// déplie la fiche (identité, gabarit, les quatre photos de référence).
 //
 // Accepter : le compte devient membre (valider_inscription, côté base) et le
 // joueur entre dans l'effectif avec son poste, base 75 partout comme tout
 // nouveau joueur. Sa session s'ouvre d'elle-même chez lui.
+// Refuser (✕) : il n'y a pas de refus en base ; son compte part pour de bon
+// (/api/comptes/supprimer), après une confirmation qui le nomme.
 //
 // Le panneau ne s'affiche que s'il y a quelqu'un à valider.
 
 import { useCallback, useEffect, useState } from "react";
-import { Check, ChevronDown, Loader2 } from "lucide-react";
+import { Loader2, X } from "lucide-react";
 import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
 import { emailsDeContact } from "@/lib/sfl/contacts";
 import { jetonServeur } from "@/lib/sfl/auth/session";
-import { usePhotoPerso } from "@/hooks/use-player-photo";
+import { signalerInscriptions } from "@/hooks/use-inscriptions-en-attente";
 import { addRoster, newRosterPlayer, rosterHasName } from "@/lib/sfl/saisie/mutations";
 import type { Saison } from "@/lib/sfl/saisie/types";
 import { ANGLES, age, type Angle } from "@/lib/sfl/inscription";
 import { liensReferences } from "@/lib/sfl/references";
+import { famillePoste } from "@/lib/sfl/admin-joueurs";
+import { Confirmer, type Confirmation } from "@/components/sfl/admin/confirmer";
+import { Liste, Rubrique, SURFACE, Tete } from "@/components/sfl/admin/ui-admin";
+
+const jjmm = (iso: string) => new Date(iso).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", timeZone: "Europe/Paris" });
 
 interface Demande {
   id: string;
@@ -45,13 +54,14 @@ interface Demande {
 function Ligne({
   d,
   onAccepter,
+  onRefuser,
   occupe,
 }: {
   d: Demande;
   onAccepter: () => void;
+  onRefuser: () => void;
   occupe: boolean;
 }) {
-  const photo = usePhotoPerso(d.name);
   const [ouvert, setOuvert] = useState(false);
   const [refs, setRefs] = useState<Partial<Record<Angle, string>> | null>(null);
   const f = d.fiche;
@@ -63,61 +73,68 @@ function Ligne({
   }, [ouvert, refs, d.id]);
 
   return (
-    <div className="border-t border-border/60 first:border-t-0">
-      <div className="flex items-center gap-3 px-4 py-3">
-        <button type="button" onClick={() => setOuvert((o) => !o)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
-          <span className="size-11 shrink-0 overflow-hidden rounded-full bg-muted">
-            {photo && (
-              // eslint-disable-next-line @next/next/no-img-element -- photo de la ligue (Storage)
-              <img src={photo} alt="" className="size-full object-cover" />
-            )}
-          </span>
-          <span className="min-w-0 flex-1">
-            <span className="block truncate text-lecture font-bold">
-              {d.name} <span className="font-medium text-muted-foreground">{d.username}</span>
-            </span>
-            <span className="block truncate text-petit text-muted-foreground">
-              {[f?.poste, ans !== null ? `${ans} ans` : null, f?.taille_cm ? `${f.taille_cm} cm` : null, f?.poids_kg ? `${f.poids_kg} kg` : null]
-                .filter(Boolean)
-                .join(" · ")}
+    <div className={cn(SURFACE, "overflow-hidden")}>
+      <div className="flex items-center gap-3 py-2.5 pr-2.5 pl-4">
+        <button type="button" onClick={() => setOuvert((o) => !o)} aria-expanded={ouvert} className="flex min-w-0 flex-1 items-center gap-3 text-left">
+          <Tete nom={d.name} />
+          <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+            <span className="truncate text-lecture font-medium">{d.name}</span>
+            <span className="truncate text-corps text-encre-2">
+              {[famillePoste(f?.poste) ?? f?.poste, jjmm(d.created_at)].filter(Boolean).join(" · ")}
             </span>
           </span>
-          <ChevronDown className={cn("size-4 shrink-0 text-muted-foreground transition-transform", ouvert && "rotate-180")} />
         </button>
-        <Button size="sm" variant="vert" className="rounded-full" disabled={occupe} onClick={onAccepter}>
-          {occupe ? <Loader2 className="size-3.5 animate-spin" /> : <Check className="mr-1 size-3.5" />}
-          Accepter
-        </Button>
+        <button
+          type="button"
+          onClick={onRefuser}
+          disabled={occupe}
+          aria-label={`Refuser ${d.name}`}
+          className="bouton-discret grid size-9 shrink-0 place-items-center text-encre-3 disabled:opacity-40"
+        >
+          <X className="size-4" strokeWidth={1.75} />
+        </button>
+        <button
+          type="button"
+          onClick={onAccepter}
+          disabled={occupe}
+          className="bouton-principal grid h-9 shrink-0 place-items-center px-4 text-corps font-semibold disabled:opacity-60"
+        >
+          {occupe ? <Loader2 className="size-4 animate-spin" /> : "Accepter"}
+        </button>
       </div>
 
       {ouvert && (
-        <div className="px-4 pb-4">
-          <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-corps">
-            <dt className="text-muted-foreground">Nom</dt>
-            <dd>{f ? `${f.prenom} ${f.nom}` : "—"}</dd>
-            <dt className="text-muted-foreground">Email</dt>
+        <div className="border-t border-border/60 px-4 pt-3 pb-4">
+          <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1 text-corps">
+            <dt className="text-encre-3">Nom</dt>
+            <dd className="truncate">{f ? `${f.prenom} ${f.nom}` : "—"}</dd>
+            <dt className="text-encre-3">Pseudo</dt>
+            <dd className="truncate">{d.username || "—"}</dd>
+            <dt className="text-encre-3">Email</dt>
             <dd className="truncate">{d.contact_email ?? "—"}</dd>
-            <dt className="text-muted-foreground">Né le</dt>
-            <dd>{f?.naissance ? new Date(f.naissance).toLocaleDateString("fr-FR") : "—"}</dd>
-            <dt className="text-muted-foreground">Pointure · maillot</dt>
+            <dt className="text-encre-3">Âge</dt>
+            <dd>{ans !== null ? `${ans} ans` : "—"}</dd>
+            <dt className="text-encre-3">Gabarit</dt>
+            <dd>{[f?.taille_cm ? `${f.taille_cm} cm` : null, f?.poids_kg ? `${f.poids_kg} kg` : null].filter(Boolean).join(" · ") || "—"}</dd>
+            <dt className="text-encre-3">Pointure · maillot</dt>
             <dd>{[f?.pointure, f?.maillot].filter(Boolean).join(" · ") || "—"}</dd>
-            <dt className="text-muted-foreground">Pied fort</dt>
+            <dt className="text-encre-3">Pied fort</dt>
             <dd>{f?.pied ?? "—"}</dd>
           </dl>
           <div className="mt-3 grid grid-cols-4 gap-2">
             {ANGLES.map((a) => (
-              <figure key={a.id} className="overflow-hidden rounded-xl bg-muted">
+              <figure key={a.id} className="overflow-hidden rounded-petit bg-secondary">
                 <div className="aspect-[3/4]">
                   {refs?.[a.id] ? (
                     // eslint-disable-next-line @next/next/no-img-element -- lien signé Storage
                     <img src={refs[a.id]} alt={a.label} className="size-full object-cover" />
                   ) : (
-                    <div className="grid size-full place-items-center text-legende text-muted-foreground">
+                    <div className="grid size-full place-items-center text-legende text-encre-3">
                       {refs ? "—" : <Loader2 className="size-3.5 animate-spin" />}
                     </div>
                   )}
                 </div>
-                <figcaption className="px-1.5 py-1 text-legende text-muted-foreground">{a.label}</figcaption>
+                <figcaption className="px-1.5 py-1 text-legende text-encre-3">{a.label}</figcaption>
               </figure>
             ))}
           </div>
@@ -139,6 +156,7 @@ export function Inscriptions({
 }) {
   const [demandes, setDemandes] = useState<Demande[]>([]);
   const [occupe, setOccupe] = useState<string | null>(null);
+  const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
   // Membres acceptés que la saison ne connaît pas : leur ajout à l'effectif
   // s'est perdu (publication écrasée par un appareil en retard, envoi raté).
   // Sans ligne dans l'effectif, l'app n'a pas de carte à leur montrer. Les
@@ -191,9 +209,17 @@ export function Inscriptions({
 
   // Membres que la saison n'a pas gardés : leur compte part pour de bon
   // (connexion, profil, activité), après une confirmation qui les nomme.
-  async function supprimer(comptes: { id: string; name: string }[]) {
+  function supprimer(comptes: { id: string; name: string }[], titre?: string) {
     const noms = comptes.map((c) => c.name).join(", ");
-    if (!window.confirm(`Supprimer définitivement : ${noms} ? Son compte part pour de bon, sans corbeille.`)) return;
+    setConfirmation({
+      titre: titre ?? `Supprimer ${noms} ?`,
+      detail: "Son compte part pour de bon, sans corbeille.",
+      action: titre ? "Refuser" : "Supprimer",
+      faire: () => void effacer(comptes),
+    });
+  }
+
+  async function effacer(comptes: { id: string; name: string }[]) {
     const jeton = await jetonServeur();
     if (!jeton) {
       toast.error("Reconnecte-toi pour supprimer.");
@@ -213,6 +239,8 @@ export function Inscriptions({
       }
       const partis = new Set(d.supprimes ?? []);
       setAbsents((l) => l.filter((m) => !partis.has(m.id)));
+      setDemandes((l) => l.filter((m) => !partis.has(m.id)));
+      signalerInscriptions();
       toast.success(partis.size > 1 ? `${partis.size} comptes supprimés.` : "Compte supprimé.");
     } finally {
       setOccupe(null);
@@ -247,82 +275,65 @@ export function Inscriptions({
         onCommit(addRoster(saison, { ...newRosterPlayer(d.name), poste: d.fiche?.poste ?? "—" }), `Inscription — ${d.name}`);
       }
       setDemandes((l) => l.filter((x) => x.id !== d.id));
+      signalerInscriptions();
       toast.success(`${d.name} entre dans la ligue.`);
     } finally {
       setOccupe(null);
     }
   }
 
-  if (!partage || (demandes.length === 0 && horsSaison.length === 0)) return null;
+  if (!partage || (demandes.length === 0 && horsSaison.length === 0)) return <Confirmer confirmation={confirmation} onFermer={() => setConfirmation(null)} />;
 
   return (
     <>
-    {horsSaison.length > 0 && (
-      <div className="overflow-hidden rounded-3xl bg-card">
-        <div className="flex items-end justify-between gap-3 px-4 pt-3 pb-2">
-          <div>
-            <p className="mono-label text-etiquette text-muted-foreground">EFFECTIF</p>
-            <p className="text-titre font-extrabold tracking-tight">
-              {horsSaison.length} membre{horsSaison.length > 1 ? "s" : ""} sans carte dans la saison
-            </p>
-          </div>
-          {horsSaison.length > 1 && (
-            <div className="flex shrink-0 gap-1.5">
-              <button
-                type="button"
-                disabled={occupe === "suppression"}
-                onClick={() => void supprimer(horsSaisonComptes)}
-                className="bouton-secondaire bouton--rouge px-3.5 py-1.5 text-corps font-semibold disabled:opacity-50"
-              >
-                Tout supprimer
-              </button>
-              <button
-                type="button"
-                onClick={() => ajouter(horsSaison)}
-                className="bouton-principal bouton--vert px-3.5 py-1.5 text-corps font-bold"
-              >
+      {demandes.length > 0 && (
+        <section className="flex flex-col gap-2">
+          <Rubrique droite={demandes.length > 1 ? demandes.length : undefined}>À valider</Rubrique>
+          {demandes.map((d) => (
+            <Ligne
+              key={d.id}
+              d={d}
+              occupe={occupe === d.id || occupe === "suppression"}
+              onAccepter={() => void accepter(d)}
+              onRefuser={() => supprimer([{ id: d.id, name: d.name }], `Refuser ${d.name} ?`)}
+            />
+          ))}
+        </section>
+      )}
+      {/* Des membres acceptés que la saison n'a pas : leur ajout s'est perdu. */}
+      {horsSaison.length > 0 && (
+        <Liste
+          titre="Sans carte dans la saison"
+          droite={
+            horsSaison.length > 1 ? (
+              <button type="button" onClick={() => ajouter(horsSaison)} className="font-medium text-foreground underline-offset-2 active:underline">
                 Tout ajouter
               </button>
+            ) : undefined
+          }
+        >
+          {horsSaisonComptes.map((m) => (
+            <div key={m.id} className="ligne-admin flex items-center gap-3 pl-4">
+              <Tete nom={m.name} cote={32} />
+              <span className="ligne-admin__corps flex min-h-12 min-w-0 flex-1 items-center gap-2 py-2 pr-2.5">
+                <span className="min-w-0 flex-1 truncate text-lecture font-medium">{m.name}</span>
+                <button
+                  type="button"
+                  disabled={occupe === "suppression"}
+                  onClick={() => supprimer([m])}
+                  className="bouton-discret h-9 px-3 text-corps font-medium text-encre-2 disabled:opacity-50"
+                >
+                  Supprimer
+                </button>
+                <button type="button" onClick={() => ajouter([m.name])} className="bouton-secondaire h-9 px-3.5 text-corps font-semibold">
+                  Ajouter
+                </button>
+              </span>
             </div>
-          )}
-        </div>
-        {horsSaisonComptes.map((m) => (
-          <div key={m.id} className="flex items-center justify-between gap-3 border-t border-border/60 px-4 py-2.5">
-            <span className="text-lecture font-semibold">{m.name}</span>
-            <div className="flex gap-1.5">
-              <button
-                type="button"
-                disabled={occupe === "suppression"}
-                onClick={() => void supprimer([m])}
-                className="bouton-discret bouton--rouge px-3 py-1.5 text-corps font-semibold disabled:opacity-50"
-              >
-                Supprimer
-              </button>
-              <button
-                type="button"
-                onClick={() => ajouter([m.name])}
-                className="bouton-secondaire bouton--vert px-3 py-1.5 text-corps font-semibold"
-              >
-                Ajouter
-              </button>
-            </div>
-          </div>
-        ))}
-      </div>
-    )}
-    {demandes.length > 0 && (
-    <div className="overflow-hidden rounded-3xl bg-card">
-      <div className="px-4 pt-3 pb-1">
-        <p className="mono-label text-etiquette text-muted-foreground">INSCRIPTIONS</p>
-        <p className="text-titre font-extrabold tracking-tight">
-          {demandes.length} joueur{demandes.length > 1 ? "s" : ""} à valider
-        </p>
-      </div>
-      {demandes.map((d) => (
-        <Ligne key={d.id} d={d} occupe={occupe === d.id} onAccepter={() => void accepter(d)} />
-      ))}
-    </div>
-    )}
+          ))}
+        </Liste>
+      )}
+      <Confirmer confirmation={confirmation} onFermer={() => setConfirmation(null)} />
     </>
   );
 }

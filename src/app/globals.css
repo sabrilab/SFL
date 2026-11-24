@@ -1444,7 +1444,8 @@
   top: 4px;
   bottom: 4px;
   left: 4px;
-  width: calc((100% - 8px) / 3);
+  /* Un tiers dans l'app ; un quart dans l'admin (--onglets, coquille.tsx). */
+  width: calc((100% - 8px) / var(--onglets, 3));
   border-radius: 999px;
   background: var(--tabbar-lentille);
   box-shadow:
@@ -1517,6 +1518,56 @@
   }
   .liquid-tabbar[data-clair] {
     --tabbar-verre: rgba(250, 250, 252, 0.97);
+  }
+}
+
+/* ───────────── L'admin (refonte du 24/11/2026, components/sfl/admin) ─────────────
+   La barre de l'app à quatre onglets : la lentille en voile léger (7 % de
+   l'encre) au lieu de l'aplat des joueurs, et l'onglet choisi garde l'encre
+   (sinon les !important de Pelouse et du style 16 le mettraient de la
+   couleur de la lentille pleine : crème sur crème le jour). */
+.coquille-admin {
+  --admin-bas: max(calc(env(safe-area-inset-bottom) - 4px), 14px);
+  /* Le haut de la capsule : 64 px en Pelouse (styles-ui-4.css). */
+  --admin-barre: calc(var(--admin-bas) + 64px);
+}
+@media (min-width: 1024px) {
+  .coquille-admin {
+    --admin-barre: 0px;
+  }
+}
+:root .liquid-tabbar.liquid-tabbar--admin .liquid-tabbar__lentille,
+:root[data-famille] .liquid-tabbar.liquid-tabbar--admin .liquid-tabbar__lentille {
+  background: color-mix(in oklab, var(--foreground) 7%, transparent) !important;
+  box-shadow: none !important;
+}
+:root .liquid-tabbar.liquid-tabbar--admin:not([data-tenu]) .liquid-tabbar__onglet,
+:root[data-famille] .liquid-tabbar.liquid-tabbar--admin:not([data-tenu]) .liquid-tabbar__onglet,
+:root[data-famille] .liquid-tabbar.liquid-tabbar--admin:not([data-tenu]) .liquid-tabbar__onglet[aria-current="page"] {
+  color: var(--foreground) !important;
+}
+/* Sous la capsule, un fondu de la couleur du fond : les listes ne passent
+   pas sous le verre. Plus haut sur la Journée, où Publier est posé au-dessus
+   de la barre. */
+.fondu-admin {
+  height: calc(var(--admin-barre) + 54px);
+  background: linear-gradient(to top, var(--background) 45%, transparent);
+}
+.coquille-admin[data-onglet="journee"] .fondu-admin {
+  height: calc(var(--admin-barre) + 118px);
+  background: linear-gradient(to top, var(--background) 70%, transparent);
+}
+/* Les listes de l'admin (ui-admin.tsx) : le filet part après la marge, à
+   partir de la deuxième ligne, comme les Réglages d'iOS. */
+.liste-admin > .ligne-admin + .ligne-admin > .ligne-admin__corps {
+  border-top: 1px solid color-mix(in oklab, var(--border) 60%, transparent);
+}
+/* Le clavier ouvert (une recherche, un champ) : la barre et Publier
+   s'effacent, comme la barre des joueurs au Vestiaire. Au doigt seulement. */
+@media (max-width: 1023.98px) and (pointer: coarse) {
+  html:has(:is(input:not([type="checkbox"], [type="radio"], [type="button"], [type="submit"], [type="range"], [type="file"]), textarea, [contenteditable="true"]):focus)
+    :is(.barre-admin, .publier-admin, .fondu-admin) {
+    display: none;
   }
 }
 
