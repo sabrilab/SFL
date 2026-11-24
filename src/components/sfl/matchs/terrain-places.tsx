@@ -241,7 +241,9 @@ export function TerrainPlaces({
 /**
  * « Je viens » : une pastille verte cochée, un peu au dehors du coin haut
  * droit de la carte. Elle garde à peu près sa taille à l'écran sur une carte
- * réduite au fond du terrain, comme les puces des titres.
+ * réduite au fond du terrain, comme les puces des titres. Elle déborde à
+ * droite plus qu'en haut : une rangée n'est qu'à 5 px de l'étiquette de la
+ * rangée de devant (places-terrain.ts), qu'elle ne doit pas toucher.
  */
 function PastilleVient({ echelle }: { echelle: number }) {
   const d = Math.min(22, Math.max(15, 16 / (echelle || 1)));
@@ -252,7 +254,7 @@ function PastilleVient({ echelle }: { echelle: number }) {
       style={{
         width: d,
         height: d,
-        top: -d * 0.3,
+        top: -d * 0.1,
         right: -d * 0.3,
         background: VERT,
         boxShadow: `0 0 0 ${Math.max(1.5, d * 0.1)}px rgba(255,255,255,0.95), 0 0 0 ${Math.max(2, d * 0.1 + 0.75)}px rgba(0,0,0,0.2)`,
