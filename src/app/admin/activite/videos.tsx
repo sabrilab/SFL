@@ -25,7 +25,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { isAdmin } from "@/lib/sfl/admin";
 import { erreurSansTable } from "@/lib/sfl/consentement";
-import { BUCKET_VIDEOS, EMOJIS_VIDEO, type Video } from "@/lib/sfl/videos";
+import { BUCKET_VIDEOS, EMOJIS_VIDEO, estEnPhotos, type Video } from "@/lib/sfl/videos";
 import { texteAnnonceVideo } from "@/lib/sfl/videos-annonce";
 import { supabase } from "@/lib/supabase";
 import { LecteurVideo } from "@/components/sfl/actus/video";
@@ -142,7 +142,7 @@ export function VideosStats({
     const sb = supabase();
     const { data: videos, error } = await sb
       .from("videos")
-      .select("id, titre, legende, fichier, affiche, largeur, hauteur, duree, publiee_le, created_at")
+      .select("id, titre, legende, fichier, affiche, largeur, hauteur, duree, publiee_le, created_at, photos")
       .order("created_at", { ascending: false });
     if (error) {
       setErreur(erreurSansTable(error.code) ? "Les vidéos arrivent avec la prochaine mise en ligne." : error.message);
@@ -168,7 +168,7 @@ export function VideosStats({
     ]);
     setErreur(null);
     setD({
-      videos: (videos ?? []) as Video[],
+      videos: (videos ?? []) as unknown as Video[],
       vues: vues.lu.map((r) => ({
         video: r.video,
         nom: nomDe(r),
@@ -201,7 +201,8 @@ export function VideosStats({
     const v = d.videos.find((x) => x.id === id);
     if (!v) return null;
     const vues = d.vues.filter((x) => x.video === id && garde(x.nom)).sort((x, y) => y.premiere - x.premiere);
-    const duree = v.duree ?? 0;
+    // Une publication en photos : vu_s = le nombre de photos vues.
+    const duree = estEnPhotos(v) ? v.photos!.length : (v.duree ?? 0);
     const part = (x: Vue) => (duree > 0 ? Math.min(1, x.vu_s / duree) : x.fini ? 1 : 0);
     const reactions = d.reactions.filter((x) => x.video === id && garde(x.nom));
     const liens = d.liens.filter((x) => x.video === id);
@@ -282,12 +283,68 @@ export function VideosStats({
 
   const pct = (x: number) => `${Math.round(x * 100)} %`;
 
+  // Tous les posts publiés côte à côte (Bola, 24/11 : « l'intérêt que ça gagne »).
+  const ensemble = useMemo(() => {
+    if (!d) return [];
+    const membres = d.membres.filter(garde).length;
+    return d.videos
+      .filter((v) => v.publiee_le)
+      .map((v) => {
+        const vues = d.vues.filter((x) => x.video === v.id && garde(x.nom));
+        return {
+          v,
+          membres,
+          joueurs: vues.length,
+          finies: vues.filter((x) => x.fini).length,
+          reactions: d.reactions.filter((x) => x.video === v.id && garde(x.nom)).length,
+          commentaires: d.commentaires.filter((x) => x.video === v.id && garde(x.nom)).length,
+          partages: d.partages.filter((x) => x.video === v.id && garde(x.nom)).length,
+          versApp: d.liens.filter((x) => x.video === v.id && x.etape === "app").length,
+        };
+      });
+  }, [d, garde]);
+
   return (
     <section id="activite-videos" className="glass scroll-mt-16 rounded-3xl p-5">
-      <h2 className="text-[17px] font-bold tracking-tight">Vidéos</h2>
+      <h2 className="text-[17px] font-bold tracking-tight">Photos et vidéos</h2>
       <p className="mt-0.5 text-[12px] leading-snug text-foreground/45">
-        Elles ne se regardent que dans l&apos;app. Qui les voit, jusqu&apos;où, ce qu&apos;ils en disent, et où va le lien.
+        Elles ne se voient que dans l&apos;app. Qui les voit, jusqu&apos;où, ce qu&apos;ils en disent, et où va le lien.
       </p>
+      {ensemble.length > 0 && (
+        <div className="mt-4 flex flex-col">
+          <p className="mono-label pb-1.5 text-[8.5px] text-foreground/45">Chaque post</p>
+          {ensemble.map((x) => (
+            <button
+              key={x.v.id}
+              type="button"
+              onClick={() => setChoisie(x.v.id)}
+              className="flex flex-col gap-1 border-t border-foreground/8 py-2.5 text-left first:border-t-0"
+            >
+              <span className="flex items-baseline justify-between gap-3">
+                <span className="truncate text-[13.5px] font-semibold">{x.v.titre}</span>
+                <span className="shrink-0 text-[12px] font-bold tabular-nums">
+                  {x.joueurs} / {x.membres}
+                </span>
+              </span>
+              <span className="h-[5px] overflow-hidden rounded-full bg-foreground/8">
+                <span className="block h-full rounded-full bg-foreground" style={{ width: `${x.membres ? Math.min(1, x.joueurs / x.membres) * 100 : 0}%` }} />
+              </span>
+              <span className="text-[12px] text-foreground/55 tabular-nums">
+                {[
+                  estEnPhotos(x.v) ? `${x.v.photos!.length} photos` : "vidéo",
+                  x.joueurs ? `${pct(x.finies / x.joueurs)} jusqu'au bout` : null,
+                  `${x.reactions} réactions`,
+                  `${x.commentaires} commentaires`,
+                  `${x.partages} partages`,
+                  x.versApp ? `${x.versApp} venus par le lien` : null,
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
       {erreur && <p className="mt-3 text-[12.5px] text-foreground/55">{erreur}</p>}
 
       {d && !erreur && (
@@ -306,9 +363,17 @@ export function VideosStats({
                     </span>
                   </button>
                   <div className="flex shrink-0 items-center gap-1.5">
-                    <button type="button" onClick={() => setVoir(v)} className="bouton-secondaire px-3 py-1.5 text-[12px] font-semibold">
-                      Voir
-                    </button>
+                    {estEnPhotos(v) ? (
+                      v.publiee_le && (
+                        <a href={`/ligue/videos?p=${encodeURIComponent(v.id)}`} className="bouton-secondaire px-3 py-1.5 text-[12px] font-semibold">
+                          Voir
+                        </a>
+                      )
+                    ) : (
+                      <button type="button" onClick={() => setVoir(v)} className="bouton-secondaire px-3 py-1.5 text-[12px] font-semibold">
+                        Voir
+                      </button>
+                    )}
                     <label
                       className={`bouton-secondaire cursor-pointer px-3 py-1.5 text-[12px] font-semibold ${occupe === v.id ? "pointer-events-none opacity-50" : ""}`}
                     >
@@ -378,9 +443,9 @@ export function VideosStats({
             <>
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                 <Tuile label="Vue par" valeur={a.joueurs} />
-                <Tuile label="Lectures" valeur={a.lectures} />
+                <Tuile label={estEnPhotos(a.v) ? "Ouvertures" : "Lectures"} valeur={a.lectures} />
                 <Tuile label="Jusqu'au bout" valeur={a.joueurs ? pct(a.finies / a.joueurs) : "–"} />
-                <Tuile label="Regardée" valeur={a.joueurs ? pct(a.moyenne) : "–"} />
+                <Tuile label={estEnPhotos(a.v) ? "Photos vues" : "Regardée"} valeur={a.joueurs ? pct(a.moyenne) : "–"} />
               </div>
               <p className="-mt-2 text-[12.5px] leading-snug text-foreground/55">
                 {a.joueurs === 0
@@ -436,9 +501,31 @@ export function VideosStats({
   );
 }
 
-/** Poser une vidéo : le fichier, un titre, une légende ; elle part en brouillon. */
+/** Une photo, ramenée à 1600 px au plus sur son grand côté, en JPEG : de quoi tenir sur un téléphone. */
+async function allegerPhoto(f: File): Promise<{ blob: Blob; largeur: number; hauteur: number }> {
+  const img = await createImageBitmap(f, { imageOrientation: "from-image" });
+  const k = Math.min(1, 1600 / Math.max(img.width, img.height));
+  const c = document.createElement("canvas");
+  c.width = Math.round(img.width * k);
+  c.height = Math.round(img.height * k);
+  c.getContext("2d")?.drawImage(img, 0, 0, c.width, c.height);
+  img.close();
+  const blob = await new Promise<Blob | null>((ok) => c.toBlob(ok, "image/jpeg", 0.85));
+  if (!blob) throw new Error("Photo illisible.");
+  return { blob, largeur: c.width, hauteur: c.height };
+}
+
+const MAX_PHOTOS = 20;
+
+/**
+ * Poser une publication : une vidéo (le fichier, un titre, une légende), ou
+ * des photos (jusqu'à 20, dans l'ordre choisi : la première fait la
+ * vignette ; 24/11) ; elle part en brouillon.
+ */
 function NouvelleVideo({ existantes, apres }: { existantes: string[]; apres: () => Promise<void> }) {
   const [ouvert, setOuvert] = useState(false);
+  const [genre, setGenre] = useState<"video" | "photos">("video");
+  const [images, setImages] = useState<File[]>([]);
   const [fichier, setFichier] = useState<File | null>(null);
   const [titre, setTitre] = useState("");
   const [legende, setLegende] = useState("");
@@ -447,7 +534,50 @@ function NouvelleVideo({ existantes, apres }: { existantes: string[]; apres: () 
   const pris = existantes.includes(id);
   const trop = !!fichier && fichier.size > MAX_OCTETS;
 
+  async function envoyerPhotos() {
+    if (images.length === 0 || !titre.trim()) return;
+    const sb = supabase();
+    try {
+      const chemins: string[] = [];
+      let dims: { largeur: number; hauteur: number } | null = null;
+      for (const [i, f] of images.slice(0, MAX_PHOTOS).entries()) {
+        setEtat(`Photo ${i + 1} sur ${Math.min(images.length, MAX_PHOTOS)}…`);
+        const { blob, largeur, hauteur } = await allegerPhoto(f);
+        dims ??= { largeur, hauteur };
+        // Un nom par envoi : aucune copie en cache ne garde une ancienne photo.
+        const chemin = `${id}/${String(i + 1).padStart(2, "0")}-${Date.now().toString(36)}.jpg`;
+        const up = await sb.storage.from(BUCKET_VIDEOS).upload(chemin, blob, { upsert: true, contentType: "image/jpeg" });
+        if (up.error) throw up.error;
+        chemins.push(chemin);
+      }
+      const ligne = {
+        id,
+        titre: titre.trim().slice(0, 80),
+        legende: legende.trim().slice(0, 200) || null,
+        fichier: chemins[0],
+        affiche: chemins[0],
+        largeur: dims?.largeur ?? null,
+        hauteur: dims?.hauteur ?? null,
+        duree: null,
+        photos: chemins,
+      };
+      const { error } = pris ? await sb.from("videos").update(ligne).eq("id", id) : await sb.from("videos").insert(ligne);
+      if (error) throw error;
+      toast.success(pris ? "Photos remplacées." : "Photos posées, en brouillon.");
+      setImages([]);
+      setTitre("");
+      setLegende("");
+      setOuvert(false);
+      await apres();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Envoi impossible.");
+    } finally {
+      setEtat(null);
+    }
+  }
+
   async function envoyer() {
+    if (genre === "photos") return envoyerPhotos();
     if (!fichier || !titre.trim() || trop) return;
     const sb = supabase();
     try {
@@ -492,18 +622,43 @@ function NouvelleVideo({ existantes, apres }: { existantes: string[]; apres: () 
   if (!ouvert)
     return (
       <button type="button" onClick={() => setOuvert(true)} className="bouton-secondaire self-start px-4 py-2 text-[13px] font-semibold">
-        Poser une vidéo
+        Poser une vidéo ou des photos
       </button>
     );
   return (
     <div className="flex flex-col gap-2.5 rounded-2xl bg-foreground/[0.04] p-3.5 ring-1 ring-foreground/10">
-      <input
-        type="file"
-        accept="video/mp4,video/quicktime,video/webm"
-        onChange={(e) => setFichier(e.target.files?.[0] ?? null)}
-        className="text-[13px] file:mr-3 file:rounded-full file:border-0 file:bg-foreground/10 file:px-3 file:py-1.5 file:text-[12px] file:font-semibold file:text-foreground"
-      />
-      {trop && <p className="text-[12.5px] text-foreground/60">Plus de 50 Mo : il faut une version plus légère (720p).</p>}
+      <div className="flex self-start rounded-full bg-foreground/[0.06] p-1 text-[12.5px] font-semibold">
+        {(["video", "photos"] as const).map((g) => (
+          <button
+            key={g}
+            type="button"
+            onClick={() => setGenre(g)}
+            className={`rounded-full px-3.5 py-1.5 ${genre === g ? "bg-foreground text-background" : "text-foreground/60"}`}
+          >
+            {g === "video" ? "Vidéo" : "Photos"}
+          </button>
+        ))}
+      </div>
+      {genre === "video" ? (
+        <input
+          type="file"
+          accept="video/mp4,video/quicktime,video/webm"
+          onChange={(e) => setFichier(e.target.files?.[0] ?? null)}
+          className="text-[13px] file:mr-3 file:rounded-full file:border-0 file:bg-foreground/10 file:px-3 file:py-1.5 file:text-[12px] file:font-semibold file:text-foreground"
+        />
+      ) : (
+        <input
+          type="file"
+          multiple
+          accept="image/jpeg,image/png,image/webp,image/heic"
+          onChange={(e) => setImages(Array.from(e.target.files ?? []))}
+          className="text-[13px] file:mr-3 file:rounded-full file:border-0 file:bg-foreground/10 file:px-3 file:py-1.5 file:text-[12px] file:font-semibold file:text-foreground"
+        />
+      )}
+      {genre === "photos" && images.length > MAX_PHOTOS && (
+        <p className="text-[12.5px] text-foreground/60">{MAX_PHOTOS} photos au plus : les suivantes ne partent pas.</p>
+      )}
+      {genre === "video" && trop && <p className="text-[12.5px] text-foreground/60">Plus de 50 Mo : il faut une version plus légère (720p).</p>}
       <input
         value={titre}
         onChange={(e) => setTitre(e.target.value)}
@@ -527,7 +682,7 @@ function NouvelleVideo({ existantes, apres }: { existantes: string[]; apres: () 
       <div className="flex items-center gap-2">
         <button
           type="button"
-          disabled={!fichier || !titre.trim() || trop || !!etat}
+          disabled={(genre === "video" ? !fichier || trop : images.length === 0) || !titre.trim() || !!etat}
           onClick={() => void envoyer()}
           className="bouton-principal bouton--vert px-4 py-2 text-[13px] font-semibold disabled:opacity-50"
         >

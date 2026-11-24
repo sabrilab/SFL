@@ -36,8 +36,8 @@ export async function POST(req: NextRequest) {
 
   const corps = (await req.json().catch(() => ({}))) as { video?: unknown };
   const id = typeof corps.video === "string" ? corps.video : "";
-  const { data: v } = await sb.from("videos").select("id, titre, legende, publiee_le").eq("id", id).maybeSingle();
-  const video = v as { id: string; titre: string; legende: string | null; publiee_le: string | null } | null;
+  const { data: v } = await sb.from("videos").select("id, titre, legende, publiee_le, photos").eq("id", id).maybeSingle();
+  const video = v as { id: string; titre: string; legende: string | null; publiee_le: string | null; photos: string[] | null } | null;
   if (!video?.publiee_le || Date.parse(video.publiee_le) > Date.now())
     return NextResponse.json({ error: "Publie la vidéo d'abord." }, { status: 400 });
 
@@ -78,7 +78,7 @@ export async function POST(req: NextRequest) {
   if (refus) return NextResponse.json({ error: "Réservation impossible." }, { status: 503 });
 
   const { titre, texte } = texteAnnonceVideo(video);
-  const notif: Notif = { titre, texte, url: `/ligue?video=${encodeURIComponent(video.id)}`, tag: annonce };
+  const notif: Notif = { titre, texte, url: `/ligue/videos?p=${encodeURIComponent(video.id)}`, tag: annonce };
   const envois = new Map<string, Envoi>();
   for (const { joueur } of (reserves ?? []) as { joueur: string }[]) {
     const uid = idDe.get(joueur);

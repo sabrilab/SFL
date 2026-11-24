@@ -8004,6 +8004,18 @@ create table if not exists public.videos (
   created_at  timestamptz not null default now()
 );
 
+-- Les publications en photos (24/11/2026, Bola : « montrer photos et vidéos
+-- comme Instagram ou TikTok », le fil vertical des Actus) : la même ligne,
+-- avec ses photos dans le même bucket privé (<id>/1.jpg, <id>/2.jpg…) ;
+-- fichier et affiche y désignent la première. Mêmes règles, mêmes vues,
+-- mêmes réactions : video_vue() y note vu_s = le nombre de photos vues.
+alter table public.videos add column if not exists photos text[];
+do $$ begin
+  alter table public.videos add constraint videos_photos_nombre
+    check (photos is null or (cardinality(photos) between 1 and 20));
+exception when duplicate_object then null;
+end $$;
+
 alter table public.videos enable row level security;
 
 drop policy if exists "videos: publiées pour l'app, tout pour l'admin" on public.videos;

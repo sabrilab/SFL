@@ -121,6 +121,7 @@ import { couverturesDuDimanche, sources, type Couverture } from "@/lib/sfl/couve
 import { ContratALaUne } from "./contrat-a-la-une";
 import { RubriqueFlair } from "@/components/sfl/flair/mon-flair";
 import { journeeDeLaVideo, useVideos, VideosDuFil } from "./video";
+import { RangeePublications } from "./fil-vertical";
 import type { Video } from "@/lib/sfl/videos";
 import { VueClassements, VueMatchs } from "./vues";
 import { ChoixEpoque, useEpoques, type ChoixDEpoque, type Epoque, type Vue } from "./epoques";
@@ -1110,6 +1111,8 @@ function EpoqueEnCours({ epoques, vue, onVue, classement, exploit }: PropsEpoque
               remplie ; si je ne joue pas, aucune feuille remplie), le vote attend ici, grisé (son
               bandeau gris, et mes cartes si je joue) : la feuille en direct passe d'abord. */}
           <VoteDuJour me={me} lesquels="en-attente" />
+          {/* Les photos et vidéos de Bola, en vignettes : l'entrée du fil vertical (Bola, 24/11). */}
+          <RangeePublications videos={videos} className="md:col-span-full" />
           {enSuspens.map((j) => {
             const meta = saison.journees.find((m) => m.j === j);
             return meta ? (

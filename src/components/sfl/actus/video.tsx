@@ -79,7 +79,7 @@ export function useVideos(): Video[] {
 let seq = 0;
 
 /** Réactions et commentaires d'une vidéo, suivis en temps réel. */
-function useEchos(video: string) {
+export function useEchos(video: string) {
   const [echos, setEchos] = useState<Echos & { demo?: boolean }>({ reactions: [], commentaires: [] });
   const [moi, setMoi] = useState<string | null>(null);
   const charger = useCallback(() => {
@@ -140,10 +140,10 @@ function useEchos(video: string) {
   return { ...echos, moi, reagirA, commenterA, retirer };
 }
 
-type Echo = ReturnType<typeof useEchos>;
+export type Echo = ReturnType<typeof useEchos>;
 
 /** Une adresse signée (ou celle d'un aperçu), demandée quand on en a besoin. */
-function useAdresse(chemin: string | null, actif = true): string | null {
+export function useAdresse(chemin: string | null, actif = true): string | null {
   const [url, setUrl] = useState<{ chemin: string; url: string } | null>(null);
   useEffect(() => {
     if (!chemin || !actif) return;
@@ -158,7 +158,7 @@ function useAdresse(chemin: string | null, actif = true): string | null {
   return url && url.chemin === chemin ? url.url : null;
 }
 
-function duree(s: number | null | undefined): string | null {
+export function duree(s: number | null | undefined): string | null {
   if (!s || !Number.isFinite(s)) return null;
   const t = Math.round(s);
   return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, "0")}`;
@@ -172,7 +172,7 @@ function depuis(at: number): string {
   return new Date(at).toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
 }
 
-async function partager(v: Video) {
+export async function partager(v: Video) {
   const issue = await partagerVideo(v);
   if (issue === "copiee") toast.success("Lien copié.");
   else if (issue === "impossible") toast.error("Le partage n'a pas pu s'ouvrir.");
@@ -434,7 +434,7 @@ function Carrousel({ v, diapos, children }: { v: Video; diapos: Diapo[]; childre
 /* ------------------------- Les images en grand ------------------------- */
 
 /** Envoyer une actu au Vestiaire : elle attend dans la barre d'écriture (au-vestiaire.tsx). */
-function useAuVestiaire() {
+export function useAuVestiaire() {
   const router = useRouter();
   return (piece: PieceActu) => {
     preparerPiece(piece);
@@ -642,7 +642,7 @@ export function ActuVue({ piece }: { piece: PieceActu }) {
 }
 
 /** Les cinq réactions : la mienne allumée, le nombre à côté. */
-function Reactions({ echos, sombre = false }: { echos: Echo; sombre?: boolean }) {
+export function Reactions({ echos, sombre = false }: { echos: Echo; sombre?: boolean }) {
   return (
     <>
       {EMOJIS_VIDEO.map((e) => {
@@ -897,7 +897,7 @@ export function LecteurVideo({ v, commentaires, onFermer }: { v: Video; commenta
 
 /* ---------------------------- Les commentaires ---------------------------- */
 
-function Commentaires({ echos, onFermer }: { echos: Echo; onFermer: () => void }) {
+export function Commentaires({ echos, onFermer }: { echos: Echo; onFermer: () => void }) {
   const session = useSession();
   const [texte, setTexte] = useState("");
   const [envoi, setEnvoi] = useState(false);
