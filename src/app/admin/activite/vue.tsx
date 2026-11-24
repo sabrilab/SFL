@@ -255,7 +255,7 @@ const PARTIES = [
   { id: "heures", label: "Heures de connexion" },
   { id: "revenu", label: "Revenu" },
   { id: "recommandation", label: "Recommandation" },
-  { id: "videos", label: "Vidéos et Bola Agent" },
+  { id: "videos", label: "Photos, vidéos et Bola Agent" },
   { id: "joueurs", label: "Par joueur" },
   { id: "essentiel", label: "L'essentiel et la croissance" },
   { id: "accords", label: "Accords" },

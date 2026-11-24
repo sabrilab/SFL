@@ -3,7 +3,8 @@
 // L'onglet Plus de l'admin (refonte du 24/11/2026, maquette v3) : ce qui
 // n'est ni la journée, ni les joueurs, ni Analytics, en trois listes façon
 // Réglages d'iOS. Journées (les saisons, les feuilles de match, l'historique),
-// Ligue (arbitres, terrains, notification), Atelier (la base, le design, la
+// Ligue (arbitres, terrains, photos et vidéos d'Actus — la partie Vidéos
+// d'Analytics —, notification), Atelier (la base, le design, la
 // note du Labo, le tableau complet). Chaque compteur reprend celui de l'ancien
 // écran ≡ (page-ligue, retiré) : les brouillons et les journées à rattraper
 // des Saisons, les alertes des feuilles.
@@ -47,6 +48,7 @@ export function PagePlus() {
       <Liste titre="Ligue">
         <Ligne titre="Arbitres" droite={arbitres.arbitres.length} href="/admin/tableau?onglet=joueurs" />
         <Ligne titre="Terrains" droite={(saison.terrains ?? []).length} href="/map" />
+        <Ligne titre="Photos et vidéos" href="/admin/activite?partie=videos" />
         <Ligne titre="Envoyer une notification" href="/admin/notifications" />
       </Liste>
       <Liste titre="Atelier">
