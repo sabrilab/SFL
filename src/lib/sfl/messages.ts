@@ -64,7 +64,7 @@ interface Brut {
 /** Traduit une erreur Postgres en phrase utile, avec le geste qui répare. */
 export function expliquer(message: string): string {
   if (/relation .*messages.* does not exist|schema cache|could not find the table/i.test(message)) {
-    return "La messagerie n'est pas encore installée en base. Ouvre Réglages → Installation Supabase une fois : le schéma s'applique tout seul.";
+    return "La messagerie n'est pas encore installée en base. Ouvre Admin → Plus → Installation Supabase une fois : le schéma s'applique tout seul.";
   }
   if (/jwt|token|not authenticated|auth session/i.test(message)) {
     return "Ta session serveur a expiré. Déconnecte-toi puis reconnecte-toi.";

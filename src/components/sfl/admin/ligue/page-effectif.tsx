@@ -66,7 +66,7 @@ export function PageEffectif() {
   return (
     <div className="shell flex flex-col gap-4 py-4 sm:max-w-[600px]">
       <header className="flex items-center gap-2">
-        <BoutonRetour parent="/admin/ligue" titre="la Ligue" />
+        <BoutonRetour />
         <h1 className="titre-lettrage flex-1 text-titre-m">Effectif</h1>
         <span className="mono-label text-encre-3">{saison.roster.length}</span>
       </header>

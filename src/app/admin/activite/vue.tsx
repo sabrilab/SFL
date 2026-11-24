@@ -1,6 +1,15 @@
 "use client";
 
-// Analytics (Admin → Activité) : ce que la page affiche, une fois le journal lu.
+// Analytics (Admin → Analytics) : ce que la page affiche, une fois le journal lu.
+//
+// Refonte de l'admin (24/11/2026, maquette v3 validée le 24/11 : « en tête
+// les gens connectés dans la journée, un graphique des connexions par jour,
+// les emails récoltés, les nouveaux inscrits, et après le reste ») : la page
+// s'ouvre sur la tête (./tete.tsx, lib/sfl/analytics-tete.ts), toujours sur
+// les joueurs seuls, puis « Le reste », une ligne par partie. Chaque partie
+// s'ouvre seule (?partie=…), avec ses sélecteurs Public et Période ; le
+// retour ramène à la tête. Les emails collectés sont devenus la feuille
+// Mails de la tête.
 //
 // Rangée selon le funnel AARRR (Sabri, 03/11/2026 : « fais une refonte
 // globale de l'onglet analytics, pour mieux s'y retrouver, c'est un peu le
@@ -25,18 +34,18 @@
 //      (./bola-plus.tsx, 12/11), les packs ouverts en XP (./revenu.tsx) ;
 //   5. Recommandation — le parrainage (./parrainage.tsx) et qui ramène du
 //      monde (./rassembleurs.tsx) ;
-//   puis, en annexes, le détail par joueur, les emails, les accords.
+//   puis le détail par joueur et les accords.
 //
 // Les conseils calculés (lib/sfl/retention.ts) se rangent dans leur étape,
 // en tête de celle-ci ; on peut tous les masquer d'un geste (Sabri, 22/10 :
-// « les conseils […] ne peuvent pas être skipés »). Une rangée de raccourcis,
-// collée en haut, mène à chaque étape.
+// « les conseils […] ne peuvent pas être skipés »).
 //
 // Chaque nom ouvre la fiche du joueur (./fiche.tsx, 22/10). Les données
 // arrivent toutes faites (`page.tsx` lit le journal) : cette vue ne fait que
 // les analyser et les montrer.
 
-import { useMemo, useState, useSyncExternalStore } from "react";
+import { useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { ChevronDown, ChevronRight, ChevronUp, Lightbulb, Loader2, Mail, RefreshCw, TrendingDown, TrendingUp, TriangleAlert } from "lucide-react";
 import {
   analyser,
@@ -78,9 +87,13 @@ import { QuiRamene } from "./rassembleurs";
 import { CeJourLa, Pics } from "./reperes";
 import { cn } from "@/lib/utils";
 import { BoutonRetour } from "@/components/layout/bouton-retour";
+import { Entete, Ligne, Liste, SegmenteClair } from "@/components/sfl/admin/ui-admin";
+import { useMediaQuery } from "@/hooks/use-media-query";
+import { teteAnalytics } from "@/lib/sfl/analytics-tete";
+import { CarteAujourdhui, CarteChiffres, CarteSemaine, FeuilleMails, type Fenetre } from "./tete";
 import { Acquisition, chiffresAcquisition, type Canal, type SiteVisite } from "./acquisition";
 import { ActivationEntonnoir, analyserActivation } from "./activation";
-import { Chapitre, Section } from "./cadre";
+import { Section } from "./cadre";
 import { Rubriques } from "./rubriques";
 import { Barres, CarteHoraire, Cohortes, Comparaison, Courbe, encre } from "./graphiques";
 
@@ -229,16 +242,26 @@ function abonneConseils(f: () => void) {
   return () => window.removeEventListener(EVT_CONSEILS, f);
 }
 
-/** Les raccourcis, dans l'ordre de la page : les cinq étapes du funnel. */
+/**
+ * « Le reste » (refonte du 24/11/2026) : sous la tête, une ligne par partie ;
+ * chacune s'ouvre seule (?partie=…, le retour du navigateur ramène à la
+ * tête). Les cinq étapes du funnel, plus L'essentiel et la croissance, les
+ * heures, les vidéos et Bola Agent, le détail par joueur et les accords.
+ */
 const PARTIES = [
-  { id: "essentiel", label: "L'essentiel" },
   { id: "acquisition", label: "Acquisition" },
   { id: "activation", label: "Activation" },
   { id: "retention", label: "Rétention" },
+  { id: "heures", label: "Heures de connexion" },
   { id: "revenu", label: "Revenu" },
   { id: "recommandation", label: "Recommandation" },
+  { id: "videos", label: "Photos, vidéos et Bola Agent" },
   { id: "joueurs", label: "Par joueur" },
+  { id: "essentiel", label: "L'essentiel et la croissance" },
+  { id: "accords", label: "Accords" },
 ] as const;
+type PartieId = (typeof PARTIES)[number]["id"];
+const estPartie = (x: string | null): x is PartieId => PARTIES.some((p) => p.id === x);
 
 /** Les conseils d'une étape, en une rangée qu'on fait glisser ; rien s'il n'y en a pas. */
 function Conseils({ liste, masques }: { liste: Conclusion[]; masques: boolean }) {
@@ -272,10 +295,6 @@ export interface BlocsActivite {
   accords: (public_: PublicId, admins: ReadonlySet<string>) => React.ReactNode;
 }
 
-function allerA(id: string) {
-  document.getElementById(`activite-${id}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
-}
-
 /* ---------------------------------- vue ---------------------------------- */
 
 export function ActiviteVue({
@@ -302,6 +321,28 @@ export function ActiviteVue({
   const [jourChoisi, setJourChoisi] = useState<number | null>(null);
   const masques = useSyncExternalStore(abonneConseils, lireMasques, () => false);
   const { saison } = useSeason();
+
+  // La partie ouverte, dans l'adresse : le retour du navigateur ramène à la tête.
+  const router = useRouter();
+  const pathname = usePathname();
+  const params = useSearchParams();
+  const brut = params.get("partie");
+  const partie: PartieId | null = estPartie(brut) ? brut : null;
+  const depuisLaTete = useRef(false);
+  function ouvrir(id: PartieId) {
+    depuisLaTete.current = !partie;
+    router.push(`${pathname}?partie=${id}`);
+    document.getElementById("app-scroll")?.scrollTo({ top: 0 });
+  }
+  function fermer() {
+    if (depuisLaTete.current) router.back();
+    else router.replace(pathname);
+    depuisLaTete.current = false;
+  }
+  const [fenetre, setFenetre] = useState<Fenetre>(7);
+  const [mails, setMails] = useState(false);
+  const large = useMediaQuery("(min-width: 1024px)");
+  const tete = useMemo(() => (data ? teteAnalytics(data.evenements, data.profiles, data.now, fenetre) : null), [data, fenetre]);
 
   const jours = PERIODES.find((p) => p.id === periode)?.days ?? null;
   // Le journal et les comptes du public choisi, et la part des admins dans
@@ -454,7 +495,6 @@ export function ActiviteVue({
   const libellePeriode = jours === null ? "depuis le début" : `sur ${jours} jours`;
   const comparaison = jours === null ? "" : ` · évolution par rapport aux ${jours} jours d'avant`;
   const totalFamilles = a ? a.familles.reduce((s, f) => s + f.noms.length, 0) : 0;
-  const emails = vu?.profiles.filter((p) => p.contact_email) ?? [];
 
   /* ------------------------------ les étapes ---------------------------- */
   const conseilsDe = (etape: EtapeAarrr) => a?.conclusions.filter((c) => c.etape === etape) ?? [];
@@ -551,80 +591,65 @@ export function ActiviteVue({
     ];
   }, [a, vu, data, activation, jours]);
 
-  return (
-    <div className="shell flex flex-col gap-4 py-4 sm:py-8">
-      <div className="flex items-end justify-between">
-        <div className="flex items-center gap-3">
-          <BoutonRetour />
-          <div>
-            <h1 className="text-titre-l font-bold tracking-tight">Analytics</h1>
-            <p className="mt-1 text-corps text-encre-3">Le funnel AARRR</p>
-          </div>
-        </div>
-        <button
-          onClick={onRefresh}
-          disabled={loading}
-          className="bouton-secondaire mono-label flex items-center gap-1.5 px-3 py-1.5"
-        >
-          {loading ? <Loader2 className="size-3 animate-spin" /> : <RefreshCw className="size-3" />}
-          Actualiser
-        </button>
-      </div>
+  const actualiser = (
+    <button
+      type="button"
+      onClick={onRefresh}
+      disabled={loading}
+      aria-label="Actualiser"
+      className="bouton-discret grid size-10 shrink-0 place-items-center text-encre-2"
+    >
+      {loading ? <Loader2 className="size-[18px] animate-spin" /> : <RefreshCw className="size-[18px]" strokeWidth={1.75} />}
+    </button>
+  );
+  const titrePartie = PARTIES.find((p) => p.id === partie)?.label;
 
-      <div className="glass flex w-full rounded-full p-1">
-        {PUBLICS.map((p) => (
-          <button
-            key={p.id}
-            onClick={() => setPublic(p.id)}
-            className={cn(
-              "flex-1 py-1.5 text-corps font-semibold",
-              public_ === p.id ? "bouton-principal bouton--mauve" : "bouton-discret text-encre-3"
-            )}
-          >
-            {p.label}
-          </button>
-        ))}
-      </div>
-      {vu && vu.admins.length > 0 && (
-        <p className="-mt-1.5 px-1 text-petit leading-snug text-encre-3">
-          {public_ === "joueurs"
-            ? `Sans ${listeNoms(vu.admins)}, qui font ${pct(vu.partAdmins)} de l'activité enregistrée.`
-            : public_ === "admins"
-              ? `${listeNoms(vu.admins)} seulement.`
-              : `Admins compris : ${listeNoms(vu.admins)} font ${pct(vu.partAdmins)} de l'activité enregistrée.`}
-        </p>
+  return (
+    <div className="mx-auto flex w-full max-w-[600px] flex-col gap-4 px-5 pt-3 lg:max-w-[1176px] lg:px-12 lg:pt-5">
+      {partie ? (
+        <header className="flex min-h-11 items-center gap-2">
+          <BoutonRetour onRetour={fermer} titre="Analytics" />
+          <h1 className="titre-lettrage min-w-0 flex-1 truncate text-titre-m">{titrePartie}</h1>
+          {actualiser}
+        </header>
+      ) : (
+        <Entete titre="Analytics" droite={actualiser} />
       )}
 
-      <div className="glass flex w-full rounded-full p-1">
-        {PERIODES.map((p) => (
-          <button
-            key={p.id}
-            onClick={() => setPeriode(p.id)}
-            className={cn(
-              "flex-1 py-1.5 text-corps font-semibold",
-              periode === p.id ? "bouton-principal" : "bouton-discret text-encre-3"
-            )}
-          >
-            {p.label}
-          </button>
-        ))}
-      </div>
+      {/* La tête : toujours les joueurs seuls (analytics-tete.ts). */}
+      {!partie && tete && data && (
+        <>
+          <div className="flex flex-col gap-3 lg:grid lg:grid-cols-[1fr_1.3fr] lg:grid-rows-[auto_1fr] lg:gap-4">
+            <CarteAujourdhui tete={tete} now={data.now} />
+            <div className="lg:col-start-2 lg:row-span-2 lg:row-start-1">
+              <CarteSemaine tete={tete} fenetre={fenetre} onFenetre={setFenetre} haute={large ? 300 : 104} />
+            </div>
+            <CarteChiffres tete={tete} onMails={() => setMails(true)} onInscrits={() => ouvrir("activation")} />
+          </div>
+          <Liste titre="Le reste" className="pt-2 pb-2">
+            {PARTIES.map((p) => (
+              <Ligne key={p.id} titre={p.label} droite={p.id === "joueurs" && a ? a.joueurs.length : undefined} onClick={() => ouvrir(p.id)} />
+            ))}
+          </Liste>
+          <FeuilleMails open={mails} onOpenChange={setMails} mails={tete.mails} />
+        </>
+      )}
 
-      {a && (
-        <nav
-          aria-label="Parties de la page"
-          className="sticky top-0 z-20 -mx-4 -my-1 flex gap-1.5 overflow-x-auto bg-background/80 px-4 py-2 backdrop-blur-xl [scrollbar-width:none]"
-        >
-          {PARTIES.map((p) => (
-            <button
-              key={p.id}
-              onClick={() => allerA(p.id)}
-              className="bouton-secondaire shrink-0 px-3 py-1.5 text-petit font-semibold"
-            >
-              {p.label}
-            </button>
-          ))}
-        </nav>
+      {/* Dans une partie : qui l'on regarde, et sur quelle période. */}
+      {partie && (
+        <div className="flex flex-col gap-2">
+          <SegmenteClair label="Public" options={PUBLICS.map((p) => ({ id: p.id, libelle: p.label }))} valeur={public_} onChange={setPublic} />
+          <SegmenteClair label="Période" options={PERIODES.map((p) => ({ id: p.id, libelle: p.label }))} valeur={periode} onChange={setPeriode} />
+          {vu && vu.admins.length > 0 && (
+            <p className="px-1 text-petit leading-snug text-encre-3">
+              {public_ === "joueurs"
+                ? `Sans ${listeNoms(vu.admins)}, qui font ${pct(vu.partAdmins)} de l'activité enregistrée.`
+                : public_ === "admins"
+                  ? `${listeNoms(vu.admins)} seulement.`
+                  : `Admins compris : ${listeNoms(vu.admins)} font ${pct(vu.partAdmins)} de l'activité enregistrée.`}
+            </p>
+          )}
+        </div>
       )}
 
       {error && (
@@ -633,442 +658,453 @@ export function ActiviteVue({
         </p>
       )}
 
-      {!a && loading && (
+      {!data && loading && (
         <div className="flex justify-center py-16 text-encre-3">
           <Loader2 className="size-5 animate-spin" />
         </div>
       )}
 
-      {a && courbe && vu && data && (
+      {a && courbe && vu && data && partie && (
         <>
-          {/* L'essentiel : une métrique clé par étape du funnel, puis la courbe */}
-          <section id="activite-essentiel" className="scroll-mt-16">
-            <p className="mono-label mb-2 px-1 text-micro text-encre-3">
-              {libellePeriode}
-              {comparaison}
-            </p>
-            <div className="glass-soft overflow-hidden rounded-[24px]">
-              {essentiel.map((e, i) => (
-                <button
-                  key={e.id}
-                  onClick={() => allerA(e.id)}
-                  className="flex w-full items-center gap-3.5 border-b border-foreground/6 px-4 py-3.5 text-left last:border-0"
-                >
-                  <span className="mono-label w-4 shrink-0 text-micro text-encre-4">{i + 1}</span>
-                  <span className="min-w-0 flex-1">
-                    <span className="mono-label block text-micro text-encre-3">{e.etape}</span>
-                    <span className="mt-1 flex items-baseline gap-2">
-                      <span className="text-titre-m leading-none font-extrabold tracking-tight tabular-nums">{e.valeur}</span>
-                      <span className="min-w-0 truncate text-corps font-semibold">{e.label}</span>
-                    </span>
-                    {e.ligne && <span className="mt-1 block text-petit leading-snug text-encre-3">{e.ligne}</span>}
-                  </span>
-                  <span className="flex shrink-0 flex-col items-end gap-1">
-                    {e.c && <Delta c={e.c} />}
-                    <ChevronRight className="size-4 text-encre-4" />
-                  </span>
-                </button>
-              ))}
-            </div>
-          </section>
-
-          {/* 2. La croissance */}
-          <section id="activite-courbes" className="glass scroll-mt-16 rounded-3xl p-5">
-            <h2 className="text-titre font-bold tracking-tight">Croissance</h2>
-            <div className="-mx-5 mt-3 flex gap-1.5 overflow-x-auto px-5 pb-1 [scrollbar-width:none]">
-              {METRIQUES.map((m) => (
-                <button
-                  key={m.id}
-                  onClick={() => setMetrique(m.id)}
-                  className={cn(
-                    "shrink-0 px-3 py-1.5 text-petit font-semibold",
-                    metrique === m.id ? "bouton-principal" : "bouton-secondaire text-encre-3"
-                  )}
-                >
-                  {m.court}
-                </button>
-              ))}
-            </div>
-            <p className="mono-label mt-4 text-micro text-encre-3">
-              {METRIQUES.find((m) => m.id === metrique)?.label}
-            </p>
-            <div className="mt-1 flex items-baseline gap-2.5">
-              <span className="text-titre-m font-extrabold tracking-tight tabular-nums">{courbe.titre}</span>
-              <Delta c={courbe.c} />
-            </div>
-            <div className="mt-3">
-              <Courbe
-                points={courbe.points}
-                avant={courbe.avant}
-                format={format}
-                creux={a.creux}
-                marques={marques}
-                actif={iChoisi >= 0 ? iChoisi : null}
-                onActif={(i) => setJourChoisi(i === null ? null : (courbe.points[i]?.t ?? null))}
-              />
-            </div>
-            <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-legende text-encre-3">
-              <span className="flex items-center gap-1.5">
-                <span className="h-0.5 w-4 rounded bg-foreground" />
+          {partie === "essentiel" && (
+            <>
+            {/* L'essentiel : une métrique clé par étape du funnel, puis la courbe */}
+            <section id="activite-essentiel" className="scroll-mt-16">
+              <p className="mono-label mb-2 px-1 text-micro text-encre-3">
                 {libellePeriode}
-              </span>
-              {courbe.avant && (
-                <span className="flex items-center gap-1.5">
-                  <span className="h-0 w-4 border-t-[1.5px] border-dashed border-foreground/40" />
-                  {`les ${jours} jours d'avant`}
-                </span>
-              )}
-              <span>Touche un jour : ce que l&apos;app y a fait s&apos;affiche dessous.</span>
-            </div>
-            {courbe.points[iJour] && (
-              <div className="mt-4 border-t border-foreground/8 pt-3.5">
-                <Pics pics={lesPics} actif={iJour} onChoisir={(i) => setJourChoisi(courbe.points[i]?.t ?? null)} />
-                <CeJourLa
-                  key={courbe.points[iJour].t}
-                  t={courbe.points[iJour].t}
-                  aujourdhui={iJour === courbe.points.length - 1}
-                  reperes={reperesDuJour?.get(courbe.points[iJour].t) ?? []}
-                  ecart={ecartDuJour(a.serie, a.debutPeriode + iJour, metrique)}
-                  metrique={metrique}
-                  format={format}
-                />
-              </div>
-            )}
-          </section>
-
-          <Chapitre id="acquisition" rang={1} titre="Acquisition" question="Qui arrive, et par où ?" />
-          <Conseils liste={conseilsDe("acquisition")} masques={masques} />
-          <Acquisition
-            site={data.site}
-            profiles={vu.profiles}
-            canaux={data.canaux}
-            jours={courbe.points.map((p) => p.t)}
-            depuis={a.depuis}
-          />
-          {/* 8 bis. Les pays choisis pour la carte */}
-          <Section
-            id="pays"
-            titre="Pays choisis pour la carte"
-            sous={
-              pays && pays.joueurs > 0
-                ? `Le dernier drapeau de chaque joueur au studio photo · ${pays.joueurs} ${pays.joueurs > 1 ? "joueurs" : "joueur"}, ${pays.cartes} ${pays.cartes > 1 ? "cartes" : "carte"}.`
-                : "Le dernier drapeau de chaque joueur au studio photo."
-            }
-          >
-            {pays && pays.lignes.length > 0 ? (
-              <div className="flex flex-col gap-2.5">
-                {pays.lignes.map((l) => (
-                  <div key={l.id} className="flex items-center gap-3">
-                    <span className="w-[44%] shrink-0 truncate text-corps font-medium">
-                      <span className="mr-1.5">{l.drapeau}</span>
-                      {l.nom}
-                    </span>
-                    <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-foreground/8">
-                      <span className="block h-full rounded-full bg-foreground/70" style={{ width: `${(l.n / pays.joueurs) * 100}%` }} />
-                    </span>
-                    <span className="w-10 shrink-0 text-right text-petit font-bold tabular-nums">{pct(l.n / pays.joueurs)}</span>
-                    <span className="w-6 shrink-0 text-right text-legende text-encre-3 tabular-nums">{l.n}</span>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-corps text-encre-3">
-                Aucun pays enregistré pour l&apos;instant : ils s&apos;enregistrent depuis le 22/10, à chaque carte au drapeau.
+                {comparaison}
               </p>
-            )}
-            {pays && pays.sansPays > 0 && (
-              <p className="mt-3 text-legende leading-snug text-encre-3">
-                {pays.sansPays} {pays.sansPays > 1 ? "cartes au drapeau faites" : "carte au drapeau faite"} avant le 22/10, sans pays enregistré.
-              </p>
-            )}
-          </Section>
-
-          <Chapitre id="activation" rang={2} titre="Activation" question="Un compte créé devient-il un joueur ?" />
-          <Conseils liste={conseilsDe("activation")} masques={masques} />
-          <ActivationEntonnoir a={activation!} onFiche={setFiche} />
-          {/* 3 bis. À suivre de près : les nouveaux venus très engagés */}
-          {suivre.length > 0 && (
-            <Section
-              id="suivre"
-              titre="À suivre de près"
-              sous="Arrivés depuis moins de 14 jours, bien plus présents que les autres dans leurs premières 24 h. Touche un nom pour sa fiche."
-            >
-              <div className="flex flex-col">
-                {suivre.map((j) => (
+              <div className="glass-soft overflow-hidden rounded-[24px]">
+                {essentiel.map((e, i) => (
                   <button
-                    key={j.name}
-                    onClick={() => setFiche(j.name)}
-                    className="flex items-center gap-3 border-b border-foreground/6 py-2.5 text-left last:border-0"
+                    key={e.id}
+                    onClick={() => estPartie(e.id) && ouvrir(e.id)}
+                    className="flex w-full items-center gap-3.5 border-b border-foreground/6 px-4 py-3.5 text-left last:border-0"
                   >
+                    <span className="mono-label w-4 shrink-0 text-micro text-encre-4">{i + 1}</span>
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-ligne font-semibold">{j.name}</span>
-                      <span className="block text-petit text-encre-3">
-                        {duree(j.ms)} dans ses premières 24 h · {Math.round(j.fois)} fois la médiane · arrivé le {jjmm(j.premier)}
+                      <span className="mono-label block text-micro text-encre-3">{e.etape}</span>
+                      <span className="mt-1 flex items-baseline gap-2">
+                        <span className="text-titre-m leading-none font-extrabold tracking-tight tabular-nums">{e.valeur}</span>
+                        <span className="min-w-0 truncate text-corps font-semibold">{e.label}</span>
                       </span>
+                      {e.ligne && <span className="mt-1 block text-petit leading-snug text-encre-3">{e.ligne}</span>}
                     </span>
-                    <ChevronRight className="size-4 shrink-0 text-encre-3" />
+                    <span className="flex shrink-0 flex-col items-end gap-1">
+                      {e.c && <Delta c={e.c} />}
+                      <ChevronRight className="size-4 text-encre-4" />
+                    </span>
                   </button>
                 ))}
               </div>
-            </Section>
-          )}
+            </section>
 
-          {/* 3 ter. Les nouveaux arrivants : SFL et Bola à part, leur carte, ce qu'ils ont fait */}
-          {vu && data && (
-            <Section id="nouveaux" titre="Nouveaux arrivants">
-              <NouveauxArrivants
-                evenements={data.evenements}
-                profiles={data.profiles}
-                parrains={data.parrains}
-                parcours={data.parcours}
-                now={data.now}
-                onFiche={setFiche}
-              />
-            </Section>
-          )}
-
-          {/* 6. Ce qui fait revenir */}
-          {a.leviers.length > 0 && (
-            <Section
-              titre="Ce qui fait revenir"
-              sous="Pendant leur première semaine, l'ont-ils fait ? Puis : sont-ils revenus après 7 jours ? Joueurs arrivés il y a 14 jours ou plus."
-            >
-              <div className="flex flex-col gap-4">
-                {a.leviers.map((l) => (
-                  <Comparaison
-                    key={l.id}
-                    label={l.label}
-                    avec={l.avecRevenus / l.avec}
-                    sans={l.sansRevenus / l.sans}
-                    nAvec={l.avec}
-                    nSans={l.sans}
-                  />
-                ))}
-              </div>
-            </Section>
-          )}
-
-          <Chapitre id="retention" rang={3} titre="Rétention" question="Reviennent-ils ?" />
-          <Conseils liste={conseilsDe("retention")} masques={masques} />
-          {/* 5. La rétention */}
-          <Section id="cohortes" titre="Combien reviennent" sous="Sur tout l'historique. Revenu après N jours : rouvert l'app N jours ou plus après sa première venue.">
-            <div className="flex flex-col gap-2.5">
-              {a.retention
-                .filter((r) => r.eligibles > 0)
-                .map((r) => (
-                  <div key={r.jours} className="flex items-center gap-3">
-                    <span className="w-[104px] shrink-0 text-corps font-medium whitespace-nowrap">
-                      Après {r.jours} {r.jours === 1 ? "jour" : "jours"}
-                    </span>
-                    <span className="h-2 flex-1 overflow-hidden rounded-full bg-foreground/8">
-                      <span className="block h-full rounded-full bg-foreground/80" style={{ width: `${(r.revenus / r.eligibles) * 100}%` }} />
-                    </span>
-                    <span className="w-10 shrink-0 text-right text-petit font-bold tabular-nums">{pct(r.revenus / r.eligibles)}</span>
-                    <span className="w-11 shrink-0 text-right text-legende text-encre-3 tabular-nums">
-                      {r.revenus}/{r.eligibles}
-                    </span>
-                  </div>
-                ))}
-            </div>
-            <p className="mono-label mt-6 mb-2 text-micro text-encre-3">Par semaine d&apos;arrivée · % encore actifs</p>
-            <Cohortes cohortes={a.cohortes} />
-            <p className="mt-2 text-legende leading-snug text-encre-3">
-              Chaque ligne : les joueurs arrivés la semaine du lundi indiqué (et combien). S0 = leur première semaine,
-              +1 la suivante, etc. Plus la case est foncée, plus ils sont restés.
-            </p>
-          </Section>
-
-          {/* 4. Qui est là */}
-          <Section id="qui" titre="Qui est là aujourd'hui" sous={`${totalFamilles} comptes, rangés selon leur dernière venue.`}>
-            <div className="flex h-3 overflow-hidden rounded-full">
-              {a.familles.map((f) =>
-                f.noms.length ? (
-                  <span
-                    key={f.id}
-                    className="h-full border-r-2 border-background last:border-0"
-                    style={{ width: `${(f.noms.length / Math.max(1, totalFamilles)) * 100}%`, background: encre(TEINTE[f.id]) }}
-                  />
-                ) : null
-              )}
-            </div>
-            <div className="mt-3 flex flex-col">
-              {a.familles.map((f) => (
-                <div key={f.id} className="border-b border-foreground/6 last:border-0">
+            {/* 2. La croissance */}
+            <section id="activite-courbes" className="glass scroll-mt-16 rounded-3xl p-5">
+              <h2 className="text-titre font-bold tracking-tight">Croissance</h2>
+              <div className="-mx-5 mt-3 flex gap-1.5 overflow-x-auto px-5 pb-1 [scrollbar-width:none]">
+                {METRIQUES.map((m) => (
                   <button
-                    onClick={() => setOuverte((o) => (o === f.id ? null : f.id))}
-                    className="flex w-full items-center gap-3 py-2.5 text-left"
-                  >
-                    <span className="size-2.5 shrink-0 rounded-full ring-1 ring-foreground/15" style={{ background: encre(TEINTE[f.id]) }} />
-                    <span className="min-w-0 flex-1">
-                      <span className="text-ligne font-semibold">{f.label}</span>
-                      <span className="block text-petit text-encre-3">{f.note}</span>
-                    </span>
-                    <span className="text-lecture font-extrabold tabular-nums">{f.noms.length}</span>
-                    <ChevronDown className={cn("size-3.5 text-encre-4 transition-transform", ouverte === f.id && "rotate-180")} />
-                  </button>
-                  {ouverte === f.id && (
-                    <p className="pb-3 pl-5.5 text-petit leading-relaxed text-encre-3">
-                      {f.noms.length ? [...f.noms].sort((x, y) => x.localeCompare(y, "fr")).join(", ") : "Personne."}
-                    </p>
-                  )}
-                </div>
-              ))}
-            </div>
-          </Section>
-
-          {/* 9. À relancer */}
-          {a.aRelancer.length > 0 && (
-            <Section titre="À relancer" sous="Venus plusieurs jours, plus vus depuis une semaine ou plus.">
-              <div className="flex flex-col">
-                {a.aRelancer.map((j) => (
-                  <button
-                    key={j.name}
-                    onClick={() => setFiche(j.name)}
-                    className="flex items-center gap-3 border-b border-foreground/6 py-2.5 text-left last:border-0"
-                  >
-                    <span className="min-w-0 flex-1 truncate text-ligne font-semibold">{j.name}</span>
-                    <span className="mono-label text-micro whitespace-nowrap text-encre-3">{j.jours} j venus</span>
-                    <span className="mono-label text-right text-micro whitespace-nowrap text-encre-3">{relative(j.last, a.now)}</span>
-                    <Mail className={cn("size-3.5", j.email ? "text-foreground" : "text-foreground/15")} />
-                  </button>
-                ))}
-              </div>
-            </Section>
-          )}
-
-          {/* 6 ter. Les notifications */}
-          {vu && data && (
-            <NotifsStats
-              key={data.now}
-              public={public_}
-              admins={vu.ensembleAdmins}
-              jours={jours}
-              actifs={actifs}
-              now={data.now}
-              onJoueur={setFiche}
-            />
-          )}
-
-          {/* 7. Quand */}
-          <Section id="quand" titre="Quand la ligue ouvre l'app" sous={`Présences par jour et par heure, ${libellePeriode}.`}>
-            <CarteHoraire carte={a.carte} />
-          </Section>
-
-          {/* 8. Ce qu'ils font */}
-          <Section titre="Ce qu'ils font" sous={`${a.chiffres.sessions.valeur} sessions ${libellePeriode} · médiane ${duree(a.dureeMediane)} · ${String(a.actionsParSession).replace(".", ",")} actions par session`}>
-            <Barres lignes={a.actions} />
-          </Section>
-          <Section titre="Pages les plus vues">
-            <Barres lignes={a.pages} />
-          </Section>
-          <Section id="rubriques" titre="Fréquentation des rubriques" sous="Ce qui prend, semaine après semaine.">
-            <Rubriques evenements={vu.evenements} effectif={vu.profiles.length} now={data.now} />
-          </Section>
-
-          {blocs?.videos(public_, vu.ensembleAdmins)}
-          {blocs?.agent(public_, vu.ensembleAdmins)}
-
-          <Chapitre id="revenu" rang={4} titre="Revenu" question="Qu'est-ce que Bola gagne ?" />
-          {blocs?.revenu(a.depuis, a.chiffres.actifs.valeur, gardeId)}
-
-          <Chapitre id="recommandation" rang={5} titre="Recommandation" question="Font-ils venir les autres ?" />
-          {blocs?.parrainage()}
-          {/* 6 bis. Qui ramène du monde */}
-          {liens && data?.reperes && vu && (
-            <QuiRamene
-              analyse={liens}
-              tousLiens={data.reperes.liens}
-              deduites={data.reperes.deduites}
-              libellePeriode={libellePeriode}
-              admins={vu.ensembleAdmins}
-              onFiche={setFiche}
-            />
-          )}
-
-          <div className="px-1 pt-6">
-            <h2 className="text-titre-l leading-none font-extrabold tracking-tight">Annexes</h2>
-          </div>
-          {/* 10. Par joueur */}
-          <section id="activite-joueurs" className="scroll-mt-16">
-            <div className="mb-2.5 flex items-center justify-between px-1">
-              <h2 className="text-titre font-bold tracking-tight">Par joueur</h2>
-              <div className="glass-soft flex rounded-full p-0.5">
-                {(
-                  [
-                    ["recent", "Récents"],
-                    ["temps", "Temps"],
-                    ["actions", "Actions"],
-                  ] as const
-                ).map(([id, label]) => (
-                  <button
-                    key={id}
-                    onClick={() => setTri(id)}
+                    key={m.id}
+                    onClick={() => setMetrique(m.id)}
                     className={cn(
-                      "rounded-full px-2.5 py-1 text-legende font-bold transition-colors",
-                      tri === id ? "bg-foreground text-background" : "text-encre-3"
+                      "shrink-0 px-3 py-1.5 text-petit font-semibold",
+                      metrique === m.id ? "bouton-principal" : "bouton-secondaire text-encre-3"
                     )}
                   >
-                    {label}
+                    {m.court}
                   </button>
                 ))}
               </div>
-            </div>
-            <div className="glass-soft overflow-hidden rounded-[24px]">
-              {joueursTries.map((p) => (
-                <button
-                  key={p.name}
-                  onClick={() => setFiche(p.name)}
-                  className="flex w-full items-center gap-3 border-b border-foreground/5 px-3.5 py-3 text-left last:border-0"
-                >
-                  <span className="min-w-0 flex-1">
-                    <span className="flex items-baseline justify-between gap-3">
-                      <span className="truncate text-ligne font-semibold">{p.name}</span>
-                      <span className="shrink-0 text-corps font-bold tabular-nums">{duree(p.temps)}</span>
-                    </span>
-                    <span className="mt-0.5 block text-petit leading-snug text-encre-3">
-                      Vu {relative(p.last, a.now)} · {p.sessions} {p.sessions > 1 ? "sessions" : "session"}, {duree(p.moyenne)} en moyenne · {p.jours} j actifs · {milliers(p.actions)} actions · arrivé le {jjmm(p.premier)}
-                    </span>
+              <p className="mono-label mt-4 text-micro text-encre-3">
+                {METRIQUES.find((m) => m.id === metrique)?.label}
+              </p>
+              <div className="mt-1 flex items-baseline gap-2.5">
+                <span className="text-titre-m font-extrabold tracking-tight tabular-nums">{courbe.titre}</span>
+                <Delta c={courbe.c} />
+              </div>
+              <div className="mt-3">
+                <Courbe
+                  points={courbe.points}
+                  avant={courbe.avant}
+                  format={format}
+                  creux={a.creux}
+                  marques={marques}
+                  actif={iChoisi >= 0 ? iChoisi : null}
+                  onActif={(i) => setJourChoisi(i === null ? null : (courbe.points[i]?.t ?? null))}
+                />
+              </div>
+              <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-legende text-encre-3">
+                <span className="flex items-center gap-1.5">
+                  <span className="h-0.5 w-4 rounded bg-foreground" />
+                  {libellePeriode}
+                </span>
+                {courbe.avant && (
+                  <span className="flex items-center gap-1.5">
+                    <span className="h-0 w-4 border-t-[1.5px] border-dashed border-foreground/40" />
+                    {`les ${jours} jours d'avant`}
                   </span>
-                  <Mail className={cn("size-3.5 shrink-0", p.email ? "text-foreground" : "text-foreground/15")} />
-                </button>
-              ))}
-              {joueursTries.length === 0 && (
-                <p className="px-4 py-8 text-center text-corps text-encre-3">
-                  Personne sur cette période — le journal se remplit tout seul.
+                )}
+                <span>Touche un jour : ce que l&apos;app y a fait s&apos;affiche dessous.</span>
+              </div>
+              {courbe.points[iJour] && (
+                <div className="mt-4 border-t border-foreground/8 pt-3.5">
+                  <Pics pics={lesPics} actif={iJour} onChoisir={(i) => setJourChoisi(courbe.points[i]?.t ?? null)} />
+                  <CeJourLa
+                    key={courbe.points[iJour].t}
+                    t={courbe.points[iJour].t}
+                    aujourdhui={iJour === courbe.points.length - 1}
+                    reperes={reperesDuJour?.get(courbe.points[iJour].t) ?? []}
+                    ecart={ecartDuJour(a.serie, a.debutPeriode + iJour, metrique)}
+                    metrique={metrique}
+                    format={format}
+                  />
+                </div>
+              )}
+            </section>
+            </>
+          )}
+
+          {partie === "acquisition" && (
+            <>
+            <Conseils liste={conseilsDe("acquisition")} masques={masques} />
+            <Acquisition
+              site={data.site}
+              profiles={vu.profiles}
+              canaux={data.canaux}
+              jours={courbe.points.map((p) => p.t)}
+              depuis={a.depuis}
+            />
+            {/* 8 bis. Les pays choisis pour la carte */}
+            <Section
+              id="pays"
+              titre="Pays choisis pour la carte"
+              sous={
+                pays && pays.joueurs > 0
+                  ? `Le dernier drapeau de chaque joueur au studio photo · ${pays.joueurs} ${pays.joueurs > 1 ? "joueurs" : "joueur"}, ${pays.cartes} ${pays.cartes > 1 ? "cartes" : "carte"}.`
+                  : "Le dernier drapeau de chaque joueur au studio photo."
+              }
+            >
+              {pays && pays.lignes.length > 0 ? (
+                <div className="flex flex-col gap-2.5">
+                  {pays.lignes.map((l) => (
+                    <div key={l.id} className="flex items-center gap-3">
+                      <span className="w-[44%] shrink-0 truncate text-corps font-medium">
+                        <span className="mr-1.5">{l.drapeau}</span>
+                        {l.nom}
+                      </span>
+                      <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-foreground/8">
+                        <span className="block h-full rounded-full bg-foreground/70" style={{ width: `${(l.n / pays.joueurs) * 100}%` }} />
+                      </span>
+                      <span className="w-10 shrink-0 text-right text-petit font-bold tabular-nums">{pct(l.n / pays.joueurs)}</span>
+                      <span className="w-6 shrink-0 text-right text-legende text-encre-3 tabular-nums">{l.n}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-corps text-encre-3">
+                  Aucun pays enregistré pour l&apos;instant : ils s&apos;enregistrent depuis le 22/10, à chaque carte au drapeau.
                 </p>
               )}
-            </div>
-          </section>
+              {pays && pays.sansPays > 0 && (
+                <p className="mt-3 text-legende leading-snug text-encre-3">
+                  {pays.sansPays} {pays.sansPays > 1 ? "cartes au drapeau faites" : "carte au drapeau faite"} avant le 22/10, sans pays enregistré.
+                </p>
+              )}
+            </Section>
+            </>
+          )}
 
-          {/* 11. Les emails collectés */}
-          <section className="glass rounded-3xl p-5">
-            <p className="mono-label text-encre-2">
-              Emails collectés · {emails.length}/{a.comptes}
-            </p>
-            {emails.length > 0 ? (
-              <div className="mt-3 flex flex-col gap-1.5">
-                {emails.map((p) => (
-                  <div key={p.name} className="flex items-baseline justify-between gap-3">
-                    <span className="text-corps font-semibold">{p.name}</span>
-                    <span className="mono-label min-w-0 truncate text-encre-3">{p.contact_email}</span>
+          {partie === "activation" && (
+            <>
+            <Conseils liste={conseilsDe("activation")} masques={masques} />
+            <ActivationEntonnoir a={activation!} onFiche={setFiche} />
+            {/* 3 bis. À suivre de près : les nouveaux venus très engagés */}
+            {suivre.length > 0 && (
+              <Section
+                id="suivre"
+                titre="À suivre de près"
+                sous="Arrivés depuis moins de 14 jours, bien plus présents que les autres dans leurs premières 24 h. Touche un nom pour sa fiche."
+              >
+                <div className="flex flex-col">
+                  {suivre.map((j) => (
+                    <button
+                      key={j.name}
+                      onClick={() => setFiche(j.name)}
+                      className="flex items-center gap-3 border-b border-foreground/6 py-2.5 text-left last:border-0"
+                    >
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-ligne font-semibold">{j.name}</span>
+                        <span className="block text-petit text-encre-3">
+                          {duree(j.ms)} dans ses premières 24 h · {Math.round(j.fois)} fois la médiane · arrivé le {jjmm(j.premier)}
+                        </span>
+                      </span>
+                      <ChevronRight className="size-4 shrink-0 text-encre-3" />
+                    </button>
+                  ))}
+                </div>
+              </Section>
+            )}
+
+            {/* 3 ter. Les nouveaux arrivants : SFL et Bola à part, leur carte, ce qu'ils ont fait */}
+            {vu && data && (
+              <Section id="nouveaux" titre="Nouveaux arrivants">
+                <NouveauxArrivants
+                  evenements={data.evenements}
+                  profiles={data.profiles}
+                  parrains={data.parrains}
+                  parcours={data.parcours}
+                  now={data.now}
+                  onFiche={setFiche}
+                />
+              </Section>
+            )}
+
+            {/* 6. Ce qui fait revenir */}
+            {a.leviers.length > 0 && (
+              <Section
+                titre="Ce qui fait revenir"
+                sous="Pendant leur première semaine, l'ont-ils fait ? Puis : sont-ils revenus après 7 jours ? Joueurs arrivés il y a 14 jours ou plus."
+              >
+                <div className="flex flex-col gap-4">
+                  {a.leviers.map((l) => (
+                    <Comparaison
+                      key={l.id}
+                      label={l.label}
+                      avec={l.avecRevenus / l.avec}
+                      sans={l.sansRevenus / l.sans}
+                      nAvec={l.avec}
+                      nSans={l.sans}
+                    />
+                  ))}
+                </div>
+              </Section>
+            )}
+            </>
+          )}
+
+          {partie === "retention" && (
+            <>
+            <Conseils liste={conseilsDe("retention")} masques={masques} />
+            {/* 5. La rétention */}
+            <Section id="cohortes" titre="Combien reviennent" sous="Sur tout l'historique. Revenu après N jours : rouvert l'app N jours ou plus après sa première venue.">
+              <div className="flex flex-col gap-2.5">
+                {a.retention
+                  .filter((r) => r.eligibles > 0)
+                  .map((r) => (
+                    <div key={r.jours} className="flex items-center gap-3">
+                      <span className="w-[104px] shrink-0 text-corps font-medium whitespace-nowrap">
+                        Après {r.jours} {r.jours === 1 ? "jour" : "jours"}
+                      </span>
+                      <span className="h-2 flex-1 overflow-hidden rounded-full bg-foreground/8">
+                        <span className="block h-full rounded-full bg-foreground/80" style={{ width: `${(r.revenus / r.eligibles) * 100}%` }} />
+                      </span>
+                      <span className="w-10 shrink-0 text-right text-petit font-bold tabular-nums">{pct(r.revenus / r.eligibles)}</span>
+                      <span className="w-11 shrink-0 text-right text-legende text-encre-3 tabular-nums">
+                        {r.revenus}/{r.eligibles}
+                      </span>
+                    </div>
+                  ))}
+              </div>
+              <p className="mono-label mt-6 mb-2 text-micro text-encre-3">Par semaine d&apos;arrivée · % encore actifs</p>
+              <Cohortes cohortes={a.cohortes} />
+              <p className="mt-2 text-legende leading-snug text-encre-3">
+                Chaque ligne : les joueurs arrivés la semaine du lundi indiqué (et combien). S0 = leur première semaine,
+                +1 la suivante, etc. Plus la case est foncée, plus ils sont restés.
+              </p>
+            </Section>
+
+            {/* 4. Qui est là */}
+            <Section id="qui" titre="Qui est là aujourd'hui" sous={`${totalFamilles} comptes, rangés selon leur dernière venue.`}>
+              <div className="flex h-3 overflow-hidden rounded-full">
+                {a.familles.map((f) =>
+                  f.noms.length ? (
+                    <span
+                      key={f.id}
+                      className="h-full border-r-2 border-background last:border-0"
+                      style={{ width: `${(f.noms.length / Math.max(1, totalFamilles)) * 100}%`, background: encre(TEINTE[f.id]) }}
+                    />
+                  ) : null
+                )}
+              </div>
+              <div className="mt-3 flex flex-col">
+                {a.familles.map((f) => (
+                  <div key={f.id} className="border-b border-foreground/6 last:border-0">
+                    <button
+                      onClick={() => setOuverte((o) => (o === f.id ? null : f.id))}
+                      className="flex w-full items-center gap-3 py-2.5 text-left"
+                    >
+                      <span className="size-2.5 shrink-0 rounded-full ring-1 ring-foreground/15" style={{ background: encre(TEINTE[f.id]) }} />
+                      <span className="min-w-0 flex-1">
+                        <span className="text-ligne font-semibold">{f.label}</span>
+                        <span className="block text-petit text-encre-3">{f.note}</span>
+                      </span>
+                      <span className="text-lecture font-extrabold tabular-nums">{f.noms.length}</span>
+                      <ChevronDown className={cn("size-3.5 text-encre-4 transition-transform", ouverte === f.id && "rotate-180")} />
+                    </button>
+                    {ouverte === f.id && (
+                      <p className="pb-3 pl-5.5 text-petit leading-relaxed text-encre-3">
+                        {f.noms.length ? [...f.noms].sort((x, y) => x.localeCompare(y, "fr")).join(", ") : "Personne."}
+                      </p>
+                    )}
                   </div>
                 ))}
               </div>
-            ) : (
-              <p className="mt-2 text-corps text-encre-3">
-                Aucun pour l&apos;instant — chaque joueur est invité à laisser le sien en tête du fil et dans Réglages.
-              </p>
+            </Section>
+
+            {/* 9. À relancer */}
+            {a.aRelancer.length > 0 && (
+              <Section titre="À relancer" sous="Venus plusieurs jours, plus vus depuis une semaine ou plus.">
+                <div className="flex flex-col">
+                  {a.aRelancer.map((j) => (
+                    <button
+                      key={j.name}
+                      onClick={() => setFiche(j.name)}
+                      className="flex items-center gap-3 border-b border-foreground/6 py-2.5 text-left last:border-0"
+                    >
+                      <span className="min-w-0 flex-1 truncate text-ligne font-semibold">{j.name}</span>
+                      <span className="mono-label text-micro whitespace-nowrap text-encre-3">{j.jours} j venus</span>
+                      <span className="mono-label text-right text-micro whitespace-nowrap text-encre-3">{relative(j.last, a.now)}</span>
+                      <Mail className={cn("size-3.5", j.email ? "text-foreground" : "text-foreground/15")} />
+                    </button>
+                  ))}
+                </div>
+              </Section>
             )}
-          </section>
 
-          {blocs?.accords(public_, vu.ensembleAdmins)}
+            {/* 6 ter. Les notifications */}
+            {vu && data && (
+              <NotifsStats
+                key={data.now}
+                public={public_}
+                admins={vu.ensembleAdmins}
+                jours={jours}
+                actifs={actifs}
+                now={data.now}
+                onJoueur={setFiche}
+              />
+            )}
 
-          <p className="px-1 pb-2 text-legende leading-relaxed text-encre-4">
-            {milliers(a.evenementsLus)} événements lus, depuis le {a.serie[0] ? jjmm(a.serie[0].t) : "—"}. Une session,
-            c&apos;est un onglet ouvert ; sa durée, c&apos;est le temps passé au premier plan, mesuré par ses signes de vie
-            (l&apos;app en émet un toutes les 90 secondes tant qu&apos;elle est au premier plan) ; un silence de plus de
-            5 minutes n&apos;est pas compté. Les visites de moins de 30 secondes ne comptent pas dans les durées.
-          </p>
+            {/* 8. Ce qu'ils font */}
+            <Section titre="Ce qu'ils font" sous={`${a.chiffres.sessions.valeur} sessions ${libellePeriode} · médiane ${duree(a.dureeMediane)} · ${String(a.actionsParSession).replace(".", ",")} actions par session`}>
+              <Barres lignes={a.actions} />
+            </Section>
+            <Section titre="Pages les plus vues">
+              <Barres lignes={a.pages} />
+            </Section>
+            <Section id="rubriques" titre="Fréquentation des rubriques" sous="Ce qui prend, semaine après semaine.">
+              <Rubriques evenements={vu.evenements} effectif={vu.profiles.length} now={data.now} />
+            </Section>
+            </>
+          )}
+
+          {partie === "heures" && (
+            <>
+            {/* 7. Quand */}
+            <Section id="quand" titre="Quand la ligue ouvre l'app" sous={`Présences par jour et par heure, ${libellePeriode}.`}>
+              <CarteHoraire carte={a.carte} />
+            </Section>
+            </>
+          )}
+
+          {partie === "videos" && (
+            <>
+            {blocs?.videos(public_, vu.ensembleAdmins)}
+            {blocs?.agent(public_, vu.ensembleAdmins)}
+            </>
+          )}
+
+          {partie === "revenu" && (
+            <>
+            {blocs?.revenu(a.depuis, a.chiffres.actifs.valeur, gardeId)}
+            </>
+          )}
+
+          {partie === "recommandation" && (
+            <>
+            {blocs?.parrainage()}
+            {/* 6 bis. Qui ramène du monde */}
+            {liens && data?.reperes && vu && (
+              <QuiRamene
+                analyse={liens}
+                tousLiens={data.reperes.liens}
+                deduites={data.reperes.deduites}
+                libellePeriode={libellePeriode}
+                admins={vu.ensembleAdmins}
+                onFiche={setFiche}
+              />
+            )}
+            </>
+          )}
+
+          {partie === "joueurs" && (
+            <>
+            {/* 10. Par joueur */}
+            <section id="activite-joueurs" className="scroll-mt-16">
+              <div className="mb-2.5 flex items-center justify-between px-1">
+                <h2 className="text-titre font-bold tracking-tight">Par joueur</h2>
+                <div className="glass-soft flex rounded-full p-0.5">
+                  {(
+                    [
+                      ["recent", "Récents"],
+                      ["temps", "Temps"],
+                      ["actions", "Actions"],
+                    ] as const
+                  ).map(([id, label]) => (
+                    <button
+                      key={id}
+                      onClick={() => setTri(id)}
+                      className={cn(
+                        "rounded-full px-2.5 py-1 text-legende font-bold transition-colors",
+                        tri === id ? "bg-foreground text-background" : "text-encre-3"
+                      )}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="glass-soft overflow-hidden rounded-[24px]">
+                {joueursTries.map((p) => (
+                  <button
+                    key={p.name}
+                    onClick={() => setFiche(p.name)}
+                    className="flex w-full items-center gap-3 border-b border-foreground/5 px-3.5 py-3 text-left last:border-0"
+                  >
+                    <span className="min-w-0 flex-1">
+                      <span className="flex items-baseline justify-between gap-3">
+                        <span className="truncate text-ligne font-semibold">{p.name}</span>
+                        <span className="shrink-0 text-corps font-bold tabular-nums">{duree(p.temps)}</span>
+                      </span>
+                      <span className="mt-0.5 block text-petit leading-snug text-encre-3">
+                        Vu {relative(p.last, a.now)} · {p.sessions} {p.sessions > 1 ? "sessions" : "session"}, {duree(p.moyenne)} en moyenne · {p.jours} j actifs · {milliers(p.actions)} actions · arrivé le {jjmm(p.premier)}
+                      </span>
+                    </span>
+                    <Mail className={cn("size-3.5 shrink-0", p.email ? "text-foreground" : "text-foreground/15")} />
+                  </button>
+                ))}
+                {joueursTries.length === 0 && (
+                  <p className="px-4 py-8 text-center text-corps text-encre-3">
+                    Personne sur cette période — le journal se remplit tout seul.
+                  </p>
+                )}
+              </div>
+            </section>
+            </>
+          )}
+
+          {partie === "accords" && (
+            <>
+            {blocs?.accords(public_, vu.ensembleAdmins)}
+
+            <p className="px-1 pb-2 text-legende leading-relaxed text-encre-4">
+              {milliers(a.evenementsLus)} événements lus, depuis le {a.serie[0] ? jjmm(a.serie[0].t) : "—"}. Une session,
+              c&apos;est un onglet ouvert ; sa durée, c&apos;est le temps passé au premier plan, mesuré par ses signes de vie
+              (l&apos;app en émet un toutes les 90 secondes tant qu&apos;elle est au premier plan) ; un silence de plus de
+              5 minutes n&apos;est pas compté. Les visites de moins de 30 secondes ne comptent pas dans les durées.
+            </p>
+            </>
+          )}
 
         </>
       )}
