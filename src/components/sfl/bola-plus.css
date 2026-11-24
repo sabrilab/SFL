@@ -253,6 +253,12 @@
   font-weight: 600;
   color: rgb(255 255 255 / 0.78);
 }
+.bp-ouverture__facture {
+  margin-top: -6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: rgb(255 255 255 / 0.66);
+}
 
 /* ── 2, 3 · Les cartes de texte (Ta carte, Bola Plus) : la nuit violette en
    sombre, le papier lilas en clair. ── */

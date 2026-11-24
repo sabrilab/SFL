@@ -208,6 +208,44 @@ function Titre({ niveau = 2, children, className }: { niveau?: 1 | 2; children: 
 
 /* ------------------------------ L'offre ------------------------------ */
 
+/**
+ * Le bouton Mensuel / Annuel (Sabri, 23/11 : « comme dans Wispr Flow »), sur
+ * l'annuel au départ : celui de « Ton prix » et celui de l'ouverture, qui
+ * partagent le même choix.
+ */
+function BasculeFormule({ affichee, occupe, onChoisir }: { affichee: Formule; occupe?: boolean; onChoisir: (f: Formule) => void }) {
+  // Les flèches passent d'une formule à l'autre, comme dans tout groupe de choix ; elles ne font pas tourner le carrousel.
+  function fleches(e: KeyboardEvent<HTMLDivElement>) {
+    const pas = e.key === "ArrowDown" || e.key === "ArrowRight" ? 1 : e.key === "ArrowUp" || e.key === "ArrowLeft" ? -1 : 0;
+    if (!pas) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const boutons = [...e.currentTarget.querySelectorAll<HTMLButtonElement>('[role="radio"]')];
+    const i = (Math.max(0, boutons.indexOf(document.activeElement as HTMLButtonElement)) + pas + FORMULES.length) % FORMULES.length;
+    boutons[i]?.focus();
+    onChoisir(FORMULES[i]);
+  }
+
+  return (
+    <div role="radiogroup" aria-label="Formule" onKeyDown={fleches} className="bp-bascule">
+      {FORMULES.map((f) => (
+        <button
+          key={f}
+          type="button"
+          role="radio"
+          aria-checked={affichee === f}
+          tabIndex={affichee === f ? 0 : -1}
+          disabled={occupe}
+          onClick={(e) => (e.stopPropagation(), onChoisir(f))}
+          className={cn("bp-bascule__choix", affichee === f && "bp-bascule__choix--choisi")}
+        >
+          {NOM_FORMULE[f]}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 /** L'offre de « Ton prix » : les deux formules à toucher, puis « Je suis intéressé ». */
 export function OffreBolaPlus({
   plus,
@@ -255,37 +293,11 @@ export function OffreBolaPlus({
     annuler();
   }
 
-  // Les flèches passent d'une formule à l'autre, comme dans tout groupe de choix ; elles ne font pas tourner le carrousel.
-  function fleches(e: KeyboardEvent<HTMLDivElement>) {
-    const pas = e.key === "ArrowDown" || e.key === "ArrowRight" ? 1 : e.key === "ArrowUp" || e.key === "ArrowLeft" ? -1 : 0;
-    if (!pas) return;
-    e.preventDefault();
-    e.stopPropagation();
-    const boutons = [...e.currentTarget.querySelectorAll<HTMLButtonElement>('[role="radio"]')];
-    const i = (Math.max(0, boutons.indexOf(document.activeElement as HTMLButtonElement)) + pas + FORMULES.length) % FORMULES.length;
-    boutons[i]?.focus();
-    choisir(FORMULES[i]);
-  }
 
   return (
     <div className="flex flex-col gap-3">
       {/* Le bouton Mensuel / Annuel (Sabri, 23/11 : « comme dans Wispr Flow »), sur l'annuel au départ. */}
-      <div role="radiogroup" aria-label="Formule" onKeyDown={fleches} className="bp-bascule">
-        {FORMULES.map((f) => (
-          <button
-            key={f}
-            type="button"
-            role="radio"
-            aria-checked={affichee === f}
-            tabIndex={affichee === f ? 0 : -1}
-            disabled={occupe}
-            onClick={() => choisir(f)}
-            className={cn("bp-bascule__choix", affichee === f && "bp-bascule__choix--choisi")}
-          >
-            {NOM_FORMULE[f]}
-          </button>
-        ))}
-      </div>
+      <BasculeFormule affichee={affichee} occupe={occupe} onChoisir={choisir} />
       {/* Les deux faces au même endroit : la carte garde sa hauteur quand on bascule. */}
       <div className="bp-offre">
         {FORMULES.map((f) => {
@@ -355,8 +367,14 @@ function useHauteur(ref: RefObject<HTMLElement | null>) {
 }
 
 /** 1 · L'ouverture : le stade teint, le gros logo BOLA et le sigle SFL dessous, les deux parts, le prix premiers joueurs. */
-function DiapoOuverture() {
-  const p = PRIX_FORMULE.mensuel;
+function DiapoOuverture({ plus, choix, onChoix }: { plus: BolaPlus; choix: Formule | null; onChoix: (f: Formule | null) => void }) {
+  // Le même choix que « Ton prix » (Sabri, 23/11 : l'ouverture « ressemble à la dernière ») : l'annuel coché au départ.
+  const affichee: Formule = (plus.interet ? plus.interet.formule : choix) ?? "annuel";
+  const p = PRIX_FORMULE[affichee];
+  function choisir(f: Formule) {
+    if (!plus.interet) onChoix(f);
+    else if (plus.interet.formule !== f) plus.noter(f);
+  }
   return (
     <div className="bp-ouverture dark" style={{ ["--teinte" as string]: AFFICHE.teinte }}>
       {/* eslint-disable-next-line @next/next/no-img-element -- déjà à ses trois tailles (public/bola-plus) */}
@@ -388,12 +406,14 @@ function DiapoOuverture() {
           <EtiquettePart part="sfl" />
         </div>
         <span className="bp-etiquette-prix">Prix premiers joueurs</span>
+        <BasculeFormule affichee={affichee} occupe={plus.occupe} onChoisir={choisir} />
         <p className="flex items-baseline gap-2 whitespace-nowrap">
           <span className="bp-ouverture__prix tabular-nums" style={{ fontFamily: ANTON }}>
-            {p.euros}&nbsp;€
+            {p.mois}&nbsp;€
           </span>
-          <span className="bp-ouverture__par">/ {p.par}</span>
+          <span className="bp-ouverture__par">/ mois</span>
         </p>
+        <p className="bp-ouverture__facture tabular-nums">{p.facture}</p>
         <CompteAReboursBolaPlus variante="grand" />
       </div>
     </div>
@@ -744,7 +764,7 @@ export function PageBolaPlus() {
   }
 
   function rendu(d: Diapo) {
-    if (d.id === "ouverture") return <DiapoOuverture />;
+    if (d.id === "ouverture") return <DiapoOuverture plus={plus} choix={choix} onChoix={setChoix} />;
     if (d.id === "prix") return <DiapoPrix plus={plus} choix={choix} onChoix={setChoix} actionRef={actionRef} />;
     if ("avantage" in d) {
       const v = d.avantage.visuel;
