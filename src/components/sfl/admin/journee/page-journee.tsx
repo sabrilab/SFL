@@ -32,6 +32,8 @@
 // Le brouillon se compose seul (20/11/2026) : chaque nouveau « Je viens »
 // entre sur un terrain sans rien déplacer, et la journée se met en ligne
 // d'elle-même le vendredi à 19 h (sa pastille le dit : « en ligne ven. 19:00 »).
+// Sur ses terrains, la carte d'un joueur qui a lui-même dit « Je viens » porte
+// une pastille verte cochée ; celle d'un joueur posé sans réponse, rien (24/11/2026).
 //
 // La journée en suspens (Ilyes, 12/11/2026, saisie/suspens.ts) : une fois le
 // coup d'envoi passé, « Suspendre » se tient à côté du geste du moment (avant,
@@ -194,6 +196,14 @@ export function PageJournee() {
     () => (convocationDuJour ? new Set([...presence.presents, ...presence.remplacants]) : new Set<string>()),
     [convocationDuJour, presence.presents, presence.remplacants]
   );
+
+  // Brouillon : ceux qui ont eux-mêmes dit « Je viens » (pas ceux qu'on a posés
+  // pour soi) portent une pastille verte sur leur carte du terrain (24/11/2026).
+  const vient = useMemo(() => {
+    if (etat !== "brouillon" || !convocationDuJour) return undefined;
+    const oui = new Set(presence.jeViens.map((n) => n.trim().toLowerCase()));
+    return (nom: string) => oui.has(nom.trim().toLowerCase());
+  }, [etat, convocationDuJour, presence.jeViens]);
 
   // Les « Je viens » de ce dimanche qui ne sont pas encore sur les terrains, posés d'un geste.
   const proposition = useMemo(
@@ -564,6 +574,7 @@ export function PageJournee() {
                 onFeuille={setFeuilleOuverte}
                 zone={zoneTerrain}
                 survol={etat === "brouillon" || etat === "en-ligne" ? survol : undefined}
+                vient={vient}
               />
               {matchs.length > 0 && matchs.every((m) => !m.noirs.length && !m.blancs.length) === false && (
                 <p className="mono-label text-encre-3">{compteursEnMots(saison, j)}</p>

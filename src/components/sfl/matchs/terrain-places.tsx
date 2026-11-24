@@ -24,9 +24,12 @@
 // (Ilyes, 02/11/2026 : la fiche du match, usePucesBola). La carte est un
 // bouton nommé : ses titres sont dits dans son nom (« Ilyes, MVP »), le nom
 // du bouton couvrant celui des puces.
+// Sur le terrain d'un brouillon (l'admin, 24/11/2026), la carte d'un joueur
+// qui a répondu lui-même « Je viens » porte une pastille verte cochée sur son
+// coin haut droit (`vient`) ; un joueur posé sans avoir répondu n'en a pas.
 
 import { useMemo } from "react";
-import { Plus, X } from "lucide-react";
+import { Check, Plus, X } from "lucide-react";
 import { useSeason } from "@/components/sfl/season-provider";
 import { CADRE_H, Pastille } from "@/components/sfl/matchs/feuille-de-match";
 import { SolTerrain } from "@/components/sfl/matchs/sol-terrain";
@@ -46,11 +49,15 @@ export interface Occupant {
   reste?: string;
   /** Ses titres du match, une fois attribués : ses puces (Bola : le MVP d'un match validé, rien d'autre). */
   titres?: readonly BoostType[];
+  /** Il a répondu lui-même « Je viens » : une pastille verte cochée sur sa carte (le terrain d'un brouillon). */
+  vient?: boolean;
 }
 
 const BLANC = { fond: "#f4f3ef", encre: "#0a0b0d" };
 const NOIR = { fond: "#0a0b0d", encre: "#f4f3ef" };
 const prenom = (nom: string) => nom.split(" ")[0];
+/** Le vert de « complet » (globals.css, .stk--vert). */
+const VERT = "#1fa055";
 
 /** Une équipe seule (mode Team), sur tout le terrain : gardien, 2, 1, 2, 1 — en fractions (largeur, profondeur depuis le fond). */
 const FORMATION: [number, number][] = [
@@ -161,7 +168,14 @@ export function TerrainPlaces({
                         onOccupant && retirable && !cestMoi
                           ? `Retirer ${occupant.nom}`
                           : // Le nom du bouton couvre celui des puces : ses titres y sont dits.
-                            [occupant.nom, occupant.enAttente && "invité", ...(occupant.titres ?? []).map((t) => NOM_PUCE[t])].filter(Boolean).join(", ")
+                            [
+                              occupant.nom,
+                              occupant.enAttente && "invité",
+                              occupant.vient && "a dit Je viens",
+                              ...(occupant.titres ?? []).map((t) => NOM_PUCE[t]),
+                            ]
+                              .filter(Boolean)
+                              .join(", ")
                       }
                       className={cn(
                         "relative flex rounded-[15px] transition-transform active:scale-95 disabled:active:scale-100",
@@ -180,6 +194,7 @@ export function TerrainPlaces({
                           <X className="size-[10px]" strokeWidth={3.2} />
                         </span>
                       )}
+                      {occupant.vient && !(retirable && onOccupant && !cestMoi) && <PastilleVient echelle={k} />}
                       <PucesTitres titres={occupant.titres ?? []} echelle={k} />
                     </button>
                     <span
@@ -220,5 +235,30 @@ export function TerrainPlaces({
         })}
       </div>
     </div>
+  );
+}
+
+/**
+ * « Je viens » : une pastille verte cochée, un peu au dehors du coin haut
+ * droit de la carte. Elle garde à peu près sa taille à l'écran sur une carte
+ * réduite au fond du terrain, comme les puces des titres.
+ */
+function PastilleVient({ echelle }: { echelle: number }) {
+  const d = Math.min(22, Math.max(15, 16 / (echelle || 1)));
+  return (
+    <span
+      aria-hidden
+      className="pointer-events-none absolute z-[1] grid place-items-center rounded-full text-white"
+      style={{
+        width: d,
+        height: d,
+        top: -d * 0.3,
+        right: -d * 0.3,
+        background: VERT,
+        boxShadow: `0 0 0 ${Math.max(1.5, d * 0.1)}px rgba(255,255,255,0.95), 0 0 0 ${Math.max(2, d * 0.1 + 0.75)}px rgba(0,0,0,0.2)`,
+      }}
+    >
+      <Check style={{ width: d * 0.64, height: d * 0.64 }} strokeWidth={3.4} />
+    </span>
   );
 }
