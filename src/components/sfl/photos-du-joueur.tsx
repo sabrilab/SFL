@@ -15,15 +15,10 @@ import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useIdentites } from "@/hooks/use-identites";
 import { usePlayerPhoto } from "@/hooks/use-player-photo";
-import { dateCourte, photosApercu, photosDuJoueur, type PhotoJournee } from "@/lib/sfl/photos-journees";
+import { dateCourte, photosDuJoueur, type PhotoJournee } from "@/lib/sfl/photos-journees";
 
-export function PhotosDuJoueur({ nom, moi = false, className }: { nom: string; moi?: boolean; className?: string }) {
-  const [apercu, setApercu] = useState<PhotoJournee[] | null>(null);
-  useEffect(() => setApercu(moi ? photosApercu() : null), [moi]);
-  const jours = useMemo(
-    () => photosDuJoueur(nom, apercu ? apercu.map((p) => ({ ...p, joueurs: [...p.joueurs, nom] })) : undefined),
-    [nom, apercu]
-  );
+export function PhotosDuJoueur({ nom, className }: { nom: string; className?: string }) {
+  const jours = useMemo(() => photosDuJoueur(nom), [nom]);
   const toutes = useMemo(() => jours.flatMap((j) => j.photos), [jours]);
   const [ouverte, setOuverte] = useState<number | null>(null);
   if (toutes.length === 0) return null;

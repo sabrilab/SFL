@@ -75,15 +75,3 @@ export function dateCourte(date: string): string {
   const d = new Date(`${date}T12:00:00`);
   return d.toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "short" });
 }
-
-/**
- * Aperçu seulement (jamais en production) : ?photos=id,id,… montre ces photos
- * sur ma grille, pour juger l'interface avant que les tags soient posés.
- */
-export function photosApercu(): PhotoJournee[] | null {
-  if (process.env.NEXT_PUBLIC_BOLA_ENV === "production" || typeof window === "undefined") return null;
-  const q = new URLSearchParams(window.location.search).get("photos");
-  if (!q) return null;
-  const ids = q.split(",");
-  return ids.map((id) => PHOTOS_JOURNEES.find((p) => p.id === id)).filter((p): p is PhotoJournee => !!p);
-}

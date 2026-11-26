@@ -244,7 +244,7 @@ function ProfilJoueurPage() {
           {/* Mes photos, juste sous ma phrase sur téléphone, comme la grille
               sous la bio d'Instagram ; sur ordinateur, en tête de la grande
               colonne, à côté de ma carte. */}
-          <PhotosDuJoueur nom={player.name} moi className="lg:hidden" />
+          <PhotosDuJoueur nom={player.name} className="lg:hidden" />
           {/* Ma photo, ma carte officielle (photo au maillot Bola) tant
               qu'elle n'est pas faite, le badge de ma carte. Sans elle, les
               deux ronds se centrent. */}
@@ -283,7 +283,7 @@ function ProfilJoueurPage() {
               ma-carte/rubriques.tsx) */}
           {/* Mes photos des journées, comme la grille d'un compte Instagram
               (photos-du-joueur.tsx, Bola, 26/11) : ici sur ordinateur */}
-          <PhotosDuJoueur nom={player.name} moi className="hidden lg:block" />
+          <PhotosDuJoueur nom={player.name} className="hidden lg:block" />
           <RubriquesMaCarte />
 
           {/* 6. Se déconnecter */}
