@@ -9,9 +9,9 @@
 // plus récente journée d'abord.
 //
 // Étape de maquette : la liste est écrite ici, à la main, une fois les tags
-// validés avec Bola sur la planche de la journée. Les noms des joueurs de la
-// J7 ne sont pas encore confirmés : `joueurs` reste vide sauf pour la 372
-// (Sid Ali, dit par Bola le 26/11). Une fois l'interface validée, la liste
+// validés avec Bola sur la planche de la journée. J7 : tags dictés par Bola
+// le 26/11 (« Adèle » lu Adel, Selim, Yacine : comptes à confirmer ; 451,
+// des jambes seulement, sans tag). Une fois l'interface validée, la liste
 // passera en base (table et bucket privé, comme les vidéos des Actus).
 
 export interface PhotoJournee {
@@ -39,25 +39,25 @@ const j7 = (id: string, f: typeof L, joueurs: string[] = []): PhotoJournee => ({
 });
 
 export const PHOTOS_JOURNEES: PhotoJournee[] = [
-  j7("365", L),
-  j7("366", L),
-  j7("372", L, ["Sid Ali"]),
-  j7("379", L),
-  j7("384", L),
-  j7("385", L),
-  j7("401", L),
-  j7("414", L),
-  j7("426", L),
-  j7("439", H),
-  j7("447", H),
+  j7("365", L, ["Jouneid", "Zakary"]),
+  j7("366", L, ["Jouneid", "Zakary"]),
+  j7("372", L, ["Sidali"]),
+  j7("379", L, ["Anas", "Youss", "Yamin", "Adel", "Sidali"]),
+  j7("384", L, ["Zakary"]),
+  j7("385", L, ["Adel", "Youss"]),
+  j7("401", L, ["Selim", "Jouneid"]),
+  j7("414", L, ["Zakary"]),
+  j7("426", L, ["Anas", "Sidali", "Abdel"]),
+  j7("439", H, ["Sosso Abdel"]),
+  j7("447", H, ["Nessime"]),
   j7("451", L),
-  j7("459", H),
-  j7("477", H),
-  j7("479", H),
-  j7("480", H),
-  j7("483", H),
-  j7("484", H),
-  j7("485", H),
+  j7("459", H, ["Ibrahim"]),
+  j7("477", H, ["Massi Sidali"]),
+  j7("479", H, ["Kais", "Kamil"]),
+  j7("480", H, ["Kylian"]),
+  j7("483", H, ["Gaïl"]),
+  j7("484", H, ["Kais"]),
+  j7("485", H, ["Yacine"]),
 ];
 
 /** Les photos d'un joueur, groupées par journée, la plus récente d'abord. */
