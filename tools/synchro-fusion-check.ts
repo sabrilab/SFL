@@ -109,22 +109,34 @@ async function main() {
   assert.equal(await envoi, true);
   delai = 0;
 
-  // 4 · Sans point de départ (un appareil d'avant ce correctif) : le conflit reste un conflit.
+  // 4 · Sans point de départ (l'ordinateur de la J8, 26/11) : il ne reste plus
+  // figé sur sa copie. Il reprend la base, garde sa copie, et le dit.
   localStorage.removeItem("sfl-saisie-base");
   base.version++;
   s = plus(localStorageStore.load(), "Théo", { buts: 4 });
   localStorageStore.save(s);
-  assert.equal(await pousser(s), false);
-  assert.equal(sync.dernierEnvoiAuto()?.conflit, true);
-  assert.equal(sync.publicationEnAttente(), true);
-  assert.equal(ligne(localStorageStore.load(), "Théo").buts, 4, "la saisie reste sur l'appareil");
-
-  // 5 · « Reprendre la base » garde une copie de ce qu'elle remplace.
-  assert.deepEqual(await sync.reprendreDeLaBase(), { ok: true });
+  assert.equal(await pousser(s), true);
+  assert.equal(ligne(localStorageStore.load(), "Théo").buts, 3, "la base reprise");
+  assert.equal(ligne(base.data as Saison, "Théo").buts, 3, "rien d'écrasé en base");
   const copie = JSON.parse(localStorage.getItem(sync.COPIE_KEY)!) as { le: string; saison: Saison };
-  assert.equal(ligne(copie.saison, "Théo").buts, 4);
-  assert.equal(ligne(localStorageStore.load(), "Théo").buts, 3);
+  assert.equal(ligne(copie.saison, "Théo").buts, 4, "la copie d'ici gardée");
   assert.equal(sync.publicationEnAttente(), false);
+  assert.ok(sync.repriseNonVue());
+  sync.repriseVue();
+  assert.equal(sync.repriseNonVue(), null);
+  assert.equal(localStorage.getItem("sfl-saison-remote-version"), String(base.version));
+
+  // 5 · Le même appareil à l'ouverture : marqué « à publier », sans point de
+  // départ, la base changée ailleurs. Le rattrapage le remet à jour.
+  localStorage.removeItem("sfl-saisie-base");
+  localStorage.setItem("sfl-saison-a-publier", "1");
+  base.data = plus(base.data as Saison, "Kamil", { buts: 7 });
+  base.version++;
+  assert.equal(await sync.pullSaison(), false, "à publier : rien d'adopté");
+  assert.equal(await sync.rattraperPublication(), true);
+  assert.equal(ligne(localStorageStore.load(), "Kamil").buts, 7);
+  assert.equal(sync.publicationEnAttente(), false);
+  sync.repriseVue();
 
   // 6 · Par saisieStore.save (le chemin de l'app), après la reprise : tout repart.
   assert.deepEqual(saisieStore.save(plus(localStorageStore.load(), "Théo", { buts: 5 })), []);

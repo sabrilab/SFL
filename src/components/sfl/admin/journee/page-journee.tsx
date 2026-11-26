@@ -53,7 +53,7 @@ import { useMyPlayer } from "@/components/sfl/player-provider";
 import { useSeason } from "@/components/sfl/season-provider";
 import { ChoisirJoueurs } from "@/components/sfl/admin/choisir-joueurs";
 import { Confirmer, type Confirmation } from "@/components/sfl/admin/confirmer";
-import { PastilleSynchro, Synchro } from "@/components/sfl/admin/synchro";
+import { AvisReprise, PastilleSynchro, Synchro } from "@/components/sfl/admin/synchro";
 import { ResultatsVotes } from "@/components/sfl/admin/resultats-votes";
 import { GestesVote } from "@/components/sfl/admin/gestes-vote";
 import { DetailPoints } from "@/components/sfl/admin/detail-points";
@@ -421,6 +421,7 @@ export function PageJournee() {
     <div className="flex min-w-0 flex-col gap-4">
       {/* En-tête : le titre de l'onglet et la synchro (la barre admin remplace le retour et ≡). */}
       <Entete titre="Journée" droite={<PastilleSynchro onClick={() => setSynchro(true)} />} />
+      <AvisReprise />
 
       {/* La frise des journées. */}
       <div ref={frise} className="-mx-5 flex gap-1.5 overflow-x-auto px-5 pb-1 [scrollbar-width:none] lg:mx-0 lg:px-0 [&::-webkit-scrollbar]:hidden" role="tablist" aria-label="Journées">
