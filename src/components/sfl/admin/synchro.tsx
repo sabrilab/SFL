@@ -37,6 +37,8 @@ import {
   publicationEnAttente,
   publierSaison,
   reprendreDeLaBase,
+  repriseNonVue,
+  repriseVue,
   SYNC_EVENT,
   type Etape,
 } from "@/lib/sfl/saisie/sync";
@@ -85,6 +87,31 @@ export function lireDefaut(d: string): string {
   if (r === "I10") return "Vue figée";
   if (r === "I11") return `${j} · ${reste} · date illisible`;
   return d;
+}
+
+/**
+ * La reprise d'office (sync.ts, 26/11/2026) : cet appareil était resté sur
+ * une vieille copie, il a repris la base. Dit une fois, en noir.
+ */
+export function AvisReprise() {
+  const subscribe = useCallback((onChange: () => void) => {
+    window.addEventListener(SYNC_EVENT, onChange);
+    window.addEventListener(SAISIE_EVENT, onChange);
+    return () => {
+      window.removeEventListener(SYNC_EVENT, onChange);
+      window.removeEventListener(SAISIE_EVENT, onChange);
+    };
+  }, []);
+  const le = useSyncExternalStore(subscribe, repriseNonVue, () => null);
+  if (!le) return null;
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-2xl bg-foreground px-4 py-3 text-background">
+      <p className="text-corps font-semibold leading-snug">Cet appareil n&apos;était plus à jour : il a repris la base.</p>
+      <button type="button" onClick={repriseVue} className="mono-label shrink-0 rounded-full bg-background px-3 py-1.5 text-foreground">
+        OK
+      </button>
+    </div>
+  );
 }
 
 /** L'état de la synchro en une pastille : ⟳ ✓, ⟳ 1 (en attente), ⟳ ! (refus, conflit). */

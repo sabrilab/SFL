@@ -445,15 +445,15 @@ let relireApres = false;
  * repart de la version de la base. null : pas de fusion possible (pas de
  * point de départ, base illisible, résultat que l'intégrité refuse).
  */
-async function fusionnerAvecLaBase(): Promise<{ saison: Saison; change: boolean } | null> {
+async function fusionnerAvecLaBase(): Promise<{ saison: Saison; change: boolean } | "sans-point" | null> {
   try {
     if (!getSession()?.admin || lectureLocale() === "publique") return null;
-    if (!lireBase()) return null;
+    if (!lireBase()) return "sans-point";
     const doc = await lireDocument(true);
     if (!doc || doc.seed < CURRENT_SEED_VERSION) return null;
     // Relus après l'attente : ce qui a été tapé pendant la lecture en fait partie.
     const base = lireBase();
-    if (!base) return null;
+    if (!base) return "sans-point";
     const f = fusionnerSaisons(base, sansVitrine(localStorageStore.load()), doc.data);
     const saison = f.change ? appliquerMvpAuto(f.saison) : doc.data;
     if (f.change && bloquantsEcriture(nouveauxEcarts(doc.data, saison, {})).length) return null;
@@ -474,6 +474,15 @@ async function envoyer(saison: Saison, forcer: boolean): Promise<boolean> {
   // que de figer celui-ci (trois essais : l'autre peut publier encore).
   for (let essai = 0; essai < 3 && !r.ok && r.conflit && !forcer; essai++) {
     const f = await fusionnerAvecLaBase();
+    // Pas de point de départ pour fusionner : l'appareil reprend la base
+    // (26/11/2026, la J8 : l'ordinateur figé depuis des jours sur sa copie).
+    if (f === "sans-point") {
+      if (await repriseDOffice()) {
+        suivant = null;
+        r = { ok: true };
+      }
+      break;
+    }
     if (!f) break;
     // Une saison attendait derrière cet envoi : elle date d'avant la fusion,
     // elle effacerait ce que l'autre appareil a publié. La fusion la contient.
@@ -656,14 +665,61 @@ export const COPIE_KEY = "sfl-saisie-avant-reprise";
  * 22/11/2026 : deux matchs saisis sur un ordinateur que la base refusait).
  * On en garde la dernière copie sur l'appareil, pour pouvoir la relire.
  */
-function garderCopie() {
+function garderCopie(toujours = false) {
   try {
-    if (!publicationEnAttente()) return;
+    if (!toujours && !publicationEnAttente()) return;
     const brut = localStorage.getItem("sfl-saisie-v1");
     if (brut) localStorage.setItem(COPIE_KEY, `{"le":${JSON.stringify(new Date().toISOString())},"saison":${brut}}`);
   } catch {
     /* stockage plein ou indisponible : la reprise passe quand même */
   }
+}
+
+/**
+ * La reprise d'office (26/11/2026). Le 26/11, l'ordinateur de l'admin
+ * n'avait plus relu la saison depuis au moins deux jours : marqué « à
+ * publier », il ne prenait plus rien de la base (pullSaison), et sans point
+ * de départ (`sfl-saisie-base`) la fusion était impossible. À chaque
+ * ouverture, il renvoyait sa vieille copie, la base la refusait, et le
+ * brouillon de la J8 n'était pas le même que sur la tablette.
+ * Désormais il reprend la base, garde sa copie (COPIE_KEY), et la Journée
+ * le dit une fois (REPRISE_KEY).
+ */
+export const REPRISE_KEY = "sfl-saisie-reprise-d-office";
+
+async function repriseDOffice(): Promise<boolean> {
+  try {
+    const doc = await lireDocument(true);
+    if (!doc || doc.seed < CURRENT_SEED_VERSION) return false;
+    garderCopie(true);
+    adoptSaison(doc.data);
+    retenirBase(doc.data, doc.version);
+    retenirLecture("entiere");
+    localStorage.setItem(VERSION_KEY, String(doc.version));
+    localStorage.setItem(REPRISE_KEY, new Date().toISOString());
+    window.dispatchEvent(new Event(SAISIE_EVENT));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** La reprise d'office pas encore vue par l'admin (sa date), ou null. */
+export function repriseNonVue(): string | null {
+  try {
+    return localStorage.getItem(REPRISE_KEY);
+  } catch {
+    return null;
+  }
+}
+
+export function repriseVue() {
+  try {
+    localStorage.removeItem(REPRISE_KEY);
+  } catch {
+    /* stockage indisponible */
+  }
+  signalerEnvoi();
 }
 
 /**
