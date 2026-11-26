@@ -10,7 +10,7 @@
 //
 // Étape de maquette : la liste est écrite ici, à la main, une fois les tags
 // validés avec Bola sur la planche de la journée. J7 : tags dictés par Bola
-// le 26/11 (« Adèle » lu Adel, Selim, Yacine : comptes à confirmer ; 451,
+// le 26/11 (Adel, Selim L et Yacine confirmés par Bola ; 451,
 // des jambes seulement, sans tag). Une fois l'interface validée, la liste
 // passera en base (table et bucket privé, comme les vidéos des Actus).
 
@@ -45,7 +45,7 @@ export const PHOTOS_JOURNEES: PhotoJournee[] = [
   j7("379", L, ["Anas", "Youss", "Yamin", "Adel", "Sidali"]),
   j7("384", L, ["Zakary"]),
   j7("385", L, ["Adel", "Youss"]),
-  j7("401", L, ["Selim", "Jouneid"]),
+  j7("401", L, ["Selim laouadi", "Jouneid"]),
   j7("414", L, ["Zakary"]),
   j7("426", L, ["Anas", "Sidali", "Abdel"]),
   j7("439", H, ["Sosso Abdel"]),
