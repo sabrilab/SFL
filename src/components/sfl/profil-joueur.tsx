@@ -44,6 +44,7 @@ import { CartesCarriere, CourbeCarriere } from "@/components/sfl/carriere-joueur
 import { ComparerCartes } from "@/components/sfl/comparer-cartes";
 import { AppartenancesJoueur } from "@/components/sfl/badge-sfl";
 import { useMyPlayer } from "@/components/sfl/player-provider";
+import { PhotosDuJoueur } from "@/components/sfl/photos-du-joueur";
 import { PlayerCard } from "@/components/sfl/player-card";
 import { useSeason } from "@/components/sfl/season-provider";
 import { BoutonSuivre, ReseauJoueur } from "@/components/sfl/suivre";
@@ -202,6 +203,7 @@ export function ProfilJoueur({ player, rank }: { player: Player; rank: number })
         {/* Blessé : ses journées manquées, ses stats arrêtées là (blessure.tsx) */}
         <LigneBlessure nom={player.name} />
         <p className="w-full text-titre-fort leading-[1.25] font-bold tracking-[-0.4px]">{fiche.synthese}</p>
+        <PhotosDuJoueur nom={player.name} className="lg:hidden" />
         {moi && (
           <button
             type="button"
@@ -214,6 +216,8 @@ export function ProfilJoueur({ player, rank }: { player: Player; rank: number })
       </div>
 
       <div className="flex min-w-0 flex-col gap-[var(--fib-21)]">
+        {/* Ses photos des journées, comme sur Instagram (photos-du-joueur.tsx, Bola, 26/11) */}
+        <PhotosDuJoueur nom={player.name} className="hidden lg:block" />
         {/* 3. Ses trophées : noir mat (blanc mat en mode clair, .vitrine-mate),
             seul le métal sort du noir et blanc */}
         {trophees > 0 && (
