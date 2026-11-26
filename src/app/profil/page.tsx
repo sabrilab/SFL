@@ -93,6 +93,7 @@ import { BoutonTheme } from "@/components/layout/bouton-theme";
 import { BoutonDeconnexion } from "@/components/sfl/auth/bouton-deconnexion";
 import { MesCartons } from "@/components/sfl/cartons/mes-cartons";
 import { VoteDuJour } from "@/components/sfl/vote-du-jour";
+import { PhotosDuJoueur } from "@/components/sfl/photos-du-joueur";
 
 /* ------------------------------ Petits blocs ------------------------------ */
 
@@ -240,6 +241,10 @@ function ProfilJoueurPage() {
           {/* Mes cartons de la SFL, s'il y en a (lib/sfl/cartons.ts, 01/11) */}
           {!bola && <MesCartons nom={player.name} />}
           {!bola && <p className="w-full text-titre-fort leading-[1.25] font-bold tracking-[-0.4px]">{fiche.synthese}</p>}
+          {/* Mes photos, juste sous ma phrase sur téléphone, comme la grille
+              sous la bio d'Instagram ; sur ordinateur, en tête de la grande
+              colonne, à côté de ma carte. */}
+          <PhotosDuJoueur nom={player.name} moi className="lg:hidden" />
           {/* Ma photo, ma carte officielle (photo au maillot Bola) tant
               qu'elle n'est pas faite, le badge de ma carte. Sans elle, les
               deux ronds se centrent. */}
@@ -276,6 +281,9 @@ function ProfilJoueurPage() {
           {/* 2. Le reste en résumé : une rangée par rubrique, qui ouvre sa page
               (ma saison, mon Niveau XP, mon évolution, mes badges, mes cartes :
               ma-carte/rubriques.tsx) */}
+          {/* Mes photos des journées, comme la grille d'un compte Instagram
+              (photos-du-joueur.tsx, Bola, 26/11) : ici sur ordinateur */}
+          <PhotosDuJoueur nom={player.name} moi className="hidden lg:block" />
           <RubriquesMaCarte />
 
           {/* 6. Se déconnecter */}
