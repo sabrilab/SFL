@@ -37,3 +37,26 @@
   --background: #f3f3ef;
   color: #0b0b0b;
 }
+
+/* Les titres (Sabri, 27/11 : « une typo sérif, avec du caractère, un peu
+   cinématographique […] resserrés […] en majuscule, un truc comme Bodoni ») :
+   Bodoni Moda, chargée par la seule route /club (app/club/page.tsx), en
+   capitales, l'optique de titrage (opsz, qui suit la taille) et
+   l'interlettrage serré. Le
+   sélecteur passe devant les styles d'essai de l'app (:root[data-style]). */
+:root .club-page .club-titre {
+  font-family: var(--font-club-titre), "Bodoni 72", Didot, serif;
+  font-weight: 600;
+  font-style: normal;
+  /* L'optique suit la taille : fine en grand, plus solide sur téléphone. */
+  font-optical-sizing: auto;
+  text-transform: uppercase;
+  letter-spacing: -0.02em;
+  text-shadow: none;
+  -webkit-text-stroke: 0;
+}
+@media (max-width: 719px) {
+  :root .club-page .club-titre {
+    font-weight: 700;
+  }
+}

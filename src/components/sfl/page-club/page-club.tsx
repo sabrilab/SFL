@@ -220,7 +220,7 @@ function Formulaire() {
         <span className="flex size-14 items-center justify-center rounded-full bg-foreground text-background">
           <Check className="size-7" strokeWidth={2.5} aria-hidden />
         </span>
-        <p className="mt-6 text-titre-l font-extrabold tracking-tight">{F.merci.titre}</p>
+        <p className="club-titre mt-6 text-titre-l">{F.merci.titre}</p>
         <p className="mt-2 text-lecture font-semibold text-encre-2">{F.merci.phrase}</p>
       </div>
     );
@@ -335,7 +335,7 @@ function CarteJoueur({ j, className, style }: { j: JoueurClub; className?: strin
       <div aria-hidden className="absolute inset-x-0 bottom-0 h-[55%] bg-gradient-to-t from-black/90 via-black/40 to-transparent" />
       <figcaption className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-2 p-[9%] text-white">
         <span className="min-w-0">
-          <span className="block truncate text-[clamp(13px,1.3vw,17px)] font-extrabold tracking-tight uppercase">{j.prenom}</span>
+          <span className="club-titre block truncate text-[clamp(14px,1.4vw,19px)]">{j.prenom}</span>
           <span className="mt-0.5 block text-[clamp(9px,0.8vw,11px)] font-bold tracking-[0.14em] text-white/60 uppercase">
             {j.categorie} · {j.poste}
           </span>
@@ -350,7 +350,7 @@ function CarteJoueur({ j, className, style }: { j: JoueurClub; className?: strin
 /** Les catégories qui défilent : le club entier, d'un bout à l'autre. */
 const CATEGORIES = ["U7", "U9", "U11", "U13", "U15", "U17", "U19", "Seniors", "Féminines", "Vétérans", "Futsal", "Loisir"];
 
-export function PageClub() {
+export function PageClub({ police }: { police?: string }) {
   const cadre = useRef<HTMLDivElement>(null);
 
   // Les apparitions : seules les sections encore sous l'écran sont cachées, une seule fois.
@@ -398,7 +398,7 @@ export function PageClub() {
       ref={cadre}
       lang="fr"
       dir="ltr"
-      className="club-page fixed inset-0 z-[60] overflow-x-hidden overflow-y-auto overscroll-contain bg-[#080908] text-[#f3f3ef]"
+      className={cn("club-page fixed inset-0 z-[60] overflow-x-hidden overflow-y-auto overscroll-contain bg-[#080908] text-[#f3f3ef]", police)}
       style={{ paddingTop: "env(safe-area-inset-top)", scrollPaddingTop: BARRE, colorScheme: "dark" }}
     >
       {/* La barre du haut. */}
@@ -427,7 +427,7 @@ export function PageClub() {
         <div aria-hidden className="absolute inset-x-0 bottom-0 -z-10 h-40 bg-gradient-to-b from-transparent to-[#080908]" />
         <div className={cn(COLONNE, "pt-12 text-center min-[960px]:pt-14")}>
           <p className="text-[11px] font-bold tracking-[0.22em] text-white/50 uppercase">{HAUT_CLUB.etiquette}</p>
-          <h1 className="mx-auto mt-5 max-w-[14ch] text-[clamp(44px,12.5vw,128px)] leading-[0.92] font-extrabold tracking-tight text-balance min-[960px]:max-w-none min-[960px]:text-[clamp(64px,6.6vw,104px)]">
+          <h1 className="club-titre mx-auto mt-6 max-w-[16ch] text-[clamp(38px,10.4vw,112px)] leading-[0.98] text-balance min-[960px]:max-w-none min-[960px]:text-[clamp(56px,5.6vw,92px)]">
             {HAUT_CLUB.titre.map((l) => (
               <span key={l} className="block">
                 {l}
@@ -473,7 +473,7 @@ export function PageClub() {
       <div aria-hidden className="relative overflow-hidden border-y border-white/[0.08] py-5">
         <div className="club-defile flex w-max gap-10 whitespace-nowrap">
           {[...CATEGORIES, ...CATEGORIES].map((c, i) => (
-            <span key={i} className="flex items-center gap-10 text-[clamp(22px,4vw,40px)] font-extrabold tracking-tight text-white/85 uppercase">
+            <span key={i} className="club-titre flex items-center gap-10 text-[clamp(22px,4vw,40px)] text-white/85">
               {c}
               <span className="size-2 rounded-full bg-white/25" />
             </span>
@@ -483,7 +483,7 @@ export function PageClub() {
 
       {/* 3 · Le manifeste. */}
       <section data-apparait className={cn(COLONNE, APPARAIT, "py-28 text-center min-[960px]:py-40")}>
-        <h2 className="text-[clamp(40px,10vw,104px)] leading-[0.95] font-extrabold tracking-tight text-balance">
+        <h2 className="club-titre text-[clamp(36px,9vw,96px)] leading-[1] text-balance">
           {MANIFESTE_CLUB.ligne.map((l, i) => (
             <span key={l} className={cn("block", i === 1 && "text-white/35")}>
               {l}
@@ -498,9 +498,9 @@ export function PageClub() {
         {SECTIONS_CLUB.map((s, i) => (
           <section key={s.id} id={s.id} data-apparait className={cn(COLONNE, APPARAIT, "grid items-center gap-12 min-[960px]:grid-cols-2 min-[960px]:gap-24")}>
             <div className={cn("text-center min-[960px]:text-left", i % 2 === 1 && "min-[960px]:order-2")}>
-              <p className="font-display text-[clamp(56px,9vw,96px)] leading-none text-white/10">{String(i + 1).padStart(2, "0")}</p>
+              <p className="club-titre text-[clamp(56px,9vw,96px)] leading-none text-white/15">{String(i + 1).padStart(2, "0")}</p>
               <p className="mt-2 text-[11px] font-bold tracking-[0.22em] text-white/50 uppercase">{s.etiquette}</p>
-              <h2 className="mt-3 text-[clamp(34px,8.5vw,60px)] leading-[0.98] font-extrabold tracking-tight text-balance">{s.titre}</h2>
+              <h2 className="club-titre mt-4 text-[clamp(30px,7.6vw,54px)] leading-[1.02] text-balance">{s.titre}</h2>
               <div className="mt-5 space-y-1.5 text-[clamp(16px,4.4vw,20px)] leading-snug font-semibold">
                 {s.phrases.map((p, k) => (
                   <p key={p} className={k === 0 ? "text-white/90" : "text-white/55"}>
@@ -537,7 +537,7 @@ export function PageClub() {
         </div>
         <div>
           <p className="text-[11px] font-bold tracking-[0.22em] text-white/50 uppercase">{ROLES_CLUB.etiquette}</p>
-          <h2 className="mt-3 text-[clamp(34px,8.5vw,60px)] leading-[0.98] font-extrabold tracking-tight text-balance">{ROLES_CLUB.titre}</h2>
+          <h2 className="club-titre mt-4 text-[clamp(30px,7.6vw,54px)] leading-[1.02] text-balance">{ROLES_CLUB.titre}</h2>
           <ul className="mt-10 divide-y divide-white/[0.08] border-y border-white/[0.08]">
             {ROLES_CLUB.roles.map((r, i) => (
               <li key={r.nom} className="flex items-baseline gap-5 py-5">
@@ -556,14 +556,14 @@ export function PageClub() {
           <div className="relative hidden min-h-full min-[960px]:block" style={{ background: `linear-gradient(160deg, ${JOUEURS_CLUB[2].maillot}, #0b0b0b 85%)` }}>
             <Photo src={JOUEURS_CLUB[2].photo} lue={JOUEURS_CLUB[2].lue} className="absolute inset-0 size-full object-cover" repli={null} />
             <div aria-hidden className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
-            <p className="absolute inset-x-10 bottom-10 text-[44px] leading-[0.95] font-extrabold tracking-tight text-white">
+            <p className="club-titre absolute inset-x-10 bottom-10 text-[40px] leading-[1] text-white">
               {FORMULAIRE_CLUB.titre}
             </p>
           </div>
           <div className="club-formulaire px-5 py-10 min-[720px]:px-10 min-[960px]:px-14 min-[960px]:py-14">
             <div className="mb-9 text-center min-[960px]:text-left">
               <p className="text-[11px] font-bold tracking-[0.22em] text-black/45 uppercase">{FORMULAIRE_CLUB.etiquette}</p>
-              <h2 className="mt-3 text-[clamp(30px,8vw,40px)] leading-[1] font-extrabold tracking-tight text-balance min-[960px]:hidden">{FORMULAIRE_CLUB.titre}</h2>
+              <h2 className="club-titre mt-3 text-[clamp(28px,7.4vw,38px)] leading-[1.02] text-balance min-[960px]:hidden">{FORMULAIRE_CLUB.titre}</h2>
               <p className="mt-3 text-[clamp(16px,4.4vw,19px)] leading-snug font-semibold whitespace-pre-line text-black/60">{FORMULAIRE_CLUB.phrase}</p>
             </div>
             <Formulaire />

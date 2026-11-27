@@ -3,16 +3,26 @@
 // (AuthGate, lib/sfl/routes-publiques.ts, estPageClub), sans barre d'onglets,
 // sans accueil de l'app ni guide d'installation, comme /sfl.
 //
-// Ce fichier reste un composant serveur : il porte l'aperçu du lien, et le
-// HTML servi contient tout le texte. La page est dans
-// components/sfl/page-club/page-club.tsx, ses textes dans lib/sfl/page-club.ts.
+// Ce fichier reste un composant serveur : il porte l'aperçu du lien, la
+// police des titres (Bodoni Moda, chargée ici seulement : le reste de l'app
+// n'en paie pas le poids), et le HTML servi contient tout le texte. La page
+// est dans components/sfl/page-club/page-club.tsx, ses textes dans
+// lib/sfl/page-club.ts.
 
 import type { Metadata } from "next";
+import { Bodoni_Moda } from "next/font/google";
 import { PageClub } from "@/components/sfl/page-club/page-club";
 import { METADONNEES_CLUB } from "@/lib/sfl/page-club";
+
+const bodoni = Bodoni_Moda({
+  subsets: ["latin"],
+  weight: "variable",
+  axes: ["opsz"],
+  variable: "--font-club-titre",
+});
 
 export const metadata: Metadata = METADONNEES_CLUB;
 
 export default function PageClubRoute() {
-  return <PageClub />;
+  return <PageClub police={bodoni.variable} />;
 }
