@@ -347,11 +347,49 @@ function CarteJoueur({ j, className, style }: { j: JoueurClub; className?: strin
   );
 }
 
+/**
+ * L'essai des polices de titre (Sabri, 27/11 : « propose-moi 12 polices »,
+ * planche dans bola-club-landing/polices-12.png) : ?police=1 à 12 charge la
+ * police de Google Fonts et l'applique aux titres de la page, le temps de
+ * choisir. Sans le paramètre, rien n'est chargé de plus.
+ */
+const POLICES_ESSAI: readonly { nom: string; poids: number; css: string }[] = [
+  { nom: "Bodoni Moda", poids: 600, css: "Bodoni+Moda:opsz,wght@6..96,600;6..96,700" },
+  { nom: "Playfair Display", poids: 800, css: "Playfair+Display:wght@800" },
+  { nom: "DM Serif Display", poids: 400, css: "DM+Serif+Display" },
+  { nom: "Abril Fatface", poids: 400, css: "Abril+Fatface" },
+  { nom: "Gloock", poids: 400, css: "Gloock" },
+  { nom: "Instrument Serif", poids: 400, css: "Instrument+Serif" },
+  { nom: "Rozha One", poids: 400, css: "Rozha+One" },
+  { nom: "Yeseva One", poids: 400, css: "Yeseva+One" },
+  { nom: "Fraunces", poids: 900, css: "Fraunces:opsz,wght@9..144,900" },
+  { nom: "Alfa Slab One", poids: 400, css: "Alfa+Slab+One" },
+  { nom: "Chonburi", poids: 400, css: "Chonburi" },
+  { nom: "Ultra", poids: 400, css: "Ultra" },
+];
+
+function useEssaiPolice(cadre: React.RefObject<HTMLDivElement | null>) {
+  useEffect(() => {
+    const n = Number(new URLSearchParams(window.location.search).get("police"));
+    const p = POLICES_ESSAI[n - 1];
+    const el = cadre.current;
+    if (!p || !el) return;
+    const lien = document.createElement("link");
+    lien.rel = "stylesheet";
+    lien.href = `https://fonts.googleapis.com/css2?family=${p.css}&display=swap`;
+    document.head.appendChild(lien);
+    el.style.setProperty("--font-club-titre", `"${p.nom}"`);
+    el.style.setProperty("--club-titre-poids", String(p.poids));
+    return () => lien.remove();
+  }, [cadre]);
+}
+
 /** Les catégories qui défilent : le club entier, d'un bout à l'autre. */
 const CATEGORIES = ["U7", "U9", "U11", "U13", "U15", "U17", "U19", "Seniors", "Féminines", "Vétérans", "Futsal", "Loisir"];
 
 export function PageClub({ police }: { police?: string }) {
   const cadre = useRef<HTMLDivElement>(null);
+  useEssaiPolice(cadre);
 
   // Les apparitions : seules les sections encore sous l'écran sont cachées, une seule fois.
   useEffect(() => {
