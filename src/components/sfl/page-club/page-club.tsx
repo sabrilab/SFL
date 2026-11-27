@@ -418,24 +418,16 @@ function CarteJoueur({ j, className, style }: { j: JoueurClub; className?: strin
 }
 
 /**
- * L'essai des polices de titre (Sabri, 27/11 : « propose-moi 12 polices »,
- * planche dans bola-club-landing/polices-12.png) : ?police=1 à 12 charge la
- * police de Google Fonts et l'applique aux titres de la page, le temps de
- * choisir. Sans le paramètre, rien n'est chargé de plus.
+ * L'essai des polices de titre (27/11) : Instrument Serif est retenue et posée
+ * par défaut (app/club/page.tsx). ?police=2 à 4 essaie trois cousines
+ * condensées, chargées de Google Fonts, le temps de choisir. Sans le
+ * paramètre, rien n'est chargé de plus.
  */
-const POLICES_ESSAI: readonly { nom: string; poids: number; css: string }[] = [
-  { nom: "Bodoni Moda", poids: 600, css: "Bodoni+Moda:opsz,wght@6..96,600;6..96,700" },
-  { nom: "Playfair Display", poids: 800, css: "Playfair+Display:wght@800" },
-  { nom: "DM Serif Display", poids: 400, css: "DM+Serif+Display" },
-  { nom: "Abril Fatface", poids: 400, css: "Abril+Fatface" },
-  { nom: "Gloock", poids: 400, css: "Gloock" },
+const POLICES_ESSAI: readonly { nom: string; poids: number; css: string; reglage?: string }[] = [
   { nom: "Instrument Serif", poids: 400, css: "Instrument+Serif" },
-  { nom: "Rozha One", poids: 400, css: "Rozha+One" },
-  { nom: "Yeseva One", poids: 400, css: "Yeseva+One" },
-  { nom: "Fraunces", poids: 900, css: "Fraunces:opsz,wght@9..144,900" },
-  { nom: "Alfa Slab One", poids: 400, css: "Alfa+Slab+One" },
-  { nom: "Chonburi", poids: 400, css: "Chonburi" },
-  { nom: "Ultra", poids: 400, css: "Ultra" },
+  { nom: "Libre Caslon Condensed", poids: 400, css: "Libre+Caslon+Condensed:wght@400..700" },
+  { nom: "Noto Serif Display", poids: 400, css: "Noto+Serif+Display:wdth,wght@62.5,300..500", reglage: '"wdth" 62.5' },
+  { nom: "Playfair", poids: 400, css: "Playfair:opsz,wdth,wght@5..1200,87.5,300..500", reglage: '"wdth" 87.5, "opsz" 144' },
 ];
 
 function useEssaiPolice(cadre: React.RefObject<HTMLDivElement | null>) {
@@ -450,6 +442,7 @@ function useEssaiPolice(cadre: React.RefObject<HTMLDivElement | null>) {
     document.head.appendChild(lien);
     el.style.setProperty("--font-club-titre", `"${p.nom}"`);
     el.style.setProperty("--club-titre-poids", String(p.poids));
+    if (p.reglage) el.style.setProperty("--club-titre-reglage", p.reglage);
     return () => lien.remove();
   }, [cadre]);
 }
