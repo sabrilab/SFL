@@ -153,11 +153,11 @@ void tousLesChamps;
  * (les dimanches les plus anciens, les objectifs les plus loin), puis, s'il
  * dépasse encore (un champ démesuré), il est coupé.
  */
-export function dossierBorne(brut: unknown, max = DOSSIER_MAX): string {
+export function dossierBorne(brut: unknown, max = DOSSIER_MAX, champs: readonly string[] = CHAMPS_DOSSIER): string {
   const o: Record<string, unknown> = {};
   if (brut && typeof brut === "object" && !Array.isArray(brut)) {
     const b = brut as Record<string, unknown>;
-    for (const k of CHAMPS_DOSSIER) if (b[k] !== undefined) o[k] = b[k];
+    for (const k of champs) if (b[k] !== undefined) o[k] = b[k];
   }
   let s = enJson(o);
   if (s.length <= max) return s;
@@ -175,8 +175,8 @@ export function dossierBorne(brut: unknown, max = DOSSIER_MAX): string {
 }
 
 /** Le dossier tel qu'il ouvre la conversation : des données, entre balises. */
-export function dossierBalise(json: string): string {
-  return `<dossier_joueur>\n${json}\n</dossier_joueur>`;
+export function dossierBalise(json: string, balise = "dossier_joueur"): string {
+  return `<${balise}>\n${json}\n</${balise}>`;
 }
 
 /** Ce que le modèle relit d'un tour : le texte du joueur, ou celui du coach avec ses cartes, en clair. */
@@ -203,8 +203,8 @@ const couper = (s: string, n: number) => (s.length > n ? `${debut(s, n - 1)}…`
  * du plus récent au plus ancien, chacun TOUR_MAX au plus ; celui qui ne tient
  * plus est coupé, les plus anciens tombent.
  */
-export function messagesPour(p: { dossier: string; historique: Tour[]; ouverture?: string; question: string }): MessageModele[] {
-  const dossier = dossierBalise(bienForme(p.dossier));
+export function messagesPour(p: { dossier: string; historique: Tour[]; ouverture?: string; question: string; balise?: string }): MessageModele[] {
+  const dossier = dossierBalise(bienForme(p.dossier), p.balise);
   const ouverture = bienForme(p.ouverture?.trim() ?? "");
   const question = bienForme(p.question.trim());
   let reste = CONTEXTE_MAX - dossier.length - ouverture.length - question.length;

@@ -41,7 +41,9 @@ import {
   surclassementsPossibles,
 } from "./regles";
 import { exerciceDe, THEMES } from "./exercices";
-import type { Categorie, Club, EtatAppel, Exercice, Groupe, Licence, LigneProgramme, LigneStats, Moi, Reponse, Seance, ThemeExercice } from "./types";
+import { COTES, ZONES_CORPS, type Cote, type ZoneCorps } from "@/lib/sfl/schemas-coach";
+import { ETAPE_CONTACT, ETAPES_REPRISE } from "./suivi";
+import type { Blessure, Categorie, Club, EtatAppel, Exercice, Groupe, Licence, LigneProgramme, LigneStats, Moi, Reponse, Seance, ThemeExercice } from "./types";
 
 export type Resultat = { ok: true; club: Club } | { ok: false; refus: string };
 
@@ -622,4 +624,56 @@ export function appliquerGroupe(club: Club, moi: Moi, seance: string, groupe: st
   });
   const reponses = Object.fromEntries(Object.entries(s.reponses).filter(([id]) => convoques.includes(id)));
   return ok(avecSeance(club, { ...s, convoques, reponses }));
+}
+
+export interface NouvelleBlessure {
+  zone: ZoneCorps;
+  cote: Cote;
+  gravite: Blessure["gravite"];
+  note: string;
+  /** Le jour où c'est arrivé ; aujourd'hui sinon. */
+  jour?: string;
+}
+
+/** Noter une blessure (staff du joueur) : la reprise commence au repos. Une seule en cours à la fois. */
+export function declarerBlessure(club: Club, moi: Moi, membre: string, n: NouvelleBlessure): Resultat {
+  const m = membreDe(club, membre);
+  if (!m) return refus("Joueur introuvable.");
+  if (!droits(club, moi).gereJoueur(m)) return refus(PAS_LE_DROIT);
+  if (!(ZONES_CORPS as readonly string[]).includes(n.zone) || !(COTES as readonly string[]).includes(n.cote)) return refus("Choisis la zone.");
+  if (!["legere", "moyenne", "serieuse"].includes(n.gravite)) return refus("Choisis la gravité.");
+  const jour = n.jour ?? club.jour;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(jour) || jour > club.jour) return refus("Le jour de la blessure est passé.");
+  if (club.blessures.some((b) => b.membre === membre && !b.retour)) return refus("Une blessure est déjà en cours : finis sa reprise d'abord.");
+  const note = n.note.trim().slice(0, 300);
+  let k = club.blessures.length + 1;
+  while (club.blessures.some((b) => b.id === `bl-${k}`)) k++;
+  const b: Blessure = { id: `bl-${k}`, membre, jour, zone: n.zone, cote: n.cote, gravite: n.gravite, note, etape: 0, etapeLe: club.jour, feuVert: false, retour: null };
+  return ok({ ...club, blessures: [...club.blessures, b] });
+}
+
+/**
+ * La reprise avance d'une étape, sans douleur à celle d'avant (l'entraîneur le
+ * confirme) ; après le match, le retour est complet. Une blessure sérieuse ne
+ * passe au contact qu'avec le feu vert d'un médecin.
+ */
+export function avancerReprise(club: Club, moi: Moi, id: string): Resultat {
+  const b = club.blessures.find((x) => x.id === id);
+  if (!b) return refus("Blessure introuvable.");
+  const m = membreDe(club, b.membre);
+  if (!m || !droits(club, moi).gereJoueur(m)) return refus(PAS_LE_DROIT);
+  if (b.retour) return refus("Il est déjà revenu.");
+  const fin = ETAPES_REPRISE.length - 1;
+  if (b.etape >= fin) return ok({ ...club, blessures: club.blessures.map((x) => (x.id === id ? { ...x, retour: club.jour } : x)) });
+  if (b.etape + 1 >= ETAPE_CONTACT && b.gravite === "serieuse" && !b.feuVert) return refus("Le feu vert du médecin d'abord.");
+  return ok({ ...club, blessures: club.blessures.map((x) => (x.id === id ? { ...x, etape: x.etape + 1, etapeLe: club.jour } : x)) });
+}
+
+/** Le médecin a donné son feu vert pour le retour au contact. */
+export function feuVertMedecin(club: Club, moi: Moi, id: string): Resultat {
+  const b = club.blessures.find((x) => x.id === id);
+  if (!b) return refus("Blessure introuvable.");
+  const m = membreDe(club, b.membre);
+  if (!m || !droits(club, moi).gereJoueur(m)) return refus(PAS_LE_DROIT);
+  return ok({ ...club, blessures: club.blessures.map((x) => (x.id === id ? { ...x, feuVert: true } : x)) });
 }

@@ -10,6 +10,7 @@
 //     ma-note.tsx, NoteEvolution), sur les matchs de son club : sa note, ce
 //     qui est gagné depuis la dernière mise à jour, les six jauges, sa série,
 //     ses matchs (lib/sfl/club/saison.ts : le vrai moteur des cartes) ;
+//   · Blessures : la reprise en cours, étape par étape (blessures.tsx) ;
 //   · Physique : taille et croissance, VMA ; poids et IMC d'un adulte, pour
 //     le staff (physique.tsx) ;
 //   · Présences : « 14 présents · 2 retards · 1 absent », puis ses séances
@@ -42,6 +43,7 @@ import { aLAgeDe, accordParentalRequis, ageLe, categorieDe, licenceDe, membreDe,
 import { nomComplet, nomCourt, type Membre } from "@/lib/sfl/club/types";
 import { cn } from "@/lib/utils";
 import { CarteClub } from "./carte-club";
+import { Blessures } from "./blessures";
 import { Physique } from "./physique";
 import { CHAMP, Feuille, NOMBRE, PageEnfant, puce, TitreSection } from "./puces";
 
@@ -285,6 +287,7 @@ export function FicheJoueurClub({ id }: { id: string }) {
         </section>
       )}
 
+      {voit && <Blessures m={m} />}
       {voit && <Physique m={m} />}
       {voit && <Presences m={m} />}
       {droits.litNotes(m) && <NotesPrivees m={m} />}

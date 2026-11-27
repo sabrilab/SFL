@@ -9,6 +9,7 @@
 import type { Blason } from "@/lib/sfl/blason";
 import type { Stats } from "@/lib/sfl/engine";
 import type { Poste } from "@/lib/sfl/inscription";
+import type { Cote, ZoneCorps } from "@/lib/sfl/schemas-coach";
 
 export type Role = "admin" | "entraineur" | "joueur" | "parent";
 export const ROLES: { id: Role; label: string }[] = [
@@ -148,6 +149,31 @@ export interface Mesure {
   vma?: number;
 }
 
+/**
+ * Une blessure d'un joueur, notée par son staff (suivi.ts, ETAPES_REPRISE) :
+ * la zone du corps (celles des schémas de Bola Agent), le côté, la gravité
+ * dite par l'entraîneur, et l'étape de la reprise où il en est. Vue
+ * seulement par le staff, le joueur et son parent.
+ */
+export interface Blessure {
+  id: string;
+  membre: string;
+  /** Le jour où c'est arrivé. */
+  jour: string;
+  zone: ZoneCorps;
+  cote: Cote;
+  gravite: "legere" | "moyenne" | "serieuse";
+  /** Ce qui s'est passé, ce qu'a dit le médecin ; « » si rien. */
+  note: string;
+  /** L'étape de la reprise (0 : repos … 5 : match), et le jour où elle a été franchie. */
+  etape: number;
+  etapeLe: string;
+  /** Le feu vert d'un médecin, demandé pour une blessure sérieuse avant le retour au contact. */
+  feuVert: boolean;
+  /** Le jour du retour complet, une fois la reprise finie. */
+  retour: string | null;
+}
+
 export interface LigneProgramme {
   /** Un exercice de la bibliothèque (exercices.ts) ou du club. */
   exercice: string;
@@ -225,6 +251,7 @@ export interface Club {
   mesures: Mesure[];
   materiel: Materiel[];
   groupes: Groupe[];
+  blessures: Blessure[];
   /** Qui est « moi » sous chaque point de vue de la démo. */
   demo: Record<Role, string>;
 }

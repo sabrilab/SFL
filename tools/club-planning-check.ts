@@ -25,6 +25,9 @@ import {
   ajouterMateriel,
   ajouterMesure,
   appliquerGroupe,
+  avancerReprise,
+  declarerBlessure,
+  feuVertMedecin,
   bilanSeance,
   compterMateriel,
   creerExercice,
@@ -45,6 +48,8 @@ import {
   semaineDuPlanning,
 } from "../src/lib/sfl/club/planning";
 import { formeDuClub } from "../src/lib/sfl/club/store";
+import { CHAMPS_DOSSIER_EQUIPE, dossierEquipe, ouvertureDe, semaineDe } from "../src/lib/sfl/club/agent-club";
+import { dossierBorne } from "../src/lib/sfl/agent-contexte";
 import {
   ageType,
   DUREES,
@@ -52,8 +57,11 @@ import {
   proposer,
 } from "../src/lib/sfl/club/proposition";
 import {
+  blessureEnCours,
   croissance,
   derniereTaille,
+  ecarte,
+  ETAPE_CONTACT,
   dernierRessenti,
   enCroissanceParmi,
   enPoussee,
@@ -460,6 +468,58 @@ eq(formeDuClub(ancien), false);
     "même nom : remplacé",
   );
   non(enregistrerGroupe(club, coach, "seniors-m9", "Groupe B"));
+}
+
+// 10 · les blessures et leur reprise
+{
+  eq(club.blessures.filter((b) => !b.retour).length, 4);
+  eq(club.blessures.every((b) => b.jour <= club.jour && b.etapeLe <= club.jour && b.jour <= b.etapeLe), true, "les blessures de la démo sont passées");
+  eq(formeDuClub(JSON.parse(JSON.stringify(club))) !== null, true, "la démo se relit avec ses blessures");
+  const libre = club.membres.find((m) => m.categorie === "u17" && !blessureEnCours(club, m.id))!;
+  let c1 = ok(declarerBlessure(club, coach, libre.id, { zone: "chevilles", cote: "droit", gravite: "legere", note: "" }));
+  eq(blessureEnCours(c1, libre.id)?.etape, 0);
+  eq(ecarte(c1, libre.id), true);
+  non(declarerBlessure(c1, coach, libre.id, { zone: "genoux", cote: "droit", gravite: "legere", note: "" }));
+  non(declarerBlessure(club, joueur, libre.id, { zone: "chevilles", cote: "droit", gravite: "legere", note: "" }));
+  non(declarerBlessure(club, coach, libre.id, { zone: "nez" as never, cote: "droit", gravite: "legere", note: "" }));
+  const senior = club.membres.find((m) => m.categorie === "seniors")!;
+  non(declarerBlessure(club, coach, senior.id, { zone: "chevilles", cote: "droit", gravite: "legere", note: "" }));
+  const id = blessureEnCours(c1, libre.id)!.id;
+  for (let k = 0; k < 5; k++) c1 = ok(avancerReprise(c1, coach, id));
+  eq(blessureEnCours(c1, libre.id)?.etape, 5);
+  c1 = ok(avancerReprise(c1, coach, id));
+  eq(blessureEnCours(c1, libre.id), null, "retour complet");
+  non(avancerReprise(c1, coach, id));
+  // Sérieuse : pas de contact sans le feu vert.
+  let c2 = ok(declarerBlessure(club, coach, libre.id, { zone: "genoux", cote: "gauche", gravite: "serieuse", note: "" }));
+  const id2 = blessureEnCours(c2, libre.id)!.id;
+  for (let k = 0; k < ETAPE_CONTACT - 1; k++) c2 = ok(avancerReprise(c2, coach, id2));
+  non(avancerReprise(c2, coach, id2));
+  c2 = ok(feuVertMedecin(c2, coach, id2));
+  c2 = ok(avancerReprise(c2, coach, id2));
+  eq(blessureEnCours(c2, libre.id)?.etape, ETAPE_CONTACT);
+}
+
+// 11 · l'agent de l'entraîneur : le dossier de l'équipe, sa semaine
+{
+  for (const cat of ["u13", "u17", "seniors"]) {
+    const d = dossierEquipe(club, "s-e1", cat);
+    const json = JSON.stringify(d);
+    eq(d.joueurs.length > 0 && d.joueurs.length <= 20, true, `${cat} : vingt joueurs au plus`);
+    eq(/poids|imc|naissance|Kg/i.test(json), false, "ni poids, ni IMC, ni date de naissance");
+    eq(d.joueurs.every((j) => /^\S.* [A-ZÉ]\.$/.test(j.nom)), true, "prénom et initiale");
+    eq(dossierBorne(d, 12_000, CHAMPS_DOSSIER_EQUIPE), JSON.stringify(d).replace(/</g, "\\u003c"), "le dossier tient sans coupe");
+    eq(json.length < 12_000, true);
+  }
+  const u17 = dossierEquipe(club, "s-e1", "u17", "u17-03");
+  eq(u17.focus?.startsWith(club.membres.find((m) => m.id === "u17-03")!.prenom), true);
+  eq(u17.joueurs.some((j) => j.blessure?.zone === "chevilles"), true);
+  eq(dossierEquipe(club, "s-e1", "u17", "seniors-05").focus, undefined, "un joueur d'une autre catégorie n'est pas le sujet");
+  const semaine = semaineDe(club, "s-e1");
+  eq(semaine.length >= 2 && semaine.length <= 4, true);
+  eq(semaine.some((x) => /défaite|perdu|absent|retard/i.test(x.dit)), false, "rien de négatif");
+  eq(ouvertureDe(club, "s-e1").includes("?"), true, "l'agent ouvre par une question");
+  eq(ouvertureDe(club, "s-e1", "u17-03").includes("étape"), true);
 }
 
 console.log(`club-planning: ok (${n} vérifications)`);

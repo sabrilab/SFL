@@ -52,6 +52,7 @@ export function formeDuClub(x: unknown): x is Club {
     liste(c.materiel, (l) => texte(l.id) && texte(l.nom) && typeof l.quantite === "number" && typeof l.aRemplacer === "number") &&
     liste(c.groupes, (l) => texte(l.id) && texte(l.categorie) && texte(l.nom) && Array.isArray(l.joueurs)) &&
     liste(c.mesures, (l) => texte(l.id) && texte(l.membre) && texte(l.jour)) &&
+    liste(c.blessures, (l) => texte(l.id) && texte(l.membre) && texte(l.jour) && texte(l.zone) && typeof l.etape === "number") &&
     liste(c.exercices, (l) => texte(l.id) && texte(l.nom) && texte(l.theme) && typeof l.minutes === "number" && Array.isArray(l.deroule)) &&
     (c.seances as Record<string, unknown>[]).every((l) => l.programme === undefined || liste(l.programme, (p) => texte(p.exercice) && typeof p.minutes === "number"));
   if (!bon || !objet(c.demo)) return false;

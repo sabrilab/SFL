@@ -81,7 +81,7 @@ export function Physique({ m }: { m: Membre }) {
               fort={poussee}
             />
           )}
-          {v && <Valeur nom="VMA" valeur={virgule(v.vma!)} unite="km/h" sous={`Intermittent 30-30 : ${Math.round(v.vma! * 8.33)} m`} />}
+          {v && <Valeur nom="VMA" valeur={virgule(v.vma!)} unite="km/h" sous={`${Math.round(v.vma! * 8.33)} m en 30 s`} />}
           {staff && adulte && p && <Valeur nom="Poids" valeur={virgule(p.poidsKg!)} unite="kg" sous={jourMoyen(p.jour)} />}
           {staff && i !== null && <Valeur nom="IMC" valeur={virgule(i)} unite="kg/m²" />}
         </div>

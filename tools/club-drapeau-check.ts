@@ -53,6 +53,12 @@ const pages = fichiers("app").filter((f) => /(^|\/)(page|route|layout)\.tsx?$/.t
 const duClub = (f: string) => /@\/(components\/sfl\/club\/|lib\/sfl\/club\/(?!drapeau|marqueur)|hooks\/use-club")/.test(lire(f));
 ok(pages.filter((f) => f.startsWith("app/club/")).length >= 8, "les pages du club sont là");
 for (const f of pages) if (!f.startsWith("app/club/")) ok(!duClub(f), `${f} : hors de /club, aucune page ne tire le club`);
+// Une route du club (la mise en page ne la couvre pas) répond 404 elle-même hors du drapeau, à chaque méthode.
+for (const f of pages.filter((p) => p.startsWith("app/club/") && /route\.ts$/.test(p))) {
+  const r = lire(f);
+  const methodes = [...r.matchAll(/^export async function (GET|POST|PUT|PATCH|DELETE)\(/gm)].length;
+  ok(methodes > 0 && [...r.matchAll(/if \(!BOLA_CLUB\) return erreur\("Introuvable\.", 404\);/g)].length === methodes, `${f} : introuvable hors du drapeau`);
+}
 ok(!existsSync(join(SRC, "app/club/not-found.tsx")) || !duClub("app/club/not-found.tsx"), "pas de page introuvable qui montrerait le club");
 
 // 3 · ce que le reste de l'app tire du club : le drapeau et le marqueur, rien d'autre

@@ -361,6 +361,14 @@ export function clubDemo(): Club {
     annonces,
     exercices: [],
     mesures,
+    // Les blessures : trois reprises en cours chez les jeunes et une chez les Seniors, une ancienne guérie.
+    blessures: [
+      { id: "bl-1", membre: "u17-14", jour: "2026-10-18", zone: "ischios", cote: "droit", gravite: "moyenne", note: "Contracture au sprint, en fin de match.", etape: 4, etapeLe: "2026-11-07", feuVert: false, retour: null },
+      { id: "bl-2", membre: "u17-03", jour: "2026-11-04", zone: "chevilles", cote: "gauche", gravite: "moyenne", note: "Entorse en retombant d'un duel aérien. Pas de radio.", etape: 2, etapeLe: "2026-11-10", feuVert: false, retour: null },
+      { id: "bl-3", membre: "u13-04", jour: "2026-11-07", zone: "genoux", cote: "les deux", gravite: "legere", note: "Douleur sous la rotule après les sprints.", etape: 1, etapeLe: "2026-11-10", feuVert: false, retour: null },
+      { id: "bl-4", membre: "seniors-05", jour: "2026-10-24", zone: "genoux", cote: "droit", gravite: "serieuse", note: "Entorse du ligament interne, IRM faite.", etape: 3, etapeLe: "2026-11-09", feuVert: false, retour: null },
+      { id: "bl-5", membre: "u17-08", jour: "2026-09-20", zone: "adducteurs", cote: "gauche", gravite: "legere", note: "", etape: 5, etapeLe: "2026-10-08", feuVert: false, retour: "2026-10-10" },
+    ],
     materiel: (
       [
         ["Ballons taille 4", 24, 2],
