@@ -113,6 +113,7 @@ import {
   RAYON_PORTRAIT,
   serieDe,
   type HabillageCarte,
+  type Matiere,
   type Traitement,
 } from "@/components/sfl/finitions-carte";
 import { Cartons, Crans, filtrePhoto, InsigneRang, Lisere, Sceau, Sifflet, VoileTraitement, type Boite } from "@/components/sfl/habillage-carte";
@@ -380,6 +381,7 @@ export function BolaCard({
   epoque,
   arbitre,
   entraineur,
+  matiere,
 }: {
   name: string;
   /** Le nom montré sur la carte, s'il diffère du nom de saison (voir lib/sfl/identites). */
@@ -407,18 +409,20 @@ export function BolaCard({
   arbitre?: FaceArbitre;
   /** La carte d'un entraîneur de Bola Team : sa note et ses trois caractéristiques (avec l'édition « entraineur »). */
   entraineur?: FaceEntraineur;
+  /** Une matière donnée telle quelle, à la place de celle de l'édition (les cartes parent et dirigeant de la maquette Bola Club). */
+  matiere?: Matiere;
 }) {
   // 254 px de large à taille 1, comme les autres cartes de l'app.
   const largeur = 254 * size;
   const u = (n: number) => n * size * (254 / W);
   const palier = palierCarte(largeur);
   // L'arbitre a sa matière à lui (ou le skin de tenue qu'il porte), sans époque ; l'entraîneur aussi.
-  const p =
-    edition === "arbitre"
+  const p = matiere ??
+    (edition === "arbitre"
       ? MATIERES[arbitre?.finition ?? "arbitre"]
       : edition === "entraineur"
         ? MATIERES_ENTRAINEUR[entraineur?.finition ?? "tableau"]
-        : matiereDe(edition, habillageDemande, epoque?.saison);
+        : matiereDe(edition, habillageDemande, epoque?.saison));
   // Une carte qui n'est pas celle d'un joueur : sa note et ses chiffres à elle.
   const autre = arbitre ?? entraineur;
   const note = autre ? autre.note : overall;

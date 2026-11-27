@@ -17,7 +17,7 @@
 // Pur : ni React, ni navigateur.
 
 /** Les débuts d'adresse ouverts à tous. */
-export const PUBLIC_ROUTES = ["/bienvenue", "/inscription", "/equipe/", "/p/", "/v/", "/confidentialite"] as const;
+export const PUBLIC_ROUTES = ["/bienvenue", "/inscription", "/equipe/", "/p/", "/v/", "/confidentialite", "/maquette-club"] as const;
 
 /** L'adresse de la présentation de la ligue. */
 export const CHEMIN_SFL = "/sfl";
