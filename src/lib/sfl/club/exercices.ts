@@ -9,27 +9,95 @@
 // Un club ajoute les siens (club.exercices, mutations.ts : creerExercice) ;
 // ils se lisent à côté de ceux de Bola, dans la même liste. Pur.
 
-import type { Club, Exercice, ThemeExercice } from "./types";
+import type { Club, Exercice, Qualite, ThemeExercice } from "./types";
 
 export const THEMES: { id: ThemeExercice; label: string }[] = [
   { id: "echauffement", label: "Échauffement" },
   { id: "technique", label: "Technique" },
   { id: "jeu", label: "Jeu réduit" },
   { id: "finition", label: "Finition" },
-  { id: "physique", label: "Physique" },
+  { id: "motricite", label: "Motricité" },
+  { id: "physique", label: "Vitesse et endurance" },
+  { id: "renforcement", label: "Renforcement" },
   { id: "gardien", label: "Gardiens" },
-  { id: "retour", label: "Retour au calme" },
+  { id: "retour", label: "Récupération" },
 ];
+
+export const QUALITES: { id: Qualite; label: string }[] = [
+  { id: "technique", label: "Technique" },
+  { id: "tactique", label: "Jeu collectif" },
+  { id: "finition", label: "Finition" },
+  { id: "motricite", label: "Motricité" },
+  { id: "vitesse", label: "Vitesse" },
+  { id: "vma", label: "VMA" },
+  { id: "endurance", label: "Endurance" },
+  { id: "renforcement", label: "Renforcement" },
+  { id: "prevention", label: "Prévention" },
+  { id: "bienetre", label: "Bien-être" },
+];
+
+/** Les qualités d'un thème, pour un exercice qui ne dit pas les siennes (ceux qu'un club écrit). */
+const PAR_THEME: Record<ThemeExercice, Qualite[]> = {
+  echauffement: ["technique", "prevention"],
+  motricite: ["motricite"],
+  technique: ["technique"],
+  jeu: ["tactique", "endurance"],
+  finition: ["finition"],
+  physique: ["vitesse", "endurance"],
+  renforcement: ["renforcement", "prevention"],
+  gardien: ["technique"],
+  retour: ["bienetre"],
+};
+export const qualitesDe = (e: Exercice): Qualite[] => e.qualites ?? PAR_THEME[e.theme];
+export const agesDe = (e: Exercice): [number, number] => e.ages ?? [6, 99];
+
+/**
+ * Ce que chaque exercice de Bola travaille, à quel âge, et s'il « tape »
+ * (sauts, sprints à fond, frappes puissantes). Les âges suivent les repères
+ * réunis le 27/11/2026 (doc « Espace entraîneur Bola Club ») : endurance par le
+ * jeu avant 12 ans, VMA par intermittent à partir de 12, renforcement au poids
+ * du corps avant la fin de la croissance, charges légères et encadrées à partir de 16.
+ */
+const META: Record<string, Pick<Exercice, "ages" | "qualites" | "impact">> = {
+  "b-rondo-4c1": { ages: [8, 99], qualites: ["technique", "tactique"] },
+  "b-passe-et-suis": { ages: [7, 99], qualites: ["technique"] },
+  "b-mobilite-ballon": { ages: [6, 99], qualites: ["motricite", "prevention"] },
+  "b-chat-ballon": { ages: [6, 13], qualites: ["technique", "motricite"] },
+  "b-controle-oriente": { ages: [9, 99], qualites: ["technique"] },
+  "b-conduite-slalom": { ages: [6, 12], qualites: ["technique", "motricite"] },
+  "b-une-deux": { ages: [9, 99], qualites: ["technique", "tactique"] },
+  "b-jeu-long": { ages: [12, 99], qualites: ["technique"] },
+  // Peu de jeu de tête chez les jeunes (UEFA) : à partir de 14 ans dans les séances proposées.
+  "b-tete": { ages: [14, 99], qualites: ["technique"] },
+  "b-dribble-1c1": { ages: [7, 99], qualites: ["technique", "vitesse"] },
+  "b-conservation-5c5": { ages: [10, 99], qualites: ["tactique", "endurance"] },
+  "b-match-4-buts": { ages: [8, 99], qualites: ["tactique", "endurance"] },
+  "b-transition-3c2": { ages: [10, 99], qualites: ["tactique", "vitesse", "finition"] },
+  "b-pressing-6s": { ages: [12, 99], qualites: ["tactique", "endurance"] },
+  "b-match-theme": { ages: [6, 99], qualites: ["tactique"] },
+  "b-sortie-de-balle": { ages: [12, 99], qualites: ["tactique", "technique"] },
+  "b-frappe-apres-controle": { ages: [8, 99], qualites: ["finition", "technique"], impact: true },
+  "b-centre-reprise": { ages: [10, 99], qualites: ["finition"], impact: true },
+  "b-face-au-gardien": { ages: [8, 99], qualites: ["finition"] },
+  "b-duel-surface": { ages: [10, 99], qualites: ["finition", "tactique"] },
+  "b-vitesse-reaction": { ages: [8, 99], qualites: ["vitesse"], impact: true },
+  "b-intermittent": { ages: [12, 99], qualites: ["vma", "endurance"] },
+  "b-appuis-echelle": { ages: [8, 99], qualites: ["motricite", "vitesse"] },
+  "b-gainage": { ages: [11, 99], qualites: ["renforcement", "prevention"] },
+  "b-gardien-prise": { ages: [8, 99], qualites: ["technique"] },
+  "b-gardien-sorties": { ages: [10, 99], qualites: ["technique"], impact: true },
+  "b-gardien-relance": { ages: [10, 99], qualites: ["technique"] },
+  "b-etirements": { ages: [6, 99], qualites: ["bienetre"] },
+  "b-tirs-au-but": { ages: [6, 99], qualites: ["finition", "bienetre"] },
+  "b-cercle": { ages: [6, 99], qualites: ["bienetre"] },
+};
 
 export const themeDit = (t: ThemeExercice) =>
   THEMES.find((x) => x.id === t)?.label ?? t;
 
-const ex = (e: Omit<Exercice, "origine">): Exercice => ({
-  ...e,
-  origine: "bola",
-});
+const ex = (e: Omit<Exercice, "origine">): Exercice => ({ ...META[e.id], ...e, origine: "bola" });
 
-/** La bibliothèque de Bola : 30 exercices, du plus simple au plus joué, thème par thème. */
+/** La bibliothèque de Bola : 47 exercices, du plus simple au plus joué, thème par thème. */
 export const BIBLIOTHEQUE: readonly Exercice[] = [
   // Échauffement
   ex({
@@ -403,7 +471,7 @@ export const BIBLIOTHEQUE: readonly Exercice[] = [
   ex({
     id: "b-gainage",
     nom: "Gainage et prévention",
-    theme: "physique",
+    theme: "renforcement",
     minutes: 10,
     joueurs: [1, 30],
     espace: "Au bord du terrain",
@@ -506,6 +574,305 @@ export const BIBLIOTHEQUE: readonly Exercice[] = [
       "Un joueur dit ce qu'il retient de la séance.",
       "L'entraîneur donne le rendez-vous suivant : jour, heure, lieu.",
     ],
+  }),
+
+  // Prévention, motricité
+  ex({
+    id: "b-echauffement-prevention",
+    nom: "Échauffement prévention",
+    theme: "echauffement",
+    minutes: 15,
+    joueurs: [1, 30],
+    espace: "Deux lignes de plots à 20 m",
+    materiel: "Plots",
+    but: "Préparer genoux, chevilles et cuisses avant l'effort : moins de blessures.",
+    deroule: [
+      "Course lente aller-retour, avec ouverture et fermeture de hanche, pas chassés, talons-fesses.",
+      "Gainage : 2 × 20 secondes face au sol, puis de chaque côté.",
+      "Équilibre sur une jambe, genou au-dessus du pied, 20 secondes par jambe, puis en se passant un ballon.",
+      "Petits sauts avec réception douce, genoux qui ne rentrent pas ; finir par deux accélérations progressives.",
+    ],
+    variante: "Pour les 7-12 ans : en jeu, sur des parcours, avec un ballon à chaque atelier.",
+    ages: [7, 99],
+    qualites: ["prevention", "motricite"],
+  }),
+  ex({
+    id: "b-parcours-motricite",
+    nom: "Parcours de motricité",
+    theme: "motricite",
+    minutes: 12,
+    joueurs: [4, 16],
+    espace: "Un parcours de 15 m",
+    materiel: "Cerceaux, plots, haies basses, ballons",
+    but: "Courir, sauter, tourner, s'équilibrer : les bases de tous les gestes.",
+    deroule: [
+      "Cerceaux à cloche-pied, slalom, passage sous une haie basse, roulade ou appui au sol.",
+      "Finir par une passe dans un mini-but.",
+      "Changer l'ordre des ateliers à chaque passage.",
+    ],
+    variante: "Ballon à la main, puis au pied sur tout le parcours.",
+    ages: [6, 10],
+    qualites: ["motricite"],
+  }),
+  ex({
+    id: "b-jonglerie-defis",
+    nom: "Défis de jonglerie",
+    theme: "motricite",
+    minutes: 8,
+    joueurs: [1, 30],
+    espace: "Libre",
+    materiel: "1 ballon par joueur",
+    but: "Apprivoiser le ballon avec toutes les surfaces.",
+    deroule: [
+      "Pied droit, pied gauche, cuisse, tête : un rebond au sol permis pour les plus jeunes.",
+      "Chacun note son record et essaie de le battre.",
+    ],
+    ages: [6, 15],
+    qualites: ["motricite", "technique"],
+  }),
+  ex({
+    id: "b-equilibre-duels",
+    nom: "Duels d'équilibre",
+    theme: "motricite",
+    minutes: 8,
+    joueurs: [2, 30],
+    espace: "Par deux",
+    materiel: "Aucun",
+    but: "Tenir ses appuis au contact, sans se blesser.",
+    deroule: [
+      "Face à face sur une jambe, mains contre mains : faire poser le pied de l'autre.",
+      "Épaule contre épaule, en marchant, puis en trottinant.",
+    ],
+    ages: [7, 14],
+    qualites: ["motricite", "prevention"],
+  }),
+
+  // Vitesse et endurance
+  ex({
+    id: "b-test-vma",
+    nom: "Test VMA de 6 minutes",
+    theme: "physique",
+    minutes: 15,
+    joueurs: [1, 30],
+    espace: "Une piste ou un tour de terrain balisé tous les 25 m",
+    materiel: "Plots, chronomètre",
+    but: "Mesurer la VMA de chacun pour régler les allures de l'intermittent.",
+    deroule: [
+      "Dix minutes d'échauffement progressif.",
+      "Six minutes de course, le plus loin possible, à allure régulière.",
+      "VMA en km/h = distance en mètres ÷ 100. La noter sur la fiche du joueur.",
+    ],
+    variante: "Deux à trois fois par saison : reprise, mi-saison, fin de saison.",
+    ages: [12, 99],
+    qualites: ["vma"],
+  }),
+  ex({
+    id: "b-intermittent-30-30",
+    nom: "Intermittent 30-30 à la VMA",
+    theme: "physique",
+    minutes: 15,
+    joueurs: [1, 30],
+    espace: "Une ligne droite, un plot par joueur à sa distance",
+    materiel: "Plots, sifflet",
+    but: "Élever la VMA en tenant des courses à vitesse maximale aérobie.",
+    deroule: [
+      "30 secondes à 100 % de sa VMA (distance = VMA en km/h × 8,3 m), 30 secondes de marche.",
+      "Deux séries de 6 minutes, 3 minutes de récupération entre les deux.",
+      "Chacun court jusqu'à son plot : les plus rapides ne tirent pas les autres.",
+    ],
+    ages: [13, 99],
+    qualites: ["vma", "endurance"],
+    impact: true,
+  }),
+  ex({
+    id: "b-repetition-sprints",
+    nom: "Répétition de sprints à 5",
+    theme: "physique",
+    minutes: 12,
+    joueurs: [2, 20],
+    espace: "20 m, deux changements de direction",
+    materiel: "Plots",
+    but: "Répéter les efforts courts du foot à 5, 6 ou 7.",
+    deroule: [
+      "Sprint de 20 m avec un demi-tour au milieu, 25 secondes de récupération active.",
+      "Six répétitions, trois minutes de pause, puis une seconde série.",
+    ],
+    ages: [14, 99],
+    qualites: ["vitesse", "vma"],
+    impact: true,
+  }),
+  ex({
+    id: "b-jeu-endurance",
+    nom: "Jeu d'endurance à 4 contre 4",
+    theme: "jeu",
+    minutes: 20,
+    joueurs: [8, 12],
+    espace: "Terrain de 30 × 20 m, deux buts",
+    materiel: "2 buts ou mini-buts, chasubles",
+    but: "Travailler l'endurance avec le ballon, sans courir pour courir.",
+    deroule: [
+      "Quatre périodes de 4 minutes, 2 minutes de récupération.",
+      "Ballons tout autour pour relancer vite : le jeu ne s'arrête pas.",
+      "Les remplaçants font les appuis sur les côtés.",
+    ],
+    ages: [10, 99],
+    qualites: ["endurance", "tactique"],
+  }),
+  ex({
+    id: "b-relais-vitesse",
+    nom: "Relais de vitesse",
+    theme: "physique",
+    minutes: 10,
+    joueurs: [6, 24],
+    espace: "Couloirs de 15 m",
+    materiel: "Plots, ballons",
+    but: "Aller vite en jouant, sans s'épuiser.",
+    deroule: [
+      "Équipes de 3 ou 4. Aller en sprint, retour en conduite de balle.",
+      "Départs variés : assis, dos tourné, au signal visuel.",
+      "Une récupération complète entre deux passages.",
+    ],
+    ages: [7, 14],
+    qualites: ["vitesse", "motricite"],
+  }),
+  ex({
+    id: "b-match-5c5-intermittent",
+    nom: "Foot à 5 en blocs courts",
+    theme: "jeu",
+    minutes: 20,
+    joueurs: [10, 15],
+    espace: "Terrain de foot à 5 (40 × 20 m)",
+    materiel: "2 buts, chasubles",
+    but: "Jouer à l'intensité d'un vrai match à 5.",
+    deroule: [
+      "Blocs de 3 minutes à fond, 2 minutes de récupération.",
+      "Une équipe de trois sort et entre à chaque bloc.",
+      "Règles du foot à 5 : pas de contact au gardien, rentrée au pied.",
+    ],
+    ages: [14, 99],
+    qualites: ["tactique", "vma"],
+  }),
+
+  // Renforcement
+  ex({
+    id: "b-circuit-poids-corps",
+    nom: "Circuit au poids du corps",
+    theme: "renforcement",
+    minutes: 15,
+    joueurs: [1, 30],
+    espace: "Six ateliers au bord du terrain",
+    materiel: "Plots",
+    but: "Renforcer tout le corps, sans charge.",
+    deroule: [
+      "Squats, fentes, pompes (genoux au sol si besoin), gainage, pont fessier, montées de genoux.",
+      "30 secondes par atelier, 30 secondes pour changer : deux tours.",
+      "Le geste propre avant la vitesse.",
+    ],
+    ages: [11, 99],
+    qualites: ["renforcement", "prevention"],
+  }),
+  ex({
+    id: "b-ischios-nordiques",
+    nom: "Ischios nordiques",
+    theme: "renforcement",
+    minutes: 8,
+    joueurs: [2, 30],
+    espace: "Par deux, sur l'herbe ou un tapis",
+    materiel: "Aucun",
+    but: "Protéger l'arrière des cuisses, la blessure la plus fréquente en foot.",
+    deroule: [
+      "À genoux, un partenaire tient les chevilles. Descendre le buste lentement, le dos droit.",
+      "Se rattraper avec les mains, remonter en poussant.",
+      "3 à 5 répétitions au début, jusqu'à 2 × 8 en quelques semaines.",
+    ],
+    ages: [14, 99],
+    qualites: ["renforcement", "prevention"],
+  }),
+  ex({
+    id: "b-pliometrie-basse",
+    nom: "Sauts bas et réceptions",
+    theme: "renforcement",
+    minutes: 10,
+    joueurs: [1, 30],
+    espace: "Une ligne de haies basses",
+    materiel: "Haies basses ou plots",
+    but: "Apprendre à sauter et à atterrir proprement : explosivité et genoux protégés.",
+    deroule: [
+      "Sauts pieds joints au-dessus des haies, réception silencieuse, genoux dans l'axe.",
+      "Puis sur une jambe, trois haies seulement.",
+      "Pas plus de 40 sauts par séance.",
+    ],
+    ages: [12, 99],
+    qualites: ["renforcement", "vitesse"],
+    impact: true,
+  }),
+  ex({
+    id: "b-musculation-encadree",
+    nom: "Musculation encadrée",
+    theme: "renforcement",
+    minutes: 20,
+    joueurs: [1, 12],
+    espace: "Salle ou bord de terrain",
+    materiel: "Haltères ou kettlebells légers, élastiques",
+    but: "Gagner en force avec des charges légères, sous les yeux de l'entraîneur.",
+    deroule: [
+      "Squat gobelet, soulevé de terre jambes tendues, tirage à l'élastique, développé haltères.",
+      "Trois séries de 8 à 12, la dernière répétition encore propre.",
+      "Monter la charge d'une séance à l'autre, jamais la même semaine qu'un test.",
+    ],
+    ages: [16, 99],
+    qualites: ["renforcement"],
+  }),
+
+  // Récupération et bien-être
+  ex({
+    id: "b-mobilite-respiration",
+    nom: "Mobilité et respiration",
+    theme: "retour",
+    minutes: 10,
+    joueurs: [1, 30],
+    espace: "Au centre du terrain",
+    materiel: "Aucun",
+    but: "Relâcher le corps et faire redescendre le cœur.",
+    deroule: [
+      "Postures de mobilité : hanches, dos, chevilles, 40 secondes chacune.",
+      "Respiration lente : 4 secondes pour inspirer, 6 pour expirer, pendant 2 minutes.",
+      "Chacun dit son ressenti de séance, de 1 à 10.",
+    ],
+    ages: [8, 99],
+    qualites: ["bienetre", "prevention"],
+  }),
+  ex({
+    id: "b-auto-massage",
+    nom: "Auto-massage au rouleau",
+    theme: "retour",
+    minutes: 8,
+    joueurs: [1, 20],
+    espace: "Vestiaire ou bord de terrain",
+    materiel: "Rouleaux de massage",
+    but: "Récupérer plus vite après une séance chargée.",
+    deroule: [
+      "Mollets, cuisses, fessiers : 45 secondes par zone, lentement.",
+      "S'arrêter sur un point sensible, jamais sur une douleur vive.",
+    ],
+    ages: [14, 99],
+    qualites: ["bienetre"],
+  }),
+  ex({
+    id: "b-gardien-appuis",
+    nom: "Appuis et réflexes du gardien",
+    theme: "gardien",
+    minutes: 10,
+    joueurs: [1, 3],
+    espace: "Le but",
+    materiel: "Plots, ballons",
+    but: "Se placer vite et réagir aux frappes proches.",
+    deroule: [
+      "Pas chassés entre deux plots, arrêt sur un tir au sol au signal.",
+      "Frappes rapprochées à 6 m, le gardien relevé entre chaque.",
+    ],
+    ages: [10, 99],
+    qualites: ["technique", "vitesse"],
   }),
 ];
 

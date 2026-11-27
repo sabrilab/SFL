@@ -7,13 +7,17 @@
 //     « — »), le compte en tête ; tant que la séance est à venir, tous les
 //     licenciés actifs de la catégorie y sont, chacun avec sa coche : la
 //     toucher le convoque ou le retire ;
+//     En tête, les modèles de convocation et, pour un match, la liste pour
+//     la feuille de match (convocation-outils.tsx) ;
 //   · Appel : par joueur, trois états, Présent, Retard, Absent ;
 //   · Stats (un match) : le score, puis les buts et les passes de chaque
 //     présent, en compteurs − / + ; « Enregistrer », dans une bande pleine au
 //     bas de l'écran. Les cartes bougent aussitôt (lib/sfl/club/saison.ts :
 //     jauges, « +1 », MVP du match), et le résultat arrive dans les actus.
 //   · Programme (un entraînement) : ses exercices et leurs minutes
-//     (programme.tsx) ; un entraînement à venir s'ouvre dessus.
+//     (programme.tsx) ; un entraînement à venir s'ouvre dessus ;
+//   · Bilan (un entraînement, à partir de son jour) : le ressenti du groupe et
+//     la remarque de l'entraîneur (bilan.tsx).
 // L'appel et les stats s'ouvrent le jour de la séance : avant, la page n'a
 // que la convocation. La saisie des stats est gardée par la page : passer
 // par « Appel » ne la perd pas ; « Enregistrer » s'éteint une fois fait.
@@ -30,10 +34,12 @@ import { nomComplet, type EtatAppel, type LigneStats, type Membre, type Seance a
 import { cn } from "@/lib/utils";
 import { CarteClub } from "./carte-club";
 import { compteDit, titreSeance } from "./fil-club";
+import { BilanSeance } from "./bilan";
+import { OutilsConvocation } from "./convocation-outils";
 import { Programme } from "./programme";
 import { Compteur, PageEnfant, Segment } from "./puces";
 
-type Vue = "programme" | "convocation" | "appel" | "stats";
+type Vue = "programme" | "convocation" | "appel" | "stats" | "bilan";
 
 const ETATS: { id: EtatAppel; label: string }[] = [
   { id: "present", label: "Présent" },
@@ -62,6 +68,7 @@ function Convocation({ s, joueurs }: { s: SeanceClub; joueurs: Membre[] }) {
   const lignes = aVenir ? club.membres.filter((m) => s.convoques.includes(m.id) || (estDeLaCategorie(m, s.categorie) && licenceActive(club, m.id))) : joueurs;
   return (
     <>
+      <OutilsConvocation s={s} />
       <span className="mono-label text-encre-3">{n.presents + n.absents > 0 ? compteDit(n) : `${s.convoques.length} ${s.convoques.length > 1 ? "convoqués" : "convoqué"}`}</span>
       <ul className="flex flex-col">
         {lignes.map((m) => {
@@ -220,6 +227,7 @@ export function SeanceDuClub({ id }: { id: string }) {
     { id: "convocation", label: "Convocation" },
     ...(ouverte ? [{ id: "appel" as const, label: "Appel" }] : []),
     ...(ouverte && match ? [{ id: "stats" as const, label: "Stats" }] : []),
+    ...(ouverte && !match ? [{ id: "bilan" as const, label: "Bilan" }] : []),
   ];
   // Un match joué s'ouvre sur ses stats, une séance passée sur son appel, une convocation sur ses réponses, un entraînement à venir sur son programme.
   const voulue: Vue = vue ?? (match && s.score ? "stats" : Object.keys(s.appel).length ? "appel" : match ? "convocation" : "programme");
@@ -235,6 +243,8 @@ export function SeanceDuClub({ id }: { id: string }) {
         <Convocation s={s} joueurs={joueurs} />
       ) : actuelle === "appel" ? (
         <Appel s={s} joueurs={joueurs} />
+      ) : actuelle === "bilan" ? (
+        <BilanSeance key={s.id} s={s} />
       ) : (
         <Stats s={s} joueurs={joueurs} brouillon={brouillon} onBrouillon={setSaisie} />
       )}

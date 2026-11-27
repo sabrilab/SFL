@@ -9,7 +9,7 @@
 // réponses d'une convocation, le score d'un match joué). Une séance mène à sa
 // page (seance.tsx). « Planifier » crée un entraînement, ou le même chaque
 // semaine pour 2 à 20 semaines (mutations.ts, planifierEntrainements) ;
-// « Exercices » ouvre la bibliothèque. Rien n'est envoyé.
+// « Exercices » ouvre la bibliothèque, le rond suivant le matériel. Rien n'est envoyé.
 
 import Link from "next/link";
 import { useState } from "react";
@@ -18,6 +18,7 @@ import {
   CalendarPlus,
   ChevronLeft,
   ChevronRight,
+  Package,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useClub } from "@/hooks/use-club";
@@ -63,6 +64,7 @@ function etatDe(club: Club, s: Seance): { texte: string; aFaire: boolean } {
     };
   }
   const p = programmeDit(s.programme);
+  if (s.jour < club.jour && s.bilan) return { texte: [p, `Ressenti ${s.bilan.ressenti}/10`].filter(Boolean).join(" · "), aFaire: false };
   if (p) return { texte: p, aFaire: false };
   return s.jour >= club.jour
     ? { texte: "Programme à écrire", aFaire: true }
@@ -281,7 +283,7 @@ export function PlanningDuClub() {
   const total = jours.reduce((t, j) => t + j.seances.length, 0);
   return (
     <PageEnfant titre="Planning" sous={semaineDite(lundi)}>
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-[1fr_1fr_auto] gap-2">
         <Planifier
           depart={categorie}
           onPlanifie={(j) => setLundi(lundiDe(j))}
@@ -292,6 +294,9 @@ export function PlanningDuClub() {
         >
           <BookOpen className="size-4" strokeWidth={2.4} />
           Exercices
+        </Link>
+        <Link href="/club/materiel" aria-label="Matériel" className="bouton-secondaire grid size-11 place-items-center">
+          <Package className="size-[18px]" strokeWidth={2.2} />
         </Link>
       </div>
       <div className="flex flex-col gap-3">

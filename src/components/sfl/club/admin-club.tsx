@@ -240,6 +240,7 @@ export function AdminClub() {
             ["/club/categories", "Catégories"],
             ["/club/planning", "Planning"],
             ["/club/exercices", "Exercices"],
+            ["/club/materiel", "Matériel"],
           ] as const
         ).map(([href, label]) => (
           <Link key={href} href={href} className="bouton-secondaire flex h-12 items-center justify-between px-5 text-[15px] font-semibold">

@@ -23,7 +23,7 @@
 import type { Stats } from "@/lib/sfl/engine";
 import type { Poste } from "@/lib/sfl/inscription";
 import { PROGRAMMES_DEMO } from "./exercices";
-import type { Annonce, Categorie, Club, EtatAppel, Licence, Membre, NotePrivee, ParentClub, Seance, Staff } from "./types";
+import type { Annonce, Categorie, Club, EtatAppel, Licence, Membre, Mesure, NotePrivee, ParentClub, Seance, Staff } from "./types";
 
 /** Le jour de la démo. */
 export const JOUR_DEMO = "2026-11-12";
@@ -286,6 +286,46 @@ export function clubDemo(): Club {
     });
   }
 
+  // Le suivi physique, sans hasard (le reste du club ne bouge pas) : deux tailles chez les U13 et les U17
+  // (fin août, début novembre), deux joueurs par catégorie en poussée de croissance ; la VMA des U17 et des
+  // Seniors au test de septembre ; le poids des adultes.
+  const mesures: Mesure[] = [];
+  const h = (t: string) => [...t].reduce((a, c) => (a * 31 + c.charCodeAt(0)) % 9973, 7);
+  const POUSSEES = new Set(["u13-04", "u13-11", "u17-06", "u17-12"]);
+  for (const m of membres) {
+    const k = h(m.id);
+    if (m.categorie === "u13" || m.categorie === "u17") {
+      const base = (m.categorie === "u13" ? 146 : 168) + (k % 14);
+      const gain = POUSSEES.has(m.id) ? 2.2 + (k % 5) / 10 : 0.6 + (k % 7) / 10;
+      mesures.push({ id: `me-${m.id}-a`, membre: m.id, jour: "2026-08-20", tailleCm: base });
+      mesures.push({ id: `me-${m.id}-b`, membre: m.id, jour: "2026-11-05", tailleCm: Math.round((base + gain) * 10) / 10 });
+    }
+    if (m.categorie === "u17" || m.categorie === "seniors" || m.categorie === "feminines") {
+      const adulte = m.categorie !== "u17";
+      mesures.push({
+        id: `me-${m.id}-v`,
+        membre: m.id,
+        jour: "2026-09-09",
+        vma: Math.round(((m.categorie === "feminines" ? 12.5 : 14) + (k % 30) / 10) * 10) / 10,
+        ...(adulte ? { tailleCm: (m.categorie === "feminines" ? 160 : 172) + (k % 16), poidsKg: (m.categorie === "feminines" ? 55 : 68) + (k % 17) } : {}),
+      });
+    }
+  }
+  // Le bilan des derniers mercredis : le ressenti du groupe et la remarque de l'entraîneur.
+  const BILANS: Record<string, [number, string]> = {
+    "u13-e9": [6, "Bonne séance, le chat au ballon les a réveillés."],
+    "u13-e10": [5, "Conduite encore trop loin du pied pour la moitié du groupe."],
+    "u17-e9": [6, "Le jeu à quatre buts a bien tourné."],
+    "u17-e10": [8, "Jambes lourdes après le match de samedi : séance trop chargée, alléger la prochaine."],
+    "seniors-e10": [7, "Intermittent bien tenu, trois absents au travail."],
+    "feminines-e10": [6, "Bon engagement dans les duels."],
+  };
+  for (const s of seances) {
+    const b = BILANS[s.id];
+    const staff = CATEGORIES.find((c) => c.id === s.categorie)?.entraineurs[0];
+    if (b && staff) s.bilan = { ressenti: b[0], remarque: b[1], auteur: staff };
+  }
+
   const notes: NotePrivee[] = [
     { id: "n-1", membre: "u13-13", auteur: "s-e1", jour: "2026-10-18", texte: "Voit le jeu avant les autres. Essai avec les U17 dès novembre." },
     { id: "n-2", membre: "u13-13", auteur: "s-e1", jour: "2026-11-08", texte: "Premier entraînement avec les U17 : à l'aise, parle peu. Le laisser prendre ses marques." },
@@ -320,6 +360,34 @@ export function clubDemo(): Club {
     notes,
     annonces,
     exercices: [],
+    mesures,
+    materiel: (
+      [
+        ["Ballons taille 4", 24, 2],
+        ["Ballons taille 5", 36, 4],
+        ["Ballons de futsal", 10, 0],
+        ["Plots", 80, 0],
+        ["Coupelles", 60, 6],
+        ["Chasubles (3 couleurs)", 36, 3],
+        ["Mini-buts", 6, 1],
+        ["Haies basses", 12, 0],
+        ["Échelles de rythme", 2, 0],
+        ["Cerceaux", 16, 0],
+        ["Rouleaux de massage", 8, 0],
+        ["Kettlebells légers", 10, 0],
+        ["Élastiques", 12, 2],
+        ["Trousses de secours", 3, 0],
+      ] as const
+    ).map(([nom, quantite, aRemplacer], i) => ({ id: `ma-${i + 1}`, nom, quantite, aRemplacer })),
+    // Le groupe du samedi des U17 : tous sauf les deux joueurs en poussée de croissance, ménagés.
+    groupes: [
+      {
+        id: "g-1",
+        categorie: "u17",
+        nom: "Groupe du samedi",
+        joueurs: membres.filter((m) => m.categorie === "u17" && !enAttente.includes(m.id) && !POUSSEES.has(m.id)).map((m) => m.id),
+      },
+    ],
     demo: { admin: "s-admin", entraineur: "s-e1", joueur: "u17-15", parent: "p-u13-13" },
   };
 }

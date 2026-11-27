@@ -109,6 +109,43 @@ export interface Seance {
   stats: Record<string, LigneStats>;
   /** Le programme d'un entraînement : ses exercices dans l'ordre, chacun avec ses minutes ; absent ou vide tant qu'il n'est pas fait. */
   programme?: LigneProgramme[];
+  /** Le bilan d'un entraînement, après coup : le ressenti du groupe (1 à 10) et la remarque de l'entraîneur. */
+  bilan?: Bilan;
+}
+
+export interface Bilan {
+  /** Le ressenti moyen du groupe, de 1 (facile) à 10 (épuisant). */
+  ressenti: number;
+  remarque: string;
+  auteur: string;
+}
+
+/** Une ligne de l'inventaire du club. */
+export interface Materiel {
+  id: string;
+  nom: string;
+  quantite: number;
+  /** Combien sont à remplacer (abîmés, perdus). */
+  aRemplacer: number;
+}
+
+/** Un modèle de convocation : le groupe habituel d'une catégorie, à reprendre d'un geste. */
+export interface Groupe {
+  id: string;
+  categorie: string;
+  nom: string;
+  joueurs: string[];
+}
+
+/** Une mesure d'un joueur : sa taille, sa VMA, et son poids s'il est adulte. */
+export interface Mesure {
+  id: string;
+  membre: string;
+  jour: string;
+  tailleCm?: number;
+  poidsKg?: number;
+  /** En km/h. */
+  vma?: number;
 }
 
 export interface LigneProgramme {
@@ -117,7 +154,10 @@ export interface LigneProgramme {
   minutes: number;
 }
 
-export type ThemeExercice = "echauffement" | "technique" | "jeu" | "finition" | "physique" | "gardien" | "retour";
+export type ThemeExercice = "echauffement" | "motricite" | "technique" | "jeu" | "finition" | "physique" | "renforcement" | "gardien" | "retour";
+
+/** Ce qu'un exercice travaille : la base des séances proposées (proposition.ts). */
+export type Qualite = "motricite" | "technique" | "tactique" | "finition" | "vitesse" | "vma" | "endurance" | "renforcement" | "prevention" | "bienetre";
 
 /** Un exercice : ceux de Bola (exercices.ts, BIBLIOTHEQUE), ou ceux qu'un club écrit. */
 export interface Exercice {
@@ -134,6 +174,12 @@ export interface Exercice {
   but: string;
   deroule: string[];
   variante?: string;
+  /** L'âge conseillé, de … à … ans (99 : sans limite). Absent : de 6 à 99. */
+  ages?: [number, number];
+  /** Ce qu'il travaille ; absent : déduit du thème. */
+  qualites?: Qualite[];
+  /** Sauts, sprints à fond ou frappes puissantes : allégé pendant une poussée de croissance. */
+  impact?: boolean;
   origine: "bola" | "club";
   /** Un exercice du club : qui l'a écrit. */
   auteur?: string;
@@ -175,6 +221,10 @@ export interface Club {
   annonces: Annonce[];
   /** Les exercices écrits par le club, à côté de ceux de Bola. */
   exercices: Exercice[];
+  /** Les mesures des joueurs (suivi.ts), seulement pour le staff, le joueur et son parent. */
+  mesures: Mesure[];
+  materiel: Materiel[];
+  groupes: Groupe[];
   /** Qui est « moi » sous chaque point de vue de la démo. */
   demo: Record<Role, string>;
 }

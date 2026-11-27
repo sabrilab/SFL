@@ -28,6 +28,7 @@ import { lireBlason } from "@/lib/sfl/blason";
 import { POSTES, type Poste } from "@/lib/sfl/inscription";
 import {
   aLAgeDe,
+  ageLe,
   ageMaxDuNom,
   categorieDe,
   compteLicences,
@@ -40,7 +41,7 @@ import {
   surclassementsPossibles,
 } from "./regles";
 import { exerciceDe, THEMES } from "./exercices";
-import type { Categorie, Club, EtatAppel, Exercice, Licence, LigneProgramme, LigneStats, Moi, Reponse, Seance, ThemeExercice } from "./types";
+import type { Categorie, Club, EtatAppel, Exercice, Groupe, Licence, LigneProgramme, LigneStats, Moi, Reponse, Seance, ThemeExercice } from "./types";
 
 export type Resultat = { ok: true; club: Club } | { ok: false; refus: string };
 
@@ -506,4 +507,119 @@ export function creerExercice(club: Club, moi: Moi, n: NouvelExercice): Resultat
     auteur: moi.id,
   };
   return ok({ ...club, exercices: [...club.exercices, e] });
+}
+
+/** Poser un programme entier (une séance proposée, prise par l'entraîneur) : il remplace l'ancien. */
+export function poserProgramme(club: Club, moi: Moi, seance: string, lignes: readonly LigneProgramme[]): Resultat {
+  if (!lignes.length || lignes.length > PROGRAMME_MAX) return refus(`De 1 à ${PROGRAMME_MAX} exercices.`);
+  for (const l of lignes) {
+    if (!exerciceDe(club, l.exercice)) return refus("Exercice introuvable.");
+    if (!Number.isInteger(l.minutes) || l.minutes < MINUTES[0] || l.minutes > MINUTES[1]) return refus(`De ${MINUTES[0]} à ${MINUTES[1]} minutes.`);
+  }
+  return avecProgramme(club, moi, seance, () => lignes.map((l) => ({ exercice: l.exercice, minutes: l.minutes })));
+}
+
+export interface NouvelleMesure {
+  tailleCm?: number;
+  poidsKg?: number;
+  vma?: number;
+}
+
+/**
+ * Une mesure d'un joueur, par son staff : la taille (100 à 220 cm), la VMA (8
+ * à 25 km/h) et, pour un adulte seulement, le poids (20 à 150 kg).
+ */
+export function ajouterMesure(club: Club, moi: Moi, membre: string, n: NouvelleMesure): Resultat {
+  const m = membreDe(club, membre);
+  if (!m) return refus("Joueur introuvable.");
+  if (!droits(club, moi).gereJoueur(m)) return refus(PAS_LE_DROIT);
+  const { tailleCm, poidsKg, vma } = n;
+  if (tailleCm === undefined && poidsKg === undefined && vma === undefined) return refus("Une taille, un poids ou une VMA.");
+  if (tailleCm !== undefined && !(tailleCm >= 100 && tailleCm <= 220)) return refus("Une taille de 100 à 220 cm.");
+  if (poidsKg !== undefined && !(poidsKg >= 20 && poidsKg <= 150)) return refus("Un poids de 20 à 150 kg.");
+  if (vma !== undefined && !(vma >= 8 && vma <= 25)) return refus("Une VMA de 8 à 25 km/h.");
+  // Le poids, seulement pour un adulte (décision de Bola, 27/11/2026).
+  if (poidsKg !== undefined && ageLe(m.naissance, club.jour) < 18) return refus("Le poids ne se note que pour un adulte.");
+  let k = club.mesures.length + 1;
+  while (club.mesures.some((x) => x.id === `me-${k}`)) k++;
+  const mesure = {
+    id: `me-${k}`,
+    membre,
+    jour: club.jour,
+    ...(tailleCm !== undefined ? { tailleCm: Math.round(tailleCm * 10) / 10 } : {}),
+    ...(poidsKg !== undefined ? { poidsKg: Math.round(poidsKg * 10) / 10 } : {}),
+    ...(vma !== undefined ? { vma: Math.round(vma * 10) / 10 } : {}),
+  };
+  return ok({ ...club, mesures: [...club.mesures, mesure] });
+}
+
+/** Le bilan d'un entraînement, à partir de son jour : le ressenti du groupe (1 à 10) et une remarque. */
+export function bilanSeance(club: Club, moi: Moi, seance: string, ressenti: number, remarque: string): Resultat {
+  const s = seanceDe(club, seance);
+  if (!s) return refus("Séance introuvable.");
+  if (s.genre !== "entrainement") return refus("Le bilan est celui d'un entraînement.");
+  if (!droits(club, moi).gere(s.categorie)) return refus(PAS_LE_DROIT);
+  if (!seanceOuverte(s, club.jour)) return refus("Le bilan se fait le jour de la séance.");
+  if (!Number.isInteger(ressenti) || ressenti < 1 || ressenti > 10) return refus("Un ressenti de 1 à 10.");
+  const r = remarque.trim();
+  if (r.length > 500) return refus("500 caractères au plus.");
+  return ok(avecSeance(club, { ...s, bilan: { ressenti, remarque: r, auteur: moi.id } }));
+}
+
+/** Le staff tient l'inventaire : l'admin, ou un entraîneur d'au moins une catégorie. */
+const estStaff = (club: Club, moi: Moi) => {
+  const d = droits(club, moi);
+  return d.administre || club.categories.some((c) => d.gere(c.id));
+};
+
+export function ajouterMateriel(club: Club, moi: Moi, nom: string, quantite: number): Resultat {
+  if (!estStaff(club, moi)) return refus("Seul le staff tient le matériel.");
+  const n = nomPropre(nom);
+  if (n.length < 2 || n.length > 40) return refus("Un nom de 2 à 40 caractères.");
+  if (club.materiel.some((m) => cle(m.nom) === cle(n))) return refus("Il est déjà dans l'inventaire.");
+  if (!Number.isInteger(quantite) || quantite < 0 || quantite > 999) return refus("Une quantité de 0 à 999.");
+  let k = club.materiel.length + 1;
+  while (club.materiel.some((m) => m.id === `ma-${k}`)) k++;
+  return ok({ ...club, materiel: [...club.materiel, { id: `ma-${k}`, nom: n, quantite, aRemplacer: 0 }] });
+}
+
+/** Changer le compte d'une ligne : la quantité, ou combien sont à remplacer (jamais plus que la quantité). */
+export function compterMateriel(club: Club, moi: Moi, id: string, quantite: number, aRemplacer: number): Resultat {
+  if (!estStaff(club, moi)) return refus("Seul le staff tient le matériel.");
+  if (!club.materiel.some((m) => m.id === id)) return refus("Matériel introuvable.");
+  if (!Number.isInteger(quantite) || quantite < 0 || quantite > 999) return refus("Une quantité de 0 à 999.");
+  if (!Number.isInteger(aRemplacer) || aRemplacer < 0 || aRemplacer > quantite) return refus("Pas plus à remplacer qu'il n'y en a.");
+  return ok({ ...club, materiel: club.materiel.map((m) => (m.id === id ? { ...m, quantite, aRemplacer } : m)) });
+}
+
+/** Garder les convoqués d'une séance comme modèle de convocation de sa catégorie. */
+export function enregistrerGroupe(club: Club, moi: Moi, seance: string, nom: string): Resultat {
+  const s = seanceDe(club, seance);
+  if (!s) return refus("Séance introuvable.");
+  if (!droits(club, moi).gere(s.categorie)) return refus(PAS_LE_DROIT);
+  const n = nomPropre(nom);
+  if (n.length < 2 || n.length > 30) return refus("Un nom de 2 à 30 caractères.");
+  if (!s.convoques.length) return refus("Personne n'est convoqué.");
+  const existant = club.groupes.find((g) => g.categorie === s.categorie && cle(g.nom) === cle(n));
+  if (existant) return ok({ ...club, groupes: club.groupes.map((g) => (g === existant ? { ...g, joueurs: [...s.convoques] } : g)) });
+  let k = club.groupes.length + 1;
+  while (club.groupes.some((g) => g.id === `g-${k}`)) k++;
+  const g: Groupe = { id: `g-${k}`, categorie: s.categorie, nom: n, joueurs: [...s.convoques] };
+  return ok({ ...club, groupes: [...club.groupes, g] });
+}
+
+/** Convoquer un modèle à une séance à venir : ses joueurs encore licenciés de la catégorie, et eux seuls. */
+export function appliquerGroupe(club: Club, moi: Moi, seance: string, groupe: string): Resultat {
+  const s = seanceDe(club, seance);
+  const g = club.groupes.find((x) => x.id === groupe);
+  if (!s || !g) return refus("Introuvable.");
+  if (g.categorie !== s.categorie) return refus("Ce modèle est celui d'une autre catégorie.");
+  if (!droits(club, moi).gere(s.categorie)) return refus(PAS_LE_DROIT);
+  if (!seanceAVenir(s, club.jour)) return refus("La séance est passée.");
+  const convoques = g.joueurs.filter((id) => {
+    const m = membreDe(club, id);
+    return !!m && estDeLaCategorie(m, s.categorie) && licenceActive(club, id);
+  });
+  const reponses = Object.fromEntries(Object.entries(s.reponses).filter(([id]) => convoques.includes(id)));
+  return ok(avecSeance(club, { ...s, convoques, reponses }));
 }

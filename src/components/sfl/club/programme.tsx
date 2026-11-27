@@ -5,7 +5,8 @@
 // minutes en − / + (de 5 en 5), et la durée totale en tête. Toucher un
 // exercice ouvre sa fiche (déroulé, matériel), où on le monte, le descend ou
 // le retire ; « Ajouter un exercice » ouvre la bibliothèque (exercices.tsx) ;
-// un programme vide se reprend d'un autre entraînement de ses catégories. Il
+// un programme vide se reprend d'un autre entraînement de ses catégories ;
+// « Proposer une séance » en bâtit une pour l'âge et le groupe (proposer.tsx). Il
 // s'écrit jusqu'au jour de la séance ; après, il se lit. Rien n'est envoyé.
 
 import { useState } from "react";
@@ -20,6 +21,7 @@ import { categorieDe } from "@/lib/sfl/club/regles";
 import type { Seance as SeanceClub } from "@/lib/sfl/club/types";
 import { cn } from "@/lib/utils";
 import { DetailExercice, exerciceDit, ListeExercices } from "./exercices";
+import { ProposerSeance } from "./proposer";
 import { Feuille, FICHE, NOMBRE } from "./puces";
 
 const ROND =
@@ -38,6 +40,8 @@ export function Programme({ s }: { s: SeanceClub }) {
       ? programmesAReprendre(club, moi, s.id).slice(0, 6)
       : [];
   const ouverte = fiche !== null ? lignes[fiche] : undefined;
+  // Le matériel des exercices, une fois chacun.
+  const aPrevoir = [...new Set(lignes.flatMap((l) => (exerciceDe(club, l.exercice)?.materiel ?? "").split(/,\s*/)).map((x) => x.trim()).filter((x) => x && x !== "Aucun"))];
   const exo = ouverte ? exerciceDe(club, ouverte.exercice) : null;
   return (
     <>
@@ -136,6 +140,13 @@ export function Programme({ s }: { s: SeanceClub }) {
           {ecrit ? "Programme à écrire" : "Pas de programme"}
         </span>
       )}
+      {aPrevoir.length > 0 && (
+        <p className="flex gap-3 text-corps text-encre-2">
+          <span className="mono-label shrink-0 pt-0.5 text-encre-3">À prévoir</span>
+          <span className="text-pretty">{aPrevoir.join(" · ")}</span>
+        </p>
+      )}
+      {ecrit && <ProposerSeance s={s} principal={!lignes.length} />}
       {ecrit && (
         <div
           className={cn(
@@ -146,7 +157,7 @@ export function Programme({ s }: { s: SeanceClub }) {
           <button
             type="button"
             onClick={() => setBibli(true)}
-            className="bouton-principal flex h-12 items-center justify-center gap-2 text-[15px] font-semibold"
+            className="bouton-secondaire flex h-12 items-center justify-center gap-2 text-[15px] font-semibold"
           >
             <Plus className="size-4" strokeWidth={2.6} />
             Ajouter un exercice
