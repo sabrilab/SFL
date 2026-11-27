@@ -48,7 +48,9 @@ export function formeDuClub(x: unknown): x is Club {
     liste(c.licences, (l) => texte(l.id) && texte(l.statut)) &&
     liste(c.seances, (l) => texte(l.id) && texte(l.genre) && texte(l.categorie) && texte(l.jour) && texte(l.heure) && Array.isArray(l.convoques) && objet(l.reponses) && objet(l.appel) && objet(l.stats)) &&
     liste(c.notes, (l) => texte(l.id) && texte(l.membre) && texte(l.texte)) &&
-    liste(c.annonces, (l) => texte(l.id) && texte(l.texte));
+    liste(c.annonces, (l) => texte(l.id) && texte(l.texte)) &&
+    liste(c.exercices, (l) => texte(l.id) && texte(l.nom) && texte(l.theme) && typeof l.minutes === "number" && Array.isArray(l.deroule)) &&
+    (c.seances as Record<string, unknown>[]).every((l) => l.programme === undefined || liste(l.programme, (p) => texte(p.exercice) && typeof p.minutes === "number"));
   if (!bon || !objet(c.demo)) return false;
   // « Moi », sous chaque point de vue, existe encore.
   const d = c.demo;

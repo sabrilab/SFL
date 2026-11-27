@@ -22,10 +22,14 @@
 
 import type { Stats } from "@/lib/sfl/engine";
 import type { Poste } from "@/lib/sfl/inscription";
+import { PROGRAMMES_DEMO } from "./exercices";
 import type { Annonce, Categorie, Club, EtatAppel, Licence, Membre, NotePrivee, ParentClub, Seance, Staff } from "./types";
 
 /** Le jour de la démo. */
 export const JOUR_DEMO = "2026-11-12";
+
+/** Le programme d'une séance de la démo : un des quatre, à tour de rôle. */
+const programmeDemo = (k: number) => PROGRAMMES_DEMO[k % PROGRAMMES_DEMO.length].map(([exercice, minutes]) => ({ exercice, minutes }));
 
 // Un tirage fixe : le même club à chaque chargement.
 function tirage(graine: number) {
@@ -239,6 +243,7 @@ export function clubDemo(): Club {
         reponses: {},
         appel,
         stats: {},
+        programme: programmeDemo(k + EFFECTIFS.indexOf(e)),
       });
     });
     // Le week-end qui vient : la convocation est partie, les réponses arrivent.
@@ -276,6 +281,8 @@ export function clubDemo(): Club {
       reponses: {},
       appel: {},
       stats: {},
+      // Le prochain entraînement : celui des U13 est prêt, les autres restent à écrire.
+      ...(e.cat === "u13" ? { programme: programmeDemo(2) } : {}),
     });
   }
 
@@ -312,6 +319,7 @@ export function clubDemo(): Club {
     seances,
     notes,
     annonces,
+    exercices: [],
     demo: { admin: "s-admin", entraineur: "s-e1", joueur: "u17-15", parent: "p-u13-13" },
   };
 }

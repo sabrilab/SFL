@@ -4,7 +4,8 @@
 // haut »), le même sous ses trois onglets : l'écusson et le nom du club, qui
 // déroulent les ligues comme le sigle des Actus (choix-ligue.tsx : SFL,
 // Bola, le club) ; à droite, selon le point de vue, le rond de l'admin
-// (« Gérer le club ») ou celui de l'entraîneur (« Catégories »), et pour un
+// (« Gérer le club ») ou celui de l'entraîneur (« Catégories »), précédés
+// pour le staff de celui du planning (planning.tsx), et pour un
 // joueur sa carte (pour un parent, celle de son enfant), qui mène à sa
 // fiche : sa carte et son évolution ; dessous,
 // les onglets de verre des Actus : Actus, Effectif, Classements ; puis le
@@ -15,7 +16,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { ChevronDown, Layers, Settings } from "lucide-react";
+import { CalendarDays, ChevronDown, Layers, Settings } from "lucide-react";
 import { LigneClubDuMenu, SigleLigue } from "@/components/sfl/choix-ligue";
 import { Ecusson } from "@/components/sfl/equipe/ecusson";
 import { useClub } from "@/hooks/use-club";
@@ -101,7 +102,22 @@ export function PageClub({ onglet, children }: { onglet: OngletClub; children: R
         <h1 className="sr-only">{club.nom}</h1>
         <div className="flex items-center justify-between gap-3 px-5">
           <MenuDuClub />
-          {droits.administre ? (
+          {(droits.administre || role === "entraineur") && droits.actif ? (
+            <span className="flex shrink-0 gap-2">
+              <Link href="/club/planning" aria-label="Planning" className="bouton-secondaire grid size-11 shrink-0 place-items-center">
+                <CalendarDays className="size-[18px]" strokeWidth={2.2} />
+              </Link>
+              {droits.administre ? (
+                <Link href="/club/admin" aria-label="Gérer le club" className="bouton-secondaire grid size-11 shrink-0 place-items-center">
+                  <Settings className="size-[18px]" strokeWidth={2.2} />
+                </Link>
+              ) : (
+                <Link href="/club/categories" aria-label="Catégories" className="bouton-secondaire grid size-11 shrink-0 place-items-center">
+                  <Layers className="size-[18px]" strokeWidth={2.2} />
+                </Link>
+              )}
+            </span>
+          ) : droits.administre ? (
             <Link href="/club/admin" aria-label="Gérer le club" className="bouton-secondaire grid size-11 shrink-0 place-items-center">
               <Settings className="size-[18px]" strokeWidth={2.2} />
             </Link>

@@ -107,6 +107,36 @@ export interface Seance {
   /** L'appel, joueur par joueur ; vide tant qu'il n'est pas fait. */
   appel: Record<string, EtatAppel>;
   stats: Record<string, LigneStats>;
+  /** Le programme d'un entraînement : ses exercices dans l'ordre, chacun avec ses minutes ; absent ou vide tant qu'il n'est pas fait. */
+  programme?: LigneProgramme[];
+}
+
+export interface LigneProgramme {
+  /** Un exercice de la bibliothèque (exercices.ts) ou du club. */
+  exercice: string;
+  minutes: number;
+}
+
+export type ThemeExercice = "echauffement" | "technique" | "jeu" | "finition" | "physique" | "gardien" | "retour";
+
+/** Un exercice : ceux de Bola (exercices.ts, BIBLIOTHEQUE), ou ceux qu'un club écrit. */
+export interface Exercice {
+  id: string;
+  nom: string;
+  theme: ThemeExercice;
+  /** La durée conseillée. */
+  minutes: number;
+  /** Le nombre de joueurs, au moins et au plus. */
+  joueurs: [number, number];
+  espace: string;
+  materiel: string;
+  /** Ce qu'on y travaille, en une phrase. */
+  but: string;
+  deroule: string[];
+  variante?: string;
+  origine: "bola" | "club";
+  /** Un exercice du club : qui l'a écrit. */
+  auteur?: string;
 }
 
 export interface NotePrivee {
@@ -143,6 +173,8 @@ export interface Club {
   seances: Seance[];
   notes: NotePrivee[];
   annonces: Annonce[];
+  /** Les exercices écrits par le club, à côté de ceux de Bola. */
+  exercices: Exercice[];
   /** Qui est « moi » sous chaque point de vue de la démo. */
   demo: Record<Role, string>;
 }

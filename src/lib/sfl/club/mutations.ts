@@ -13,6 +13,11 @@
 //     écrire une note privée, créer un match ou un entraînement, convoquer
 //     ou retirer un joueur, faire l'appel, saisir les stats et le score (le
 //     jour de la séance, pas avant), publier une annonce ;
+//   · l'entraîneur, dans ses catégories (et l'admin partout), pour un
+//     entraînement : planifier une série chaque semaine, écrire son
+//     programme (ajouter, retirer, ranger un exercice, changer ses minutes),
+//     reprendre celui d'un autre entraînement ; tout le staff écrit un
+//     exercice du club (exercices.ts) ;
 //   · le joueur (ou son parent) : répondre à sa convocation, tant que la
 //     séance n'est pas passée.
 // Un joueur qui change de catégorie, perd son surclassement ou sa licence
@@ -34,7 +39,8 @@ import {
   seanceOuverte,
   surclassementsPossibles,
 } from "./regles";
-import type { Categorie, Club, EtatAppel, Licence, LigneStats, Moi, Reponse, Seance } from "./types";
+import { exerciceDe, THEMES } from "./exercices";
+import type { Categorie, Club, EtatAppel, Exercice, Licence, LigneProgramme, LigneStats, Moi, Reponse, Seance, ThemeExercice } from "./types";
 
 export type Resultat = { ok: true; club: Club } | { ok: false; refus: string };
 
@@ -370,4 +376,134 @@ export function libererLicence(club: Club, moi: Moi, compte: string): Resultat {
   if (!club.licences.some((l) => l.compte === compte)) return refus("Ce compte n'a pas de licence.");
   // Il sort du club : plus de convocation à venir pour lui (regles.ts : sans licence active, il ne lit ni ne gère plus rien).
   return ok(convocationsTenues({ ...club, licences: club.licences.filter((l) => l.compte !== compte) }));
+}
+
+/** Le jour « AAAA-MM-JJ » n jours plus tard. */
+export function plusJours(iso: string, n: number): string {
+  const [a, m, d] = iso.split("-").map(Number);
+  return new Date(Date.UTC(a, m - 1, d + n)).toISOString().slice(0, 10);
+}
+
+export const SEMAINES_MAX = 20;
+
+/**
+ * Planifier des entraînements : le même jour de la semaine, à la même heure
+ * et au même lieu, `semaines` fois (1 : une seule séance). Chacun est une
+ * séance à part (creerSeance) : on la convoque, on écrit son programme à
+ * part. Un jour où la catégorie a déjà un entraînement est sauté.
+ */
+export function planifierEntrainements(club: Club, moi: Moi, n: Omit<NouvelleSeance, "genre" | "adversaire">, semaines: number): Resultat {
+  if (!Number.isInteger(semaines) || semaines < 1 || semaines > SEMAINES_MAX) return refus(`De 1 à ${SEMAINES_MAX} semaines.`);
+  let c = club;
+  let poses = 0;
+  for (let k = 0; k < semaines; k++) {
+    const jour = plusJours(n.jour, 7 * k);
+    if (c.seances.some((s) => s.categorie === n.categorie && s.genre === "entrainement" && s.jour === jour)) continue;
+    const r = creerSeance(c, moi, { ...n, genre: "entrainement", jour });
+    if (!r.ok) return r;
+    c = r.club;
+    poses++;
+  }
+  if (!poses) return refus("Ces entraînements sont déjà au planning.");
+  return ok(c);
+}
+
+export const PROGRAMME_MAX = 12;
+const MINUTES = [5, 90] as const;
+
+/** Le programme d'un entraînement s'écrit par son staff, jusqu'au jour de la séance. */
+function programmable(club: Club, moi: Moi, seance: string): Seance | string {
+  const s = seanceDe(club, seance);
+  if (!s) return "Séance introuvable.";
+  if (s.genre !== "entrainement") return "Le programme est celui d'un entraînement.";
+  if (!droits(club, moi).gere(s.categorie)) return PAS_LE_DROIT;
+  if (s.jour < club.jour) return "La séance est passée.";
+  return s;
+}
+
+function avecProgramme(club: Club, moi: Moi, seance: string, f: (p: LigneProgramme[]) => LigneProgramme[] | string): Resultat {
+  const s = programmable(club, moi, seance);
+  if (typeof s === "string") return refus(s);
+  const p = f([...(s.programme ?? [])]);
+  if (typeof p === "string") return refus(p);
+  return ok(avecSeance(club, { ...s, programme: p }));
+}
+
+/** Ajouter un exercice au bout du programme, avec sa durée conseillée. */
+export function ajouterAuProgramme(club: Club, moi: Moi, seance: string, exercice: string): Resultat {
+  const e = exerciceDe(club, exercice);
+  if (!e) return refus("Exercice introuvable.");
+  return avecProgramme(club, moi, seance, (p) => (p.length >= PROGRAMME_MAX ? `${PROGRAMME_MAX} exercices au plus.` : [...p, { exercice: e.id, minutes: e.minutes }]));
+}
+
+export function retirerDuProgramme(club: Club, moi: Moi, seance: string, rang: number): Resultat {
+  return avecProgramme(club, moi, seance, (p) => (p[rang] ? p.filter((_, i) => i !== rang) : "Exercice introuvable."));
+}
+
+/** Monter (−1) ou descendre (+1) un exercice d'un cran. */
+export function rangerDansProgramme(club: Club, moi: Moi, seance: string, rang: number, sens: -1 | 1): Resultat {
+  return avecProgramme(club, moi, seance, (p) => {
+    const j = rang + sens;
+    if (!p[rang] || !p[j]) return "Il ne va pas plus loin.";
+    [p[rang], p[j]] = [p[j], p[rang]];
+    return p;
+  });
+}
+
+export function minutesDansProgramme(club: Club, moi: Moi, seance: string, rang: number, minutes: number): Resultat {
+  if (!Number.isInteger(minutes) || minutes < MINUTES[0] || minutes > MINUTES[1]) return refus(`De ${MINUTES[0]} à ${MINUTES[1]} minutes.`);
+  return avecProgramme(club, moi, seance, (p) => (p[rang] ? p.map((l, i) => (i === rang ? { ...l, minutes } : l)) : "Exercice introuvable."));
+}
+
+/** Reprendre le programme d'un autre entraînement (le sien, ou celui d'une autre de ses catégories). */
+export function reprendreProgramme(club: Club, moi: Moi, seance: string, depuis: string): Resultat {
+  const source = seanceDe(club, depuis);
+  if (!source || source.genre !== "entrainement" || !source.programme?.length) return refus("Rien à reprendre.");
+  if (!droits(club, moi).gere(source.categorie)) return refus(PAS_LE_DROIT);
+  const lignes = source.programme.map((l) => ({ ...l }));
+  return avecProgramme(club, moi, seance, () => lignes);
+}
+
+export interface NouvelExercice {
+  nom: string;
+  theme: ThemeExercice;
+  minutes: number;
+  joueurs: [number, number];
+  espace: string;
+  materiel: string;
+  but: string;
+  /** Une étape par ligne. */
+  deroule: string;
+}
+
+/** Écrire un exercice du club : l'admin, ou un entraîneur (d'au moins une catégorie). */
+export function creerExercice(club: Club, moi: Moi, n: NouvelExercice): Resultat {
+  const d = droits(club, moi);
+  if (!d.administre && !club.categories.some((c) => d.gere(c.id))) return refus("Seul le staff écrit un exercice.");
+  const nom = nomPropre(n.nom);
+  if (nom.length < 2 || nom.length > 50) return refus("Un nom de 2 à 50 caractères.");
+  if (!THEMES.some((t) => t.id === n.theme)) return refus("Un thème.");
+  if (!Number.isInteger(n.minutes) || n.minutes < MINUTES[0] || n.minutes > MINUTES[1]) return refus(`De ${MINUTES[0]} à ${MINUTES[1]} minutes.`);
+  const [a, b] = n.joueurs;
+  if (!Number.isInteger(a) || !Number.isInteger(b) || a < 1 || b < a || b > 40) return refus("Un nombre de joueurs.");
+  const deroule = n.deroule.split("\n").map(nomPropre).filter(Boolean);
+  if (!deroule.length || deroule.length > 8 || deroule.some((l) => l.length > 200)) return refus("De une à huit étapes, de 200 caractères au plus.");
+  const but = nomPropre(n.but);
+  if (but.length > 160) return refus("Un but de 160 caractères au plus.");
+  let k = club.exercices.length + 1;
+  while (club.exercices.some((e) => e.id === `c-${k}`)) k++;
+  const e: Exercice = {
+    id: `c-${k}`,
+    nom,
+    theme: n.theme,
+    minutes: n.minutes,
+    joueurs: [a, b],
+    espace: nomPropre(n.espace).slice(0, 60),
+    materiel: nomPropre(n.materiel).slice(0, 80),
+    but,
+    deroule,
+    origine: "club",
+    auteur: moi.id,
+  };
+  return ok({ ...club, exercices: [...club.exercices, e] });
 }

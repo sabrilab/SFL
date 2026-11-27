@@ -234,10 +234,20 @@ export function AdminClub() {
       <Staff />
       <EcussonDuClub />
       <Abonnement />
-      <Link href="/club/categories" className="bouton-secondaire flex h-12 items-center justify-between px-5 text-[15px] font-semibold">
-        Catégories
-        <ChevronRight className="size-5 opacity-50" strokeWidth={2.2} />
-      </Link>
+      <div className="flex flex-col gap-2">
+        {(
+          [
+            ["/club/categories", "Catégories"],
+            ["/club/planning", "Planning"],
+            ["/club/exercices", "Exercices"],
+          ] as const
+        ).map(([href, label]) => (
+          <Link key={href} href={href} className="bouton-secondaire flex h-12 items-center justify-between px-5 text-[15px] font-semibold">
+            {label}
+            <ChevronRight className="size-5 opacity-50" strokeWidth={2.2} />
+          </Link>
+        ))}
+      </div>
     </PageEnfant>
   );
 }

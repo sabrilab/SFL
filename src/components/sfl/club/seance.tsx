@@ -12,6 +12,8 @@
 //     présent, en compteurs − / + ; « Enregistrer », dans une bande pleine au
 //     bas de l'écran. Les cartes bougent aussitôt (lib/sfl/club/saison.ts :
 //     jauges, « +1 », MVP du match), et le résultat arrive dans les actus.
+//   · Programme (un entraînement) : ses exercices et leurs minutes
+//     (programme.tsx) ; un entraînement à venir s'ouvre dessus.
 // L'appel et les stats s'ouvrent le jour de la séance : avant, la page n'a
 // que la convocation. La saisie des stats est gardée par la page : passer
 // par « Appel » ne la perd pas ; « Enregistrer » s'éteint une fois fait.
@@ -28,9 +30,10 @@ import { nomComplet, type EtatAppel, type LigneStats, type Membre, type Seance a
 import { cn } from "@/lib/utils";
 import { CarteClub } from "./carte-club";
 import { compteDit, titreSeance } from "./fil-club";
+import { Programme } from "./programme";
 import { Compteur, PageEnfant, Segment } from "./puces";
 
-type Vue = "convocation" | "appel" | "stats";
+type Vue = "programme" | "convocation" | "appel" | "stats";
 
 const ETATS: { id: EtatAppel; label: string }[] = [
   { id: "present", label: "Présent" },
@@ -213,19 +216,22 @@ export function SeanceDuClub({ id }: { id: string }) {
   // Avant le jour de la séance, il n'y a que la convocation : ni appel, ni stats.
   const ouverte = seanceOuverte(s, club.jour);
   const vues: { id: Vue; label: string }[] = [
+    ...(!match ? [{ id: "programme" as const, label: "Programme" }] : []),
     { id: "convocation", label: "Convocation" },
     ...(ouverte ? [{ id: "appel" as const, label: "Appel" }] : []),
     ...(ouverte && match ? [{ id: "stats" as const, label: "Stats" }] : []),
   ];
-  // Un match joué s'ouvre sur ses stats, une séance passée sur son appel, une convocation sur ses réponses.
-  const voulue: Vue = vue ?? (match && s.score ? "stats" : Object.keys(s.appel).length ? "appel" : "convocation");
+  // Un match joué s'ouvre sur ses stats, une séance passée sur son appel, une convocation sur ses réponses, un entraînement à venir sur son programme.
+  const voulue: Vue = vue ?? (match && s.score ? "stats" : Object.keys(s.appel).length ? "appel" : match ? "convocation" : "programme");
   const actuelle: Vue = vues.some((v) => v.id === voulue) ? voulue : "convocation";
   // Une saisie jamais enregistrée (un match du jour) reste à enregistrer, même à 0 – 0.
   const brouillon: Brouillon = saisie ?? { score: s.score ?? { nous: 0, eux: 0 }, stats: s.stats, sale: s.score === null };
   return (
     <PageEnfant sur={categorieDe(club, s.categorie)?.nom} titre={titreSeance(club, s)} sous={`${jourLong(s.jour)} · ${s.heure} · ${s.lieu}`}>
       {vues.length > 1 && <Segment nom="Vue" choix={vues} actif={actuelle} onChange={setVue} />}
-      {actuelle === "convocation" ? (
+      {actuelle === "programme" ? (
+        <Programme s={s} />
+      ) : actuelle === "convocation" ? (
         <Convocation s={s} joueurs={joueurs} />
       ) : actuelle === "appel" ? (
         <Appel s={s} joueurs={joueurs} />
