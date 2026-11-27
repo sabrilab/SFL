@@ -30,12 +30,16 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Check, Loader2 } from "lucide-react";
+import { ArrowDown, Check, Loader2 } from "lucide-react";
 import { LOGO_BOLA } from "@/components/sfl/finitions-carte";
 import {
   ANCRE_DEMANDE,
   CAPTURE,
-  CAPTURE_HAUT,
+  CHIFFRES_CLUB,
+  COACH_CLUB,
+  JOUEURS_CLUB,
+  MANIFESTE_CLUB,
+  type JoueurClub,
   FORMULAIRE_CLUB,
   HAUT_CLUB,
   PAYS,
@@ -49,12 +53,10 @@ import {
   type DemandeClub,
 } from "@/lib/sfl/page-club";
 import { cn } from "@/lib/utils";
+import "./page-club.css";
 
 const BARRE = 56;
 const COLONNE = "mx-auto w-full px-5 min-[720px]:max-w-[600px] min-[960px]:max-w-[1120px] min-[960px]:px-10";
-const ETIQUETTE = "mono-label text-encre-3";
-const TITRE = "mt-3 text-nom leading-[1.05] font-extrabold tracking-tight text-balance min-[960px]:text-[clamp(40px,3.6vw,52px)] min-[960px]:leading-[1.03]";
-const PHRASE = "text-[clamp(16px,4.6vw,19px)] leading-snug font-bold text-balance min-[960px]:text-titre-m";
 const ANNEAU = "outline-offset-4 focus-visible:outline-2 focus-visible:outline-foreground";
 const APPARAIT =
   "transition-[opacity,translate] duration-[400ms] ease-out data-[cache]:translate-y-3 data-[cache]:opacity-0 motion-reduce:transition-none";
@@ -278,7 +280,7 @@ function Formulaire() {
       <button
         type="submit"
         disabled={etat === "envoi"}
-        className="bouton-principal bouton--vert flex w-full items-center justify-center gap-2 py-4 text-lecture font-bold"
+        className="flex w-full items-center justify-center gap-2 rounded-full bg-[#0b0b0b] py-4 text-lecture font-bold text-white transition-transform active:scale-[0.98] disabled:opacity-60"
       >
         {etat === "envoi" && <Loader2 className="size-4 animate-spin" aria-hidden />}
         {etat === "envoi" ? F.envoi : F.envoyer}
@@ -292,6 +294,61 @@ function Formulaire() {
     </form>
   );
 }
+
+/** Une photo qui peut manquer : sans elle, rien ne casse (repli). */
+function Photo({ src, lue, className, repli }: { src: string; lue: string; className?: string; repli: React.ReactNode }) {
+  const [absente, setAbsente] = useState(false);
+  const img = useRef<HTMLImageElement>(null);
+  // Une erreur arrivée avant l'hydratation n'a pas d'écouteur : on la relit au montage.
+  useEffect(() => {
+    const el = img.current;
+    if (el && el.complete && el.naturalWidth === 0) setAbsente(true);
+  }, []);
+  if (absente) return <>{repli}</>;
+  return (
+    // Photos déjà à leur taille (WebP) : l'optimiseur de Next n'y ajouterait rien.
+    // eslint-disable-next-line @next/next/no-img-element
+    <img ref={img} src={src} alt={lue} loading="lazy" decoding="async" draggable={false} onError={() => setAbsente(true)} className={cn("select-none", className)} />
+  );
+}
+
+/** La carte d'un joueur du haut : sa photo pleine, sa note, son prénom, sa catégorie. */
+function CarteJoueur({ j, className, style }: { j: JoueurClub; className?: string; style?: React.CSSProperties }) {
+  return (
+    <figure
+      className={cn(
+        "relative aspect-[2/3] overflow-hidden rounded-[20px] bg-[#111] shadow-[0_0_0_1px_rgba(255,255,255,0.1),0_40px_80px_-30px_rgba(0,0,0,0.7)]",
+        className
+      )}
+      style={style}
+    >
+      <Photo
+        src={j.photo}
+        lue={j.lue}
+        className="absolute inset-0 size-full object-cover"
+        repli={
+          <div aria-hidden className="absolute inset-0" style={{ background: `linear-gradient(160deg, ${j.maillot} 0%, #0b0b0b 85%)` }}>
+            <span className="absolute inset-x-0 top-[18%] text-center font-display text-[clamp(64px,9vw,120px)] leading-none text-white/25">{j.prenom[0]}</span>
+          </div>
+        }
+      />
+      <div aria-hidden className="absolute inset-x-0 bottom-0 h-[55%] bg-gradient-to-t from-black/90 via-black/40 to-transparent" />
+      <figcaption className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-2 p-[9%] text-white">
+        <span className="min-w-0">
+          <span className="block truncate text-[clamp(13px,1.3vw,17px)] font-extrabold tracking-tight uppercase">{j.prenom}</span>
+          <span className="mt-0.5 block text-[clamp(9px,0.8vw,11px)] font-bold tracking-[0.14em] text-white/60 uppercase">
+            {j.categorie} · {j.poste}
+          </span>
+        </span>
+        <span className="font-display text-[clamp(28px,3vw,44px)] leading-[0.85]">{j.note}</span>
+      </figcaption>
+      <span aria-hidden className="absolute top-[7%] left-[8%] h-1 w-6 rounded-full" style={{ background: j.maillot }} />
+    </figure>
+  );
+}
+
+/** Les catégories qui défilent : le club entier, d'un bout à l'autre. */
+const CATEGORIES = ["U7", "U9", "U11", "U13", "U15", "U17", "U19", "Seniors", "Féminines", "Vétérans", "Futsal", "Loisir"];
 
 export function PageClub() {
   const cadre = useRef<HTMLDivElement>(null);
@@ -333,128 +390,198 @@ export function PageClub() {
   };
 
   const premiere = SECTIONS_CLUB[0];
+  // L'éventail du haut : la carte du milieu devant, les autres qui s'écartent.
+  const milieu = (JOUEURS_CLUB.length - 1) / 2;
 
   return (
     <div
       ref={cadre}
       lang="fr"
       dir="ltr"
-      className="fixed inset-0 z-[60] overflow-x-hidden overflow-y-auto overscroll-contain bg-background text-foreground"
-      style={{ paddingTop: "env(safe-area-inset-top)", scrollPaddingTop: BARRE }}
+      className="club-page fixed inset-0 z-[60] overflow-x-hidden overflow-y-auto overscroll-contain bg-[#080908] text-[#f3f3ef]"
+      style={{ paddingTop: "env(safe-area-inset-top)", scrollPaddingTop: BARRE, colorScheme: "dark" }}
     >
-      {/* La barre du haut : le logo, et le bouton qui reste sous le pouce. */}
-      <div
-        className="glass-soft fixed inset-x-0 top-0 z-20 border-x-0 border-t-0 bg-background/80 backdrop-blur-xl"
-        style={{ paddingTop: "env(safe-area-inset-top)" }}
-      >
+      {/* La barre du haut. */}
+      <div className="fixed inset-x-0 top-0 z-20 border-b border-white/[0.07] bg-[#080908]/75 backdrop-blur-xl" style={{ paddingTop: "env(safe-area-inset-top)" }}>
         <div className={cn(COLONNE, "flex items-center justify-between")} style={{ height: BARRE }}>
           <div className="flex items-center gap-2.5">
             <svg viewBox="0 0 1000 237" className="h-[15px] w-auto" fill="currentColor" role="img" aria-label="Bola">
               <path d={LOGO_BOLA.symbole} />
               <path d={LOGO_BOLA.logotype} />
             </svg>
-            <span className="mono-label text-encre-2">Club</span>
+            <span className="rounded-full border border-white/20 px-2 py-0.5 text-[10px] font-bold tracking-[0.16em] text-white/70 uppercase">Club</span>
           </div>
           <a
             href={`#${ANCRE_DEMANDE}`}
             onClick={aller(ANCRE_DEMANDE)}
-            className="bouton-principal bouton--vert relative flex h-[36px] items-center px-4 text-petit font-bold before:absolute before:inset-x-0 before:-inset-y-[4px] before:content-['']"
+            className="relative flex h-[36px] items-center rounded-full bg-white px-4 text-petit font-bold text-black transition-transform before:absolute before:inset-x-0 before:-inset-y-[4px] before:content-[''] active:scale-[0.97]"
           >
             {HAUT_CLUB.bouton}
           </a>
         </div>
       </div>
 
-      <div style={{ paddingTop: BARRE }}>
-        {/* 1 · Le haut : le titre et les boutons ; sur ordinateur, l'écran des actus à droite. */}
-        <header className={cn(COLONNE, "grid items-center gap-12 pt-12 pb-16 min-[960px]:grid-cols-[1.1fr_0.9fr] min-[960px]:gap-16 min-[960px]:pt-20 min-[960px]:pb-28")}>
-          <div className="text-center min-[960px]:text-left">
-            <p className={ETIQUETTE}>{HAUT_CLUB.etiquette}</p>
-            <h1 className="mt-4 text-[clamp(40px,11.5vw,56px)] leading-[0.98] font-extrabold tracking-tight text-balance min-[960px]:text-[clamp(56px,5.4vw,76px)]">
-              {HAUT_CLUB.titre.map((l) => (
-                <span key={l} className="block">
-                  {l}
-                </span>
-              ))}
-            </h1>
-            <p className={cn(PHRASE, "mt-5 whitespace-pre-line text-encre-2")}>{HAUT_CLUB.ligne}</p>
-            <div className="mt-9 flex flex-col gap-2.5 min-[720px]:mx-auto min-[720px]:max-w-[420px] min-[960px]:mx-0 min-[960px]:flex-row">
-              <a href={`#${ANCRE_DEMANDE}`} onClick={aller(ANCRE_DEMANDE)} className="bouton-principal bouton--vert flex items-center justify-center py-4 text-lecture font-bold min-[960px]:px-8">
-                {HAUT_CLUB.bouton}
-              </a>
-              <a href={`#${premiere.id}`} onClick={aller(premiere.id)} className="bouton-discret flex items-center justify-center py-3.5 text-ligne font-semibold min-[960px]:px-6">
-                {HAUT_CLUB.second}
-              </a>
-            </div>
+      {/* 1 · Le haut : le titre, puis l'éventail des cartes, une par catégorie. */}
+      <header className="relative isolate overflow-hidden" style={{ paddingTop: BARRE }}>
+        <div aria-hidden className="absolute inset-0 -z-10 bg-[radial-gradient(70%_55%_at_50%_70%,rgba(70,140,90,0.28),transparent_70%)]" />
+        <div aria-hidden className="absolute inset-x-0 bottom-0 -z-10 h-40 bg-gradient-to-b from-transparent to-[#080908]" />
+        <div className={cn(COLONNE, "pt-12 text-center min-[960px]:pt-14")}>
+          <p className="text-[11px] font-bold tracking-[0.22em] text-white/50 uppercase">{HAUT_CLUB.etiquette}</p>
+          <h1 className="mx-auto mt-5 max-w-[14ch] text-[clamp(44px,12.5vw,128px)] leading-[0.92] font-extrabold tracking-tight text-balance min-[960px]:max-w-none min-[960px]:text-[clamp(64px,6.6vw,104px)]">
+            {HAUT_CLUB.titre.map((l) => (
+              <span key={l} className="block">
+                {l}
+              </span>
+            ))}
+          </h1>
+          <p className="mx-auto mt-6 max-w-[34ch] text-[clamp(16px,4.4vw,21px)] leading-snug font-semibold whitespace-pre-line text-white/65">{HAUT_CLUB.ligne}</p>
+          <div className="mx-auto mt-9 flex max-w-[420px] flex-col gap-2.5 min-[600px]:max-w-none min-[600px]:flex-row min-[600px]:justify-center">
+            <a href={`#${ANCRE_DEMANDE}`} onClick={aller(ANCRE_DEMANDE)} className="flex items-center justify-center rounded-full bg-white px-8 py-4 text-lecture font-bold text-black transition-transform active:scale-[0.98]">
+              {HAUT_CLUB.bouton}
+            </a>
+            <a href={`#${premiere.id}`} onClick={aller(premiere.id)} className="flex items-center justify-center gap-2 rounded-full border border-white/15 px-7 py-4 text-lecture font-semibold text-white/85 hover:bg-white/[0.06]">
+              {HAUT_CLUB.second}
+              <ArrowDown className="size-4" aria-hidden />
+            </a>
           </div>
-          <Telephone src={CAPTURE_HAUT.src} lue={CAPTURE_HAUT.lue} vite className="mx-auto w-[min(76vw,300px)] min-[960px]:w-[min(26vw,340px)]" />
-        </header>
-
-        {/* 2 · Ce que le club reçoit : une phrase, sa capture ; en alternance sur ordinateur. */}
-        <div className="space-y-24 min-[960px]:space-y-32">
-          {SECTIONS_CLUB.map((s, i) => (
-            <section
-              key={s.id}
-              id={s.id}
-              data-apparait
-              className={cn(COLONNE, APPARAIT, "grid items-center gap-10 min-[960px]:grid-cols-2 min-[960px]:gap-20")}
-            >
-              <div className={cn("text-center min-[960px]:text-left", i % 2 === 1 && "min-[960px]:order-2")}>
-                <p className={ETIQUETTE}>{s.etiquette}</p>
-                <h2 className={TITRE}>{s.titre}</h2>
-                <div className={cn(PHRASE, "mt-5 space-y-1.5")}>
-                  {s.phrases.map((p, j) => (
-                    <p key={p} className={j === 0 ? "text-encre" : "text-encre-2"}>
-                      {p}
-                    </p>
-                  ))}
-                </div>
-              </div>
-              <Telephone src={s.capture.src} lue={s.capture.lue} className="mx-auto w-[min(70vw,280px)] min-[960px]:w-[min(24vw,320px)]" />
-            </section>
-          ))}
         </div>
 
-        {/* 3 · Les quatre vues. */}
-        <section data-apparait className={cn(COLONNE, APPARAIT, "mt-28 min-[960px]:mt-40")}>
-          <div className="text-center">
-            <p className={ETIQUETTE}>{ROLES_CLUB.etiquette}</p>
-            <h2 className={TITRE}>{ROLES_CLUB.titre}</h2>
-          </div>
-          <ul className="mt-10 grid grid-cols-2 gap-3 min-[960px]:mt-14 min-[960px]:grid-cols-4 min-[960px]:gap-4">
-            {ROLES_CLUB.roles.map((r) => (
-              <li key={r.nom} className="rounded-[22px] bg-foreground/[0.05] p-5 min-[960px]:p-7">
-                <p className="text-titre-fort font-extrabold tracking-tight min-[960px]:text-titre-m">{r.nom}</p>
-                <p className="mt-2 text-ligne leading-snug font-semibold text-encre-2">{r.phrase}</p>
+        {/* L'éventail : chaque carte tourne et descend selon sa distance au milieu. */}
+        <div className="relative mx-auto mt-14 flex h-[clamp(260px,72vw,520px)] max-w-[1200px] items-start justify-center min-[960px]:mt-12">
+          {JOUEURS_CLUB.map((j, i) => {
+            const d = i - milieu;
+            return (
+              <CarteJoueur
+                key={j.id}
+                j={j}
+                className="club-carte absolute top-0 w-[clamp(120px,34vw,280px)]"
+                style={
+                  {
+                    "--x": `${d * 62}%`,
+                    "--r": `${d * 7}deg`,
+                    "--y": `${Math.abs(d) * Math.abs(d) * 4 + Math.abs(d) * 6}%`,
+                    zIndex: 10 - Math.abs(d),
+                  } as React.CSSProperties
+                }
+              />
+            );
+          })}
+        </div>
+      </header>
+
+      {/* 2 · Les catégories qui défilent. */}
+      <div aria-hidden className="relative overflow-hidden border-y border-white/[0.08] py-5">
+        <div className="club-defile flex w-max gap-10 whitespace-nowrap">
+          {[...CATEGORIES, ...CATEGORIES].map((c, i) => (
+            <span key={i} className="flex items-center gap-10 text-[clamp(22px,4vw,40px)] font-extrabold tracking-tight text-white/85 uppercase">
+              {c}
+              <span className="size-2 rounded-full bg-white/25" />
+            </span>
+          ))}
+        </div>
+      </div>
+
+      {/* 3 · Le manifeste. */}
+      <section data-apparait className={cn(COLONNE, APPARAIT, "py-28 text-center min-[960px]:py-40")}>
+        <h2 className="text-[clamp(40px,10vw,104px)] leading-[0.95] font-extrabold tracking-tight text-balance">
+          {MANIFESTE_CLUB.ligne.map((l, i) => (
+            <span key={l} className={cn("block", i === 1 && "text-white/35")}>
+              {l}
+            </span>
+          ))}
+        </h2>
+        <p className="mx-auto mt-7 max-w-[30ch] text-[clamp(17px,4.6vw,22px)] leading-snug font-semibold text-white/65">{MANIFESTE_CLUB.phrase}</p>
+      </section>
+
+      {/* 4 · Ce que le club reçoit : numérotées, en alternance sur ordinateur. */}
+      <div className="space-y-28 min-[960px]:space-y-40">
+        {SECTIONS_CLUB.map((s, i) => (
+          <section key={s.id} id={s.id} data-apparait className={cn(COLONNE, APPARAIT, "grid items-center gap-12 min-[960px]:grid-cols-2 min-[960px]:gap-24")}>
+            <div className={cn("text-center min-[960px]:text-left", i % 2 === 1 && "min-[960px]:order-2")}>
+              <p className="font-display text-[clamp(56px,9vw,96px)] leading-none text-white/10">{String(i + 1).padStart(2, "0")}</p>
+              <p className="mt-2 text-[11px] font-bold tracking-[0.22em] text-white/50 uppercase">{s.etiquette}</p>
+              <h2 className="mt-3 text-[clamp(34px,8.5vw,60px)] leading-[0.98] font-extrabold tracking-tight text-balance">{s.titre}</h2>
+              <div className="mt-5 space-y-1.5 text-[clamp(16px,4.4vw,20px)] leading-snug font-semibold">
+                {s.phrases.map((p, k) => (
+                  <p key={p} className={k === 0 ? "text-white/90" : "text-white/55"}>
+                    {p}
+                  </p>
+                ))}
+              </div>
+            </div>
+            <div className="relative">
+              <div aria-hidden className="absolute inset-[10%] -z-0 rounded-full bg-[radial-gradient(closest-side,rgba(90,170,110,0.35),transparent)] blur-2xl" />
+              <Telephone src={s.capture.src} lue={s.capture.lue} className="relative mx-auto w-[min(72vw,290px)] min-[960px]:w-[min(25vw,330px)]" />
+            </div>
+          </section>
+        ))}
+      </div>
+
+      {/* 5 · Les chiffres. */}
+      <section data-apparait className={cn(COLONNE, APPARAIT, "mt-32 min-[960px]:mt-44")}>
+        <ul className="grid gap-px overflow-hidden rounded-[28px] bg-white/[0.08] min-[720px]:grid-cols-3">
+          {CHIFFRES_CLUB.map((c) => (
+            <li key={c.texte} className="bg-[#080908] px-7 py-9 min-[960px]:px-10 min-[960px]:py-12">
+              <p className="font-display text-[clamp(64px,10vw,112px)] leading-none">{c.valeur}</p>
+              <p className="mt-3 text-lecture font-semibold text-white/60">{c.texte}</p>
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      {/* 6 · Les quatre vues, à côté de l'entraîneuse. */}
+      <section data-apparait className={cn(COLONNE, APPARAIT, "mt-32 grid items-center gap-10 min-[960px]:mt-44 min-[960px]:grid-cols-[0.9fr_1.1fr] min-[960px]:gap-20")}>
+        <div className="relative aspect-[3/4] overflow-hidden rounded-[28px] bg-[linear-gradient(160deg,#1d3b5e,#0b0b0b_85%)]">
+          <Photo src={COACH_CLUB.photo} lue={COACH_CLUB.lue} className="absolute inset-0 size-full object-cover" repli={null} />
+          <div aria-hidden className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-black/70 to-transparent" />
+        </div>
+        <div>
+          <p className="text-[11px] font-bold tracking-[0.22em] text-white/50 uppercase">{ROLES_CLUB.etiquette}</p>
+          <h2 className="mt-3 text-[clamp(34px,8.5vw,60px)] leading-[0.98] font-extrabold tracking-tight text-balance">{ROLES_CLUB.titre}</h2>
+          <ul className="mt-10 divide-y divide-white/[0.08] border-y border-white/[0.08]">
+            {ROLES_CLUB.roles.map((r, i) => (
+              <li key={r.nom} className="flex items-baseline gap-5 py-5">
+                <span className="w-7 shrink-0 font-display text-titre-m text-white/25">{i + 1}</span>
+                <span className="w-[7.5rem] shrink-0 text-titre-fort font-extrabold tracking-tight min-[960px]:w-40 min-[960px]:text-titre-m">{r.nom}</span>
+                <span className="text-ligne leading-snug font-semibold text-white/60 min-[960px]:text-lecture">{r.phrase}</span>
               </li>
             ))}
           </ul>
-        </section>
+        </div>
+      </section>
 
-        {/* 4 · La demande de démo. */}
-        <section id={ANCRE_DEMANDE} data-apparait className={cn(COLONNE, APPARAIT, "mt-28 min-[960px]:mt-40")}>
-          <div className="mx-auto max-w-[720px] rounded-[28px] bg-foreground/[0.04] px-5 py-10 shadow-[inset_0_0_0_1px_rgb(var(--foreground-rgb)/0.08)] min-[720px]:px-10 min-[960px]:px-14 min-[960px]:py-14">
-            <div className="mb-10 text-center">
-              <p className={ETIQUETTE}>{FORMULAIRE_CLUB.etiquette}</p>
-              <h2 className={TITRE}>{FORMULAIRE_CLUB.titre}</h2>
-              <p className={cn(PHRASE, "mt-4 whitespace-pre-line text-encre-2")}>{FORMULAIRE_CLUB.phrase}</p>
+      {/* 7 · La demande de démo : la photo des seniors à gauche sur ordinateur. */}
+      <section id={ANCRE_DEMANDE} data-apparait className={cn(COLONNE, APPARAIT, "mt-32 min-[960px]:mt-44")}>
+        <div className="grid overflow-hidden rounded-[32px] bg-[#f3f3ef] text-[#0b0b0b] min-[960px]:grid-cols-[0.85fr_1.15fr]" style={{ colorScheme: "light" }}>
+          <div className="relative hidden min-h-full min-[960px]:block" style={{ background: `linear-gradient(160deg, ${JOUEURS_CLUB[2].maillot}, #0b0b0b 85%)` }}>
+            <Photo src={JOUEURS_CLUB[2].photo} lue={JOUEURS_CLUB[2].lue} className="absolute inset-0 size-full object-cover" repli={null} />
+            <div aria-hidden className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
+            <p className="absolute inset-x-10 bottom-10 text-[44px] leading-[0.95] font-extrabold tracking-tight text-white">
+              {FORMULAIRE_CLUB.titre}
+            </p>
+          </div>
+          <div className="club-formulaire px-5 py-10 min-[720px]:px-10 min-[960px]:px-14 min-[960px]:py-14">
+            <div className="mb-9 text-center min-[960px]:text-left">
+              <p className="text-[11px] font-bold tracking-[0.22em] text-black/45 uppercase">{FORMULAIRE_CLUB.etiquette}</p>
+              <h2 className="mt-3 text-[clamp(30px,8vw,40px)] leading-[1] font-extrabold tracking-tight text-balance min-[960px]:hidden">{FORMULAIRE_CLUB.titre}</h2>
+              <p className="mt-3 text-[clamp(16px,4.4vw,19px)] leading-snug font-semibold whitespace-pre-line text-black/60">{FORMULAIRE_CLUB.phrase}</p>
             </div>
             <Formulaire />
           </div>
-        </section>
-      </div>
+        </div>
+      </section>
 
       <footer className={cn(COLONNE, "mt-24 min-[960px]:mt-32")} style={{ paddingBottom: "max(env(safe-area-inset-bottom), 24px)" }}>
-        <div className="flex flex-col gap-5 border-t border-foreground/10 pt-7 pb-4 min-[960px]:flex-row min-[960px]:items-center min-[960px]:justify-between">
+        <div className="flex flex-col gap-5 border-t border-white/10 pt-7 pb-4 min-[960px]:flex-row min-[960px]:items-center min-[960px]:justify-between">
           <svg viewBox="0 0 1000 237" className="h-[14px] w-auto self-start" fill="currentColor" role="img" aria-label="Bola">
             <path d={LOGO_BOLA.symbole} />
             <path d={LOGO_BOLA.logotype} />
           </svg>
-          <div className="flex items-center gap-5">
-            <Link href="/confidentialite" className={cn(ETIQUETTE, ANNEAU, "-my-4 py-4 text-encre-2")}>
+          <div className="flex items-center gap-5 text-[11px] font-bold tracking-[0.16em] text-white/45 uppercase">
+            <Link href="/confidentialite" className={cn(ANNEAU, "-my-4 py-4 text-white/70")}>
               {FORMULAIRE_CLUB.lienConfidentialite}
             </Link>
-            <p className={ETIQUETTE}>© 2026 Bola</p>
+            <p>© 2026 Bola</p>
           </div>
         </div>
       </footer>

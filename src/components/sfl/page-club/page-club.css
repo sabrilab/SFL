@@ -1,0 +1,39 @@
+/* La page publique /club (page-club.tsx) : ce que Tailwind ne dit pas seul.
+   L'éventail des cartes du haut, le défilé des catégories, et le formulaire
+   posé sur sa carte claire (les jetons de l'app y passent à l'encre noire). */
+
+.club-page .club-carte {
+  left: 50%;
+  transform: translateX(calc(-50% + var(--x))) translateY(var(--y)) rotate(var(--r));
+  transform-origin: 50% 120%;
+  transition: transform 600ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+@media (hover: hover) {
+  .club-page .club-carte:hover {
+    transform: translateX(calc(-50% + var(--x))) translateY(calc(var(--y) - 4%)) rotate(var(--r));
+  }
+}
+
+.club-page .club-defile {
+  animation: club-defile 40s linear infinite;
+}
+@keyframes club-defile {
+  to {
+    transform: translateX(-50%);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .club-page .club-defile {
+    animation: none;
+  }
+  .club-page .club-carte {
+    transition: none;
+  }
+}
+
+.club-page .club-formulaire {
+  --foreground: #0b0b0b;
+  --foreground-rgb: 11 11 11;
+  --background: #f3f3ef;
+  color: #0b0b0b;
+}

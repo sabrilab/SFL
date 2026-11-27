@@ -56,6 +56,48 @@ export const HAUT_CLUB = {
   second: "Voir l’app",
 } as const;
 
+/**
+ * Les joueurs du haut : une carte par catégorie, chacune son maillot. Les
+ * photos sont générées par Magnific à la demande de Sabri (27/11/2026 :
+ * « des images de joueurs de différentes catégories avec des maillots
+ * différents pour mettre un peu plus d'âme ») ; ce sont des personnes qui
+ * n'existent pas, jamais présentées comme des licenciés. Tant qu'une photo
+ * manque, la carte montre la couleur de son maillot et son initiale.
+ */
+export interface JoueurClub {
+  id: string;
+  categorie: string;
+  prenom: string;
+  poste: string;
+  note: number;
+  /** La couleur du maillot (le repli sans photo). */
+  maillot: string;
+  photo: string;
+  lue: string;
+}
+
+export const JOUEURS_CLUB: readonly JoueurClub[] = [
+  { id: "u11", categorie: "U11", prenom: "Nolan", poste: "ATT", note: 64, maillot: "#7fb7e6", photo: "/club/joueurs/u11.webp", lue: "Un jeune joueur de U11 en maillot rayé bleu ciel" },
+  { id: "u15", categorie: "U15 F", prenom: "Inès", poste: "MIL", note: 71, maillot: "#f2c230", photo: "/club/joueurs/u15-filles.webp", lue: "Une joueuse de U15 en maillot jaune" },
+  { id: "seniors", categorie: "Seniors", prenom: "Karim", poste: "ATT", note: 79, maillot: "#b3262e", photo: "/club/joueurs/seniors.webp", lue: "Un joueur senior en maillot rouge, sous les projecteurs" },
+  { id: "feminines", categorie: "Féminines", prenom: "Awa", poste: "DÉF", note: 77, maillot: "#1f6b45", photo: "/club/joueurs/feminines.webp", lue: "Une joueuse senior, capitaine, en maillot vert" },
+  { id: "veterans", categorie: "Vétérans", prenom: "Didier", poste: "G", note: 72, maillot: "#2a2a2a", photo: "/club/joueurs/veterans.webp", lue: "Un vétéran en maillot noir et blanc qui lace ses chaussures" },
+];
+
+/** L'entraîneuse : la photo des quatre vues. */
+export const COACH_CLUB = { photo: "/club/joueurs/coach.webp", lue: "Une entraîneuse au bord du terrain, un carnet à la main" } as const;
+
+export const MANIFESTE_CLUB = {
+  ligne: ["Du plus petit", "au plus ancien."],
+  phrase: "Chaque licencié compte. Chacun a sa carte.",
+} as const;
+
+export const CHIFFRES_CLUB = [
+  { valeur: "1", texte: "app pour tout le club" },
+  { valeur: "4", texte: "vues : admin, entraîneur, joueur, parent" },
+  { valeur: "0", texte: "feuille de papier" },
+] as const;
+
 /** Une section : son étiquette, son titre, ses phrases, et la capture qui l'illustre. */
 export interface SectionClub {
   id: string;
