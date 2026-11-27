@@ -67,7 +67,7 @@ import { identiteConfirmee, rafraichirIdentites } from "@/lib/sfl/identites";
 import { age, BORNES, POSTES, type Poste } from "@/lib/sfl/inscription";
 import { etatNotifications } from "@/lib/sfl/notifications";
 import { photoPerso, rafraichirPhotos } from "@/lib/sfl/photos";
-import { estPageSfl } from "@/lib/sfl/routes-publiques";
+import { estPageClub, estPageSfl } from "@/lib/sfl/routes-publiques";
 import type { Saison } from "@/lib/sfl/saisie/types";
 import { enDemo as enDemoSuivis, liensDeLaBase, liensDemo, rafraichirSuivis, suivisLus } from "@/lib/sfl/suivis";
 import { maVille, maVilleAProposer, type VilleJoueur } from "@/lib/sfl/villes";
@@ -272,7 +272,7 @@ export function Accueil() {
 
   const nomSession = session?.name ?? null;
   const serveur = !!session?.server;
-  const libre = estPageSfl(pathname) || SANS_ACCUEIL.some((r) => pathname?.startsWith(r));
+  const libre = estPageSfl(pathname) || SANS_ACCUEIL.some((r) => pathname?.startsWith(r)) || estPageClub(pathname);
   // Le joueur connecté, s'il est bien celui qu'on voit (pas un profil que l'admin emprunte).
   const nom = libre ? null : demo ? player.name : serveur && nomSession && memeNom(nomSession, me) ? player.name : null;
   const motDePasseDu = !libre && serveur && !!session?.motDePasseAChanger;
@@ -520,6 +520,7 @@ export function ApresAccueil({ children }: { children: ReactNode }) {
   const { donne } = useAccord(session?.name);
   if (estPageSfl(pathname)) return null;
   if (etat !== "fini") return null;
+  if (estPageClub(pathname)) return null;
   if (session && donne !== true) return null;
   return <>{children}</>;
 }

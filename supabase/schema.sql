@@ -10276,6 +10276,34 @@ $$;
 revoke execute on function public.equipe_chambrage_retirer(bigint) from public, anon;
 grant execute on function public.equipe_chambrage_retirer(bigint) to authenticated;
 
+-- ─────────────── Bola Club : les demandes de démo (27/11/2026) ───────────────
+-- Le formulaire de getbola.app/club (campagne de mails vers les clubs). Écrit
+-- par la seule route /api/clubs, avec la clé secrète (aucune écriture ouverte
+-- au navigateur), lu par l'admin seul. Chaque champ garde la règle de l'écran
+-- (lib/sfl/page-club.ts, erreurDemande).
+create table if not exists public.club_demandes (
+  id          bigint generated always as identity primary key,
+  club        text not null check (char_length(club) between 2 and 80),
+  ville       text not null check (char_length(ville) between 2 and 60),
+  pays        text not null check (pays in ('France', 'Belgique', 'Suisse', 'Luxembourg', 'Autre')),
+  licencies   text not null check (licencies in ('moins-60', '60-200', '200-500', 'plus-500')),
+  nom         text not null check (char_length(nom) between 2 and 60),
+  role        text not null check (role in ('Président', 'Secrétaire', 'Responsable sportif', 'Entraîneur', 'Autre')),
+  email       text not null check (email = lower(btrim(email)) and char_length(email) <= 120 and email ~ '^[^@[:space:]]+@[^@[:space:]]+\.[^@[:space:]]+$'),
+  telephone   text check (telephone is null or telephone ~ '^[0-9 +().-]{6,20}$'),
+  message     text check (message is null or char_length(message) <= 1000),
+  source      text check (source is null or source ~ '^[a-z0-9._-]{1,60}$'),
+  created_at  timestamptz not null default now()
+);
+create index if not exists club_demandes_email on public.club_demandes (email, created_at);
+
+alter table public.club_demandes enable row level security;
+drop policy if exists "club_demandes: l'admin" on public.club_demandes;
+create policy "club_demandes: l'admin" on public.club_demandes for select to authenticated
+  using ((select public.is_league_admin()));
+revoke all on public.club_demandes from anon, authenticated;
+grant select on public.club_demandes to authenticated;
+
 -- ─────────────── Droits de table : pas plus que ce que l'API sert (03/11/2026) ───────────────
 -- Supabase donne d'office tous les droits de table à anon et authenticated, et
 -- la RLS filtre ensuite. Trois d'entre eux ne servent à rien ici : TRUNCATE,

@@ -43,7 +43,7 @@ import { useDiscussionsMatch } from "@/hooks/use-discussions-match";
 import { useMonEquipe } from "@/hooks/use-mon-equipe";
 import { useModeClair } from "@/hooks/use-mode-clair";
 import { useT } from "@/lib/i18n/langue";
-import { estPageSfl } from "@/lib/sfl/routes-publiques";
+import { estPageClub, estPageSfl } from "@/lib/sfl/routes-publiques";
 
 const TABS = [
   { href: "/", Icon: MapIcon, label: "Map" },
@@ -95,6 +95,7 @@ export function BottomNav() {
   // L'admin est un outil (30/10/2026) : son geste du moment occupe le bas de
   // l'écran, sous le pouce ; le retour en haut à gauche ramène à l'app.
   if (pathname.startsWith("/admin")) return null;
+  if (estPageClub(pathname)) return null;
   if (estPageSfl(pathname) || SANS_BARRE.some((r) => pathname.startsWith(r))) return null;
 
   return (
