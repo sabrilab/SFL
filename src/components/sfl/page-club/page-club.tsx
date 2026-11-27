@@ -34,11 +34,11 @@ import { ArrowDown, Check, Loader2 } from "lucide-react";
 import { LOGO_BOLA } from "@/components/sfl/finitions-carte";
 import {
   ANCRE_DEMANDE,
-  CAPTURE,
+  type CaptureClub,
   CHIFFRES_CLUB,
-  COACH_CLUB,
   JOUEURS_CLUB,
   MANIFESTE_CLUB,
+  ORDINATEUR_CLUB,
   type JoueurClub,
   FORMULAIRE_CLUB,
   HAUT_CLUB,
@@ -64,7 +64,7 @@ const SAISIE =
   "h-12 w-full rounded-champ bg-foreground/[0.06] px-4 text-lecture font-semibold outline-none placeholder:text-foreground/25 focus:bg-foreground/[0.09] focus-visible:ring-2 focus-visible:ring-foreground/40 aria-[invalid=true]:ring-2 aria-[invalid=true]:ring-[#ff5a4c]";
 
 /** Une capture de l'app, dans un téléphone noir. */
-function Telephone({ src, lue, className, vite }: { src: string; lue: string; className?: string; vite?: boolean }) {
+function Telephone({ capture, className, vite }: { capture: CaptureClub; className?: string; vite?: boolean }) {
   return (
     <div
       className={cn(
@@ -75,15 +75,85 @@ function Telephone({ src, lue, className, vite }: { src: string; lue: string; cl
       {/* Une image déjà à sa taille (WebP, 2 px par px affiché) : l'optimiseur de Next n'y ajouterait rien. */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        src={src}
-        alt={lue}
-        width={CAPTURE.largeur}
-        height={CAPTURE.hauteur}
+        src={capture.src}
+        alt={capture.lue}
+        width={capture.largeur}
+        height={capture.hauteur}
         loading={vite ? "eager" : "lazy"}
         decoding="async"
         draggable={false}
         className="block h-auto w-full rounded-[33px] select-none"
       />
+    </div>
+  );
+}
+
+/** Une capture de l'app sur ordinateur, dans un portable : l'écran noir, puis le socle. */
+function Portable({ capture }: { capture: CaptureClub }) {
+  return (
+    <div className="mx-auto w-full max-w-[1000px] px-[4%]">
+      <div className="rounded-t-[16px] bg-[#16171a] p-[8px] pb-[12px] shadow-[0_0_0_1px_rgba(255,255,255,0.08)] min-[960px]:rounded-t-[24px] min-[960px]:p-[14px] min-[960px]:pb-[20px]">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={capture.src}
+          alt={capture.lue}
+          width={capture.largeur}
+          height={capture.hauteur}
+          loading="lazy"
+          decoding="async"
+          draggable={false}
+          className="block h-auto w-full rounded-[4px] select-none min-[960px]:rounded-[8px]"
+        />
+      </div>
+      <div className="relative mx-[-4%] h-[10px] rounded-b-[14px] bg-gradient-to-b from-[#3a3b3f] to-[#161719] min-[960px]:h-[16px]">
+        <div className="absolute top-0 left-1/2 h-[4px] w-[16%] -translate-x-1/2 rounded-b-[6px] bg-[#0e0f11]" />
+      </div>
+    </div>
+  );
+}
+
+/** Les quatre cartes : un onglet par rôle, la carte dans le téléphone. */
+function Roles() {
+  const [actif, setActif] = useState<string>(ROLES_CLUB.roles[0].id);
+  const role = ROLES_CLUB.roles.find((r) => r.id === actif) ?? ROLES_CLUB.roles[0];
+  return (
+    <div className="grid items-center gap-12 min-[960px]:grid-cols-2 min-[960px]:gap-24">
+      <div className="text-center min-[960px]:text-left">
+        <p className="text-[11px] font-bold tracking-[0.22em] text-white/50 uppercase">{ROLES_CLUB.etiquette}</p>
+        <h2 className="club-titre mt-4 text-[clamp(30px,7.6vw,54px)] leading-[1.02] text-balance">{ROLES_CLUB.titre}</h2>
+        <div
+          role="tablist"
+          aria-label={ROLES_CLUB.etiquette}
+          className="mt-8 flex flex-wrap justify-center gap-2 min-[960px]:mt-10 min-[960px]:block min-[960px]:divide-y min-[960px]:divide-white/[0.08] min-[960px]:border-y min-[960px]:border-white/[0.08]"
+        >
+          {ROLES_CLUB.roles.map((r, i) => {
+            const choisi = r.id === role.id;
+            return (
+              <button
+                key={r.id}
+                type="button"
+                role="tab"
+                aria-selected={choisi}
+                onClick={() => setActif(r.id)}
+                className={cn(
+                  "rounded-full px-4 py-2.5 text-ligne font-bold transition-[opacity,background-color] min-[960px]:flex min-[960px]:w-full min-[960px]:items-baseline min-[960px]:gap-5 min-[960px]:rounded-none min-[960px]:px-0 min-[960px]:py-5 min-[960px]:text-left",
+                  ANNEAU,
+                  choisi ? "bg-white text-black min-[960px]:bg-transparent min-[960px]:text-white" : "bg-white/[0.07] text-white/70 min-[960px]:bg-transparent min-[960px]:opacity-45 min-[960px]:hover:opacity-75"
+                )}
+              >
+                <span className="hidden w-7 shrink-0 font-display text-titre-m text-white/40 min-[960px]:inline">{i + 1}</span>
+                <span className="shrink-0 min-[960px]:w-40 min-[960px]:text-titre-m min-[960px]:font-extrabold min-[960px]:tracking-tight">{r.nom}</span>
+                <span className="hidden text-lecture leading-snug font-semibold text-white/70 min-[960px]:inline">{r.phrase}</span>
+              </button>
+            );
+          })}
+        </div>
+        <p className="mt-5 text-[clamp(16px,4.4vw,20px)] leading-snug font-semibold text-white/60 min-[960px]:hidden">{role.phrase}</p>
+      </div>
+      <div className="relative" role="tabpanel" aria-label={role.nom}>
+        <div aria-hidden className="absolute inset-[10%] rounded-full bg-[radial-gradient(closest-side,rgba(90,170,110,0.35),transparent)] blur-2xl" />
+        <Telephone key={role.id} capture={role.carte} className="relative mx-auto w-[min(72vw,290px)] min-[960px]:w-[min(25vw,330px)]" />
+      </div>
     </div>
   );
 }
@@ -549,7 +619,7 @@ export function PageClub({ police }: { police?: string }) {
             </div>
             <div className="relative">
               <div aria-hidden className="absolute inset-[10%] -z-0 rounded-full bg-[radial-gradient(closest-side,rgba(90,170,110,0.35),transparent)] blur-2xl" />
-              <Telephone src={s.capture.src} lue={s.capture.lue} className="relative mx-auto w-[min(72vw,290px)] min-[960px]:w-[min(25vw,330px)]" />
+              <Telephone capture={s.capture} className="relative mx-auto w-[min(72vw,290px)] min-[960px]:w-[min(25vw,330px)]" />
             </div>
           </section>
         ))}
@@ -567,28 +637,22 @@ export function PageClub({ police }: { police?: string }) {
         </ul>
       </section>
 
-      {/* 6 · Les quatre vues, à côté de l'entraîneuse. */}
-      <section data-apparait className={cn(COLONNE, APPARAIT, "mt-32 grid items-center gap-10 min-[960px]:mt-44 min-[960px]:grid-cols-[0.9fr_1.1fr] min-[960px]:gap-20")}>
-        <div className="relative aspect-[3/4] overflow-hidden rounded-[28px] bg-[linear-gradient(160deg,#1d3b5e,#0b0b0b_85%)]">
-          <Photo src={COACH_CLUB.photo} lue={COACH_CLUB.lue} className="absolute inset-0 size-full object-cover" repli={null} />
-          <div aria-hidden className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-black/70 to-transparent" />
-        </div>
-        <div>
-          <p className="text-[11px] font-bold tracking-[0.22em] text-white/50 uppercase">{ROLES_CLUB.etiquette}</p>
-          <h2 className="club-titre mt-4 text-[clamp(30px,7.6vw,54px)] leading-[1.02] text-balance">{ROLES_CLUB.titre}</h2>
-          <ul className="mt-10 divide-y divide-white/[0.08] border-y border-white/[0.08]">
-            {ROLES_CLUB.roles.map((r, i) => (
-              <li key={r.nom} className="flex items-baseline gap-5 py-5">
-                <span className="w-7 shrink-0 font-display text-titre-m text-white/25">{i + 1}</span>
-                <span className="w-[7.5rem] shrink-0 text-titre-fort font-extrabold tracking-tight min-[960px]:w-40 min-[960px]:text-titre-m">{r.nom}</span>
-                <span className="text-ligne leading-snug font-semibold text-white/60 min-[960px]:text-lecture">{r.phrase}</span>
-              </li>
-            ))}
-          </ul>
+      {/* 6 · Le bureau du club, sur ordinateur. */}
+      <section data-apparait className={cn(COLONNE, APPARAIT, "mt-32 text-center min-[960px]:mt-44")}>
+        <p className="text-[11px] font-bold tracking-[0.22em] text-white/50 uppercase">{ORDINATEUR_CLUB.etiquette}</p>
+        <h2 className="club-titre mt-4 text-[clamp(30px,7.6vw,54px)] leading-[1.02] text-balance">{ORDINATEUR_CLUB.titre}</h2>
+        <p className="mx-auto mt-5 max-w-[32ch] text-[clamp(16px,4.4vw,20px)] leading-snug font-semibold text-white/60">{ORDINATEUR_CLUB.phrase}</p>
+        <div className="mt-14">
+          <Portable capture={ORDINATEUR_CLUB.capture} />
         </div>
       </section>
 
-      {/* 7 · La demande de démo : la photo des seniors à gauche sur ordinateur. */}
+      {/* 7 · Les quatre cartes, une par rôle. */}
+      <section data-apparait className={cn(COLONNE, APPARAIT, "mt-32 min-[960px]:mt-44")}>
+        <Roles />
+      </section>
+
+      {/* 8 · La demande de démo : la photo des seniors à gauche sur ordinateur. */}
       <section id={ANCRE_DEMANDE} data-apparait className={cn(COLONNE, APPARAIT, "mt-32 min-[960px]:mt-44")}>
         <div className="grid overflow-hidden rounded-[32px] bg-[#f3f3ef] text-[#0b0b0b] min-[960px]:grid-cols-[0.85fr_1.15fr]" style={{ colorScheme: "light" }}>
           <div className="relative hidden min-h-full min-[960px]:block" style={{ background: `linear-gradient(160deg, ${JOUEURS_CLUB[2].maillot}, #0b0b0b 85%)` }}>

@@ -45,9 +45,6 @@ export const METADONNEES_CLUB: Metadata = {
 /** L'ancre du formulaire : les boutons du haut et de la barre y mènent. */
 export const ANCRE_DEMANDE = "demande";
 
-/** L'écran du haut : l'effectif du club en cartes. */
-export const CAPTURE_HAUT = { src: "/club/effectif.webp", lue: "L’effectif d’un club en cartes de joueur, triées par note" } as const;
-
 export const HAUT_CLUB = {
   etiquette: "Bola Club",
   titre: ["Votre club.", "Une carte par licencié."],
@@ -94,62 +91,99 @@ export const MANIFESTE_CLUB = {
 
 export const CHIFFRES_CLUB = [
   { valeur: "1", texte: "app pour tout le club" },
-  { valeur: "4", texte: "vues : admin, entraîneur, joueur, parent" },
+  { valeur: "4", texte: "cartes : joueur, parent, entraîneur, présidence" },
   { valeur: "0", texte: "feuille de papier" },
 ] as const;
 
-/** Une section : son étiquette, son titre, ses phrases, et la capture qui l'illustre. */
+/** Une capture de l'app : sa source, ce qu'elle montre, sa taille en pixels. */
+export interface CaptureClub {
+  src: string;
+  lue: string;
+  largeur: number;
+  hauteur: number;
+}
+
+/** Un écran entier de téléphone (390 × 844 en double densité). */
+const ECRAN = { largeur: 780, hauteur: 1688 } as const;
+
+/** Une section : son étiquette, son titre, ses phrases, et l'écran qui l'illustre. */
 export interface SectionClub {
   id: string;
   etiquette: string;
   titre: string;
   phrases: readonly string[];
-  capture: { src: string; lue: string };
+  capture: CaptureClub;
 }
 
-/** Les captures font 780 × 1200 (le haut d'un écran de 390 × 600, en double densité). */
-export const CAPTURE = { largeur: 780, hauteur: 1200 } as const;
-
+/**
+ * Les sections montrent le rendu de l'app Bola Club tel qu'on le dessine
+ * (27/11/2026, fils « Concevoir l'app Bola Club par rôle » et « Ajouter les
+ * séances d'entraînement ») : la Map du club, le match, l'Actu, la gestion,
+ * le planning de l'entraîneur. Club et joueurs fictifs (FC Démo).
+ */
 export const SECTIONS_CLUB: readonly SectionClub[] = [
   {
-    id: "actus",
-    etiquette: "Actus du club",
-    titre: "Tout le club au même endroit.",
-    phrases: ["Convocations, résultats, annonces.", "Chaque catégorie a son fil."],
-    capture: { src: "/club/actus.webp", lue: "Les actus d’un club : deux convocations, présents et absents" },
+    id: "map",
+    etiquette: "La Map du club",
+    titre: "Le club, c’est la maison.",
+    phrases: ["Tous les matchs de la semaine autour du stade.", "À domicile, à l’extérieur, toutes les équipes."],
+    capture: { src: "/club/app/map.webp", lue: "La Map du club : le stade et les matchs de la semaine de chaque équipe", ...ECRAN },
   },
   {
     id: "match",
     etiquette: "Le jour du match",
-    titre: "Présent ou absent, en un geste.",
-    phrases: ["L’entraîneur convoque, fait l’appel.", "Il saisit le score et les stats."],
-    capture: { src: "/club/match.webp", lue: "La saisie d’un match : le score, les buts et les passes de chaque joueur" },
+    titre: "Il vient. Ou pas.",
+    phrases: ["La convocation arrive sur le téléphone.", "Joueurs et parents répondent en un geste."],
+    capture: { src: "/club/app/match.webp", lue: "Un match U13 : le lieu, le rendez-vous, les convoqués et la réponse", ...ECRAN },
   },
   {
-    id: "progression",
-    etiquette: "Progression",
-    titre: "Le suivi de chaque joueur.",
-    phrases: ["Sa carte monte avec ses matchs.", "Évolution, présences, notes du staff."],
-    capture: { src: "/club/progression.webp", lue: "La fiche d’un joueur vue par son entraîneur : sa carte et son évolution" },
+    id: "planning",
+    etiquette: "L’entraîneur",
+    titre: "La semaine, séance par séance.",
+    phrases: ["Programmes, exercices, appel.", "Chaque équipe a son planning."],
+    capture: { src: "/club/app/planning.webp", lue: "Le planning de l’entraîneur : les entraînements de la semaine", largeur: 780, hauteur: 1410 },
   },
   {
-    id: "licences",
-    etiquette: "Administration",
-    titre: "Les licences en un coup d’œil.",
-    phrases: ["Invitez par lien, ou importez votre liste.", "L’accord des parents pour les plus jeunes."],
-    capture: { src: "/club/licences.webp", lue: "L’administration d’un club : les licences, l’invitation, le staff" },
+    id: "actu",
+    etiquette: "Actu",
+    titre: "La vie du club, en direct.",
+    phrases: ["Résultats, joueur du mois, annonces.", "Et les autres clubs Bola autour."],
+    capture: { src: "/club/app/actu.webp", lue: "L’Actu du club : un résultat, le joueur du mois, un mot de la présidente", ...ECRAN },
+  },
+  {
+    id: "club",
+    etiquette: "La présidence",
+    titre: "Tout le club dans la main.",
+    phrases: ["Licences, équipes, accords parentaux.", "Ce qui reste à faire, au même endroit."],
+    capture: { src: "/club/app/club.webp", lue: "L’espace de la présidente : licences, choses à faire, équipes", ...ECRAN },
   },
 ];
 
+/** L'écran sur ordinateur : le planning, vu par l'administration. */
+export const ORDINATEUR_CLUB = {
+  etiquette: "Sur ordinateur",
+  titre: "Le bureau du club.",
+  phrase: "Le même club, en grand, pour préparer la semaine.",
+  capture: { src: "/club/app/ordinateur-planning.webp", lue: "Le planning de tout le club sur ordinateur", largeur: 1400, hauteur: 1078 },
+} as const;
+
+/** Une vue : le rôle, ce qu'il y fait, et sa carte. */
+export interface RoleClub {
+  id: string;
+  nom: string;
+  phrase: string;
+  carte: CaptureClub;
+}
+
 export const ROLES_CLUB = {
-  etiquette: "Quatre vues",
-  titre: "Chacun voit ce qui le regarde.",
+  etiquette: "Quatre cartes",
+  titre: "Chacun a la sienne.",
   roles: [
-    { nom: "Admin", phrase: "Licences, catégories, staff." },
-    { nom: "Entraîneur", phrase: "Convocations, appel, stats." },
-    { nom: "Joueur", phrase: "Sa carte, ses convocations." },
-    { nom: "Parent", phrase: "La carte de son enfant." },
-  ],
+    { id: "joueur", nom: "Joueur", phrase: "Sa note, sa saison, ses convocations.", carte: { src: "/club/app/carte-joueur.webp", lue: "La carte d’un joueur U13 et sa note qui monte", ...ECRAN } },
+    { id: "parent", nom: "Parent", phrase: "La progression de son enfant.", carte: { src: "/club/app/carte-parent.webp", lue: "La carte d’un parent et la progression de son enfant", ...ECRAN } },
+    { id: "entraineur", nom: "Entraîneur", phrase: "Ses équipes, ceux qui montent.", carte: { src: "/club/app/carte-entraineur.webp", lue: "La carte d’un entraîneur et ses équipes", ...ECRAN } },
+    { id: "presidente", nom: "Présidence", phrase: "Le club entier, en chiffres.", carte: { src: "/club/app/carte-presidente.webp", lue: "La carte de la présidente et les chiffres du club", ...ECRAN } },
+  ] satisfies RoleClub[],
 } as const;
 
 // ─────────────── Le formulaire ───────────────
