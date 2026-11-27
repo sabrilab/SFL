@@ -10,29 +10,26 @@
 //   · PageBolaPlus : un carrousel horizontal (retours de Sabri du 14/11, 20:34
 //     → 20:47 : « en mode carrousel », « de belles couleurs »), une carte à la
 //     fois, qu'on fait glisser au doigt, comme la présentation d'un passe de
-//     jeu. Dix cartes : l'ouverture (le stade teint en violet et vert, le
-//     gros logo BOLA et le petit sigle SFL dessous, le prix premiers joueurs),
-//     puis les avantages de la liste (AVANTAGES : « Ta carte continue. » avec
-//     la vraie carte « Toi », « Bola Plus » et ses fonctions, « Ton studio »
-//     (Bola Studio, bola-app#22 : trois templates en éventail qui ouvrent le
-//     panneau des douze, et « 300 ⚽ / mois » sous le titre ; studio-bola.tsx),
-//     puis la part SFL
-//     en photos : maillots, matchs filmés, cadeaux, cérémonies), « Ramène 5
-//     abonnés. », et « Ton prix » : le bundle, la grille officielle de la SFL
-//     barrée, l'étiquette « Prix premiers joueurs », les deux formules (sous
-//     chacune, ses ballons de Bola Studio : « 300 ⚽ / mois », et pour l'annuel
-//     « + 1 000 ⚽ offerts », lus dans lib/sfl/studio.ts) et « Je suis
-//     intéressé ». Chaque carte porte l'étiquette de sa part :
-//     la pilule violette de Bola Plus (la lune Bola) ou l'étiquette verte de
-//     la SFL (son vrai sigle) ; on glisse des violettes aux vertes.
+//     jeu. Six cartes depuis le 27/11 (« ça va tenir en 4 pages […] on a 5
+//     ou 6 cartes ») : l'ouverture (le stade teint en violet, le logo BOLA et
+//     le grand sigle SFL, le bouton Mensuel / Annuel et le prix) ; la SFL, le
+//     dessin de « Bola Plus » en noir et chrome : ses lignes (LIGNES_SFL :
+//     maillots, ta carte, matchs filmés, cadeaux, cérémonies, « Ramène 5 »)
+//     ouvrent chacune sa fiche, et la rosace porte le sigle SFL ; « Bola
+//     Plus » et ses fonctions ; « Ton studio » (Bola Studio, bola-app#22 :
+//     trois templates en éventail qui ouvrent le panneau des douze, « 300 ⚽ /
+//     mois ») et, dessous, les matchs filmés (PiedStudio) ; « Bola 27 » ; et
+//     « Ton prix » : le bundle, les deux formules (sous chacune, ses ballons
+//     de Bola Studio, lus dans lib/sfl/studio.ts) et « Je suis intéressé ».
+//     Chaque carte porte l'étiquette de sa part : la pilule violette de Bola
+//     Plus (la lune Bola) ou l'étiquette verte de la SFL (son vrai sigle).
 //
 // Le carrousel : le défilement natif et son aimantation (scroll-snap), rien
 // ne suit le doigt. On voit le bord de la carte voisine : le geste s'annonce
 // sans un mot. Sous le rail, un segment par carte, touchable, qui dit où l'on
 // est (aria-current). Au clavier : ← et →, Début et Fin. Sur ordinateur, deux
 // boutons ‹ › (pointeur fin seulement) ; la molette verticale n'est pas
-// détournée. Avec « Réduire les animations », les sauts sont immédiats et
-// les ronds de « Ramène 5 » sont pleins d'emblée. La page ne défile pas en
+// détournée. Avec « Réduire les animations », les sauts sont immédiats. La page ne défile pas en
 // vertical : elle tient dans l'écran, au-dessus de la barre d'onglets.
 //
 // « Je suis intéressé » : collé au-dessus de la barre d'onglets
@@ -56,9 +53,9 @@
 // dessinées à l'encre de la page.
 
 import Link from "next/link";
-import { useEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type KeyboardEvent, type ReactNode, type RefObject } from "react";
+import { createContext, useContext, useEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type KeyboardEvent, type ReactNode, type RefObject } from "react";
 import { createPortal } from "react-dom";
-import { Check, ChevronLeft, ChevronRight, MessageCircle, Sparkles, Target, User, Users } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, Gift, IdCard, MessageCircle, Shirt, Sparkles, Target, Trophy, UserPlus, Users, Video } from "lucide-react";
 import { ANTON } from "@/components/sfl/actus/ecran";
 import { noterArrivee, noterCarte, noterFiche, noterTemps, partirDe } from "@/lib/sfl/bola-plus-parcours-store";
 import { FicheBolaPlus, PastilleFiche, aUneFiche, useFiche } from "@/components/sfl/bola-plus-fiches";
@@ -81,12 +78,14 @@ import {
   LARGEURS,
   NOM_BUNDLE,
   NOM_FORMULE,
+  LIGNES_SFL,
   NOM_PART,
   PALETTE,
-  PARRAINAGE,
+  VISUELS_SFL,
   PRIX_FORMULE,
   VARIABLES_PLUS,
   diapos,
+  partDeFiche,
   voitBolaPlus,
   fichierVisuel,
   sourcesVisuel,
@@ -94,6 +93,7 @@ import {
   type ComposantAvantage,
   type Diapo,
   type Formule,
+  type LigneSfl,
   type Part,
   type Visuel,
 } from "@/lib/sfl/bola-plus";
@@ -474,6 +474,93 @@ function VisuelBolaPlus() {
   );
 }
 
+/** Ouvre la fiche d'une ligne ou d'un encadré dans une carte (la page la fournit). */
+const OuvrirFiche = createContext<(id: string) => void>(() => {});
+
+const ICONES_SFL: Record<LigneSfl, typeof Users> = { maillots: Shirt, carte: IdCard, "matchs-filmes": Video, cadeaux: Gift, ceremonies: Trophy, parrainage: UserPlus };
+
+/** La rosace guillochée et, au centre, le sigle SFL (27/11 : « le même, mais pour la carte SFL »). */
+function EmblemeSfl({ className }: { className?: string }) {
+  return (
+    <span aria-hidden className={cn("bp-embleme-sfl", className)}>
+      <svg viewBox="-158 -158 316 316" className="bp-embleme-sfl__rosace">
+        <RosaceBola cx={0} cy={0} r1={ROSACE.r1} r2={ROSACE.r2} couleur="currentColor" epaisseur={0.8} />
+      </svg>
+      <span className="bp-embleme-sfl__sigle" />
+    </span>
+  );
+}
+
+/**
+ * La carte SFL (Sabri, 27/11) : le même dessin que « Bola Plus », en noir et
+ * chrome ; ses lignes sont les anciennes cartes de la SFL, chacune ouvre sa
+ * fiche quand elle en a une.
+ */
+function VisuelSfl() {
+  const ouvrir = useContext(OuvrirFiche);
+  return (
+    <div className="bp-visuel-plus bp-visuel-sfl">
+      <ul className="bp-fonctions bp-fonctions--sfl">
+        {LIGNES_SFL.map((l) => {
+          const Icone = ICONES_SFL[l.id];
+          const contenu = (
+            <>
+              <span className="bp-fonctions__icone" aria-hidden>
+                <Icone className="size-[17px]" strokeWidth={2.2} />
+              </span>
+              {l.nom}
+            </>
+          );
+          return (
+            <li key={l.id}>
+              {aUneFiche(l.id) ? (
+                <button
+                  type="button"
+                  className="bp-fonctions__ligne"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    ouvrir(l.id);
+                  }}
+                >
+                  {contenu}
+                </button>
+              ) : (
+                <span className="bp-fonctions__ligne">{contenu}</span>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+      <EmblemeSfl className="bp-visuel-plus__embleme" />
+    </div>
+  );
+}
+
+/** Sous « Ton studio » (27/11) : les ballons du mois, puis les matchs filmés, qui ouvrent leur fiche. */
+function PiedStudio() {
+  const ouvrir = useContext(OuvrirFiche);
+  const v = VISUELS_SFL["matchs-filmes"];
+  return (
+    <>
+      <MentionStudio />
+      <button
+        type="button"
+        className="bp-matchs dark"
+        style={{ ["--teinte" as string]: v.teinte }}
+        onClick={(e) => {
+          e.stopPropagation();
+          ouvrir("matchs-filmes");
+        }}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element -- déjà à ses trois tailles (public/bola-plus) */}
+        <img src={fichierVisuel(v.image, LARGEUR)} srcSet={sourcesVisuel(v.image)} sizes={TAILLES} width={LARGEUR} height={hauteurDe(v)} alt={v.alt} loading="lazy" decoding="async" draggable={false} className="bp-photo" />
+        <EtiquettePart part="sfl" className="bp-matchs__part" />
+        <span className="bp-titre bp-matchs__titre">Tes matchs filmés</span>
+      </button>
+    </>
+  );
+}
+
 /** Le logo BOLA officiel, en blanc : l'ouverture et Bola 27. */
 function LogoBola({ className }: { className?: string }) {
   // eslint-disable-next-line @next/next/no-img-element -- le logo officiel, en SVG
@@ -495,25 +582,33 @@ function VisuelBola27() {
 /** Les visuels dessinés par le code. */
 const COMPOSANTS: Record<ComposantAvantage, () => ReactNode> = {
   carte: VisuelCarte,
+  sfl: VisuelSfl,
   "bola-plus": VisuelBolaPlus,
   "bola-27": VisuelBola27,
   studio: VisuelStudio,
 };
 
 /** Ce qu'un visuel dessiné ajoute sous son titre : les ballons du mois de « Ton studio ». */
-const PIEDS: Partial<Record<ComposantAvantage, () => ReactNode>> = { studio: MentionStudio };
+const PIEDS: Partial<Record<ComposantAvantage, () => ReactNode>> = { studio: PiedStudio };
 
 /** Un avantage dessiné par le code : son étiquette, son visuel, son titre et sa ligne. */
 function DiapoComposant({ avantage, composant }: { avantage: Avantage; composant: ComposantAvantage }) {
   const Dessin = COMPOSANTS[composant];
   const Pied = PIEDS[composant];
-  const titreEnHaut = composant === "bola-plus";
+  const titreEnHaut = composant === "bola-plus" || composant === "sfl";
   // Bola 27 : le logo est son titre ; seule sa ligne suit.
   const logo = composant === "bola-27";
   return (
-    <div className={cn("bp-texte", `bp-texte--${avantage.part}`, logo && "bp-texte--logo")}>
+    <div className={cn("bp-texte", `bp-texte--${avantage.part}`, `bp-texte--${composant}`, logo && "bp-texte--logo")}>
       <EtiquettePart part={avantage.part} className="self-start" />
-      {titreEnHaut && <Titre className="bp-texte__titre">{avantage.titre}</Titre>}
+      {titreEnHaut &&
+        (composant === "sfl" ? (
+          <Titre className="bp-texte__titre bp-titre-sfl">
+            <span role="img" aria-label={avantage.titre} className="bp-titre-sfl__sigle" />
+          </Titre>
+        ) : (
+          <Titre className="bp-texte__titre">{avantage.titre}</Titre>
+        ))}
       <Dessin />
       {logo && avantage.sous && <p className="bp-texte__sous bp-bola27__sous">{avantage.sous}</p>}
       {!titreEnHaut && !logo && (
@@ -527,88 +622,32 @@ function DiapoComposant({ avantage, composant }: { avantage: Avantage; composant
   );
 }
 
-/**
- * Un avantage en photo : le visuel plein cadre sous le voile de sa part, son
- * étiquette, son titre. « Tes maillots » montre d'abord le portant ; les
- * maillots portés (Avantage.depose, gardés hors du dépôt) ne prennent sa
- * place qu'une fois chargés : absents, rien ne bouge ni ne reste vide.
- */
+/** Un avantage en photo : le visuel plein cadre sous le voile de sa part, son étiquette, son titre. */
 function DiapoPhoto({ avantage, visuel }: { avantage: Avantage; visuel: Visuel }) {
-  const [deposeLa, setDeposeLa] = useState(false);
-  const depose = deposeLa ? avantage.depose : undefined;
-
-  useEffect(() => {
-    const fichier = avantage.depose?.fichier;
-    if (!fichier) return;
-    let vivant = true;
-    const essai = new Image();
-    essai.onload = () => {
-      if (vivant && essai.naturalWidth > 0) setDeposeLa(true);
-    };
-    essai.src = fichier;
-    return () => {
-      vivant = false;
-      essai.onload = null;
-    };
-  }, [avantage.depose?.fichier]);
-
   return (
     <div
       className={cn("bp-photo-carte dark", `bp-photo-carte--${avantage.part}`)}
-      data-teindre={visuel.teindre && !depose ? "" : undefined}
-      data-voile-court={visuel.voileCourt && !depose ? "" : undefined}
+      data-teindre={visuel.teindre ? "" : undefined}
+      data-voile-court={visuel.voileCourt ? "" : undefined}
       style={{ ["--teinte" as string]: visuel.teinte }}
     >
-      {depose ? (
-        // Déjà chargé (l'essai ci-dessus) : il prend la place du portant.
-        // eslint-disable-next-line @next/next/no-img-element -- un seul fichier déposé, sans tailles
-        <img src={depose.fichier} width={1170} height={1462} alt={depose.alt} decoding="async" draggable={false} className="bp-photo" />
-      ) : (
-        // eslint-disable-next-line @next/next/no-img-element -- déjà à ses trois tailles (public/bola-plus)
-        <img
-          src={fichierVisuel(visuel.image, LARGEUR)}
-          srcSet={sourcesVisuel(visuel.image)}
-          sizes={TAILLES}
-          width={LARGEUR}
-          height={hauteurDe(visuel)}
-          alt={visuel.alt}
-          loading="lazy"
-          decoding="async"
-          draggable={false}
-          className="bp-photo"
-        />
-      )}
+      {/* eslint-disable-next-line @next/next/no-img-element -- déjà à ses trois tailles (public/bola-plus) */}
+      <img
+        src={fichierVisuel(visuel.image, LARGEUR)}
+        srcSet={sourcesVisuel(visuel.image)}
+        sizes={TAILLES}
+        width={LARGEUR}
+        height={hauteurDe(visuel)}
+        alt={visuel.alt}
+        loading="lazy"
+        decoding="async"
+        draggable={false}
+        className="bp-photo"
+      />
       <EtiquettePart part={avantage.part} className="bp-photo-carte__part" />
       <div className="bp-photo-carte__bas">
         <Titre className="bp-photo-carte__titre">{avantage.titre}</Titre>
         {avantage.sous && <p className="bp-photo-carte__sous">{avantage.sous}</p>}
-      </div>
-    </div>
-  );
-}
-
-/** Où se posent les ronds de « Ramène 5 », en arc régulier au-dessus de « Toi » (en degrés, 0 = à droite, de −162° à −18°). */
-const ARC = Array.from({ length: PARRAINAGE.nombre }, (_, i) => -162 + (144 / (PARRAINAGE.nombre - 1)) * i);
-
-/** « Ramène 5 abonnés. » : cinq ronds en arc qui se remplissent au-dessus de « Toi ». */
-function DiapoParrainage({ vu }: { vu: boolean }) {
-  return (
-    <div className="bp-parrainage dark" data-vu={vu ? "" : undefined}>
-      <div className="bp-arc" aria-hidden>
-        {ARC.map((deg, i) => (
-          <span
-            key={deg}
-            className="bp-arc__rond"
-            style={{ ["--x" as string]: Math.cos((deg * Math.PI) / 180).toFixed(3), ["--y" as string]: Math.sin((deg * Math.PI) / 180).toFixed(3), ["--i" as string]: i } as CSSProperties}
-          >
-            <User className="size-[18px]" strokeWidth={2.4} />
-          </span>
-        ))}
-        <span className="bp-arc__toi">Toi</span>
-      </div>
-      <div>
-        <Titre className="bp-texte__titre">{PARRAINAGE.titre}</Titre>
-        <p className="bp-texte__sous bp-parrainage__sous">{PARRAINAGE.sous}</p>
       </div>
     </div>
   );
@@ -676,8 +715,8 @@ const sansAbonnement = () => () => {};
 const policeDemandee = (): "barlow" | "archivo" =>
   process.env.NODE_ENV !== "production" && new URLSearchParams(window.location.search).get("police") === "b" ? "archivo" : POLICE_TITRES;
 
-/** La part d'une carte, pour son segment : la sienne, le lime de « Ramène 5 », ou les deux (l'ouverture, le prix). */
-const partDe = (d: Diapo): Part | "prix" | "deux" => ("avantage" in d ? d.avantage.part : d.id === "parrainage" ? "prix" : "deux");
+/** La part d'une carte, pour son segment : la sienne, ou les deux (l'ouverture, le prix). */
+const partDe = (d: Diapo): Part | "deux" => ("avantage" in d ? d.avantage.part : "deux");
 
 /** Les couleurs de la page (lib/sfl/bola-plus.ts, PALETTE), en variables CSS. */
 const COULEURS = {
@@ -702,9 +741,7 @@ export function PageBolaPlus() {
   const liste = diapos();
   const n = liste.length;
   const iPrix = liste.findIndex((d) => d.id === "prix");
-  const iParrainage = liste.findIndex((d) => d.id === "parrainage");
   const [actif, setActif] = useState(0);
-  const [vus, setVus] = useState<ReadonlySet<number>>(() => new Set([0]));
   // La barre n'arrive qu'une fois la page en marche (elle est portée dans <body>).
   const pret = useSyncExternalStore(sansAbonnement, () => true, () => false);
   const police = useSyncExternalStore(sansAbonnement, policeDemandee, () => POLICE_TITRES);
@@ -719,8 +756,8 @@ export function PageBolaPlus() {
     return () => window.clearInterval(id);
   }, []);
   const idFiche = (d: Diapo) => ("avantage" in d ? d.avantage.id : d.id);
-  const dFiche = liste.find((d) => idFiche(d) === fiche.ouverte);
-  const partFiche = dFiche && "avantage" in dFiche ? dFiche.avantage.part : "plus";
+  const partFiche = fiche.ouverte ? partDeFiche(fiche.ouverte) : "plus";
+  const ouvrirFiche = (id: string) => (noterFiche(id), fiche.ouvrir(id));
 
   // La carte active : celle qui occupe le rail aux trois cinquièmes au moins.
   useEffect(() => {
@@ -734,7 +771,6 @@ export function PageBolaPlus() {
           if (vise.current === i) vise.current = null;
           setActif(i);
           noterCarte(i);
-          setVus((v) => (v.has(i) ? v : new Set(v).add(i)));
         }
       },
       { root: rail, threshold: 0.6 }
@@ -766,14 +802,13 @@ export function PageBolaPlus() {
   function rendu(d: Diapo) {
     if (d.id === "ouverture") return <DiapoOuverture plus={plus} choix={choix} onChoix={setChoix} />;
     if (d.id === "prix") return <DiapoPrix plus={plus} choix={choix} onChoix={setChoix} actionRef={actionRef} />;
-    if ("avantage" in d) {
-      const v = d.avantage.visuel;
-      return v.genre === "image" ? <DiapoPhoto avantage={d.avantage} visuel={v} /> : <DiapoComposant avantage={d.avantage} composant={v.composant} />;
-    }
-    return <DiapoParrainage vu={vus.has(iParrainage)} />;
+    if (!("avantage" in d)) return null;
+    const v = d.avantage.visuel;
+    return v.genre === "image" ? <DiapoPhoto avantage={d.avantage} visuel={v} /> : <DiapoComposant avantage={d.avantage} composant={v.composant} />;
   }
 
   return (
+    <OuvrirFiche value={ouvrirFiche}>
     <section className="bp" style={COULEURS} aria-roledescription="carrousel" aria-label="Bola Plus" data-police={police}>
       <div className="bp-tete">
         <BoutonRetour />
@@ -825,5 +860,6 @@ export function PageBolaPlus() {
         />
       )}
     </section>
+    </OuvrirFiche>
   );
 }
