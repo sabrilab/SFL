@@ -37,6 +37,7 @@ import {
   type CaptureClub,
   CHIFFRES_CLUB,
   JOUEURS_CLUB,
+  COACH_CLUB,
   MANIFESTE_CLUB,
   ORDINATEUR_CLUB,
   type JoueurClub,
@@ -640,9 +641,17 @@ export function PageClub({ police }: { police?: string }) {
         </div>
       </section>
 
-      {/* 7 · Les quatre cartes, une par rôle. */}
+      {/* 7 · Les quatre cartes, une par rôle, puis l'entraîneuse. */}
       <section data-apparait className={cn(COLONNE, APPARAIT, "mt-32 min-[960px]:mt-44")}>
         <Roles />
+      </section>
+
+      {/* L'entraîneuse en grand, sur le bord du terrain. */}
+      <section data-apparait className={cn(COLONNE, APPARAIT, "mt-24 min-[960px]:mt-32")}>
+        <div className="relative aspect-[4/5] overflow-hidden rounded-[28px] bg-[linear-gradient(160deg,#1d3b5e,#0b0b0b_85%)] min-[960px]:aspect-[21/9]">
+          <Photo src={COACH_CLUB.photo} lue={COACH_CLUB.lue} className="absolute inset-0 size-full object-cover object-[50%_35%]" repli={null} />
+          <div aria-hidden className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-black/60 to-transparent" />
+        </div>
       </section>
 
       {/* 8 · La demande de démo : la photo des seniors à gauche sur ordinateur. */}
