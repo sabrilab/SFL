@@ -12,7 +12,10 @@
 //   · une adresse entière : la présentation de la ligue, /sfl, le lien de sa
 //     bio Instagram. Comparée en entier partout (la porte, la barre d'onglets,
 //     l'accueil, le guide d'installation, l'intro) : /sflx ou /sfl/abc ne sont
-//     pas elle, et n'héritent de rien.
+//     pas elle, et n'héritent de rien ;
+//   · une autre adresse entière : la présentation de Bola Club, /club, le
+//     point d'arrivée de la campagne de mails vers les clubs (27/11/2026),
+//     traitée comme /sfl partout.
 //
 // Pur : ni React, ni navigateur.
 
@@ -36,7 +39,20 @@ export function estPageSflMalEcrite(chemin: string | null | undefined): boolean 
   return !!chemin && chemin !== CHEMIN_SFL && chemin.replace(/\/$/, "").toLowerCase() === CHEMIN_SFL;
 }
 
+/** L'adresse de la présentation de Bola Club. */
+export const CHEMIN_CLUB = "/club";
+
+/** Est-ce la présentation de Bola Club ? L'adresse entière, à la lettre. */
+export function estPageClub(chemin: string | null | undefined): boolean {
+  return chemin === CHEMIN_CLUB;
+}
+
+/** Une page de présentation plein écran (/sfl, /club) : ni barre, ni accueil, ni guide. */
+export function estPageVitrine(chemin: string | null | undefined): boolean {
+  return estPageSfl(chemin) || estPageClub(chemin);
+}
+
 /** La porte laisse-t-elle passer cette adresse sans compte ? */
 export function estPublique(chemin: string | null | undefined): boolean {
-  return estPageSfl(chemin) || PUBLIC_ROUTES.some((r) => !!chemin?.startsWith(r));
+  return estPageVitrine(chemin) || PUBLIC_ROUTES.some((r) => !!chemin?.startsWith(r));
 }

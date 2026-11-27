@@ -34,7 +34,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { photoMiniature, photosPartagees } from "@/lib/sfl/photos";
-import { estPageSfl } from "@/lib/sfl/routes-publiques";
+import { estPageClub, estPageSfl } from "@/lib/sfl/routes-publiques";
 import { jouerIntro, PLACES, TRACES, type Intro } from "./intro-bola";
 
 const CardCanvas = dynamic(() => import("./card-3d-canvas").then((m) => m.CardCanvas), {
@@ -118,7 +118,7 @@ export function AppSplash() {
     });
 
     // Lu au montage : l'intro ne joue qu'une fois, sur la page où l'on arrive.
-    const courte = estPageSfl(window.location.pathname);
+    const courte = estPageSfl(window.location.pathname) || estPageClub(window.location.pathname);
 
     async function run() {
       const fontsP = document.fonts.ready.then(() => bump(WEIGHTS.fonts));

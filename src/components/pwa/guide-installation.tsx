@@ -48,7 +48,7 @@ import { useIsClient } from "@/hooks/use-is-client";
 import { useSession } from "@/hooks/use-session";
 import { adresseSortie, lienSortie, lireEnvironnement, type Environnement } from "@/lib/pwa/environnement";
 import { codeGarde } from "@/lib/sfl/parrainage";
-import { estPageSfl, estPageSflMalEcrite } from "@/lib/sfl/routes-publiques";
+import { estPageClub, estPageSfl, estPageSflMalEcrite } from "@/lib/sfl/routes-publiques";
 import { sourceArrivee } from "@/lib/sfl/site-visites";
 
 interface BeforeInstallPromptEvent extends Event {
@@ -110,6 +110,7 @@ export function GuideInstallation() {
     };
   }, []);
 
+  if (estPageClub(pathname)) return null;
   if (!isClient || ferme || estPageSfl(pathname) || estPageSflMalEcrite(pathname) || SANS_GUIDE.some((r) => pathname?.startsWith(r))) return null;
   const env = lireEnvironnement();
   if (env.systeme === "autre" || env.installee) return null;

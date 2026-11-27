@@ -161,7 +161,7 @@ const SOURCES = [ROUTE, PAGE, TEXTES, ROUTES, ALT, COUVERTURE];
 
 // 1 · La porte.
 // Ce qui est ouvert sans compte, et rien d'autre : chaque dossier de src/app est essayé.
-const OUVERTES = new Set(["bienvenue", "inscription", "confidentialite", "sfl"]);
+const OUVERTES = new Set(["bienvenue", "inscription", "confidentialite", "sfl", "club"]);
 const dossiers = readdirSync(join(RACINE, "src/app")).filter((n) => statSync(join(RACINE, "src/app", n)).isDirectory());
 assert.ok(dossiers.length > 20 && dossiers.includes("sfl") && dossiers.includes("saisons"), "1 · src/app n'a plus la forme attendue : le contrôle de la porte ne prouve plus rien");
 for (const d of dossiers)
@@ -204,14 +204,14 @@ verifier(
 // /sfl comparée en entier dans chaque composant, plus jamais par un début d'adresse.
 for (const [fichier, attendu, quoi] of [
   ["src/components/layout/bottom-nav.tsx", "if (estPageSfl(pathname) || SANS_BARRE.some((r) => pathname.startsWith(r))) return null;", "la barre d'onglets se montre sur /sfl"],
-  ["src/components/sfl/accueil/accueil.tsx", "const libre = estPageSfl(pathname) || SANS_ACCUEIL.some((r) => pathname?.startsWith(r));", "l'accueil de l'app s'ouvre sur /sfl"],
+  ["src/components/sfl/accueil/accueil.tsx", "const libre = estPageSfl(pathname) || SANS_ACCUEIL.some((r) => pathname?.startsWith(r)) || estPageClub(pathname);", "l'accueil de l'app s'ouvre sur /sfl"],
   ["src/components/sfl/accueil/accueil.tsx", "if (estPageSfl(pathname)) return null;\n  if (etat !== \"fini\") return null;", "ce qui s'ouvre de soi-même joue sous /sfl (ApresAccueil)"],
   [
     "src/components/pwa/guide-installation.tsx",
     "if (!isClient || ferme || estPageSfl(pathname) || estPageSflMalEcrite(pathname) || SANS_GUIDE.some((r) => pathname?.startsWith(r))) return null;",
     "le guide d'installation couvre /sfl",
   ],
-  ["src/components/sfl/app-splash.tsx", "const courte = estPageSfl(window.location.pathname);", "l'intro courte ne reconnaît plus /sfl"],
+  ["src/components/sfl/app-splash.tsx", "const courte = estPageSfl(window.location.pathname) || estPageClub(window.location.pathname);", "l'intro courte ne reconnaît plus /sfl"],
 ] as const)
   verifier(lire(fichier).includes(attendu), `1 · ${quoi} (${fichier})`);
 for (const fichier of ["src/components/layout/bottom-nav.tsx", "src/components/sfl/accueil/accueil.tsx", "src/components/pwa/guide-installation.tsx", "src/components/sfl/app-splash.tsx", "src/components/sfl/auth/auth-gate.tsx", ROUTES])
