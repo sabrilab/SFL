@@ -346,6 +346,21 @@ function PlanClub({ role, choisi }: { role: Role; choisi: string | null }) {
       interactive: true,
     });
     (window as unknown as { __plan: maplibregl.Map }).__plan = map;
+    // Les trajets depuis la maison : un fil pointillé vers chaque match à l'extérieur.
+    map.on("load", () => {
+      map.addSource("trajets", {
+        type: "geojson",
+        data: {
+          type: "FeatureCollection",
+          features: MATCHS.filter((m) => !m.maison).map((m) => ({
+            type: "Feature" as const,
+            properties: { mien: MIEN[role] === m.id ? 1 : 0 },
+            geometry: { type: "LineString" as const, coordinates: [[CLUB.lng, CLUB.lat], [m.lng, m.lat]] },
+          })),
+        },
+      });
+      map.addLayer({ id: "trajets", type: "line", source: "trajets", paint: { "line-color": "#0a0b0d", "line-opacity": 0.45, "line-width": 2.5, "line-dasharray": [1.5, 1.8] }, layout: { "line-cap": "round" } });
+    });
     const reperes: maplibregl.Marker[] = [];
     MATCHS.filter((m) => !m.maison).forEach((m, k) => {
       const est = m.id === (choisi ?? MIEN[role]);
@@ -407,6 +422,8 @@ function PlanClub({ role, choisi }: { role: Role; choisi: string | null }) {
   );
 }
 
+const TRAJET: Record<string, string> = { u17: "21 min", fem: "14 min", u13b: "17 min" };
+
 function TuileMatch({ m, role }: { m: MatchClub; role: Role }) {
   const mien = MIEN[role] === m.id;
   const ligne =
@@ -439,7 +456,7 @@ function TuileMatch({ m, role }: { m: MatchClub; role: Role }) {
       </div>
       <div className="flex items-center gap-1.5 text-[12.5px] text-[#0a0b0d]/60">
         <MapPin className="size-3.5 shrink-0" />
-        <span className="truncate">{m.maison ? `À la maison · ${m.lieu.split(", ")[1]}` : `${m.ville} · ${m.lieu}`}</span>
+        <span className="truncate">{m.maison ? `À la maison · ${m.lieu.split(", ")[1]}` : `${m.ville} · ${TRAJET[m.id]} en voiture`}</span>
       </div>
       <div className={cn("text-[13px] font-semibold", mien ? "text-[#0a0b0d]" : "text-[#0a0b0d]/55")}>{ligne}</div>
     </div>
@@ -579,6 +596,29 @@ function EcranCarte({ role }: { role: Role }) {
             <Chiffres items={[["8", "matchs"], ["5", "buts"], ["3", "passes"], ["92%", "présence"]]} />
           </div>
           <div className="flex flex-col gap-2">
+            <Rubrique droite="Corentin · lundi">Le mot du coach</Rubrique>
+            <div className={cn(SURFACE, "flex gap-3 p-4")}>
+              <CarteCoach size={44 / 254} />
+              <span className="text-lecture">Gros match samedi. Tes appels en profondeur font la différence, continue. On bosse le pied gauche mercredi.</span>
+            </div>
+          </div>
+          <div className="flex flex-col gap-2">
+            <Rubrique droite="3 sur 12">Tes badges du club</Rubrique>
+            <div className="flex flex-wrap gap-2">
+              {[
+                ["Joueur du mois", true],
+                ["Triplé", true],
+                ["10 entraînements de suite", true],
+                ["Capitaine", false],
+                ["Clean sheet", false],
+              ].map(([b, ok]) => (
+                <span key={b as string} className={cn("rounded-full px-3 py-1.5 text-corps font-semibold", ok ? "bg-foreground text-background" : "border border-dashed border-foreground/25 text-encre-3")}>
+                  {b}
+                </span>
+              ))}
+            </div>
+          </div>
+          <div className="flex flex-col gap-2">
             <Rubrique>Prochain match</Rubrique>
             <div className={cn(SURFACE, "overflow-hidden")}>
               <Ligne i={0} titre="FC Démo – AS Exemple" sous="Samedi 14 h · à la maison · tu es convoqué" fort avant={<Ecusson initiales="AE" fond="blanc" blason={ADVERSES["AS Exemple"]} taille={34} />} />
@@ -704,6 +744,25 @@ function EcranActu({ role, autres }: { role: Role; autres: boolean }) {
       <Segmente options={["FC Démo", "Les clubs Bola"]} valeur={autres ? "Les clubs Bola" : "FC Démo"} />
       {!autres ? (
         <>
+          <div className="-mx-4 flex gap-4 overflow-x-auto px-4 [scrollbar-width:none]">
+            {[
+              ["Le club", true],
+              ["U13", true],
+              ["U17", false],
+              ["Seniors", true],
+              ["Féminines", true],
+              ["Vétérans", false],
+            ].map(([n, neuf]) => (
+              <span key={n as string} className="flex shrink-0 flex-col items-center gap-1.5">
+                <span className={cn("grid size-[66px] place-items-center rounded-full p-[3px]", neuf ? "bg-[conic-gradient(#f4f3ef,#0E4D32,#A7ADB4,#f4f3ef)]" : "bg-foreground/15")}>
+                  <span className="grid size-full place-items-center rounded-full bg-background">
+                    <Ecusson initiales={CLUB.initiales} fond="noir" blason={BLASON} taille={40} />
+                  </span>
+                </span>
+                <span className="text-petit font-medium">{n}</span>
+              </span>
+            ))}
+          </div>
           {role === "president" && (
             <div className={cn(SURFACE, "flex items-center gap-3 px-4 py-3")}>
               <Megaphone className="size-5 text-encre-2" />
@@ -1088,10 +1147,47 @@ function EcranClub() {
       </div>
 
       <div className="flex flex-col gap-2">
+        <Rubrique droite="saison 2026-27">Cotisations</Rubrique>
+        <div className={cn(SURFACE, "flex flex-col gap-3 p-4")}>
+          <div className="flex items-baseline justify-between">
+            <span className="flex items-baseline gap-2">
+              <span className="font-[family-name:var(--font-anton)] text-[44px] leading-none tabular-nums">48</span>
+              <span className="text-lecture text-encre-2">payées sur 62</span>
+            </span>
+            <span className="text-lecture font-semibold tabular-nums">8 640 €</span>
+          </div>
+          <div className="flex h-1.5 overflow-hidden rounded-full bg-foreground/[0.08]">
+            <div className="h-full bg-foreground" style={{ width: "77%" }} />
+            <div className="h-full bg-foreground/35" style={{ width: "10%" }} />
+          </div>
+          <span className="text-corps text-encre-2">6 en plusieurs fois · 8 à relancer</span>
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <Rubrique droite="novembre">Présence aux entraînements</Rubrique>
+        <div className={cn(SURFACE, "flex flex-col gap-3 p-4")}>
+          {[
+            ["U13", 91],
+            ["U17", 78],
+            ["Seniors", 64],
+            ["Féminines", 86],
+          ].map(([c, v]) => (
+            <span key={c} className="flex items-center gap-3">
+              <span className="w-20 text-lecture font-medium">{c}</span>
+              <Jauge v={v as number} couleur={(v as number) < 70 ? "#E5383B" : undefined} />
+              <span className="w-10 text-right text-corps tabular-nums">{v} %</span>
+            </span>
+          ))}
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-2">
         <Rubrique>À faire</Rubrique>
         <div className={cn(SURFACE, "overflow-hidden")}>
           <Ligne i={0} titre="2 accords parentaux" sous="Ewen et Soan, U13 : pas convoqués avant" fort />
           <Ligne i={1} titre="5 invitations sans réponse" sous="Envoyées il y a plus de 7 jours" />
+          <Ligne i={2} titre="8 cotisations à relancer" sous="1 440 € restants" />
         </div>
       </div>
 
