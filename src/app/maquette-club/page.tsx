@@ -109,8 +109,9 @@ const DIRIGEANT: Matiere = { ...MATIERES_ARBITRE.raye, titre: "PRÉSIDENTE" };
 const ZERO = ST(0, 0, 0, 0, 0, 0);
 
 function CarteJoueur({ size, prenom = TIMEO.prenom, nom = TIMEO.nom, poste = TIMEO.poste, note = TIMEO.note }: { size: number; prenom?: string; nom?: string; poste?: string; note?: number }) {
-  if (254 * size < 170) return <CartePhoto name={`${prenom} ${nom}`} affiche={prenom} position={poste} overall={note} size={size} photo={null} />;
-  return <BolaCard name={`${prenom} ${nom}`} affiche={prenom} username="u13 · fc démo" position={poste} overall={note} stats={TIMEO.stats} size={size} photo={null} numero={9} />;
+  const photo = prenom === TIMEO.prenom ? "/maquette-club/u11-carre.webp" : null;
+  if (254 * size < 170) return <CartePhoto name={`${prenom} ${nom}`} affiche={prenom} position={poste} overall={note} size={size} photo={photo} />;
+  return <BolaCard name={`${prenom} ${nom}`} affiche={prenom} username="u13 · fc démo" position={poste} overall={note} stats={TIMEO.stats} size={size} photo={photo} numero={9} />;
 }
 
 function CarteParent({ size }: { size: number }) {
@@ -125,7 +126,7 @@ function CarteParent({ size }: { size: number }) {
       overall={0}
       stats={ZERO}
       size={size}
-      photo={null}
+      photo="/maquette-club/parent-carre.webp"
       arbitre={{ note: "12", stats: [["vus", 12], ["dép", 5], ["cov", 3], ["sai", 2]] }}
     />
   );
@@ -143,7 +144,7 @@ function CarteDirigeant({ size }: { size: number }) {
       overall={0}
       stats={ZERO}
       size={size}
-      photo={null}
+      photo="/maquette-club/presidente-carre.webp"
       arbitre={{ note: "62", stats: [["lic", 62], ["éq", 4], ["bén", 9], ["sai", 3]] }}
     />
   );
@@ -152,11 +153,12 @@ function CarteDirigeant({ size }: { size: number }) {
 function CarteCoach({ size }: { size: number }) {
   return (
     <CarteEntraineur
-      nom="Corentin Delorme"
-      affiche="Corentin"
-      pseudo="corentin"
+      nom="Solène Delorme"
+      affiche="Solène"
+      pseudo="solène"
       equipe={{ nom: "FC Démo U13", initiales: CLUB.initiales, fond: "noir", blason: BLASON }}
       stats={{ RES: 78, PRES: 84, COH: 76 }}
+      photo="/maquette-club/coach-carre.webp"
       size={size}
     />
   );
@@ -576,7 +578,7 @@ const TAILLE = 0.97; // ~63 % d'un téléphone de 390 px, comme Ma carte
 function EcranCarte({ role }: { role: Role }) {
   const carte =
     role === "joueur" ? <CarteJoueur size={TAILLE} /> : role === "parent" ? <CarteParent size={TAILLE} /> : role === "entraineur" ? <CarteCoach size={TAILLE} /> : <CarteDirigeant size={TAILLE} />;
-  const sous = { joueur: "Attaquant · U13 · FC Démo", parent: "Maman de Timéo · U13 · FC Démo", entraineur: "Entraîneur · U13 et U17 · FC Démo", president: "Présidente · FC Démo" }[role];
+  const sous = { joueur: "Attaquant · U13 · FC Démo", parent: "Maman de Timéo · U13 · FC Démo", entraineur: "Entraîneuse · U13 et U17 · FC Démo", president: "Présidente · FC Démo" }[role];
   return (
     <Page role={role} actif="carte">
       <Tete titre="Ma carte" droite={<Vue role={role} />} />
@@ -596,7 +598,7 @@ function EcranCarte({ role }: { role: Role }) {
             <Chiffres items={[["8", "matchs"], ["5", "buts"], ["3", "passes"], ["92%", "présence"]]} />
           </div>
           <div className="flex flex-col gap-2">
-            <Rubrique droite="Corentin · lundi">Le mot du coach</Rubrique>
+            <Rubrique droite="Solène · lundi">Le mot du coach</Rubrique>
             <div className={cn(SURFACE, "flex gap-3 p-4")}>
               <CarteCoach size={44 / 254} />
               <span className="text-lecture">Gros match samedi. Tes appels en profondeur font la différence, continue. On bosse le pied gauche mercredi.</span>
@@ -771,6 +773,8 @@ function EcranActu({ role, autres }: { role: Role; autres: boolean }) {
             </div>
           )}
           <Post qui="Seniors" quand="Dimanche · J9">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/maquette-club/seniors.webp" alt="" className="aspect-[4/5] w-full rounded-[14px] object-cover object-top" />
             <Score a="FC Démo" b="Olymp. Témoin" sa={3} sb={1} ba={BLASON} bb={ADVERSES["Olympique Témoin"]} ia="FCD" ib="OT" />
             <span className="text-lecture">Troisième victoire de suite. Le terrain d&apos;honneur a fait le plein.</span>
           </Post>
@@ -780,7 +784,7 @@ function EcranActu({ role, autres }: { role: Role; autres: boolean }) {
               <span className="flex flex-col gap-1">
                 <span className="text-titre font-semibold">Timéo Aubrac</span>
                 <span className="text-corps text-encre-2">5 buts en novembre · 70 → 73</span>
-                <span className="text-corps text-encre-3">Choisi par Corentin</span>
+                <span className="text-corps text-encre-3">Choisi par Solène</span>
               </span>
             </div>
           </Post>
@@ -792,6 +796,8 @@ function EcranActu({ role, autres }: { role: Role; autres: boolean }) {
             </div>
           </Post>
           <Post qui="Féminines" quand="Dimanche · J9">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/maquette-club/feminines.webp" alt="" className="aspect-[4/5] w-full rounded-[14px] object-cover object-top" />
             <Score a="Étoile Factice" b="FC Démo" sa={0} sb={2} ba={ADVERSES["Étoile Factice"]} bb={BLASON} ia="EF" ib="FCD" />
           </Post>
         </>
@@ -1131,7 +1137,7 @@ function EcranJoueur() {
         <Rubrique>Tes remarques</Rubrique>
         <div className={cn(SURFACE, "flex flex-col gap-2 p-4")}>
           <span className="text-lecture">Très bon appel en profondeur. Travailler le pied gauche et le repli défensif.</span>
-          <span className="text-petit text-encre-3">Corentin · 12/11 · vue par toi seul</span>
+          <span className="text-petit text-encre-3">Solène · 12/11 · vue par toi seul</span>
         </div>
       </div>
     </Page>
@@ -1542,8 +1548,8 @@ function EcranClub() {
         <Rubrique droite="4">Équipes</Rubrique>
         <div className={cn(SURFACE, "overflow-hidden")}>
           {[
-            ["U13", "Corentin Delorme", "15"],
-            ["U17", "Corentin Delorme", "15"],
+            ["U13", "Solène Delorme", "15"],
+            ["U17", "Solène Delorme", "15"],
             ["Seniors", "Mathis Tavernier", "18"],
             ["Féminines", "Solène Garrigue", "12"],
           ].map(([c, e, n], i) => (
