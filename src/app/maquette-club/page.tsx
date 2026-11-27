@@ -32,7 +32,7 @@ import type { Blason } from "@/lib/sfl/blason";
 import type { Stats } from "@/lib/sfl/engine";
 
 type Role = "joueur" | "parent" | "entraineur" | "president";
-type Ecran = "map" | "match" | "carte" | "actu" | "clubs" | "equipe" | "club";
+type Ecran = "map" | "match" | "carte" | "actu" | "clubs" | "equipe" | "stats" | "joueur" | "club";
 
 /* ----------------------------- les données ----------------------------- */
 
@@ -776,6 +776,7 @@ function EcranEquipe() {
     <Page role="entraineur" actif="gestion">
       <Tete titre="Mon équipe" droite={<Vue role="entraineur" />} />
       <Segmente options={["U13", "U17"]} valeur="U13" />
+      <Onglets valeur="Semaine" />
 
       <div className="flex flex-col gap-2">
         <Rubrique droite="samedi 14 h">Convocation · AS Exemple</Rubrique>
@@ -824,6 +825,232 @@ function EcranEquipe() {
           ))}
         </div>
         <span className="px-1 text-corps text-encre-3">Ewen attend l&apos;accord de ses parents.</span>
+      </div>
+    </Page>
+  );
+}
+
+
+/* ------------------------ les stats de l'entraîneur ---------------------- */
+
+/** Semaine · Stats · Joueurs : les trois vues de Mon équipe. */
+function Onglets({ valeur }: { valeur: string }) {
+  return (
+    <div className="flex gap-5 border-b border-border/60 px-1">
+      {["Semaine", "Stats", "Joueurs"].map((o) => (
+        <span key={o} className={cn("-mb-px border-b-2 pb-2 text-lecture font-semibold", o === valeur ? "border-foreground text-foreground" : "border-transparent text-encre-3")}>
+          {o}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+// Les 8 matchs de la saison (U13) : buts pour, contre, résultat.
+const SAISON: { adv: string; pour: number; contre: number }[] = [
+  { adv: "OT", pour: 2, contre: 1 },
+  { adv: "EF", pour: 1, contre: 1 },
+  { adv: "RE", pour: 0, contre: 2 },
+  { adv: "SF", pour: 3, contre: 0 },
+  { adv: "SG", pour: 2, contre: 2 },
+  { adv: "UM", pour: 4, contre: 1 },
+  { adv: "AE", pour: 2, contre: 0 },
+  { adv: "USM", pour: 3, contre: 1 },
+];
+
+/** Buts pour au-dessus de la ligne, contre en dessous : la saison d'un coup d'œil. */
+function BarresSaison() {
+  const W = 320;
+  const H = 150;
+  const mid = 82;
+  const u = 16;
+  const pas = (W - 16) / SAISON.length;
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} className="w-full" aria-hidden>
+      <line x1="8" x2={W - 8} y1={mid} y2={mid} stroke="currentColor" strokeOpacity="0.2" />
+      {SAISON.map((m, i) => {
+        const x = 8 + i * pas + pas / 2 - 9;
+        const res = m.pour > m.contre ? "#1FA055" : m.pour < m.contre ? "#E5383B" : "currentColor";
+        return (
+          <g key={i}>
+            <rect x={x} y={mid - m.pour * u - 1} width="18" height={m.pour * u} rx="3" fill="currentColor" />
+            <rect x={x} y={mid + 1} width="18" height={m.contre * u} rx="3" fill="currentColor" fillOpacity="0.3" />
+            <circle cx={x + 9} cy={H - 6} r="3" fill={res} fillOpacity={res === "currentColor" ? 0.4 : 1} />
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
+/** Une jauge fine : la valeur sur sa piste. */
+function Jauge({ v, max = 100, couleur }: { v: number; max?: number; couleur?: string }) {
+  return (
+    <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-foreground/[0.08]">
+      <span className="block h-full rounded-full" style={{ width: `${(v / max) * 100}%`, background: couleur ?? "currentColor" }} />
+    </span>
+  );
+}
+
+// La charge d'entraînement des 6 dernières semaines (RPE × minutes, moyenne de l'équipe).
+const CHARGE = [310, 340, 365, 420, 300, 380];
+
+const VMA: { p: string; v: number; avant: number }[] = [
+  { p: "Timéo", v: 14.5, avant: 13.5 },
+  { p: "Marius", v: 14, avant: 13.5 },
+  { p: "Côme", v: 13.5, avant: 13.5 },
+  { p: "Gaspard", v: 13, avant: 12.5 },
+  { p: "Basile", v: 12, avant: 12 },
+];
+
+const MINUTES: { p: string; m: number }[] = [
+  { p: "Marius", m: 470 },
+  { p: "Timéo", m: 455 },
+  { p: "Gaspard", m: 430 },
+  { p: "Maël", m: 410 },
+  { p: "Lubin", m: 300 },
+  { p: "Aloïs", m: 180 },
+  { p: "Malo", m: 120 },
+];
+
+function EcranStats() {
+  const pour = SAISON.reduce((t, m) => t + m.pour, 0);
+  const contre = SAISON.reduce((t, m) => t + m.contre, 0);
+  const maxC = Math.max(...CHARGE);
+  return (
+    <Page role="entraineur" actif="gestion">
+      <Tete titre="Mon équipe" droite={<Vue role="entraineur" />} />
+      <Segmente options={["U13", "U17"]} valeur="U13" />
+      <Onglets valeur="Stats" />
+
+      <div className="flex flex-col gap-2">
+        <Rubrique droite="8 matchs">La saison</Rubrique>
+        <div className={cn(SURFACE, "flex flex-col gap-3 p-4")}>
+          <div className="grid grid-cols-4">
+            {[
+              ["5-2-1", "V-N-D"],
+              [String(pour), "marqués"],
+              [String(contre), "encaissés"],
+              ["2e", "classement"],
+            ].map(([v, l], i) => (
+              <span key={l} className={cn("flex flex-col items-center gap-1", i > 0 && "border-l border-border/60")}>
+                <span className="font-[family-name:var(--font-anton)] text-titre-m leading-none tabular-nums">{v}</span>
+                <span className="text-petit text-encre-3">{l}</span>
+              </span>
+            ))}
+          </div>
+          <BarresSaison />
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <Rubrique droite="6 semaines">Charge d&apos;entraînement</Rubrique>
+        <div className={cn(SURFACE, "flex flex-col gap-3 p-4")}>
+          <div className="flex h-24 items-end gap-2">
+            {CHARGE.map((c, i) => (
+              <span key={i} className="flex flex-1 flex-col items-center gap-1.5">
+                <span className="w-full rounded-[6px]" style={{ height: `${(c / maxC) * 72}px`, background: i === 3 ? "#E5383B" : "currentColor", opacity: i === CHARGE.length - 1 ? 1 : 0.55 }} />
+                <span className="text-[10px] text-encre-3">S{i + 43}</span>
+              </span>
+            ))}
+          </div>
+          <span className="text-corps text-encre-2">Semaine 46 trop chargée : +15 % d&apos;un coup. Ressenti moyen 6,1 / 10 cette semaine.</span>
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <Rubrique droite="test du 12/11">VMA</Rubrique>
+        <div className={cn(SURFACE, "flex flex-col gap-3 p-4")}>
+          {VMA.map((j) => (
+            <span key={j.p} className="flex items-center gap-3">
+              <span className="w-16 text-lecture font-medium">{j.p}</span>
+              <Jauge v={j.v - 9} max={7} />
+              <span className="w-20 text-right text-corps tabular-nums">
+                {j.v.toLocaleString("fr-FR")} km/h {j.v > j.avant && <span className="text-[#1FA055]">▲</span>}
+              </span>
+            </span>
+          ))}
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <Rubrique droite="sur 480 min">Temps de jeu</Rubrique>
+        <div className={cn(SURFACE, "flex flex-col gap-3 p-4")}>
+          {MINUTES.map((j) => (
+            <span key={j.p} className="flex items-center gap-3">
+              <span className="w-16 text-lecture font-medium">{j.p}</span>
+              <Jauge v={j.m} max={480} couleur={j.m < 200 ? "#E5383B" : undefined} />
+              <span className="w-14 text-right text-corps text-encre-2 tabular-nums">{j.m} min</span>
+            </span>
+          ))}
+          <span className="text-corps text-encre-3">Aloïs et Malo jouent peu : à faire tourner samedi.</span>
+        </div>
+      </div>
+    </Page>
+  );
+}
+
+/** Six stats sur un hexagone : la carte, lue comme un profil. */
+function Radar({ stats, avant }: { stats: Stats; avant: Stats }) {
+  const cles = ["VIT", "TIR", "PAS", "DRI", "DEF", "PHY"] as const;
+  const c = 110;
+  const r = 82;
+  const pt = (v: number, i: number) => {
+    const a = -Math.PI / 2 + (i * Math.PI) / 3;
+    const k = Math.max(0.05, (v - 45) / 40) * r;
+    return `${(c + Math.cos(a) * k).toFixed(1)},${(c + Math.sin(a) * k).toFixed(1)}`;
+  };
+  return (
+    <svg viewBox="0 0 220 220" className="mx-auto w-[220px]" aria-hidden>
+      {[0.33, 0.66, 1].map((f) => (
+        <polygon key={f} points={cles.map((_, i) => pt(45 + 40 * f, i)).join(" ")} fill="none" stroke="currentColor" strokeOpacity="0.12" />
+      ))}
+      <polygon points={cles.map((k, i) => pt(avant[k], i)).join(" ")} fill="currentColor" fillOpacity="0.08" stroke="currentColor" strokeOpacity="0.35" strokeDasharray="3 3" />
+      <polygon points={cles.map((k, i) => pt(stats[k], i)).join(" ")} fill="currentColor" fillOpacity="0.18" stroke="currentColor" strokeWidth="2" />
+      {cles.map((k, i) => {
+        const a = -Math.PI / 2 + (i * Math.PI) / 3;
+        return (
+          <text key={k} x={c + Math.cos(a) * (r + 18)} y={c + Math.sin(a) * (r + 18) + 4} textAnchor="middle" className="fill-current text-[11px] font-semibold">
+            {k.toLowerCase()} {stats[k]}
+          </text>
+        );
+      })}
+    </svg>
+  );
+}
+
+function EcranJoueur() {
+  return (
+    <Page role="entraineur" actif="gestion">
+      <Tete titre="Timéo" sous="U13 · attaquant · 12 ans" droite={<Vue role="entraineur" />} />
+      <div className="flex items-center gap-4">
+        <CarteJoueur size={110 / 254} />
+        <div className="flex flex-1 flex-col gap-2">
+          <Chiffres items={[["455", "minutes"], ["5", "buts"], ["3", "passes"]]} />
+          <span className="text-corps font-medium text-[#1FA055]">Note 70 → 73 depuis septembre</span>
+        </div>
+      </div>
+      <div className="flex flex-col gap-2">
+        <Rubrique droite="pointillés : septembre">Profil</Rubrique>
+        <div className={cn(SURFACE, "py-3")}>
+          <Radar stats={TIMEO.stats} avant={ST(75, 72, 68, 73, 51, 63)} />
+        </div>
+      </div>
+      <div className="flex flex-col gap-2">
+        <Rubrique>Mesures</Rubrique>
+        <div className={cn(SURFACE, "overflow-hidden")}>
+          <Ligne i={0} titre="VMA" sous="Test navette du 12/11" droite="14,5 km/h ▲" />
+          <Ligne i={1} titre="Sprint 20 m" sous="3,61 s le 12/11, 3,78 s en septembre" droite="−0,17 s" />
+          <Ligne i={2} titre="Présence" sous="11 séances sur 12" droite="92 %" />
+          <Ligne i={3} titre="Ressenti après séance" sous="Moyenne des 4 dernières" droite="5,8 / 10" />
+        </div>
+      </div>
+      <div className="flex flex-col gap-2">
+        <Rubrique>Tes remarques</Rubrique>
+        <div className={cn(SURFACE, "flex flex-col gap-2 p-4")}>
+          <span className="text-lecture">Très bon appel en profondeur. Travailler le pied gauche et le repli défensif.</span>
+          <span className="text-petit text-encre-3">Corentin · 12/11 · vue par toi seul</span>
+        </div>
       </div>
     </Page>
   );
@@ -906,6 +1133,8 @@ function Maquette() {
   if (ecran === "carte") return <EcranCarte role={role} />;
   if (ecran === "actu" || ecran === "clubs") return <EcranActu role={role} autres={ecran === "clubs"} />;
   if (ecran === "equipe") return <EcranEquipe />;
+  if (ecran === "stats") return <EcranStats />;
+  if (ecran === "joueur") return <EcranJoueur />;
   return <EcranClub />;
 }
 
