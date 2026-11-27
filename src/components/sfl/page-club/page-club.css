@@ -45,7 +45,7 @@
    l'interlettrage serré. Le
    sélecteur passe devant les styles d'essai de l'app (:root[data-style]). */
 :root .club-page .club-titre {
-  font-family: var(--font-club-titre), "Bodoni 72", Didot, serif;
+  font-family: var(--font-club-titre, "Libre Caslon Condensed"), "Bodoni 72", Didot, serif;
   font-weight: var(--club-titre-poids, 400);
   font-variation-settings: var(--club-titre-reglage, normal);
   font-style: normal;

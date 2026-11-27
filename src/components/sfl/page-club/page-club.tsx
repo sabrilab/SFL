@@ -418,9 +418,9 @@ function CarteJoueur({ j, className, style }: { j: JoueurClub; className?: strin
 }
 
 /**
- * L'essai des polices de titre (27/11) : Instrument Serif est retenue et posée
- * par défaut (app/club/page.tsx). ?police=2 à 4 essaie trois cousines
- * condensées, chargées de Google Fonts, le temps de choisir. Sans le
+ * L'essai des polices de titre (27/11) : Libre Caslon Condensed est retenue et
+ * posée par défaut (app/club/page.tsx). ?police=1, 3 et 4 rappellent les autres
+ * finalistes, chargées de Google Fonts, le temps de choisir. Sans le
  * paramètre, rien n'est chargé de plus.
  */
 const POLICES_ESSAI: readonly { nom: string; poids: number; css: string; reglage?: string }[] = [
