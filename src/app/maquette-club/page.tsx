@@ -32,7 +32,7 @@ import type { Blason } from "@/lib/sfl/blason";
 import type { Stats } from "@/lib/sfl/engine";
 
 type Role = "joueur" | "parent" | "entraineur" | "president";
-type Ecran = "map" | "match" | "carte" | "actu" | "clubs" | "equipe" | "stats" | "joueur" | "club";
+type Ecran = "map" | "match" | "carte" | "actu" | "clubs" | "equipe" | "stats" | "joueur" | "seance" | "compo" | "feuille" | "notes" | "club";
 
 /* ----------------------------- les données ----------------------------- */
 
@@ -860,17 +860,40 @@ function EcranEquipe() {
               </span>
             ))}
           </div>
-          <span className="flex h-11 items-center justify-center rounded-full bg-foreground/[0.07] text-lecture font-semibold">Faire la compo</span>
+          <span className="flex h-11 items-center justify-center rounded-full bg-foreground text-lecture font-semibold text-background">Faire la compo</span>
         </div>
       </div>
 
       <div className="flex flex-col gap-2">
-        <Rubrique>La semaine</Rubrique>
+        <Rubrique droite="23 – 29 nov.">La semaine</Rubrique>
         <div className={cn(SURFACE, "overflow-hidden")}>
-          <Ligne i={0} titre="Mercredi 18 h · entraînement" sous="L'appel à faire sur place" />
-          <Ligne i={1} titre="Mercredi 2 · Racing Essai" sous="Convocation à envoyer" fort />
-          <Ligne i={2} titre="Après le match" sous="Score, buteurs, notes des joueurs" />
+          {SEMAINE_COACH.map((d, i) => (
+            <div key={d.j} className={cn("flex items-stretch gap-3 px-4 py-3", i > 0 && "border-t border-border/60", d.fait && "opacity-45")}>
+              <span className="flex w-10 shrink-0 flex-col items-center">
+                <span className="text-petit font-semibold text-encre-3 uppercase">{d.j}</span>
+                <span className="font-[family-name:var(--font-anton)] text-titre-m leading-tight tabular-nums">{d.n}</span>
+              </span>
+              <span className="flex min-w-0 flex-1 flex-col justify-center gap-0.5">
+                <span className="truncate text-lecture font-semibold">{d.titre}</span>
+                <span className={cn("truncate text-corps", d.alerte ? "font-medium text-foreground" : "text-encre-2")}>{d.sous}</span>
+              </span>
+              {d.action && <span className={cn("self-center rounded-full px-3 py-1.5 text-corps font-semibold whitespace-nowrap", d.alerte ? "bg-foreground text-background" : "bg-foreground/[0.07]")}>{d.action}</span>}
+            </div>
+          ))}
         </div>
+      </div>
+
+      <div className="grid grid-cols-3 gap-2">
+        {[
+          ["Exercices", "47"],
+          ["Matériel", "18 à changer"],
+          ["Modèles", "3 groupes"],
+        ].map(([t, d]) => (
+          <span key={t} className={cn(SURFACE, "flex flex-col gap-0.5 px-3 py-3")}>
+            <span className="text-lecture font-semibold">{t}</span>
+            <span className="text-petit text-encre-3">{d}</span>
+          </span>
+        ))}
       </div>
 
       <div className="flex flex-col gap-2">
@@ -1115,6 +1138,330 @@ function EcranJoueur() {
   );
 }
 
+/* --------------------------- la vie de l'entraîneur ------------------------- */
+
+const SEMAINE_COACH: { j: string; n: number; titre: string; sous: string; action?: string; alerte?: boolean; fait?: boolean }[] = [
+  { j: "lun", n: 23, titre: "Bilan du match", sous: "Notes données · ressenti 6,1 / 10", fait: true },
+  { j: "mer", n: 25, titre: "Entraînement · 17 h 30", sous: "Vitesse et finition · 5 exercices · 58 min", fait: true },
+  { j: "ven", n: 27, titre: "Compo du samedi", sous: "12 viennent · 2 à relancer", action: "Composer", alerte: true },
+  { j: "sam", n: 28, titre: "FC Démo – AS Exemple · 14 h", sous: "À la maison · terrain 2 · rdv 13 h 15", action: "Feuille" },
+  { j: "mer", n: 2, titre: "Entraînement · 17 h 30", sous: "Programme à écrire", action: "Préparer" },
+];
+
+/** Un écran enfant de Mon équipe : retour, titre, sous-titre. */
+function TeteEnfant({ sur, titre, sous, droite }: { sur: string; titre: string; sous: string; droite?: ReactNode }) {
+  return (
+    <header className="flex flex-col gap-2 px-1 pt-[max(env(safe-area-inset-top),14px)]">
+      <div className="flex items-center justify-between">
+        <span className="flex items-center gap-1 text-lecture font-medium text-encre-2">
+          <ChevronRight className="size-4 rotate-180" /> {sur}
+        </span>
+        {droite}
+      </div>
+      <h1 className="text-titre-l leading-tight font-bold tracking-tight">{titre}</h1>
+      <span className="-mt-1 text-corps text-encre-3">{sous}</span>
+    </header>
+  );
+}
+
+const PROGRAMME: { t: string; f: string; m: number }[] = [
+  { t: "Le chat au ballon", f: "échauffement", m: 8 },
+  { t: "1 contre 1 face à face", f: "technique", m: 15 },
+  { t: "Match à quatre buts", f: "jeu réduit", m: 15 },
+  { t: "Face au gardien", f: "finition", m: 12 },
+  { t: "Concours de tirs au but", f: "retour au calme", m: 8 },
+];
+
+/** Le schéma d'un exercice, à la craie : un carré, des plots, des joueurs, une flèche. */
+function Schema() {
+  return (
+    <svg viewBox="0 0 300 170" className="w-full rounded-[14px] bg-[#1f2a26]" aria-hidden>
+      <rect x="20" y="15" width="260" height="140" rx="4" fill="none" stroke="#f4f3ef" strokeOpacity="0.55" strokeWidth="1.5" />
+      <line x1="150" x2="150" y1="15" y2="155" stroke="#f4f3ef" strokeOpacity="0.3" strokeDasharray="4 4" />
+      {[
+        [20, 60],
+        [20, 110],
+        [280, 60],
+        [280, 110],
+      ].map(([x, y], i) => (
+        <rect key={i} x={x - 3} y={y - 3} width="6" height="6" fill="#f4f3ef" />
+      ))}
+      {[
+        [70, 50],
+        [90, 120],
+        [120, 85],
+      ].map(([x, y], i) => (
+        <circle key={i} cx={x} cy={y} r="7" fill="none" stroke="#f4f3ef" strokeWidth="2" />
+      ))}
+      {[
+        [190, 60],
+        [215, 110],
+        [235, 80],
+      ].map(([x, y], i) => (
+        <g key={i} stroke="#f4f3ef" strokeWidth="2">
+          <line x1={x - 6} y1={y - 6} x2={x + 6} y2={y + 6} />
+          <line x1={x + 6} y1={y - 6} x2={x - 6} y2={y + 6} />
+        </g>
+      ))}
+      <path d="M120 85 Q170 60 205 70" fill="none" stroke="#f4f3ef" strokeWidth="1.8" strokeDasharray="5 4" markerEnd="url(#fl)" />
+      <defs>
+        <marker id="fl" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+          <path d="M0 0 L8 4 L0 8 z" fill="#f4f3ef" />
+        </marker>
+      </defs>
+    </svg>
+  );
+}
+
+function EcranSeance() {
+  const total = PROGRAMME.reduce((t, e) => t + e.m, 0);
+  return (
+    <Page role="entraineur" actif="gestion">
+      <TeteEnfant sur="Mon équipe" titre="Entraînement" sous="U13 · mercredi 2 décembre · 17 h 30 · terrain synthétique" droite={<Vue role="entraineur" />} />
+      <Segmente options={["Programme", "Convocation", "Appel", "Bilan"]} valeur="Programme" />
+      <div className={cn(SURFACE, "flex items-center gap-3 p-4")}>
+        <span className="flex-1">
+          <span className="block text-lecture font-semibold">Séance proposée</span>
+          <span className="block text-corps text-encre-2">U13 · vitesse · 14 joueurs · 2 en croissance : pas de sprints à fond</span>
+        </span>
+        <span className="rounded-full bg-foreground px-3 py-1.5 text-corps font-semibold text-background">Prendre</span>
+      </div>
+      <div className="flex items-baseline justify-between px-1">
+        <span className="flex items-baseline gap-1.5">
+          <span className="font-[family-name:var(--font-anton)] text-[40px] leading-none tabular-nums">{total}</span>
+          <span className="text-lecture text-encre-2">min</span>
+        </span>
+        <span className="mono-label text-encre-3">{PROGRAMME.length} exercices</span>
+      </div>
+      <div className="flex flex-col gap-2">
+        {PROGRAMME.map((e, i) => (
+          <div key={e.t} className={cn(SURFACE, "flex flex-col gap-3 p-4")}>
+            <div className="flex items-center gap-3">
+              <span className="font-[family-name:var(--font-anton)] text-titre-m text-encre-3 tabular-nums">{i + 1}</span>
+              <span className="flex flex-1 flex-col">
+                <span className="text-lecture font-semibold">{e.t}</span>
+                <span className="text-petit font-medium text-encre-3 uppercase">{e.f}</span>
+              </span>
+              <span className="text-lecture tabular-nums">{e.m} min</span>
+            </div>
+            {i === 1 && (
+              <>
+                <Schema />
+                <span className="text-corps text-encre-2">Carré de 20 × 15 m · 1 ballon pour 2 · chasubles. Un contre un, le défenseur part du plot quand l&apos;attaquant touche le ballon.</span>
+              </>
+            )}
+          </div>
+        ))}
+        <span className="flex h-11 items-center justify-center gap-2 rounded-full border border-foreground/15 text-lecture font-semibold">
+          <Plus className="size-4" /> Ajouter un exercice
+        </span>
+      </div>
+    </Page>
+  );
+}
+
+// La compo du samedi : foot à 8 (U13), en 1-3-3-1. Haut = attaque.
+const COMPO: { p: string; x: number; y: number }[] = [
+  { p: "Timéo", x: 50, y: 13 },
+  { p: "Côme", x: 18, y: 36 },
+  { p: "Marius", x: 50, y: 42 },
+  { p: "Léandre", x: 82, y: 36 },
+  { p: "Eliott", x: 22, y: 64 },
+  { p: "Maël", x: 50, y: 68 },
+  { p: "Noé", x: 78, y: 64 },
+  { p: "Basile", x: 50, y: 88 },
+];
+
+function Terrain({ children, h = 470 }: { children: ReactNode; h?: number }) {
+  return (
+    <div className="relative overflow-hidden rounded-[18px] bg-[linear-gradient(180deg,#1d2b24,#16211c)]" style={{ height: h }}>
+      <svg viewBox="0 0 100 140" preserveAspectRatio="none" className="absolute inset-0 h-full w-full" aria-hidden>
+        <g fill="none" stroke="#f4f3ef" strokeOpacity="0.28" strokeWidth="0.5" vectorEffect="non-scaling-stroke">
+          <rect x="5" y="4" width="90" height="132" />
+          <line x1="5" x2="95" y1="70" y2="70" />
+          <circle cx="50" cy="70" r="11" />
+          <rect x="27" y="4" width="46" height="18" />
+          <rect x="27" y="118" width="46" height="18" />
+        </g>
+        {Array.from({ length: 7 }, (_, i) => (
+          <rect key={i} x="5" y={4 + i * 19} width="90" height="9.5" fill="#ffffff" fillOpacity="0.018" />
+        ))}
+      </svg>
+      {children}
+    </div>
+  );
+}
+
+function EcranCompo() {
+  const banc = ["Gaspard", "Lubin", "Aloïs", "Malo"];
+  const de = (p: string) => U13.find((j) => j.p === p)!;
+  return (
+    <Page role="entraineur" actif="gestion">
+      <TeteEnfant sur="Mon équipe" titre="Compo" sous="Samedi 14 h · FC Démo – AS Exemple · foot à 8" droite={<Vue role="entraineur" />} />
+      <div className="flex gap-2 overflow-x-auto [scrollbar-width:none]">
+        {["1-3-3-1", "1-2-3-2", "1-3-2-2", "1-2-4-1"].map((f, i) => (
+          <span key={f} className={cn("shrink-0 rounded-full px-3.5 py-1.5 text-corps font-semibold tabular-nums", i === 0 ? "bg-foreground text-background" : "bg-foreground/[0.07] text-encre-2")}>
+            {f}
+          </span>
+        ))}
+      </div>
+      <Terrain>
+        {COMPO.map((c) => {
+          const j = de(c.p);
+          return (
+            <span key={c.p} className="absolute flex -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-1" style={{ left: `${c.x}%`, top: `${c.y}%` }}>
+              <CarteJoueur size={50 / 254} prenom={j.p} nom={j.n} poste={j.poste} note={j.note} />
+              <span className="rounded-full bg-black/55 px-1.5 py-px text-[11px] font-semibold text-white">{c.p}</span>
+            </span>
+          );
+        })}
+        <span className="absolute top-3 right-3 rounded-full bg-black/45 px-2.5 py-1 text-petit font-semibold text-white tabular-nums">Moy. 70,6</span>
+      </Terrain>
+      <div className="flex flex-col gap-2">
+        <Rubrique droite="4">Remplaçants</Rubrique>
+        <div className={cn(SURFACE, "flex justify-around px-3 py-3")}>
+          {banc.map((p) => {
+            const j = de(p);
+            return (
+              <span key={p} className="flex flex-col items-center gap-1">
+                <CarteJoueur size={46 / 254} prenom={j.p} nom={j.n} poste={j.poste} note={j.note} />
+                <span className="text-petit font-medium">{p}</span>
+              </span>
+            );
+          })}
+        </div>
+      </div>
+      <div className={cn(SURFACE, "overflow-hidden")}>
+        <Ligne i={0} titre="Absents" sous="Sacha (malade) · Titouan (sans réponse)" />
+        <Ligne i={1} titre="Temps de jeu prévu" sous="Aloïs et Malo : 2 × 15 min minimum" fort />
+      </div>
+      <div className="flex gap-2">
+        <span className="flex h-12 flex-1 items-center justify-center rounded-full bg-foreground/[0.07] text-lecture font-semibold">Garder en modèle</span>
+        <span className="flex h-12 flex-1 items-center justify-center rounded-full bg-foreground text-lecture font-semibold text-background">Envoyer aux joueurs</span>
+      </div>
+    </Page>
+  );
+}
+
+const EVENEMENTS: { m: string; t: string; qui?: string; cote: "nous" | "eux" }[] = [
+  { m: "41'", t: "But", qui: "Timéo", cote: "nous" },
+  { m: "38'", t: "Remplacement", qui: "Aloïs ↔ Côme", cote: "nous" },
+  { m: "27'", t: "But", cote: "eux" },
+  { m: "19'", t: "But", qui: "Marius · passe de Timéo", cote: "nous" },
+  { m: "11'", t: "Carton blanc", qui: "Noé · 10 min", cote: "nous" },
+];
+
+function EcranFeuille() {
+  return (
+    <Page role="entraineur" actif="gestion">
+      <TeteEnfant sur="Mon équipe" titre="Feuille de match" sous="U13 · samedi 28 · terrain 2" droite={<Vue role="entraineur" />} />
+      <div className={cn(SURFACE, "flex flex-col items-center gap-3 px-4 pt-5 pb-4")}>
+        <span className="flex items-center gap-2 rounded-full bg-[#E5383B] px-2.5 py-1 text-petit font-bold text-white">
+          <span className="size-1.5 rounded-full bg-white" /> EN DIRECT · 2e MI-TEMPS
+        </span>
+        <div className="flex w-full items-center justify-between">
+          <span className="flex w-24 flex-col items-center gap-1.5">
+            <Ecusson initiales={CLUB.initiales} fond="noir" blason={BLASON} taille={52} />
+            <span className="text-corps font-medium">FC Démo</span>
+          </span>
+          <span className="flex flex-col items-center">
+            <span className="font-[family-name:var(--font-anton)] text-[56px] leading-none tabular-nums">2 – 1</span>
+            <span className="font-[family-name:var(--font-anton)] text-titre-m text-encre-2 tabular-nums">41:12</span>
+          </span>
+          <span className="flex w-24 flex-col items-center gap-1.5">
+            <Ecusson initiales="AE" fond="blanc" blason={ADVERSES["AS Exemple"]} taille={52} />
+            <span className="text-corps font-medium">AS Exemple</span>
+          </span>
+        </div>
+      </div>
+      <div className="grid grid-cols-4 gap-2">
+        {["But", "Remplacer", "Carton", "Pause"].map((a, i) => (
+          <span key={a} className={cn("flex h-12 items-center justify-center rounded-[14px] text-corps font-semibold", i === 0 ? "bg-foreground text-background" : "bg-foreground/[0.07]")}>
+            {a}
+          </span>
+        ))}
+      </div>
+      <div className="flex flex-col gap-2">
+        <Rubrique>Le match</Rubrique>
+        <div className={cn(SURFACE, "overflow-hidden")}>
+          {EVENEMENTS.map((e, i) => (
+            <div key={i} className={cn("flex items-center gap-3 px-4 py-3", i > 0 && "border-t border-border/60")}>
+              <span className="w-9 font-[family-name:var(--font-anton)] text-titre text-encre-3 tabular-nums">{e.m}</span>
+              {e.qui && e.t === "But" ? <CarteJoueur size={34 / 254} prenom={e.qui.split(" ")[0]} nom="" note={de2(e.qui.split(" ")[0])} /> : <span className="w-[34px]" />}
+              <span className="flex flex-1 flex-col">
+                <span className="text-lecture font-semibold">{e.t}{e.cote === "eux" ? " · AS Exemple" : ""}</span>
+                {e.qui && <span className="text-corps text-encre-2">{e.qui}</span>}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="flex flex-col gap-2">
+        <Rubrique droite="sur 50 min">Temps de jeu</Rubrique>
+        <div className={cn(SURFACE, "grid grid-cols-2 gap-x-4 gap-y-2.5 p-4")}>
+          {[
+            ["Timéo", 41],
+            ["Marius", 41],
+            ["Basile", 41],
+            ["Maël", 41],
+            ["Côme", 38],
+            ["Aloïs", 3],
+            ["Gaspard", 0],
+            ["Malo", 0],
+          ].map(([p, m]) => (
+            <span key={p as string} className="flex items-center gap-2">
+              <span className="w-16 text-corps font-medium">{p}</span>
+              <Jauge v={m as number} max={50} couleur={(m as number) < 10 ? "#E5383B" : undefined} />
+              <span className="w-8 text-right text-petit text-encre-2 tabular-nums">{m}&apos;</span>
+            </span>
+          ))}
+        </div>
+      </div>
+    </Page>
+  );
+}
+
+const de2 = (p: string) => U13.find((j) => j.p === p)?.note ?? 70;
+
+function EcranNotes() {
+  const notes: [string, number, string?][] = [
+    ["Timéo", 8.5, "Homme du match"],
+    ["Marius", 8],
+    ["Basile", 7.5],
+    ["Maël", 7],
+    ["Côme", 7],
+    ["Noé", 6],
+    ["Léandre", 6.5],
+    ["Eliott", 6.5],
+  ];
+  return (
+    <Page role="entraineur" actif="gestion">
+      <TeteEnfant sur="Feuille de match" titre="Après le match" sous="FC Démo 3 – 1 AS Exemple · terminé" droite={<Vue role="entraineur" />} />
+      <Chiffres items={[["3 – 1", "score"], ["58 %", "possession"], ["11", "tirs"], ["4", "cadrés contre"]]} />
+      <div className="flex flex-col gap-2">
+        <Rubrique droite="les cartes bougent lundi">Tes notes</Rubrique>
+        <div className={cn(SURFACE, "overflow-hidden")}>
+          {notes.map(([p, n, t], i) => (
+            <div key={p} className={cn("flex items-center gap-3 px-4 py-2.5", i > 0 && "border-t border-border/60")}>
+              <CarteJoueur size={36 / 254} prenom={p} nom="" note={de2(p)} />
+              <span className="flex flex-1 flex-col">
+                <span className="text-lecture font-medium">{p}</span>
+                {t && <span className="text-petit font-semibold text-encre-2">{t}</span>}
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="grid size-8 place-items-center rounded-full bg-foreground/[0.07] text-lecture">−</span>
+                <span className="w-10 text-center font-[family-name:var(--font-anton)] text-titre-m tabular-nums">{n.toLocaleString("fr-FR")}</span>
+                <span className="grid size-8 place-items-center rounded-full bg-foreground/[0.07] text-lecture">+</span>
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+      <span className="flex h-12 items-center justify-center rounded-full bg-foreground text-lecture font-semibold text-background">Publier le résultat dans l&apos;Actu</span>
+    </Page>
+  );
+}
+
 /* ---------------------------- Le club (présidente) ---------------------- */
 
 function EcranClub() {
@@ -1231,6 +1578,10 @@ function Maquette() {
   if (ecran === "equipe") return <EcranEquipe />;
   if (ecran === "stats") return <EcranStats />;
   if (ecran === "joueur") return <EcranJoueur />;
+  if (ecran === "seance") return <EcranSeance />;
+  if (ecran === "compo") return <EcranCompo />;
+  if (ecran === "feuille") return <EcranFeuille />;
+  if (ecran === "notes") return <EcranNotes />;
   return <EcranClub />;
 }
 
