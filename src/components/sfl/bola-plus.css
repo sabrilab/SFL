@@ -448,68 +448,144 @@
   text-shadow: 0 2px 18px rgb(0 0 0 / 0.35);
 }
 
-/* ── 8 · Ramène 5 abonnés : la nuit, un halo vert et un halo violet, cinq
-   ronds en arc qui se remplissent en lime au-dessus de « Toi ». ── */
-.bp-parrainage {
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  padding: 18px 22px 24px;
+/* ── 2 · La SFL (Sabri, 27/11) : le dessin de « Bola Plus », en noir et
+   chrome. Le noir reste noir en clair comme en sombre ; le chrome est un
+   dégradé de gris neutres, comme le métal des cartes. ── */
+.bp-texte--sfl,
+:root:not(.dark) .bp-texte--sfl {
+  --chrome: linear-gradient(170deg, #fff 0%, rgb(196 196 196) 38%, rgb(250 250 250) 52%, rgb(128 128 128) 78%, rgb(226 226 226) 100%);
   color: #fff;
   background:
-    radial-gradient(60% 40% at 18% 30%, color-mix(in srgb, var(--bp-sfl-vif) 34%, transparent), transparent 70%),
-    radial-gradient(60% 40% at 84% 46%, color-mix(in srgb, var(--bp-plus-vif) 42%, transparent), transparent 70%),
+    radial-gradient(80% 50% at 50% 30%, rgb(255 255 255 / 0.1), transparent 70%),
+    radial-gradient(70% 40% at 50% 100%, rgb(255 255 255 / 0.06), transparent 70%),
     var(--bp-nuit);
-  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.08);
+  box-shadow:
+    inset 0 0 0 1px rgb(255 255 255 / 0.14),
+    inset 0 1px 0 rgb(255 255 255 / 0.22);
 }
-.bp-arc {
-  --rayon: min(118px, 30vw);
-  position: relative;
-  flex: 1;
+/* Le titre : le sigle SFL, en chrome. */
+.bp-titre-sfl {
+  line-height: 0;
+}
+.bp-titre-sfl__sigle {
+  display: block;
+  width: 46%;
+  aspect-ratio: 735 / 237;
+  background: var(--chrome);
+  mask: url(/bola/sfl.svg) left center / contain no-repeat;
+  -webkit-mask: url(/bola/sfl.svg) left center / contain no-repeat;
+}
+.bp-fonctions--sfl {
+  gap: 6px;
+}
+.bp-fonctions--sfl li,
+:root:not(.dark) .bp-fonctions--sfl li {
+  display: block;
   min-height: 0;
+  padding: 0;
+  background: rgb(255 255 255 / 0.06);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.1);
 }
-.bp-arc__rond,
-.bp-arc__toi {
-  position: absolute;
-  left: 50%;
-  top: 62%;
+.bp-fonctions__ligne {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 44px;
+  padding: 0 14px 0 6px;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  border-radius: inherit;
+}
+button.bp-fonctions__ligne:active {
+  background: rgb(255 255 255 / 0.08);
+}
+.bp-fonctions--sfl .bp-fonctions__ligne {
+  font-size: 16px;
+  white-space: nowrap;
+}
+.bp-fonctions--sfl .bp-fonctions__icone {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  color: var(--bp-nuit);
+  background: var(--chrome);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.5);
+}
+/* La rosace, et au centre le sigle SFL en chrome. */
+.bp-embleme-sfl {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 999px;
+  aspect-ratio: 1;
 }
-.bp-arc__rond {
-  width: 48px;
-  height: 48px;
-  translate: calc(-50% + var(--x) * var(--rayon)) calc(-50% + var(--y) * var(--rayon));
-  color: rgb(255 255 255 / 0.45);
-  border: 1.5px dashed rgb(255 255 255 / 0.32);
-  transition:
-    background-color 0.36s ease calc(var(--i) * 0.12s + 0.15s),
-    border-color 0.36s ease calc(var(--i) * 0.12s + 0.15s),
-    color 0.36s ease calc(var(--i) * 0.12s + 0.15s);
+.bp-visuel-sfl .bp-visuel-plus__embleme,
+:root:not(.dark) .bp-visuel-sfl .bp-visuel-plus__embleme {
+  width: auto;
+  height: 100%;
+  max-height: 150px;
+  color: rgb(255 255 255 / 0.7);
+  opacity: 1;
 }
-.bp-parrainage[data-vu] .bp-arc__rond {
-  color: var(--bp-nuit);
-  border: 1.5px solid var(--bp-prix);
-  background-color: var(--bp-prix);
+.bp-embleme-sfl__rosace {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0.45;
 }
-.bp-arc__toi {
-  width: 76px;
-  height: 76px;
-  translate: -50% -50%;
-  font-family: var(--font-barlow), "Barlow Condensed", sans-serif;
-  font-size: 24px;
-  font-weight: 800;
-  text-transform: uppercase;
+.bp-embleme-sfl__sigle {
+  position: relative;
+  width: 44%;
+  aspect-ratio: 735 / 237;
+  background: var(--chrome);
+  mask: url(/bola/sfl.svg) center / contain no-repeat;
+  -webkit-mask: url(/bola/sfl.svg) center / contain no-repeat;
+}
+
+/* ── 4 · Ton studio et, dessous, tes matchs filmés (27/11). ── */
+.bp-texte--studio > div:last-child {
+  display: flex;
+  flex-direction: column;
+}
+.bp-matchs {
+  position: relative;
+  overflow: hidden;
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 7;
+  margin-top: 14px;
+  border-radius: 18px;
+  background: var(--teinte);
   color: #fff;
-  background: linear-gradient(160deg, var(--bp-plus-vif), var(--bp-plus-fond));
-  box-shadow:
-    0 0 0 4px color-mix(in srgb, var(--bp-plus-vif) 30%, transparent),
-    0 14px 30px -10px rgb(0 0 0 / 0.6);
+  text-align: left;
 }
-.bp-parrainage__sous {
-  color: var(--bp-prix);
+.bp-matchs::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  background: linear-gradient(to top, var(--bp-sfl-fond) 0%, color-mix(in srgb, var(--bp-sfl-fond) 60%, transparent) 35%, transparent 70%);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.12);
+}
+.bp-matchs__part {
+  position: absolute;
+  z-index: 1;
+  top: 10px;
+  left: 12px;
+}
+:root:root .bp-titre.bp-titre.bp-matchs__titre {
+  white-space: nowrap;
+  position: absolute;
+  z-index: 1;
+  left: 14px;
+  bottom: 12px;
+  font-size: 17px;
+  line-height: 1;
 }
 
 /* ── 9 · Ton prix : la nuit en sombre, le blanc en clair. ── */
@@ -759,9 +835,6 @@
 .bp-segment[data-part="sfl"] {
   --seg: var(--bp-sfl-vif);
 }
-.dark .bp-segment[data-part="prix"] {
-  --seg: var(--bp-prix);
-}
 .bp-segment:focus-visible {
   outline: 2px solid var(--foreground);
   outline-offset: -6px;
@@ -828,8 +901,7 @@ html[data-clavier] .bp-barre {
   .bp-tete {
     height: 50px;
   }
-  .bp-texte,
-  .bp-parrainage {
+  .bp-texte {
     gap: 10px;
     padding: 14px 18px 18px;
   }
@@ -934,19 +1006,12 @@ html[data-clavier] .bp-barre {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .bp-arc__rond,
   .bp-segment > span,
   .bp-formule,
   .bp-barre,
   .bp-barre[data-cachee],
   .bp-fleche {
     transition: none;
-  }
-  /* Les ronds de « Ramène 5 » sont pleins d'emblée. */
-  .bp-parrainage .bp-arc__rond {
-    color: var(--bp-nuit);
-    border: 1.5px solid var(--bp-prix);
-    background-color: var(--bp-prix);
   }
 }
 
