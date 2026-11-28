@@ -10287,3 +10287,41 @@ grant execute on function public.equipe_chambrage_retirer(bigint) to authenticat
 -- Retirés en fin de fichier, à chaque migration : les tables créées plus haut
 -- au même passage y passent aussi. Les autres droits ne changent pas ici.
 revoke truncate, trigger, references on all tables in schema public from anon, authenticated;
+
+-- ─────────────── Le rappel d'une heure avant le match (28/11/2026) ───────────────
+-- Bola : « il faudrait que les joueurs reçoivent une notification 1 heure
+-- avant leur match ». Chaque joueur de la feuille est prévenu une heure avant
+-- SON match (lib/sfl/rappel-avant-match.ts, /api/journees/rappel). Une ligne
+-- par joueur et par match, posée avant l'envoi : jamais deux rappels.
+-- Fermée aux téléphones : seule la route serveur, avec la clé secrète.
+create table if not exists public.journee_rappels (
+  saison    int  not null,
+  j         int  not null,
+  n         int  not null,
+  joueur    text not null,
+  envoye_le timestamptz not null default now(),
+  primary key (saison, j, n, joueur)
+);
+
+alter table public.journee_rappels enable row level security;
+revoke all on public.journee_rappels from anon, authenticated;
+
+-- Qui sonne la route : la base, toutes les 5 minutes le dimanche de 6 h à
+-- 20 h 55 UTC (7 h à 22 h à Paris l'hiver, 8 h à 23 h l'été), par pg_cron et
+-- pg_net. Le cron de Vercel ne passe pas assez souvent, et l'heure des
+-- matchs change d'une journée à l'autre. La route ne prévient que dans
+-- l'heure d'avant un match : les autres passages ne font rien.
+-- Une base sans ces extensions (aperçus, local) passe sans erreur.
+do $$
+begin
+  create extension if not exists pg_cron;
+  create extension if not exists pg_net;
+  perform cron.schedule(
+    'rappel-avant-match',
+    '*/5 6-20 * * 0',
+    $job$ select net.http_get('https://getbola.app/api/journees/rappel', timeout_milliseconds := 55000) $job$
+  );
+exception when others then
+  raise notice 'rappel-avant-match : pg_cron ou pg_net indisponible (%)', sqlerrm;
+end;
+$$;
