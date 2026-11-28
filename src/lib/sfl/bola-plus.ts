@@ -34,17 +34,13 @@
 //
 // Ce que la page montre (le carrousel, bola-plus.tsx) : l'ouverture, les
 // avantages (AVANTAGES, une liste de données : un avantage de plus s'ajoute
-// ici sans toucher au carrousel ; Bola Studio y est entré ainsi, « Ton
-// studio », après « Bola Plus » : bola-app#22), « Ramène 5
-// abonnés » (PARRAINAGE, seulement expliqué : aucun suivi ni paiement), puis
-// « Ton prix ». Chaque avantage appartient à une part : « plus » (violet,
+// ici sans toucher au carrousel), puis « Ton prix ». Depuis le 27/11, six
+// cartes : l'ouverture, la SFL (ses lignes : LIGNES_SFL, dont « Ramène 5
+// abonnés », seulement expliqué dans sa fiche), Bola Plus, le studio et les
+// matchs filmés, Bola 27, le prix. Chaque avantage appartient à une part : « plus » (violet,
 // Bola Plus) ou « sfl » (vert terrain, la ligue) ; la palette (PALETTE) est
 // écrite ici et posée en variables CSS par la page, la couleur ne sort pas de
-// cette page. « Tes maillots » peut montrer les maillots portés (retour du
-// 13/11 01:45) : un seul fichier, public/bola-plus/maillots-portes.webp
-// (1170 px, 4:5), qui montre de vrais joueurs : il ne va jamais dans ce dépôt,
-// qui est public (.gitignore le refuse) ; absent, la carte garde le portant.
-// Les visuels générés le disent dans leur texte de remplacement. Les
+// cette page. Les visuels générés le disent dans leur texte de remplacement. Les
 // variables de la part Bola Plus (VARIABLES_PLUS) sont écrites ici une fois,
 // pour la page et pour Bola Studio ; la carte « Toi » (CARTE_TOI) aussi, pour
 // la page (les vignettes de Bola Studio sont des images depuis le 15/11).
@@ -265,6 +261,8 @@ export const FONCTIONS_BOLA_PLUS = [
   { id: "trash-talk", nom: "Trash talk" },
   { id: "skins", nom: "Skins et aspects" },
   { id: "quetes", nom: "Quêtes et missions" },
+  // Sabri, 28/11 : « Ton studio » devient une ligne de Bola Plus ; au toucher, sa carte (CARTE_STUDIO).
+  { id: "studio", nom: "Ton studio" },
 ] as const;
 
 /** Les trois offres, pour mémoire (la page ne montre que Bola Plus et la SFL). */
@@ -337,28 +335,18 @@ export interface Visuel {
   voileCourt?: boolean;
 }
 
-/**
- * Le visuel qui prend la place de celui d'un avantage dès que son fichier est
- * déposé dans public/ et chargé : un seul fichier, 1170 px de large, en 4:5.
- * Absent, la carte garde son visuel, sans attente. Son texte commence par
- * « Image générée » et ne nomme personne.
- */
-export interface VisuelDepose {
-  fichier: string;
-  alt: string;
-}
-
 /** La part d'un avantage : Bola Plus (l'app) ou la SFL (la ligue). */
 export type Part = "plus" | "sfl";
 export const NOM_PART: Record<Part, string> = { plus: "Bola Plus", sfl: "SFL" };
 
 /**
  * Les visuels dessinés par le code (bola-plus.tsx, COMPOSANTS) : la vraie
- * carte « Toi », la liste de Bola Plus, et « studio » : l'éventail de Bola
- * Studio (components/sfl/studio-bola.tsx, ses templates et ses ballons dans
- * lib/sfl/studio.ts). Le carrousel, ses segments et sa palette suivent seuls.
+ * carte « Toi », la liste de la SFL (27/11), la liste de Bola Plus, et
+ * « studio » : l'éventail de Bola Studio (components/sfl/studio-bola.tsx, ses
+ * templates et ses ballons dans lib/sfl/studio.ts) et, dessous, les matchs
+ * filmés (27/11). Le carrousel, ses segments et sa palette suivent seuls.
  */
-export type ComposantAvantage = "carte" | "bola-plus" | "studio" | "bola-27";
+export type ComposantAvantage = "carte" | "sfl" | "bola-plus" | "studio" | "bola-27";
 
 /** Le visuel d'un avantage : une image de public/bola-plus/, ou un composant de l'app. */
 export type VisuelAvantage = ({ genre: "image" } & Visuel) | { genre: "composant"; composant: ComposantAvantage };
@@ -370,44 +358,20 @@ export interface Avantage {
   titre: string;
   sous?: string;
   visuel: VisuelAvantage;
-  depose?: VisuelDepose;
 }
 
 /** L'ouverture : le stade de Bola, teint par la feuille de style. */
 export const AFFICHE: Visuel = { image: "affiche", alt: "", teinte: "#2a2440", rapport: RAPPORT_VISUEL };
 
-// L'ordre (Sabri, 23/11 : « mettre les maillots avant ta carte […] Bola Plus, un truc, et le jeu qui arrive
-// en dernier ») : d'abord ce que tu reçois en plus (les maillots), puis ta carte, Bola Plus, le studio, le
-// reste de la SFL, et Bola 27, discret, en dernier.
+// Depuis le 28/11, cinq cartes : « Ton studio » passe en ligne de Bola Plus (CARTE_STUDIO).
+// Le carrousel en six cartes (Sabri, 27/11 : « ça va tenir en 4 pages […] normalement, on a 5 ou 6
+// cartes ») : l'ouverture, puis la SFL (une carte noire et chromée qui liste ce que la ligue donne, comme
+// « Bola Plus » liste ses fonctions), Bola Plus, le studio et les matchs filmés sur une même carte, Bola 27
+// tel quel, et « Ton prix ». Les anciennes cartes de la SFL (maillots, ta carte, matchs filmés, cadeaux,
+// cérémonies, « Ramène 5 ») deviennent les lignes de la carte SFL (LIGNES_SFL) ; leurs fiches restent.
 export const AVANTAGES: readonly Avantage[] = [
-  {
-    id: "maillots",
-    part: "sfl",
-    titre: "Tes maillots",
-    visuel: { genre: "image", image: "maillots", alt: "Les deux maillots de la SFL, le noir et le blanc", teinte: "#1d2a25", rapport: RAPPORT_VISUEL, teindre: true },
-    depose: { fichier: "/bola-plus/maillots-portes.webp", alt: "Image générée : trois joueurs de la SFL portent les maillots, le noir et le blanc" },
-  },
-  { id: "carte", part: "plus", titre: "Ta carte continue.", sous: "Tes stats te suivent.", visuel: { genre: "composant", composant: "carte" } },
+  { id: "sfl", part: "sfl", titre: "La SFL", visuel: { genre: "composant", composant: "sfl" } },
   { id: "bola-plus", part: "plus", titre: "Bola Plus", visuel: { genre: "composant", composant: "bola-plus" } },
-  { id: "studio", part: "plus", titre: "Ton studio", visuel: { genre: "composant", composant: "studio" } },
-  {
-    id: "matchs-filmes",
-    part: "sfl",
-    titre: "Tes matchs filmés",
-    visuel: { genre: "image", image: "matchs-filmes", alt: "Image générée : une caméra filme deux joueurs au duel, la nuit, dans le stade de piliers", teinte: "#1f3a2c", rapport: RAPPORT_CARROUSEL },
-  },
-  {
-    id: "cadeaux",
-    part: "sfl",
-    titre: "Des cadeaux",
-    visuel: { genre: "image", image: "cadeaux", alt: "Image générée : des crampons verts, des gants et une veste noirs près d'un écrin, sur du marbre", teinte: "#1b2a2a", rapport: RAPPORT_CARROUSEL },
-  },
-  {
-    id: "ceremonies",
-    part: "sfl",
-    titre: "Les cérémonies officielles",
-    visuel: { genre: "image", image: "ceremonies", alt: "Image générée : un joueur lève le trophée noir sur le podium de marbre, ses coéquipiers applaudissent", teinte: "#22243a", rapport: RAPPORT_CARROUSEL, voileCourt: true },
-  },
   {
     // Le jeu (Sabri, 17/11 11:36) : l'accès anticipé. Depuis le 23/11, discret : son logo seul (BOLA et un 27),
     // les images dans sa fiche, au toucher.
@@ -419,17 +383,48 @@ export const AVANTAGES: readonly Avantage[] = [
   },
 ];
 
-/** « Ramène 5 abonnés » (14/11 20:39) : seulement expliqué, ni suivi ni paiement ; offert tant que les cinq paient. */
-export const PARRAINAGE = { titre: "Ramène 5 abonnés.", sous: "Le tien est offert, tant qu'ils restent abonnés.", nombre: 5 } as const;
+/** La ligne de tête de la carte SFL, à part des autres (Sabri, 28/11 : « en premier 18 journées, chaque dimanche, Sunday Five League », pour aller au Pépite d'Or). */
+export const SAISON_SFL = { titre: "18 journées", ligne: "Chaque dimanche · Sunday Five League", but: "Jusqu'au Pépite d'Or." } as const;
 
-/** Les diapositives du carrousel, dans l'ordre : l'ouverture, les avantages, « Ramène 5 », le prix. */
-export type Diapo = { id: "ouverture"; nom: string } | ({ id: string; nom: string } & { avantage: Avantage }) | { id: "parrainage"; nom: string } | { id: "prix"; nom: string };
+/**
+ * « Ton studio » (Sabri, 28/11) : plus une carte du carrousel, une ligne de Bola Plus ; au toucher, sa carte
+ * s'ouvre dans une feuille (l'éventail de Bola Studio, le titre, les ballons du mois). Les matchs filmés
+ * restent une ligne de la SFL.
+ */
+export const CARTE_STUDIO: Avantage = { id: "studio", part: "plus", titre: "Ton studio", visuel: { genre: "composant", composant: "studio" } };
+
+/** Les lignes de la carte SFL (27/11), dans l'ordre de Sabri ; chacune ouvre sa fiche quand elle en a une. */
+export const LIGNES_SFL = [
+  { id: "maillots", nom: "Tes maillots" },
+  { id: "carte", nom: "Ta carte" },
+  { id: "matchs-filmes", nom: "Tes matchs filmés" },
+  { id: "cadeaux", nom: "Des cadeaux" },
+  { id: "ceremonies", nom: "Les cérémonies officielles" },
+  { id: "parrainage", nom: "Ramène 5 abonnés" },
+] as const;
+export type LigneSfl = (typeof LIGNES_SFL)[number]["id"];
+
+/**
+ * Les photos de la SFL (14/11) : « Tes matchs filmés » sur la carte du studio ; les autres attendent les
+ * fiches à refaire (Sabri, 27/11 : « il faudra retravailler ça par la suite »).
+ */
+export const VISUELS_SFL = {
+  maillots: { image: "maillots", alt: "Les deux maillots de la SFL, le noir et le blanc", teinte: "#1d2a25", rapport: RAPPORT_VISUEL, teindre: true },
+  "matchs-filmes": { image: "matchs-filmes", alt: "Image générée : une caméra filme deux joueurs au duel, la nuit, dans le stade de piliers", teinte: "#1f3a2c", rapport: RAPPORT_CARROUSEL },
+  cadeaux: { image: "cadeaux", alt: "Image générée : des crampons verts, des gants et une veste noirs près d'un écrin, sur du marbre", teinte: "#1b2a2a", rapport: RAPPORT_CARROUSEL },
+  ceremonies: { image: "ceremonies", alt: "Image générée : un joueur lève le trophée noir sur le podium de marbre, ses coéquipiers applaudissent", teinte: "#22243a", rapport: RAPPORT_CARROUSEL, voileCourt: true },
+} as const satisfies Record<string, Visuel>;
+
+/** Les diapositives du carrousel, dans l'ordre : l'ouverture, les avantages, le prix. */
+export type Diapo = { id: "ouverture"; nom: string } | ({ id: string; nom: string } & { avantage: Avantage }) | { id: "prix"; nom: string };
 export const diapos = (avantages: readonly Avantage[] = AVANTAGES): Diapo[] => [
   { id: "ouverture", nom: "Bola Plus et la SFL" },
   ...avantages.map((a) => ({ id: a.id, nom: a.titre.replace(/\.$/, ""), avantage: a })),
-  { id: "parrainage", nom: PARRAINAGE.titre.replace(/\.$/, "") },
   { id: "prix", nom: "Ton prix" },
 ];
+
+/** La part d'une fiche : celle de sa carte, ou la SFL pour une ligne de la carte SFL. */
+export const partDeFiche = (id: string): Part => (AVANTAGES.find((a) => a.id === id)?.part ?? (LIGNES_SFL.some((l) => l.id === id) ? "sfl" : "plus"));
 
 /** L'adresse d'un visuel à une largeur donnée. */
 export const fichierVisuel = (image: string, largeur: number) => `/bola-plus/${image}-${largeur}.webp`;
