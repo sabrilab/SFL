@@ -8,13 +8,21 @@
 // plein écran sur le noir ; on passe aux autres en glissant (ou aux flèches,
 // au clavier), et les autres joueurs de la photo sont nommés dessous.
 // Sans photo, la section ne se montre pas.
+//
+// Privé ou public (Bola, 28/11) : sur ma propre page, à côté du titre, deux
+// mots, « Public » et « Privé », un clic pour passer de l'un à l'autre
+// (lib/sfl/photos-privees.ts). En privé, je garde ma grille ; les autres ne
+// voient plus une photo dès qu'un des joueurs qu'on y voit l'a mise en privé,
+// sauf s'ils sont dessus.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { ChevronLeft, ChevronRight, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Lock, X } from "lucide-react";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useIdentites } from "@/hooks/use-identites";
 import { usePlayerPhoto } from "@/hooks/use-player-photo";
+import { useMyPlayer } from "@/components/sfl/player-provider";
 import { dateCourte, photosDuJoueur, type PhotoJournee } from "@/lib/sfl/photos-journees";
 import { Commentaires } from "@/components/sfl/actus/video";
 import { CoeurEclos, RailPhoto, useDoubleToucher, usePhotoSociale } from "@/components/sfl/photos/actions-photo";
@@ -22,18 +30,28 @@ import { PartagePhoto } from "@/components/sfl/photos/partage-photo";
 import { useCardViewer } from "@/components/sfl/card-viewer";
 import { PlayerCard } from "@/components/sfl/player-card";
 import { useSeason } from "@/components/sfl/season-provider";
+import { choisirPhotosPrivees, usePhotosPrivees, usePhotosVisibles } from "@/lib/sfl/photos-privees";
 
 export function PhotosDuJoueur({ nom, className }: { nom: string; className?: string }) {
-  const jours = useMemo(() => photosDuJoueur(nom), [nom]);
+  const { me } = useMyPlayer();
+  const aMoi = !!me && me === nom;
+  const visible = usePhotosVisibles(me ?? null);
+  const prive = usePhotosPrivees().has(nom);
+  const jours = useMemo(
+    () => photosDuJoueur(nom).map((j) => ({ ...j, photos: j.photos.filter(visible) })).filter((j) => j.photos.length > 0),
+    [nom, visible]
+  );
   const toutes = useMemo(() => jours.flatMap((j) => j.photos), [jours]);
   const [ouverte, setOuverte] = useState<number | null>(null);
   if (toutes.length === 0) return null;
 
   return (
     <section className={cn("w-full", className)} aria-label="Photos">
-      <div className="mb-[var(--fib-13)] flex items-baseline justify-between">
-        <h2 className="text-titre-fort font-bold tracking-[-0.3px]">Photos</h2>
-        <span className="font-mono text-petit text-encre-3">{toutes.length}</span>
+      <div className="mb-[var(--fib-13)] flex items-center justify-between">
+        <h2 className="flex items-center gap-2 text-titre-fort font-bold tracking-[-0.3px]">
+          Photos <span className="font-mono text-petit font-normal text-encre-3">{toutes.length}</span>
+        </h2>
+        {aMoi && <PublicPrive nom={nom} prive={prive} />}
       </div>
       <div className="flex flex-col gap-[var(--fib-13)]">
         {jours.map((j) => (
@@ -66,6 +84,40 @@ export function PhotosDuJoueur({ nom, className }: { nom: string; className?: st
       </div>
       {ouverte !== null && <Visionneuse photos={toutes} depart={ouverte} nom={nom} onFermer={() => setOuverte(null)} />}
     </section>
+  );
+}
+
+/** Deux mots, un clic : mes photos à tout le monde, ou à moi seul. */
+function PublicPrive({ nom, prive }: { nom: string; prive: boolean }) {
+  const [enCours, setEnCours] = useState(false);
+  const choisir = async (p: boolean) => {
+    if (p === prive || enCours) return;
+    setEnCours(true);
+    navigator.vibrate?.(8);
+    const erreur = await choisirPhotosPrivees(nom, p);
+    setEnCours(false);
+    if (erreur) toast.error(erreur);
+  };
+  const option = (p: boolean, libelle: string) => (
+    <button
+      type="button"
+      role="radio"
+      aria-checked={prive === p}
+      onClick={() => void choisir(p)}
+      className={cn(
+        "flex h-8 items-center gap-1.5 rounded-full px-3.5 text-[13px] font-semibold transition-colors motion-reduce:transition-none",
+        prive === p ? "bg-foreground text-background" : "text-foreground/55"
+      )}
+    >
+      {p && <Lock className="size-3.5" strokeWidth={2.4} />}
+      {libelle}
+    </button>
+  );
+  return (
+    <div role="radiogroup" aria-label="Qui voit mes photos" className="flex items-center rounded-full bg-foreground/[0.08] p-[3px]">
+      {option(false, "Public")}
+      {option(true, "Privé")}
+    </div>
   );
 }
 
