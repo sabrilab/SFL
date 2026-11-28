@@ -1,22 +1,20 @@
 // Bola Club : les versions de couleurs (demande de Bola, 28/11/2026 : « c'est
-// trop noir et blanc […] propose plusieurs versions »). Trois versions à
-// comparer, posées sur <html data-couleurs> tant qu'on est dans /club
+// trop noir et blanc […] propose plusieurs versions »). Il en a gardé deux
+// (28/11 : Vif écartée, « trop de couleurs »), posées sur <html data-couleurs> tant qu'on est dans /club
 // (club/couleurs-club.tsx), lues par app/club/couleurs.css :
 //   · pelouse : l'app reste sombre, un seul vert de pelouse pour ce qui agit
 //     et compte, l'orange des plots pour l'échauffement ;
 //   · club : les couleurs de l'écusson du club font tout (le terrain dans son
-//     vert, la craie dans sa crème) : chaque club a sa version à lui ;
-//   · vif : une couleur par thème d'exercice, des chasubles franches, un
-//     terrain d'herbe vive.
+//     vert, la craie dans sa crème) : chaque club a sa version à lui.
+// Le rouge (--non) reste rare dans les deux : ce qui compte vraiment.
 // Le choix est gardé sur le téléphone ; ?couleurs= le pose (captures). Pur.
 
 export const VERSIONS = [
   { id: "pelouse", label: "Pelouse" },
   { id: "club", label: "Couleurs du club" },
-  { id: "vif", label: "Vif" },
 ] as const;
 export type VersionCouleurs = (typeof VERSIONS)[number]["id"];
-export const VERSION_DEFAUT: VersionCouleurs = "vif";
+export const VERSION_DEFAUT: VersionCouleurs = "pelouse";
 export const CLE_COULEURS = "bola-club-couleurs";
 
 export const estVersion = (v: unknown): v is VersionCouleurs => VERSIONS.some((x) => x.id === v);

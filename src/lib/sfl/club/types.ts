@@ -9,6 +9,7 @@
 import type { Blason } from "@/lib/sfl/blason";
 import type { Stats } from "@/lib/sfl/engine";
 import type { Poste } from "@/lib/sfl/inscription";
+import type { Direct } from "./direct";
 import type { Cote, ZoneCorps } from "@/lib/sfl/schemas-coach";
 
 export type Role = "admin" | "entraineur" | "joueur" | "parent";
@@ -112,6 +113,8 @@ export interface Seance {
   programme?: LigneProgramme[];
   /** Le bilan d'un entraînement, après coup : le ressenti du groupe (1 à 10) et la remarque de l'entraîneur. */
   bilan?: Bilan;
+  /** Le match en direct (lib/sfl/club/direct.ts) : compo, chrono, fil, notes sur l'adversaire. */
+  direct?: Direct;
 }
 
 export interface Bilan {

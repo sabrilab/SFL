@@ -6,7 +6,7 @@
 // « club », les variables tirées de l'écusson. La police des titres (Libre
 // Caslon Condensed, celle de la landing et de la maquette Bola Club) est
 // chargée ici, sans bloquer la page. La pastille « Couleurs · Vif », à côté de celle de la démo,
-// passe à la version suivante ; ?couleurs=pelouse|club|vif la pose.
+// passe à la version suivante ; ?couleurs=pelouse|club la pose.
 
 import { useEffect, useSyncExternalStore } from "react";
 import { useSearchParams } from "next/navigation";

@@ -22,6 +22,7 @@
 
 import type { Stats } from "@/lib/sfl/engine";
 import type { Poste } from "@/lib/sfl/inscription";
+import { avecDirectDemo } from "./direct";
 import { PROGRAMMES_DEMO } from "./exercices";
 import type { Annonce, Categorie, Club, EtatAppel, Licence, Membre, Mesure, NotePrivee, ParentClub, Seance, Staff } from "./types";
 
@@ -344,7 +345,7 @@ export function clubDemo(): Club {
     { id: "a-4", categorie: "seniors", auteur: "s-e2", jour: "2026-11-06", texte: "Covoiturage pour dimanche : départ du stade à 13h15." },
   ];
 
-  return {
+  return avecDirectDemo({
     nom: "FC Démo",
     initiales: "FCD",
     blason: { forme: "ecu", motif: "parti", couleurs: ["#0E4D32", "#F4F3EF", "#A7ADB4"], embleme: "initiales" },
@@ -397,5 +398,5 @@ export function clubDemo(): Club {
       },
     ],
     demo: { admin: "s-admin", entraineur: "s-e1", joueur: "u17-15", parent: "p-u13-13" },
-  };
+  });
 }

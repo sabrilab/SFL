@@ -69,6 +69,25 @@ import {
   enPoussee,
   imc,
 } from "../src/lib/sfl/club/suivi";
+import {
+  annulerEvenement,
+  butContre,
+  butPour,
+  carton,
+  changerSysteme,
+  chrono,
+  chronoDit,
+  dureeDe,
+  echangerPostes,
+  formatDe,
+  lancerDirect,
+  minuteDe,
+  noterAdversaire,
+  remplacer,
+  scoreDe,
+  tempsDeJeu,
+  terminerDirect,
+} from "../src/lib/sfl/club/direct";
 import type { Club, Moi } from "../src/lib/sfl/club/types";
 
 let n = 0;
@@ -541,6 +560,87 @@ eq(formeDuClub(ancien), false);
   const v = variablesDuClub(club.blason.couleurs);
   eq(clarte(v["--club-accent"]) >= 0.4, true, "l'accent du club se lit sur le noir");
   eq(clarte(v["--terrain-pelouse"]) < 0.3, true, "le terrain reste sombre sous la craie");
+}
+
+// 13 · le match en direct
+{
+  eq([formatDe(7), formatDe(10), formatDe(12), formatDe(13)], [5, 8, 8, 11]);
+  eq([dureeDe(7), dureeDe(12), dureeDe(16), dureeDe(18)], [15, 30, 40, 45]);
+  // La démo : le prochain match des U17, en pause à la 35e, 1-1, trois notes, sans le blessé écarté.
+  const demo = club.seances.find((x) => x.id === "u17-m9")!.direct!;
+  eq(scoreDe(demo), { nous: 1, eux: 1 });
+  eq(chronoDit(demo, 0), "34:12");
+  eq(demo.notes.length, 3);
+  eq(demo.terrain.filter((id) => club.membres.find((m) => m.id === id)?.poste === "G").length, 1, "un seul gardien sur le terrain");
+  eq(demo.terrain.includes("u17-03") || demo.banc.includes("u17-03"), false, "un blessé écarté ne joue pas");
+  // Un match tout neuf : les U13 (foot à 8).
+  const sid = "u13-m9";
+  const vierge: Club = { ...club, seances: club.seances.map((x) => (x.id === sid ? { ...x, direct: undefined } : x)) };
+  non(lancerDirect(vierge, joueur, sid));
+  non(lancerDirect(vierge, coach, "u17-e11"));
+  non(lancerDirect(vierge, coach, "u13-m1"));
+  let c = ok(lancerDirect(vierge, coach, sid));
+  const d0 = () => c.seances.find((x) => x.id === sid)!.direct!;
+  eq(d0().terrain.length, 8);
+  eq(d0().systeme, "3-3-1");
+  eq(club.membres.find((m) => m.id === d0().terrain[0])!.poste, "G", "le gardien au but");
+  eq(new Set([...d0().terrain, ...d0().banc]).size, d0().terrain.length + d0().banc.length, "personne deux fois");
+  const t0 = 1_000_000;
+  const a = (m: number) => t0 + m * 60_000 - 1000;
+  c = ok(chrono(c, coach, sid, "demarrer", t0));
+  non(butContre(ok(lancerDirect(vierge, coach, sid)), joueur, sid, t0));
+  eq(minuteDe(d0(), t0), 1);
+  eq(minuteDe(d0(), a(10)), 10);
+  const [g, , , , , , milieu, avant] = d0().terrain as string[];
+  c = ok(butPour(c, coach, sid, avant, milieu, a(5)));
+  non(butPour(c, coach, sid, avant, avant, a(6)));
+  non(butPour(c, coach, sid, d0().banc[0] ?? "personne", null, a(6)));
+  c = ok(butContre(c, coach, sid, a(12)));
+  const entre = d0().banc[0];
+  c = ok(remplacer(c, coach, sid, avant, entre, a(20)));
+  eq(d0().terrain.includes(entre) && d0().banc.includes(avant), true, "il entre, l'autre va au banc");
+  non(remplacer(c, coach, sid, avant, entre, a(21)));
+  c = ok(echangerPostes(c, coach, sid, milieu, g));
+  eq(d0().terrain[0], milieu);
+  c = ok(echangerPostes(c, coach, sid, milieu, g));
+  c = ok(changerSysteme(c, coach, sid, "2-3-2"));
+  non(changerSysteme(c, coach, sid, "4-3-3"));
+  c = ok(carton(c, coach, sid, milieu, "jaune", a(22)));
+  c = ok(carton(c, coach, sid, milieu, "jaune", a(24)));
+  eq(d0().terrain.includes(milieu), false, "un second jaune sort le joueur");
+  eq(d0().terrain.filter((x) => x === null).length, 1, "son poste reste vide");
+  eq(d0().evenements.filter((e) => e.carton === "rouge").length, 1);
+  eq(new Set(d0().evenements.map((e) => e.id)).size, d0().evenements.length, "des ids uniques");
+  const rouge = d0().evenements.find((e) => e.carton === "rouge")!;
+  non(annulerEvenement(c, coach, sid, rouge.id));
+  const contre = d0().evenements.find((e) => e.type === "butContre")!;
+  c = ok(annulerEvenement(c, coach, sid, contre.id));
+  eq(scoreDe(d0()), { nous: 1, eux: 0 });
+  c = ok(noterAdversaire(c, coach, sid, "  Jeu long  ", a(26)));
+  non(noterAdversaire(c, coach, sid, "   ", a(26)));
+  eq(d0().notes[0], { id: d0().notes[0].id, minute: 26, texte: "Jeu long" });
+  c = ok(chrono(c, coach, sid, "pause", t0 + 30 * 60_000));
+  eq(chronoDit(d0(), t0 + 99 * 60_000), "30:00", "en pause, le chrono ne bouge pas");
+  c = ok(chrono(c, coach, sid, "mitemps", t0 + 30 * 60_000));
+  non(chrono(c, coach, sid, "mitemps", t0 + 30 * 60_000));
+  eq(chronoDit(d0(), 0), "30:00", "la seconde mi-temps part de 30:00 en foot à 8");
+  const t1 = t0 + 40 * 60_000;
+  c = ok(chrono(c, coach, sid, "demarrer", t1));
+  eq(minuteDe(d0(), t1 + 5 * 60_000), 36);
+  const temps = tempsDeJeu(d0(), t1 + 30 * 60_000);
+  eq(temps[avant], 19, "l'avant a joué jusqu'à sa sortie");
+  eq(temps[entre], 41, "l'entrant depuis la 20e");
+  eq(temps[milieu], 23, "le milieu jusqu'à son exclusion");
+  eq(temps[g], 60, "le gardien tout le match");
+  c = ok(terminerDirect(c, coach, sid, t1 + 30 * 60_000));
+  const fin = c.seances.find((x) => x.id === sid)!;
+  eq(fin.score, { nous: 1, eux: 0 });
+  eq(fin.stats[avant], { buts: 1, passes: 0 });
+  eq(fin.stats[milieu], { buts: 0, passes: 1 });
+  eq(fin.appel[entre], "present");
+  non(butContre(c, coach, sid, t1));
+  eq(ok(lancerDirect(c, coach, sid)).seances.find((x) => x.id === sid)!.direct!.fini, true, "relancer ne rouvre pas un match fini");
+  eq(formeDuClub(JSON.parse(JSON.stringify(c))), true, "un club avec un direct se relit");
 }
 
 console.log(`club-planning: ok (${n} vérifications)`);

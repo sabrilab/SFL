@@ -18,11 +18,13 @@
 //     (programme.tsx) ; un entraînement à venir s'ouvre dessus ;
 //   · Bilan (un entraînement, à partir de son jour) : le ressenti du groupe et
 //     la remarque de l'entraîneur (bilan.tsx).
+// Un match a en tête son bouton rouge « Match en direct » (direct.tsx).
 // L'appel et les stats s'ouvrent le jour de la séance : avant, la page n'a
 // que la convocation. La saisie des stats est gardée par la page : passer
 // par « Appel » ne la perd pas ; « Enregistrer » s'éteint une fois fait.
 // Rien n'est envoyé aux joueurs : la démonstration vit sur le téléphone.
 
+import Link from "next/link";
 import { useState } from "react";
 import { Check } from "lucide-react";
 import { toast } from "sonner";
@@ -236,6 +238,19 @@ export function SeanceDuClub({ id }: { id: string }) {
   const brouillon: Brouillon = saisie ?? { score: s.score ?? { nous: 0, eux: 0 }, stats: s.stats, sale: s.score === null };
   return (
     <PageEnfant sur={categorieDe(club, s.categorie)?.nom} titre={titreSeance(club, s)} sous={`${jourLong(s.jour)} · ${s.heure} · ${s.lieu}`}>
+      {/* Le direct : le bouton rouge d'un match pas encore joué (direct.tsx). */}
+      {match && (!s.score || s.direct) && (
+        <Link
+          href={`/club/seance/${encodeURIComponent(s.id)}/direct`}
+          className={cn(
+            s.direct?.fini ? "bouton-secondaire" : "bouton-rouge",
+            "flex h-12 items-center justify-center gap-2 text-[15px] font-semibold",
+          )}
+        >
+          {!s.direct?.fini && <span className="size-2 rounded-full bg-white" />}
+          {s.direct?.fini ? "Revoir le direct" : s.direct ? "Reprendre le direct" : "Match en direct"}
+        </Link>
+      )}
       {vues.length > 1 && <Segment nom="Vue" choix={vues} actif={actuelle} onChange={setVue} />}
       {actuelle === "programme" ? (
         <Programme s={s} />

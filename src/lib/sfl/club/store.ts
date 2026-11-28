@@ -54,7 +54,8 @@ export function formeDuClub(x: unknown): x is Club {
     liste(c.mesures, (l) => texte(l.id) && texte(l.membre) && texte(l.jour)) &&
     liste(c.blessures, (l) => texte(l.id) && texte(l.membre) && texte(l.jour) && texte(l.zone) && typeof l.etape === "number") &&
     liste(c.exercices, (l) => texte(l.id) && texte(l.nom) && texte(l.theme) && typeof l.minutes === "number" && Array.isArray(l.deroule)) &&
-    (c.seances as Record<string, unknown>[]).every((l) => l.programme === undefined || liste(l.programme, (p) => texte(p.exercice) && typeof p.minutes === "number"));
+    (c.seances as Record<string, unknown>[]).every((l) => l.programme === undefined || liste(l.programme, (p) => texte(p.exercice) && typeof p.minutes === "number")) &&
+    (c.seances as Record<string, unknown>[]).every((l) => l.direct === undefined || (objet(l.direct) && texte(l.direct.systeme) && Array.isArray(l.direct.terrain) && Array.isArray(l.direct.banc) && Array.isArray(l.direct.evenements) && Array.isArray(l.direct.notes)));
   if (!bon || !objet(c.demo)) return false;
   // « Moi », sous chaque point de vue, existe encore.
   const d = c.demo;
