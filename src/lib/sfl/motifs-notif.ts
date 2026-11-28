@@ -85,6 +85,8 @@ export const MOTIFS_NOTIF = {
   divisions: { famille: "ligue", label: "L'annonce des divisions", effet: null },
   // La veille de chaque dimanche de l'arc 1 : « J4 · La journée de Miken » (lib/sfl/outsiders.ts).
   outsider: { famille: "ligue", label: "La journée de l'outsider", effet: null },
+  // Une heure avant son match du dimanche, à chaque joueur de la feuille (28/11, lib/sfl/rappel-avant-match.ts).
+  "rappel-match": { famille: "ligue", label: "Le rappel 1 h avant le match", effet: null },
   // La convocation du dimanche, le lundi matin, à toute la ligue (lib/sfl/annonces-ligue.ts).
   convocation: { famille: "ligue", label: "La convocation du dimanche", effet: "a répondu à la convocation" },
   // Les résultats, les MVP et les divisions d'une journée, à sa révélation (lib/sfl/annonces-ligue.ts, revelation.ts).
