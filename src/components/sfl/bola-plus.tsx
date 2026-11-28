@@ -55,7 +55,7 @@
 import Link from "next/link";
 import { createContext, useContext, useEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type KeyboardEvent, type ReactNode, type RefObject } from "react";
 import { createPortal } from "react-dom";
-import { Check, ChevronLeft, ChevronRight, Gift, IdCard, MessageCircle, Shirt, Sparkles, Target, Trophy, UserPlus, Users, Video } from "lucide-react";
+import { Camera, Check, ChevronLeft, ChevronRight, Gift, IdCard, MessageCircle, Shirt, Sparkles, Target, Trophy, UserPlus, Users, Video } from "lucide-react";
 import { ANTON } from "@/components/sfl/actus/ecran";
 import { noterArrivee, noterCarte, noterFiche, noterTemps, partirDe } from "@/lib/sfl/bola-plus-parcours-store";
 import { FicheBolaPlus, PastilleFiche, aUneFiche, useFiche } from "@/components/sfl/bola-plus-fiches";
@@ -66,6 +66,7 @@ import { SigleLigue } from "@/components/sfl/choix-ligue";
 import { LOGO_BOLA } from "@/components/sfl/finitions-carte";
 import { RosaceBola } from "@/components/sfl/motif-carte";
 import { BoutonRetour } from "@/components/layout/bouton-retour";
+import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { useBolaPlus, type BolaPlus } from "@/hooks/use-bola-plus";
 import { useSession } from "@/hooks/use-session";
 import { ovr } from "@/lib/sfl/engine";
@@ -82,7 +83,7 @@ import {
   SAISON_SFL,
   NOM_PART,
   PALETTE,
-  VISUELS_SFL,
+  CARTE_STUDIO,
   PRIX_FORMULE,
   VARIABLES_PLUS,
   diapos,
@@ -447,23 +448,41 @@ function VisuelCarte() {
   );
 }
 
-const ICONES: Record<(typeof FONCTIONS_BOLA_PLUS)[number]["id"], typeof Users> = { equipe: Users, "trash-talk": MessageCircle, skins: Sparkles, quetes: Target };
+const ICONES: Record<(typeof FONCTIONS_BOLA_PLUS)[number]["id"], typeof Users> = { equipe: Users, "trash-talk": MessageCircle, skins: Sparkles, quetes: Target, studio: Camera };
 
 /** « Bola Plus » : ses quatre fonctions, et son prix seul barré, « Offert ». */
 function VisuelBolaPlus() {
+  const ouvrir = useContext(OuvrirFiche);
   return (
     <div className="bp-visuel-plus">
       <ul className="bp-fonctions">
         {FONCTIONS_BOLA_PLUS.map((f) => {
           const Icone = ICONES[f.id];
-          return (
-            <li key={f.id}>
+          const contenu = (
+            <>
               <span className="bp-fonctions__icone" aria-hidden>
                 <Icone className="size-[18px]" strokeWidth={2.2} />
               </span>
               {f.nom}
               {f.id === "equipe" && <SigleLigue ligue="team" hauteur={11} className="bp-fonctions__sigle" />}
+            </>
+          );
+          // « Ton studio » (28/11) : la ligne ouvre sa carte.
+          return f.id === "studio" ? (
+            <li key={f.id} className="bp-fonctions__li-bouton">
+              <button
+                type="button"
+                className="bp-fonctions__ligne bp-fonctions__ligne--plus"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  ouvrir("studio");
+                }}
+              >
+                {contenu}
+              </button>
             </li>
+          ) : (
+            <li key={f.id}>{contenu}</li>
           );
         })}
       </ul>
@@ -544,31 +563,6 @@ function VisuelSfl() {
   );
 }
 
-/** Sous « Ton studio » (27/11) : les ballons du mois, puis les matchs filmés, qui ouvrent leur fiche. */
-function PiedStudio() {
-  const ouvrir = useContext(OuvrirFiche);
-  const v = VISUELS_SFL["matchs-filmes"];
-  return (
-    <>
-      <MentionStudio />
-      <button
-        type="button"
-        className="bp-matchs dark"
-        style={{ ["--teinte" as string]: v.teinte }}
-        onClick={(e) => {
-          e.stopPropagation();
-          ouvrir("matchs-filmes");
-        }}
-      >
-        {/* eslint-disable-next-line @next/next/no-img-element -- déjà à ses trois tailles (public/bola-plus) */}
-        <img src={fichierVisuel(v.image, LARGEUR)} srcSet={sourcesVisuel(v.image)} sizes={TAILLES} width={LARGEUR} height={hauteurDe(v)} alt={v.alt} loading="lazy" decoding="async" draggable={false} className="bp-photo" />
-        <EtiquettePart part="sfl" className="bp-matchs__part" />
-        <span className="bp-titre bp-matchs__titre">Tes matchs filmés</span>
-      </button>
-    </>
-  );
-}
-
 /** Le logo BOLA officiel, en blanc : l'ouverture et Bola 27. */
 function LogoBola({ className }: { className?: string }) {
   // eslint-disable-next-line @next/next/no-img-element -- le logo officiel, en SVG
@@ -597,7 +591,24 @@ const COMPOSANTS: Record<ComposantAvantage, () => ReactNode> = {
 };
 
 /** Ce qu'un visuel dessiné ajoute sous son titre : les ballons du mois de « Ton studio ». */
-const PIEDS: Partial<Record<ComposantAvantage, () => ReactNode>> = { studio: PiedStudio };
+const PIEDS: Partial<Record<ComposantAvantage, () => ReactNode>> = { studio: MentionStudio };
+
+/**
+ * La carte « Ton studio » dans une feuille (Sabri, 28/11) : on la touche dans les lignes de Bola Plus et
+ * elle s'ouvre telle qu'elle était dans le carrousel, sans les matchs filmés (une ligne de la SFL).
+ */
+function FeuilleStudio({ ouverte, onFermer }: { ouverte: boolean; onFermer: () => void }) {
+  return (
+    <Sheet open={ouverte} onOpenChange={(o) => !o && onFermer()}>
+      <SheetContent side="bottom" className="bp-feuille-studio" style={COULEURS}>
+        <SheetTitle className="sr-only">{CARTE_STUDIO.titre}</SheetTitle>
+        <div className="bp-feuille-studio__carte">
+          <DiapoComposant avantage={CARTE_STUDIO} composant="studio" />
+        </div>
+      </SheetContent>
+    </Sheet>
+  );
+}
 
 /** Un avantage dessiné par le code : son étiquette, son visuel, son titre et sa ligne. */
 function DiapoComposant({ avantage, composant }: { avantage: Avantage; composant: ComposantAvantage }) {
@@ -765,7 +776,8 @@ export function PageBolaPlus() {
   }, []);
   const idFiche = (d: Diapo) => ("avantage" in d ? d.avantage.id : d.id);
   const partFiche = fiche.ouverte ? partDeFiche(fiche.ouverte) : "plus";
-  const ouvrirFiche = (id: string) => (noterFiche(id), fiche.ouvrir(id));
+  const [studio, setStudio] = useState(false);
+  const ouvrirFiche = (id: string) => (noterFiche(id), id === CARTE_STUDIO.id ? setStudio(true) : fiche.ouvrir(id));
 
   // La carte active : celle qui occupe le rail aux trois cinquièmes au moins.
   useEffect(() => {
@@ -854,6 +866,7 @@ export function PageBolaPlus() {
         ))}
       </div>
       <div className="bp-pied" aria-hidden />
+      {pret && <FeuilleStudio ouverte={studio} onFermer={() => setStudio(false)} />}
       {pret && fiche.ouverte && <FicheBolaPlus id={fiche.ouverte} part={partFiche} couleurs={COULEURS} onFermer={fiche.fermer} />}
       {pret && (
         <BarreInteret

@@ -1171,3 +1171,41 @@ html[data-clavier] .bp-barre {
     font-size: 12.5px;
   }
 }
+
+/* « Ton studio », ligne de Bola Plus (28/11) : elle a la forme des autres et ouvre sa carte. */
+.bp-fonctions li.bp-fonctions__li-bouton {
+  display: block;
+  padding: 0;
+}
+.bp-fonctions__ligne--plus {
+  min-height: 48px;
+  padding: 0 14px 0 8px;
+  font-size: 17px;
+  white-space: nowrap;
+}
+button.bp-fonctions__ligne--plus:active {
+  background: color-mix(in srgb, var(--bp-plus-vif) 12%, transparent);
+}
+
+/* La carte « Ton studio » dans sa feuille : la même carte que dans le carrousel. */
+.bp-feuille-studio {
+  padding: 12px 12px calc(env(safe-area-inset-bottom, 0px) + 16px);
+  border-radius: 28px 28px 0 0;
+}
+.bp-feuille-studio__carte {
+  position: relative;
+  width: 100%;
+  max-width: 390px;
+  height: min(600px, 78dvh);
+  margin: 0 auto;
+  border-radius: 28px;
+  overflow: hidden;
+  isolation: isolate;
+}
+.bp-feuille-studio__carte > * {
+  height: 100%;
+}
+/* « text-wrap: balance » des titres remet le retour à la ligne : le titre de la feuille tient sur une ligne. */
+:root:root .bp-feuille-studio__carte .bp-titre.bp-texte__titre {
+  text-wrap: nowrap;
+}

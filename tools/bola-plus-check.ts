@@ -33,9 +33,9 @@
 //       source (barrés au-dessus des prix, saison < 140 €, année < 280 € et
 //       < 12 × 35 €, 4 échéances qui couvrent le prix, remises 43 % et 32 %
 //       calculées, jamais affichées) ; le bundle complet ; les avantages (une
-//       part et un identifiant chacun ; depuis le 27/11, six cartes : la
-//       SFL et ses six lignes, Bola Plus, le studio et les matchs filmés,
-//       Bola 27 en dernier) ; les visuels (trois largeurs, WebP,
+//       part et un identifiant chacun ; depuis le 28/11, cinq cartes : la
+//       SFL, « 18 journées » et ses six lignes, Bola Plus et ses lignes dont
+//       « Ton studio », Bola 27 en dernier) ; les visuels (trois largeurs, WebP,
 //       légers, « Image générée : » pour ceux qui le sont) ; la palette loin
 //       de l'or, du rouge et du cobalt des cartes, sans la braise, et ses
 //       contrastes ; la feuille sans aucune teinte écrite (tout passe par les
@@ -44,9 +44,9 @@
 //       effacée sur « Ton prix », la vraie carte « Toi », aucun montant en
 //       dur, une liste fermée de mots.
 //   9 · Bola Studio dans le carrousel (bola-app#22, raccordé le 14/11) :
-//       « Ton studio » après « Bola Plus », dessiné par VisuelStudio
-//       (COMPOSANTS) avec ses ballons du mois sous le titre puis les matchs
-//       filmés (PIEDS, PiedStudio) ; sous chaque formule de « Ton prix », ses ballons
+//       « Ton studio », ligne de Bola Plus qui ouvre sa carte dans une
+//       feuille (CARTE_STUDIO, FeuilleStudio), dessinée par VisuelStudio
+//       (COMPOSANTS) avec ses ballons du mois sous le titre (PIEDS) ; sous chaque formule de « Ton prix », ses ballons
 //       (BALLONS_FORMULE de lib/sfl/studio.ts), visibles, après la ligne du
 //       dessous. Le catalogue, le panneau, les recharges et les vignettes
 //       (public/bola-plus/studio/, le seul dossier admis à côté des visuels)
@@ -81,6 +81,7 @@ import {
   NOM_BUNDLE,
   PALETTE,
   LIGNES_SFL,
+  CARTE_STUDIO,
   SAISON_SFL,
   VISUELS_SFL,
   PRIX_FORMULE,
@@ -593,7 +594,7 @@ async function banc() {
   assert.deepEqual(Object.keys(NOM_BUNDLE).sort(), [...BUNDLE].sort());
   assert.deepEqual(
     FONCTIONS_BOLA_PLUS.map((f) => f.nom),
-    ["Ton équipe", "Trash talk", "Skins et aspects", "Quêtes et missions"]
+    ["Ton équipe", "Trash talk", "Skins et aspects", "Quêtes et missions", "Ton studio"]
   );
 
   // Les cartes (Sabri, 27/11 : « ça va tenir en 4 pages […] normalement, on a 5 ou 6 cartes ») : la SFL,
@@ -601,7 +602,6 @@ async function banc() {
   const ATTENDUS = [
     ["sfl", "sfl", "La SFL"],
     ["bola-plus", "plus", "Bola Plus"],
-    ["studio", "plus", "Ton studio"],
     // Le jeu (Sabri, 17/11) : son nom porte son année, le seul chiffre admis dans un titre.
     ["bola-27", "plus", "Bola 27"],
   ] as const;
@@ -617,13 +617,11 @@ async function banc() {
       assert.equal(liste[i].part, part, `« ${titre} » : sa part`);
       assert.equal(liste[i].titre, titre, `« ${titre} » : son titre exact`);
     }
-    assert.equal(liste.length, ATTENDUS.length, "les quatre cartes, aucune de plus");
+    assert.equal(liste.length, ATTENDUS.length, "les trois cartes, aucune de plus");
     // La SFL : la liste dessinée par le code, comme « Bola Plus ».
     assert.deepEqual(liste.find((a) => a.id === "sfl")?.visuel, { genre: "composant", composant: "sfl" }, "« La SFL » : sa liste, pas une image");
-    // « Ton studio » : dessiné par le code (l'éventail de Bola Studio, puis les matchs filmés), pas une image.
-    const studio = liste.find((a) => a.id === "studio");
-    assert.deepEqual(studio?.visuel, { genre: "composant", composant: "studio" }, "« Ton studio » : l'éventail de Bola Studio");
-    assert.ok(!studio?.sous, "« Ton studio » : ses ballons viennent de studio.ts, pas d'une ligne écrite ici");
+    // « Ton studio » (28/11) : une ligne de Bola Plus, plus une carte du carrousel.
+    assert.ok(!liste.some((a) => a.id === "studio"), "« Ton studio » n'est plus une carte du carrousel");
     // Bola 27, discret : son logo dessiné par le code, en dernier.
     const jeu = liste.find((a) => a.id === "bola-27");
     assert.deepEqual(jeu?.visuel, { genre: "composant", composant: "bola-27" }, "« Bola 27 » : son logo, pas une image");
@@ -664,10 +662,12 @@ async function banc() {
   // Les cartes du carrousel : l'ouverture, les avantages, le prix : six.
   const ordre = diapos().map((d) => d.id);
   assert.deepEqual(ordre, ["ouverture", ...AVANTAGES.map((a) => a.id), "prix"]);
-  assert.equal(ordre.length, 6, "six cartes");
+  assert.equal(ordre.length, 5, "cinq cartes (28/11)");
+  // « Ton studio » : sa carte s'ouvre depuis sa ligne de Bola Plus, dessinée par le code (l'éventail de Bola Studio).
+  assert.deepEqual(CARTE_STUDIO, { id: "studio", part: "plus", titre: "Ton studio", visuel: { genre: "composant", composant: "studio" } }, "« Ton studio » : sa carte, l'éventail de Bola Studio");
+  assert.equal(FONCTIONS_BOLA_PLUS[FONCTIONS_BOLA_PLUS.length - 1].id, CARTE_STUDIO.id, "« Ton studio » : la dernière ligne de Bola Plus");
   assert.equal(diapos([...AVANTAGES, { id: "autre", part: "plus", titre: "Un autre", visuel: { genre: "composant", composant: "carte" } }]).length, ordre.length + 1, "un avantage de plus fait une carte de plus, sans rien d'autre");
   assert.equal(ordre.indexOf("sfl"), 1, "la SFL juste après l'ouverture");
-  assert.equal(ordre.indexOf("studio"), ordre.indexOf("bola-plus") + 1, "« Ton studio » juste après « Bola Plus »");
   assert.equal(partDeFiche("cadeaux"), "sfl", "la fiche d'une ligne SFL a les couleurs de la SFL");
   assert.equal(partDeFiche("bola-27"), "plus");
   assert.equal(AFFICHE.alt, "", "l'ouverture : le stade est un décor");
@@ -815,9 +815,12 @@ async function banc() {
     assert.ok(/diapos\(\)/.test(page), "le carrousel lit la liste des cartes de la source");
     assert.ok(/const COMPOSANTS: Record<ComposantAvantage, \(\) => ReactNode> = \{/.test(tsx), "les visuels dessinés passent par COMPOSANTS");
     // Bola Studio : son éventail dans COMPOSANTS, ses ballons du mois sous le titre (PIEDS), lus dans studio-bola.tsx.
-    assert.ok(/\n  studio: VisuelStudio,\n\};/.test(tsx) && /const PIEDS: Partial<Record<ComposantAvantage, \(\) => ReactNode>> = \{ studio: PiedStudio \};/.test(tsx), "« Ton studio » : l'éventail, ses ballons du mois et les matchs filmés");
-    const piedStudio = bloc("PiedStudio");
-    assert.ok(/<MentionStudio \/>/.test(piedStudio) && /VISUELS_SFL\["matchs-filmes"\]/.test(piedStudio) && /ouvrir\("matchs-filmes"\)/.test(piedStudio), "sous « Ton studio » : ses ballons, puis les matchs filmés qui ouvrent leur fiche (27/11)");
+    assert.ok(/\n  studio: VisuelStudio,\n\};/.test(tsx) && /const PIEDS: Partial<Record<ComposantAvantage, \(\) => ReactNode>> = \{ studio: MentionStudio \};/.test(tsx), "« Ton studio » : l'éventail et ses ballons du mois, sans les matchs filmés (28/11)");
+    const lignesPlus = bloc("VisuelBolaPlus");
+    assert.ok(/e\.stopPropagation\(\);\s*ouvrir\("studio"\);/.test(lignesPlus), "la ligne « Ton studio » de Bola Plus ouvre sa carte");
+    const feuille = bloc("FeuilleStudio");
+    assert.ok(/<DiapoComposant avantage=\{CARTE_STUDIO\} composant="studio" \/>/.test(feuille) && /<SheetTitle /.test(feuille), "la carte « Ton studio » dans sa feuille, avec son nom");
+    assert.ok(/id === CARTE_STUDIO\.id \? setStudio\(true\)/.test(page) && /<FeuilleStudio ouverte=\{studio\}/.test(page), "la page ouvre la carte « Ton studio »");
     const sfl = bloc("VisuelSfl");
     assert.ok(/LIGNES_SFL\.map/.test(sfl) && /aUneFiche\(l\.id\)/.test(sfl) && /e\.stopPropagation\(\);\s*ouvrir\(l\.id\);/.test(sfl) && /<EmblemeSfl /.test(sfl), "la carte SFL : ses lignes, qui ouvrent leur fiche, et sa rosace");
     assert.ok(/SAISON_SFL\.titre/.test(sfl) && sfl.indexOf("bp-saison-sfl") < sfl.indexOf("LIGNES_SFL.map"), "la carte SFL : « 18 journées » en tête, avant les lignes");
@@ -848,11 +851,11 @@ async function banc() {
     // La vraie carte « Toi », sans photo ni nom de joueur.
     assert.ok(/<PlayerCard player=\{player\} /.test(carte) && /player\.name === me/.test(carte), "« Ta carte » : la carte du compte ouvert (16/11)");
     assert.ok(/<BolaCard name=\{CARTE_TOI\.name\} /.test(carte) && CARTE_TOI.name === "Toi" && !/photo=/.test(carte), "sans joueur à soi : la carte « Toi », sans photo");
-    assert.ok(/alt=\{visuel\.alt\}/.test(photo) && /alt=\{v\.alt\}/.test(piedStudio) && /alt=\{AFFICHE\.alt\}/.test(ouverture), "chaque visuel a son texte de remplacement");
+    assert.ok(/alt=\{visuel\.alt\}/.test(photo) && /alt=\{AFFICHE\.alt\}/.test(ouverture), "chaque visuel a son texte de remplacement");
     assert.ok(/srcSet=\{sourcesVisuel\(/.test(photo) && /sizes=\{TAILLES\}/.test(photo) && /loading="lazy"/.test(photo), "les visuels : trois tailles, chargés quand on y arrive");
     // Les mots de l'écran : une liste fermée. Ni sous-titre, ni texte d'aide.
     const mots = [...new Set([...sansCommentaire.replace(/&apos;/g, "'").matchAll(/>\s*([^<>{}\n;()=]*[A-Za-zÀ-ÿ][^<>{}\n;()=]*?)\s*</g)].map((m) => m[1].trim()))].sort();
-    assert.deepEqual(mots, ["/ mois", "Annuler", "Bola Plus", "C'est noté", "Je suis intéressé", "Offert", "Prix premiers joueurs", "Tes matchs filmés"], "les mots de l'écran : une liste fermée");
+    assert.deepEqual(mots, ["/ mois", "Annuler", "Bola Plus", "C'est noté", "Je suis intéressé", "Offert", "Prix premiers joueurs"], "les mots de l'écran : une liste fermée");
     // La feuille : aimantée, sans teinte écrite (seulement les variables de la page), le mouvement réduit traité.
     const sansNotes = css.replace(/\/\*[\s\S]*?\*\//g, "");
     assert.ok(/scroll-snap-type: x mandatory;/.test(sansNotes) && /scroll-snap-align: center;/.test(sansNotes) && /scroll-snap-stop: always;/.test(sansNotes), "le rail est aimanté, carte par carte");
@@ -914,7 +917,7 @@ async function banc() {
   refuse("une ligne SFL retirée", () => lignesJustes(LIGNES_SFL.filter((l) => l.id !== "cadeaux")));
   refuse("les lignes SFL dans le désordre", () => lignesJustes([LIGNES_SFL[1], LIGNES_SFL[0], ...LIGNES_SFL.slice(2)]));
   refuse("un visuel généré qui ne le dit pas", () => visuelsSflJustes({ ...VISUELS_SFL, cadeaux: { ...VISUELS_SFL.cadeaux, alt: "Des crampons verts" } }));
-  refuse("les matchs filmés retirés du studio", () => ecranJuste(mute("matchs", ecran, '          ouvrir("matchs-filmes");', "          ouvrir(\"studio\");"), style));
+  refuse("la ligne « Ton studio » qui n'ouvre rien", () => ecranJuste(mute("ligne studio", ecran, '                  ouvrir("studio");', '                  ouvrir("bola-plus");'), style));
   refuse("une ligne SFL qui fait aussi tourner la carte", () => ecranJuste(mute("ligne", ecran, "                    e.stopPropagation();\n                    ouvrir(l.id);", "                    ouvrir(l.id);"), style));
   refuse("une image retirée", () => visuelsLa([...IMAGES, "absente"]));
   // La palette.
@@ -949,9 +952,7 @@ async function banc() {
   refuse("les ballons des formules au-dessus des 4 fois", () => ecranJuste(mute("ballons avant", ecran, '              <span className="bp-formule__sous tabular-nums">{p.sous}</span>\n              <span className="bp-formule__ballons tabular-nums">{BALLONS_FORMULE[f]}</span>', '              <span className="bp-formule__ballons tabular-nums">{BALLONS_FORMULE[f]}</span>\n              <span className="bp-formule__sous tabular-nums">{p.sous}</span>'), style));
   refuse("« Ton studio » sans ses ballons du mois", () => ecranJuste(mute("pied", ecran, "          {Pied && <Pied />}\n", ""), style));
   refuse("« Ton studio » dessiné par un autre visuel", () => ecranJuste(mute("visuel studio", ecran, "  studio: VisuelStudio,\n", "  studio: VisuelCarte,\n"), style));
-  refuse("« Ton studio » retiré du carrousel", () => avantagesJustes(AVANTAGES.filter((a) => a.id !== "studio")));
-  refuse("« Ton studio » après la part SFL", () => avantagesJustes([...AVANTAGES.filter((a) => a.id !== "studio"), AVANTAGES.find((a) => a.id === "studio")!]));
-  refuse("« Ton studio » en image", () => avantagesJustes(AVANTAGES.map((a) => (a.id === "studio" ? { ...a, visuel: { genre: "image", image: "affiche", alt: "Le stade", teinte: "#2a2440", rapport: 1.25 } } : a))));
+  refuse("« Ton studio » remis dans le carrousel", () => avantagesJustes([...AVANTAGES.slice(0, 2), CARTE_STUDIO, ...AVANTAGES.slice(2)]));
   refuse("Klarna nommé", () => sansPaiement("bola-plus.tsx", mute("klarna", ecran, "Je suis intéressé\n          </button>\n        )}\n      </div>\n    </div>", "Je suis intéressé avec Klarna\n          </button>\n        )}\n      </div>\n    </div>")));
   refuse("un montant en dur dans la tuile", () => uneSource("tuile", ecran.replace('whitespace-nowrap">Bola Plus</span>', 'whitespace-nowrap">Bola Plus · 19,90 €</span>')));
   refuse("un ancien prix dans l'admin", () => aucunMontant("admin", "<span>20 € par mois</span>"));

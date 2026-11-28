@@ -261,6 +261,8 @@ export const FONCTIONS_BOLA_PLUS = [
   { id: "trash-talk", nom: "Trash talk" },
   { id: "skins", nom: "Skins et aspects" },
   { id: "quetes", nom: "Quêtes et missions" },
+  // Sabri, 28/11 : « Ton studio » devient une ligne de Bola Plus ; au toucher, sa carte (CARTE_STUDIO).
+  { id: "studio", nom: "Ton studio" },
 ] as const;
 
 /** Les trois offres, pour mémoire (la page ne montre que Bola Plus et la SFL). */
@@ -361,6 +363,7 @@ export interface Avantage {
 /** L'ouverture : le stade de Bola, teint par la feuille de style. */
 export const AFFICHE: Visuel = { image: "affiche", alt: "", teinte: "#2a2440", rapport: RAPPORT_VISUEL };
 
+// Depuis le 28/11, cinq cartes : « Ton studio » passe en ligne de Bola Plus (CARTE_STUDIO).
 // Le carrousel en six cartes (Sabri, 27/11 : « ça va tenir en 4 pages […] normalement, on a 5 ou 6
 // cartes ») : l'ouverture, puis la SFL (une carte noire et chromée qui liste ce que la ligue donne, comme
 // « Bola Plus » liste ses fonctions), Bola Plus, le studio et les matchs filmés sur une même carte, Bola 27
@@ -369,8 +372,6 @@ export const AFFICHE: Visuel = { image: "affiche", alt: "", teinte: "#2a2440", r
 export const AVANTAGES: readonly Avantage[] = [
   { id: "sfl", part: "sfl", titre: "La SFL", visuel: { genre: "composant", composant: "sfl" } },
   { id: "bola-plus", part: "plus", titre: "Bola Plus", visuel: { genre: "composant", composant: "bola-plus" } },
-  // « Ton studio, tes matchs filmés, tu le mets dans une même carte qui vient en quatrième » (27/11).
-  { id: "studio", part: "plus", titre: "Ton studio", visuel: { genre: "composant", composant: "studio" } },
   {
     // Le jeu (Sabri, 17/11 11:36) : l'accès anticipé. Depuis le 23/11, discret : son logo seul (BOLA et un 27),
     // les images dans sa fiche, au toucher.
@@ -384,6 +385,13 @@ export const AVANTAGES: readonly Avantage[] = [
 
 /** La ligne de tête de la carte SFL, à part des autres (Sabri, 28/11 : « en premier 18 journées, chaque dimanche, Sunday Five League », pour aller au Pépite d'Or). */
 export const SAISON_SFL = { titre: "18 journées", ligne: "Chaque dimanche · Sunday Five League", but: "Jusqu'au Pépite d'Or." } as const;
+
+/**
+ * « Ton studio » (Sabri, 28/11) : plus une carte du carrousel, une ligne de Bola Plus ; au toucher, sa carte
+ * s'ouvre dans une feuille (l'éventail de Bola Studio, le titre, les ballons du mois). Les matchs filmés
+ * restent une ligne de la SFL.
+ */
+export const CARTE_STUDIO: Avantage = { id: "studio", part: "plus", titre: "Ton studio", visuel: { genre: "composant", composant: "studio" } };
 
 /** Les lignes de la carte SFL (27/11), dans l'ordre de Sabri ; chacune ouvre sa fiche quand elle en a une. */
 export const LIGNES_SFL = [
