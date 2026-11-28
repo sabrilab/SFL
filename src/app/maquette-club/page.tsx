@@ -113,12 +113,14 @@ const ZERO = ST(0, 0, 0, 0, 0, 0);
 type LigneJeu = "G" | "D" | "M" | "A";
 /** La ligne d'un poste : gardien, défense, milieu, attaque. */
 const ligneDe = (poste: string): LigneJeu => (poste === "G" ? "G" : poste.startsWith("D") ? "D" : poste.startsWith("M") ? "M" : "A");
-/** Une couleur par ligne, comme les maillots d'entraînement : or, bleu, vert, rouge. */
+/** Palette Pelouse (alignée sur /club, couleurs.css) : une seule couleur pour toutes les lignes, le vert du club. */
+const PELOUSE = { fond: "#3fcb74", encre: "#052614", clair: "#e3f7ea", fonce: "#2f7d47" };
+const ROUGE = "#ff5a5f";
 const LIGNE: Record<LigneJeu, { nom: string; fond: string; encre: string; clair: string; fonce: string }> = {
-  G: { nom: "gardien", fond: "#F5B700", encre: "#1a1400", clair: "#fff3c2", fonce: "#f2c94c" },
-  D: { nom: "défense", fond: "#2F6BFF", encre: "#ffffff", clair: "#dfe8ff", fonce: "#9db8ff" },
-  M: { nom: "milieu", fond: "#16A34A", encre: "#ffffff", clair: "#d9f5e3", fonce: "#8fdcaa" },
-  A: { nom: "attaque", fond: "#F0443A", encre: "#ffffff", clair: "#ffe0dc", fonce: "#ff9f96" },
+  G: { nom: "gardien", ...PELOUSE },
+  D: { nom: "défense", ...PELOUSE },
+  M: { nom: "milieu", ...PELOUSE },
+  A: { nom: "attaque", ...PELOUSE },
 };
 
 /** La carte d'un joueur du club, à la couleur de sa ligne. */
@@ -140,12 +142,11 @@ function matiereLigne(l: LigneJeu): Matiere {
   };
 }
 
-/** La note d'un match, sur 10 : vert au-dessus de 7, orange de 6 à 7, rouge en dessous. */
+/** La note d'un match, sur 10 : vert à 7 et plus, neutre entre 6 et 7, rouge (rare) en dessous de 6. */
 function couleurNote(n: number): string {
-  if (n >= 8) return "#16A34A";
-  if (n >= 7) return "#65C466";
-  if (n >= 6) return "#FF8A4C";
-  return "#E5383B";
+  if (n >= 7) return PELOUSE.fond;
+  if (n >= 6) return "#5b6170";
+  return ROUGE;
 }
 
 function NoteMatch({ n, grand }: { n: number; grand?: boolean }) {
@@ -1039,7 +1040,7 @@ function BarresSaison() {
       <line x1="8" x2={W - 8} y1={mid} y2={mid} stroke="currentColor" strokeOpacity="0.2" />
       {SAISON.map((m, i) => {
         const x = 8 + i * pas + pas / 2 - 9;
-        const res = m.pour > m.contre ? "#1FA055" : m.pour < m.contre ? "#E5383B" : "currentColor";
+        const res = m.pour > m.contre ? PELOUSE.fond : m.pour < m.contre ? ROUGE : "currentColor";
         return (
           <g key={i}>
             <rect x={x} y={mid - m.pour * u - 1} width="18" height={m.pour * u} rx="3" fill="currentColor" />
@@ -1118,7 +1119,7 @@ function EcranStats() {
           <div className="flex h-24 items-end gap-2">
             {CHARGE.map((c, i) => (
               <span key={i} className="flex flex-1 flex-col items-center gap-1.5">
-                <span className="w-full rounded-[6px]" style={{ height: `${(c / maxC) * 72}px`, background: i === 3 ? "#E5383B" : "currentColor", opacity: i === CHARGE.length - 1 ? 1 : 0.55 }} />
+                <span className="w-full rounded-[6px]" style={{ height: `${(c / maxC) * 72}px`, background: i === 3 ? ROUGE : "currentColor", opacity: i === CHARGE.length - 1 ? 1 : 0.55 }} />
                 <span className="text-[10px] text-encre-3">S{i + 43}</span>
               </span>
             ))}
@@ -1148,7 +1149,7 @@ function EcranStats() {
           {MINUTES.map((j) => (
             <span key={j.p} className="flex items-center gap-3">
               <span className="w-16 text-lecture font-medium">{j.p}</span>
-              <Jauge v={j.m} max={480} couleur={j.m < 200 ? "#E5383B" : undefined} />
+              <Jauge v={j.m} max={480} couleur={j.m < 200 ? ROUGE : undefined} />
               <span className="w-14 text-right text-corps text-encre-2 tabular-nums">{j.m} min</span>
             </span>
           ))}
@@ -1399,7 +1400,7 @@ function EcranCompo() {
           return (
             <span key={c.p} className="absolute flex -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-1" style={{ left: `${c.x}%`, top: `${c.y}%` }}>
               <CarteJoueur size={50 / 254} prenom={j.p} nom={j.n} poste={j.poste} note={j.note} />
-              <span className="rounded-full px-1.5 py-px text-[11px] font-semibold" style={{ background: LIGNE[ligneDe(j.poste)].fond, color: LIGNE[ligneDe(j.poste)].encre }}>
+              <span className="rounded-full px-1.5 py-px text-[11px] font-semibold" style={{ background: "rgba(0,0,0,0.55)", color: "#fff" }}>
                 {c.p}
               </span>
             </span>
@@ -1407,14 +1408,6 @@ function EcranCompo() {
         })}
         <span className="absolute top-3 right-3 rounded-full bg-black/45 px-2.5 py-1 text-petit font-semibold text-white tabular-nums">Moy. 70,6</span>
       </Terrain>
-      <div className="flex justify-center gap-4">
-        {(["G", "D", "M", "A"] as LigneJeu[]).map((l) => (
-          <span key={l} className="flex items-center gap-1.5 text-corps font-medium">
-            <span className="size-2.5 rounded-full" style={{ background: LIGNE[l].fond }} />
-            {LIGNE[l].nom}
-          </span>
-        ))}
-      </div>
       <div className="flex flex-col gap-2">
         <Rubrique droite="4">Remplaçants</Rubrique>
         <div className={cn(SURFACE, "flex justify-around px-3 py-3")}>
@@ -1454,7 +1447,7 @@ function EcranFeuille() {
     <Page role="entraineur" actif="gestion">
       <TeteEnfant sur="Mon équipe" titre="Feuille de match" sous="U13 · samedi 28 · terrain 2" droite={<Vue role="entraineur" />} />
       <div className={cn(SURFACE, "flex flex-col items-center gap-3 px-4 pt-5 pb-4")}>
-        <span className="flex items-center gap-2 rounded-full bg-[#E5383B] px-2.5 py-1 text-petit font-bold text-white">
+        <span className="flex items-center gap-2 rounded-full bg-[#ff5a5f] px-2.5 py-1 text-petit font-bold text-white">
           <span className="size-1.5 rounded-full bg-white" /> EN DIRECT · 2e MI-TEMPS
         </span>
         <div className="flex w-full items-center justify-between">
@@ -1509,7 +1502,7 @@ function EcranFeuille() {
           ].map(([p, m]) => (
             <span key={p as string} className="flex items-center gap-2">
               <span className="w-16 text-corps font-medium">{p}</span>
-              <Jauge v={m as number} max={50} couleur={(m as number) < 10 ? "#E5383B" : undefined} />
+              <Jauge v={m as number} max={50} couleur={(m as number) < 10 ? ROUGE : undefined} />
               <span className="w-8 text-right text-petit text-encre-2 tabular-nums">{m}&apos;</span>
             </span>
           ))}
@@ -1620,7 +1613,7 @@ function EcranClub() {
           ].map(([c, v]) => (
             <span key={c} className="flex items-center gap-3">
               <span className="w-20 text-lecture font-medium">{c}</span>
-              <Jauge v={v as number} couleur={(v as number) < 70 ? "#E5383B" : undefined} />
+              <Jauge v={v as number} couleur={(v as number) < 70 ? ROUGE : undefined} />
               <span className="w-10 text-right text-corps tabular-nums">{v} %</span>
             </span>
           ))}
