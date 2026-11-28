@@ -57,6 +57,7 @@ for (const f of tous) {
 // la feuille, le score, le vote, l'arbitre, les cartons, la présence, l'admin.
 const LECTEURS_DU_DIRECT = new Set([
   "app/api/cartons/annoncer/route.ts",
+  "app/api/journees/rappel/route.ts", // la feuille du dimanche : le rappel 1 h avant le match
   "app/api/ligue/annoncer/route.ts",
   "app/map/page.tsx",
   "components/sfl/actus/course.tsx",
