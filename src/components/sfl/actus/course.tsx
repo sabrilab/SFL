@@ -122,7 +122,8 @@ import { ContratALaUne } from "./contrat-a-la-une";
 import { RubriqueFlair } from "@/components/sfl/flair/mon-flair";
 import { journeeDeLaVideo, useVideos, VideosDuFil } from "./video";
 import { RangeePublications } from "./fil-vertical";
-import { BlocPhotos, OuvrirPhoto } from "./photos-du-dimanche";
+import { BlocPhotos, FilDesPhotos, useFilDesPhotos } from "./photos-du-dimanche";
+import { usePhotosVisibles } from "@/lib/sfl/photos-privees";
 import { Visionneuse } from "@/components/sfl/photos-du-joueur";
 import { blocsDePhotos, photosDeLaJournee, repartirBlocs, type PhotoJournee } from "@/lib/sfl/photos-journees";
 import type { Video } from "@/lib/sfl/videos";
@@ -171,13 +172,18 @@ function Dimanche({
   const [terrain, terrainCollant] = useCollant();
   const { chapitre, rubriques } = useMemo(() => couverturesDuDimanche(j, scenes.map((a) => a.type)), [j, scenes]);
   // Ses photos (photos-du-dimanche.tsx), glissées entre les rubriques au fil du défilement.
-  const photos = useMemo(() => (avecPhotos ? photosDeLaJournee(j) : []), [j, avecPhotos]);
+  // Sans celles qu'un joueur dessus a mises en privé, sauf si j'y suis (photos-privees.ts).
+  const { me } = useMyPlayer();
+  const visible = usePhotosVisibles(me ?? null);
+  const photos = useMemo(() => (avecPhotos ? photosDeLaJournee(j).filter(visible) : []), [j, avecPhotos, visible]);
   const places = useMemo(() => repartirBlocs(blocsDePhotos(photos), scenes.length), [photos, scenes.length]);
   const [photoOuverte, setPhotoOuverte] = useState<number | null>(null);
   const ouvrirPhoto = useCallback((p: PhotoJournee) => setPhotoOuverte(photos.indexOf(p)), [photos]);
+  // Relu à la fermeture de la visionneuse : les j'aime et commentaires posés dedans.
+  const fil = useFilDesPhotos(photos, ouvrirPhoto, photoOuverte === null);
   const blocs = (i: number) => places[i]?.map((b) => <BlocPhotos key={b[0].id} bloc={b} className="my-2 md:col-span-full md:my-0" />);
   return (
-    <OuvrirPhoto.Provider value={ouvrirPhoto}>
+    <FilDesPhotos.Provider value={fil}>
       <section
         id={depliee ? undefined : `j${j}`}
         className={cn(
@@ -213,7 +219,7 @@ function Dimanche({
       {photoOuverte !== null && photoOuverte >= 0 && (
         <Visionneuse photos={photos} depart={photoOuverte} nom="" onFermer={() => setPhotoOuverte(null)} />
       )}
-    </OuvrirPhoto.Provider>
+    </FilDesPhotos.Provider>
   );
 }
 

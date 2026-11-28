@@ -129,6 +129,7 @@ export function GuideInstallation() {
     !env.appHote &&
     (pathname?.startsWith("/p/") ||
       pathname?.startsWith("/v/") ||
+      pathname?.startsWith("/photo/") ||
       (pathname?.startsWith("/inscription") && (codeGarde() !== null || /[?&]parrain=/.test(window.location.search))))
   )
     return null;

@@ -110,3 +110,12 @@ export function repartirBlocs<T>(blocs: T[], rubriques: number): T[][] {
   blocs.forEach((b, i) => places[Math.floor((i * places.length) / blocs.length)].push(b));
   return places;
 }
+
+/** « j7-365 » : la journée et le numéro de la photo (ses j'aime, ses commentaires, son lien). */
+export function cleDePhoto(p: Pick<PhotoJournee, "journee" | "id">): string {
+  return `j${p.journee}-${p.id}`.toLowerCase();
+}
+
+export function photoDeCle(cle: string, liste: PhotoJournee[] = PHOTOS_JOURNEES): PhotoJournee | null {
+  return liste.find((p) => cleDePhoto(p) === cle.toLowerCase()) ?? null;
+}

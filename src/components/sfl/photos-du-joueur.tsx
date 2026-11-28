@@ -16,6 +16,9 @@ import { cn } from "@/lib/utils";
 import { useIdentites } from "@/hooks/use-identites";
 import { usePlayerPhoto } from "@/hooks/use-player-photo";
 import { dateCourte, photosDuJoueur, type PhotoJournee } from "@/lib/sfl/photos-journees";
+import { Commentaires } from "@/components/sfl/actus/video";
+import { CoeurEclos, RailPhoto, useDoubleToucher, usePhotoSociale } from "@/components/sfl/photos/actions-photo";
+import { PartagePhoto } from "@/components/sfl/photos/partage-photo";
 
 export function PhotosDuJoueur({ nom, className }: { nom: string; className?: string }) {
   const jours = useMemo(() => photosDuJoueur(nom), [nom]);
@@ -96,6 +99,15 @@ export function Visionneuse({ photos, depart, nom, onFermer }: { photos: PhotoJo
   }, [aller, index, onFermer, photos.length]);
 
   const autres = p.joueurs.filter((j) => j !== nom);
+  // Comme sur un réseau social (28/11) : j'aime, commentaires, partage (photos/actions-photo.tsx).
+  const s = usePhotoSociale(p);
+  const [commentaires, setCommentaires] = useState(false);
+  const [partage, setPartage] = useState(false);
+  const [eclos, setEclos] = useState(0);
+  const doubleToucher = useDoubleToucher(() => {
+    s.aimer();
+    setEclos((n) => n + 1);
+  });
 
   return createPortal(
     <div role="dialog" aria-modal="true" aria-label={`J${p.journee}, photo ${index + 1} sur ${photos.length}`} className="dark fixed inset-0 z-[60] bg-black text-white">
@@ -106,6 +118,7 @@ export function Visionneuse({ photos, depart, nom, onFermer }: { photos: PhotoJo
           const el = e.currentTarget;
           setIndex(Math.round(el.scrollLeft / Math.max(1, el.clientWidth)));
         }}
+        onPointerUp={doubleToucher}
       >
         {photos.map((ph, i) => (
           <div key={ph.id} className="flex h-full w-full shrink-0 snap-center items-center justify-center">
@@ -116,6 +129,8 @@ export function Visionneuse({ photos, depart, nom, onFermer }: { photos: PhotoJo
           </div>
         ))}
       </div>
+
+      <CoeurEclos signal={eclos} />
 
       <div
         className="pointer-events-none absolute inset-x-0 top-0 flex items-center justify-between bg-gradient-to-b from-black/60 to-transparent px-3 pb-8"
@@ -159,6 +174,15 @@ export function Visionneuse({ photos, depart, nom, onFermer }: { photos: PhotoJo
           </button>
         </>
       )}
+
+      <RailPhoto
+        s={s}
+        onCommentaires={() => setCommentaires(true)}
+        onPartager={() => setPartage(true)}
+        className="absolute right-3 bottom-[calc(env(safe-area-inset-bottom,0px)+96px)] z-[5] lg:right-24 lg:bottom-1/2 lg:translate-y-1/2"
+      />
+      {commentaires && <Commentaires echos={s.echos} onFermer={() => setCommentaires(false)} />}
+      {partage && <PartagePhoto p={p} onFermer={() => setPartage(false)} />}
 
       {autres.length > 0 && (
         <div

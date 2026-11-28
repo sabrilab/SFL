@@ -46,7 +46,8 @@ import {
   reagir,
   retirerCommentaire,
   type Commentaire,
-  type EmojiVideo,
+  type EmojiEcho,
+  type GenreEcho,
   type Echos,
   type Video,
 } from "@/lib/sfl/videos";
@@ -78,15 +79,15 @@ export function useVideos(): Video[] {
 
 let seq = 0;
 
-/** Réactions et commentaires d'une vidéo, suivis en temps réel. */
-export function useEchos(video: string) {
+/** Réactions et commentaires d'une vidéo (ou d'une photo de journée), suivis en temps réel. */
+export function useEchos(video: string, genre: GenreEcho = "video") {
   const [echos, setEchos] = useState<Echos & { demo?: boolean }>({ reactions: [], commentaires: [] });
   const [moi, setMoi] = useState<string | null>(null);
   const charger = useCallback(() => {
-    lireEchos(video)
+    lireEchos(video, genre)
       .then(setEchos)
       .catch(() => {});
-  }, [video]);
+  }, [video, genre]);
   useEffect(() => {
     let fini = false;
     monIdVideo().then((id) => !fini && setMoi(id));
@@ -95,9 +96,9 @@ export function useEchos(video: string) {
     let arreter: (() => void) | null = null;
     try {
       const canal = sb
-        .channel(`sfl-video-${video}-${++seq}`)
-        .on("postgres_changes", { event: "*", schema: "public", table: "video_reactions", filter: `video=eq.${video}` }, charger)
-        .on("postgres_changes", { event: "*", schema: "public", table: "video_commentaires", filter: `video=eq.${video}` }, charger)
+        .channel(`sfl-${genre}-${video}-${++seq}`)
+        .on("postgres_changes", { event: "*", schema: "public", table: `${genre}_reactions`, filter: `${genre}=eq.${video}` }, charger)
+        .on("postgres_changes", { event: "*", schema: "public", table: `${genre}_commentaires`, filter: `${genre}=eq.${video}` }, charger)
         .subscribe();
       arreter = () => void sb.removeChannel(canal);
     } catch {
@@ -107,9 +108,9 @@ export function useEchos(video: string) {
       fini = true;
       arreter?.();
     };
-  }, [video, charger]);
+  }, [video, genre, charger]);
 
-  const reagirA = async (emoji: EmojiVideo) => {
+  const reagirA = async (emoji: EmojiEcho) => {
     if (!moi) return;
     const pose = echos.reactions.some((r) => r.joueur === moi && r.emoji === emoji);
     // Tout de suite à l'écran ; la base suit.
@@ -118,20 +119,20 @@ export function useEchos(video: string) {
       reactions: pose ? e.reactions.filter((r) => !(r.joueur === moi && r.emoji === emoji)) : [...e.reactions, { joueur: moi, emoji }],
     }));
     try {
-      await reagir(video, emoji, !pose, !!echos.demo);
+      await reagir(video, emoji, !pose, !!echos.demo, genre);
     } catch {
       toast.error("La réaction n'est pas partie.");
     }
     charger();
   };
   const commenterA = async (texte: string) => {
-    await commenter(video, texte, !!echos.demo);
+    await commenter(video, texte, !!echos.demo, genre);
     charger();
   };
   const retirer = async (id: number) => {
     setEchos((e) => ({ ...e, commentaires: e.commentaires.filter((c) => c.id !== id) }));
     try {
-      await retirerCommentaire(id, !!echos.demo);
+      await retirerCommentaire(id, !!echos.demo, genre);
     } catch {
       toast.error("Le commentaire n'a pas pu être retiré.");
     }
