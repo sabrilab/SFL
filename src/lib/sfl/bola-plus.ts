@@ -382,6 +382,9 @@ export const AVANTAGES: readonly Avantage[] = [
   },
 ];
 
+/** La ligne de tête de la carte SFL, à part des autres (Sabri, 28/11 : « en premier 18 journées, chaque dimanche, Sunday Five League », pour aller au Pépite d'Or). */
+export const SAISON_SFL = { titre: "18 journées", ligne: "Chaque dimanche · Sunday Five League", but: "Jusqu'au Pépite d'Or." } as const;
+
 /** Les lignes de la carte SFL (27/11), dans l'ordre de Sabri ; chacune ouvre sa fiche quand elle en a une. */
 export const LIGNES_SFL = [
   { id: "maillots", nom: "Tes maillots" },

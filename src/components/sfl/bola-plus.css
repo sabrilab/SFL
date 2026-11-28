@@ -478,6 +478,34 @@
 .bp-fonctions--sfl {
   gap: 6px;
 }
+/* En tête de la carte SFL, à part (28/11) : la saison, 18 journées le dimanche, jusqu'au Pépite d'Or. */
+.bp-saison-sfl {
+  display: flex;
+  align-items: center;
+  margin: 2px 0 10px;
+  padding: 11px 14px 12px;
+  border-radius: 16px;
+  background: linear-gradient(120deg, rgb(255 255 255 / 0.12), rgb(255 255 255 / 0.04));
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.16);
+}
+.bp-saison-sfl__texte {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.bp-saison-sfl__titre {
+  font-size: 20px;
+  font-weight: 800;
+  line-height: 1.1;
+}
+.bp-saison-sfl__ligne {
+  white-space: nowrap;
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.25;
+  color: rgb(255 255 255 / 0.7);
+}
 .bp-fonctions--sfl li,
 :root:not(.dark) .bp-fonctions--sfl li {
   display: block;
@@ -502,6 +530,7 @@ button.bp-fonctions__ligne:active {
   background: rgb(255 255 255 / 0.08);
 }
 .bp-fonctions--sfl .bp-fonctions__ligne {
+  min-height: 40px;
   font-size: 16px;
   white-space: nowrap;
 }
@@ -1047,6 +1076,16 @@ html[data-clavier] .bp-barre {
   background: var(--bp-nuit);
   color: #fff;
 }
+/* L'ouverture reste une carte noire en mode clair : son bouton garde le choix en vert vif (28/11, « Annuel »
+   coché se perdait, noir sur noir). */
+:root:not(.dark) .bp-ouverture .bp-bascule {
+  background: rgb(255 255 255 / 0.08);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.1);
+}
+:root:not(.dark) .bp-ouverture .bp-bascule__choix--choisi {
+  background: var(--bp-prix);
+  color: var(--bp-nuit);
+}
 /* Les deux faces l'une sur l'autre : la carte prend la hauteur de la plus haute. */
 .bp-offre {
   display: grid;
@@ -1077,7 +1116,7 @@ html[data-clavier] .bp-barre {
   }
 }
 
-/* « Bola 27 », discret (23/11) : BOLA, et dessous un 27 en creux, au milieu de la carte. */
+/* « Bola 27 », discret (23/11) : BOLA, et dessous un 27 plein (28/11), au milieu de la carte. */
 .bp-texte--logo {
   justify-content: center;
 }
@@ -1104,11 +1143,18 @@ html[data-clavier] .bp-barre {
   line-height: 0.86;
   letter-spacing: -0.02em;
   font-style: italic;
-  color: transparent;
-  -webkit-text-stroke: 2px currentColor;
+  /* Plein (28/11) : le 27 en creux ne se voyait pas (« color: transparent » effaçait aussi son trait),
+     et le trait seul dessinait les contours internes de l'italique d'Anton. */
 }
 .bp-bola27__sous {
   text-align: center;
+}
+/* En mode clair, sur le lilas, BOLA et le 27 passent à l'encre (28/11 : « Bola 27 » doit se lire). */
+:root:not(.dark) .bp-bola27 {
+  color: var(--bp-nuit);
+}
+:root:not(.dark) .bp-bola27__logo {
+  filter: brightness(0);
 }
 
 /* Archivo Expanded est plus large que Barlow Condensed : les titres des

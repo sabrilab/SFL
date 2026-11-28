@@ -81,6 +81,7 @@ import {
   NOM_BUNDLE,
   PALETTE,
   LIGNES_SFL,
+  SAISON_SFL,
   VISUELS_SFL,
   PRIX_FORMULE,
   REMISE,
@@ -650,6 +651,8 @@ async function banc() {
       "la carte SFL : ses six lignes, dans l'ordre"
     );
   lignesJustes(LIGNES_SFL);
+  assert.equal(SAISON_SFL.titre, "18 journées", "la saison SFL : 18 journées");
+  assert.ok(SAISON_SFL.ligne.includes("Sunday Five League"), "la saison SFL : chaque dimanche, Sunday Five League");
   // Les photos de la SFL : décrites, et les images générées le disent.
   const visuelsSflJustes = (visuels: Record<string, Visuel>) => {
     for (const v of Object.values(visuels)) {
@@ -817,6 +820,7 @@ async function banc() {
     assert.ok(/<MentionStudio \/>/.test(piedStudio) && /VISUELS_SFL\["matchs-filmes"\]/.test(piedStudio) && /ouvrir\("matchs-filmes"\)/.test(piedStudio), "sous « Ton studio » : ses ballons, puis les matchs filmés qui ouvrent leur fiche (27/11)");
     const sfl = bloc("VisuelSfl");
     assert.ok(/LIGNES_SFL\.map/.test(sfl) && /aUneFiche\(l\.id\)/.test(sfl) && /e\.stopPropagation\(\);\s*ouvrir\(l\.id\);/.test(sfl) && /<EmblemeSfl /.test(sfl), "la carte SFL : ses lignes, qui ouvrent leur fiche, et sa rosace");
+    assert.ok(/SAISON_SFL\.titre/.test(sfl) && sfl.indexOf("bp-saison-sfl") < sfl.indexOf("LIGNES_SFL.map"), "la carte SFL : « 18 journées » en tête, avant les lignes");
     const composant = bloc("DiapoComposant");
     assert.ok(/const Pied = PIEDS\[composant\];/.test(composant) && composant.indexOf("{Pied && <Pied />}") > composant.indexOf("{avantage.sous &&"), "les ballons du mois sous le titre de « Ton studio »");
     // Une seule barre « Je suis intéressé », effacée sur « Ton prix » où le bouton est dans la carte.

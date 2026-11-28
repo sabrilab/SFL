@@ -79,6 +79,7 @@ import {
   NOM_BUNDLE,
   NOM_FORMULE,
   LIGNES_SFL,
+  SAISON_SFL,
   NOM_PART,
   PALETTE,
   VISUELS_SFL,
@@ -500,6 +501,13 @@ function VisuelSfl() {
   const ouvrir = useContext(OuvrirFiche);
   return (
     <div className="bp-visuel-plus bp-visuel-sfl">
+      <div className="bp-saison-sfl">
+        <span className="bp-saison-sfl__texte">
+          <span className="bp-saison-sfl__titre">{SAISON_SFL.titre}</span>
+          <span className="bp-saison-sfl__ligne">{SAISON_SFL.ligne}</span>
+          <span className="bp-saison-sfl__ligne">{SAISON_SFL.but}</span>
+        </span>
+      </div>
       <ul className="bp-fonctions bp-fonctions--sfl">
         {LIGNES_SFL.map((l) => {
           const Icone = ICONES_SFL[l.id];
@@ -567,7 +575,7 @@ function LogoBola({ className }: { className?: string }) {
   return <img src="/bola/logo-blanc.svg" alt="Bola" width={1000} height={237} draggable={false} className={className} />;
 }
 
-/** « Bola 27 », discret (23/11) : le logo BOLA et un 27 en creux ; ses images sont dans sa fiche. */
+/** « Bola 27 », discret (23/11) : le logo BOLA et un 27 plein (28/11) ; ses images sont dans sa fiche. */
 function VisuelBola27() {
   return (
     <Titre className="bp-bola27">
