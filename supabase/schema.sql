@@ -1177,6 +1177,10 @@ grant update (habillage) on public.profiles to authenticated;
 grant update (ville, ville_lat, ville_lng, ville_cachee, ville_le) on public.profiles to authenticated;
 grant update (accueil_le) on public.profiles to authenticated;
 grant update (nouveautes_vues) on public.profiles to authenticated;
+-- Mes photos de journée en privé (lib/sfl/photos-privees.ts, Bola, 28/11/2026) :
+-- lu par toute la ligue pour filtrer, posé par le joueur seul.
+alter table public.profiles add column if not exists photos_privees boolean not null default false;
+grant update (photos_privees) on public.profiles to authenticated;
 grant insert, select on public.activity to authenticated;
 grant insert, update, delete on public.presence to authenticated;
 grant insert, update, select on public.compositions to authenticated;
