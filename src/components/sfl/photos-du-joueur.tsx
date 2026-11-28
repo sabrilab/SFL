@@ -63,7 +63,7 @@ export function PhotosDuJoueur({ nom, className }: { nom: string; className?: st
   );
 }
 
-function Visionneuse({ photos, depart, nom, onFermer }: { photos: PhotoJournee[]; depart: number; nom: string; onFermer: () => void }) {
+export function Visionneuse({ photos, depart, nom, onFermer }: { photos: PhotoJournee[]; depart: number; nom: string; onFermer: () => void }) {
   const rang = useRef<HTMLDivElement>(null);
   const [index, setIndex] = useState(depart);
   const p = photos[index];
