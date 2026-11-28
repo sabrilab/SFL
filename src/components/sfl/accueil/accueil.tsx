@@ -126,7 +126,7 @@ const ON_Y_REVIENT: Etape[] = ["identite", "sexe", "naissance", "gabarit", "pied
  * (lib/sfl/routes-publiques.ts) ; ni sur la présentation de la ligue (/sfl,
  * comparée en entier : estPageSfl).
  */
-const SANS_ACCUEIL = ["/confidentialite", "/inscription", "/bienvenue", "/equipe/", "/p/", "/v/"];
+const SANS_ACCUEIL = ["/confidentialite", "/inscription", "/bienvenue", "/equipe/", "/p/", "/v/", "/photo/"];
 
 /** Au plus, le temps d'une lecture ; au-delà, on fait sans. */
 const ATTENTE_MS = 4500;

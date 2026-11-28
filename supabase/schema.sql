@@ -10329,3 +10329,151 @@ exception when others then
   raise notice 'rappel-avant-match : pg_cron ou pg_net indisponible (%)', sqlerrm;
 end;
 $$;
+
+-- ─────────────── Les photos de journée, comme un réseau social (28/11/2026) ───────────────
+-- Bola, 28/11 : « qu'on puisse réagir à la photo, mettre un j'aime, mettre un
+-- commentaire, et qu'on puisse la partager ». Les photos d'une journée sont
+-- listées dans l'app (lib/sfl/photos-journees.ts) : leur clé, « j7-365 », est
+-- la journée et le numéro de la photo. Mêmes règles que les vidéos des Actus
+-- (video_reactions, video_commentaires, video_partages).
+--
+-- Le privé (Bola, 28/11 : « un clic privé, un clic public ») : une photo dont
+-- un joueur tagué est en privé (profiles.photos_privees, lib/sfl/photos-privees.ts)
+-- ne sort pas de l'app ; ni elle ni la photo d'un joueur qui n'a pas accepté
+-- l'usage hors de l'app (consentements.hors_app, la dernière ligne fait foi).
+-- photo_peut_sortir le dit au lien public (app/photo/[cle]) et à l'export en
+-- story ou en publication.
+
+alter table public.profiles add column if not exists photos_privees boolean not null default false;
+
+create table if not exists public.photo_reactions (
+  photo       text not null check (photo ~ '^j[0-9]{1,2}-[a-z0-9]{1,30}$'),
+  joueur      uuid not null default auth.uid() references public.profiles(id) on delete cascade,
+  emoji       text not null check (emoji in ('❤️', '🔥', '🐐', '😮', '😂', '👏')),
+  created_at  timestamptz not null default now(),
+  primary key (photo, joueur, emoji)
+);
+
+alter table public.photo_reactions enable row level security;
+
+drop policy if exists "photo_reactions: l'app lit" on public.photo_reactions;
+create policy "photo_reactions: l'app lit"
+  on public.photo_reactions for select to authenticated
+  using (true);
+
+drop policy if exists "photo_reactions: je réagis pour moi" on public.photo_reactions;
+create policy "photo_reactions: je réagis pour moi"
+  on public.photo_reactions for insert to authenticated
+  with check (joueur = (select auth.uid()) and (select public.est_membre()));
+
+drop policy if exists "photo_reactions: je retire la mienne" on public.photo_reactions;
+create policy "photo_reactions: je retire la mienne"
+  on public.photo_reactions for delete to authenticated
+  using (joueur = (select auth.uid()));
+
+revoke all on public.photo_reactions from anon, authenticated;
+grant select, delete on public.photo_reactions to authenticated;
+grant insert (photo, emoji) on public.photo_reactions to authenticated;
+
+create table if not exists public.photo_commentaires (
+  id          bigint generated always as identity primary key,
+  photo       text not null check (photo ~ '^j[0-9]{1,2}-[a-z0-9]{1,30}$'),
+  joueur      uuid not null default auth.uid() references public.profiles(id) on delete cascade,
+  texte       text not null check (char_length(btrim(texte)) between 1 and 400),
+  created_at  timestamptz not null default now()
+);
+create index if not exists photo_commentaires_photo on public.photo_commentaires (photo, id);
+
+alter table public.photo_commentaires enable row level security;
+
+drop policy if exists "photo_commentaires: l'app lit" on public.photo_commentaires;
+create policy "photo_commentaires: l'app lit"
+  on public.photo_commentaires for select to authenticated
+  using (true);
+
+-- Un joueur à qui l'admin a coupé la parole au Vestiaire ne commente pas non plus.
+drop policy if exists "photo_commentaires: j'écris pour moi" on public.photo_commentaires;
+create policy "photo_commentaires: j'écris pour moi"
+  on public.photo_commentaires for insert to authenticated
+  with check (
+    joueur = (select auth.uid())
+    and (select public.est_membre())
+    and (select public.peut_parler_au_vestiaire())
+  );
+
+drop policy if exists "photo_commentaires: je retire le mien, l'admin aussi" on public.photo_commentaires;
+create policy "photo_commentaires: je retire le mien, l'admin aussi"
+  on public.photo_commentaires for delete to authenticated
+  using (joueur = (select auth.uid()) or (select public.is_league_admin()));
+
+revoke all on public.photo_commentaires from anon, authenticated;
+grant select, delete on public.photo_commentaires to authenticated;
+grant insert (photo, texte) on public.photo_commentaires to authenticated;
+
+create table if not exists public.photo_partages (
+  id      bigint generated always as identity primary key,
+  photo   text not null check (photo ~ '^j[0-9]{1,2}-[a-z0-9]{1,30}$'),
+  joueur  uuid not null references public.profiles(id) on delete cascade,
+  format  text not null default 'lien' check (format in ('lien', 'story', 'publication')),
+  le      timestamptz not null default now()
+);
+
+alter table public.photo_partages enable row level security;
+
+drop policy if exists "photo_partages: l'admin" on public.photo_partages;
+create policy "photo_partages: l'admin"
+  on public.photo_partages for select to authenticated
+  using ((select public.is_league_admin()));
+
+revoke all on public.photo_partages from anon, authenticated;
+grant select on public.photo_partages to authenticated;
+
+-- J'ai partagé une photo : son lien, ou son image en story ou en publication.
+create or replace function public.photo_partage(p text, f text default 'lien')
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if not public.est_membre() then
+    return;
+  end if;
+  insert into public.photo_partages (photo, joueur, format) values (p, (select auth.uid()), f);
+exception when check_violation then
+  return;
+end;
+$$;
+
+-- La photo peut-elle sortir de l'app ? Oui si chacun des joueurs qu'on y voit
+-- (leur nom de ligue) a accepté l'usage hors de l'app et n'a pas mis ses
+-- photos en privé. Un nom inconnu dit non ; une photo sans joueur dit oui.
+create or replace function public.photo_peut_sortir(noms text[])
+returns boolean
+language sql
+security definer
+set search_path = ''
+stable
+as $$
+  select coalesce(cardinality(noms), 0) <= 20 and not exists (
+    select 1 from unnest(coalesce(noms, '{}')) n(nom)
+     where not exists (
+       select 1 from public.profiles p
+        where p.name = n.nom
+          and not p.photos_privees
+          and coalesce((
+            select k.hors_app from public.consentements k
+             where k.user_id = p.id order by k.created_at desc limit 1
+          ), false)
+     )
+  );
+$$;
+
+revoke all on function public.photo_partage(text, text), public.photo_peut_sortir(text[]) from public, anon;
+grant execute on function public.photo_partage(text, text) to authenticated;
+grant execute on function public.photo_peut_sortir(text[]) to anon, authenticated;
+
+do $$ begin
+  alter publication supabase_realtime add table public.photo_reactions, public.photo_commentaires;
+exception when duplicate_object or undefined_object then null;
+end $$;

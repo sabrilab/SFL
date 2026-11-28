@@ -75,3 +75,47 @@ export function dateCourte(date: string): string {
   const d = new Date(`${date}T12:00:00`);
   return d.toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "short" });
 }
+
+/** Les photos d'une journée, dans l'ordre de la prise de vue. */
+export function photosDeLaJournee(j: number, liste: PhotoJournee[] = PHOTOS_JOURNEES): PhotoJournee[] {
+  return liste.filter((p) => p.journee === j).sort((a, b) => a.id.localeCompare(b.id, "fr", { numeric: true }));
+}
+
+/**
+ * Les photos d'une journée en blocs pour le fil d'Actus : une photo en
+ * largeur seule, deux photos en hauteur côte à côte (une seule, si elle
+ * reste sans voisine).
+ */
+export function blocsDePhotos(photos: PhotoJournee[]): PhotoJournee[][] {
+  const blocs: PhotoJournee[][] = [];
+  let enAttente: PhotoJournee | null = null;
+  for (const p of photos) {
+    if (p.largeur >= p.hauteur) blocs.push([p]);
+    else if (enAttente) {
+      blocs.push([enAttente, p]);
+      enAttente = null;
+    } else enAttente = p;
+  }
+  if (enAttente) blocs.push([enAttente]);
+  return blocs;
+}
+
+/**
+ * Où glisser les blocs entre les rubriques d'un dimanche, répartis
+ * régulièrement : pour chaque rubrique (dans l'ordre), les blocs qui la
+ * suivent. Sans rubrique, tout se range à la place 0.
+ */
+export function repartirBlocs<T>(blocs: T[], rubriques: number): T[][] {
+  const places: T[][] = Array.from({ length: Math.max(1, rubriques) }, () => []);
+  blocs.forEach((b, i) => places[Math.floor((i * places.length) / blocs.length)].push(b));
+  return places;
+}
+
+/** « j7-365 » : la journée et le numéro de la photo (ses j'aime, ses commentaires, son lien). */
+export function cleDePhoto(p: Pick<PhotoJournee, "journee" | "id">): string {
+  return `j${p.journee}-${p.id}`.toLowerCase();
+}
+
+export function photoDeCle(cle: string, liste: PhotoJournee[] = PHOTOS_JOURNEES): PhotoJournee | null {
+  return liste.find((p) => cleDePhoto(p) === cle.toLowerCase()) ?? null;
+}

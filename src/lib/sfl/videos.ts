@@ -39,6 +39,16 @@ const DUREE_ADRESSE_S = 2 * 3600;
 
 export const EMOJIS_VIDEO = ["🔥", "🐐", "😮", "😂", "👏"] as const;
 export type EmojiVideo = (typeof EMOJIS_VIDEO)[number];
+/** Le j'aime d'une photo de journée (28/11), à côté des réactions des vidéos. */
+export const JAIME = "❤️";
+export type EmojiEcho = EmojiVideo | typeof JAIME;
+
+/**
+ * Ce qui porte des réactions et des commentaires : une vidéo des Actus
+ * (tables video_*), ou une photo de journée (tables photo_*, clé
+ * « j7-365 », lib/sfl/photos-journees.ts).
+ */
+export type GenreEcho = "video" | "photo";
 
 export interface Video {
   id: string;
@@ -62,7 +72,7 @@ export interface Video {
 
 export interface Reaction {
   joueur: string;
-  emoji: EmojiVideo;
+  emoji: EmojiEcho;
 }
 
 export interface Commentaire {
@@ -182,20 +192,20 @@ export async function monIdVideo(): Promise<string | null> {
   return data.session?.user.id ?? (DEMO_VIDEOS ? "moi" : null);
 }
 
-export async function lireEchos(video: string): Promise<Echos & { demo?: boolean }> {
+export async function lireEchos(video: string, genre: GenreEcho = "video"): Promise<Echos & { demo?: boolean }> {
   const sb = supabase();
   const [r, c] = await Promise.all([
-    sb.from("video_reactions").select("joueur, emoji").eq("video", video),
+    sb.from(`${genre}_reactions`).select("joueur, emoji").eq(genre, video),
     sb
-      .from("video_commentaires")
+      .from(`${genre}_commentaires`)
       .select("id, joueur, texte, created_at, profiles ( name )")
-      .eq("video", video)
+      .eq(genre, video)
       .order("id", { ascending: true })
       .limit(500),
   ]);
   const err = r.error ?? c.error;
   if (err) {
-    if (DEMO_VIDEOS && erreurSansTable(err.code)) return { ...demoLire(), demo: true };
+    if (DEMO_VIDEOS && erreurSansTable(err.code)) return genre === "video" ? { ...demoLire(), demo: true } : { reactions: [], commentaires: [], demo: true };
     throw err;
   }
   type Brut = { id: number; joueur: string; texte: string; created_at: string; profiles: { name: string } | { name: string }[] | null };
@@ -209,7 +219,8 @@ export async function lireEchos(video: string): Promise<Echos & { demo?: boolean
 }
 
 /** Poser ou retirer ma réaction. */
-export async function reagir(video: string, emoji: EmojiVideo, poser: boolean, demo: boolean): Promise<void> {
+export async function reagir(video: string, emoji: EmojiEcho, poser: boolean, demo: boolean, genre: GenreEcho = "video"): Promise<void> {
+  if (demo && genre === "photo") return;
   if (demo) {
     const e = demoLire();
     const reactions = e.reactions.filter((x) => !(x.joueur === "moi" && x.emoji === emoji));
@@ -218,33 +229,40 @@ export async function reagir(video: string, emoji: EmojiVideo, poser: boolean, d
   }
   const sb = supabase();
   const { error } = poser
-    ? await sb.from("video_reactions").insert({ video, emoji })
-    : await sb.from("video_reactions").delete().eq("video", video).eq("emoji", emoji).eq("joueur", (await monIdVideo()) ?? "");
+    ? await sb.from(`${genre}_reactions`).insert({ [genre]: video, emoji })
+    : await sb
+        .from(`${genre}_reactions`)
+        .delete()
+        .eq(genre, video)
+        .eq("emoji", emoji)
+        .eq("joueur", (await monIdVideo()) ?? "");
   if (error && error.code !== "23505") throw error;
 }
 
 export const LONGUEUR_COMMENTAIRE = 400;
 
-export async function commenter(video: string, texte: string, demo: boolean): Promise<void> {
+export async function commenter(video: string, texte: string, demo: boolean, genre: GenreEcho = "video"): Promise<void> {
   const t = texte.trim().slice(0, LONGUEUR_COMMENTAIRE);
   if (!t) return;
+  if (demo && genre === "photo") return;
   if (demo) {
     const e = demoLire();
     const nom = getSession()?.name ?? "Moi";
     demoEcrire({ ...e, commentaires: [...e.commentaires, { id: Date.now(), joueur: "moi", nom, texte: t, at: Date.now() }] });
     return;
   }
-  const { error } = await supabase().from("video_commentaires").insert({ video, texte: t });
+  const { error } = await supabase().from(`${genre}_commentaires`).insert({ [genre]: video, texte: t });
   if (error) throw error;
 }
 
-export async function retirerCommentaire(id: number, demo: boolean): Promise<void> {
+export async function retirerCommentaire(id: number, demo: boolean, genre: GenreEcho = "video"): Promise<void> {
+  if (demo && genre === "photo") return;
   if (demo) {
     const e = demoLire();
     demoEcrire({ ...e, commentaires: e.commentaires.filter((c) => c.id !== id) });
     return;
   }
-  const { error } = await supabase().from("video_commentaires").delete().eq("id", id);
+  const { error } = await supabase().from(`${genre}_commentaires`).delete().eq("id", id);
   if (error) throw error;
 }
 

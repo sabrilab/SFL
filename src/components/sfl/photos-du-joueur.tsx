@@ -24,6 +24,12 @@ import { useIdentites } from "@/hooks/use-identites";
 import { usePlayerPhoto } from "@/hooks/use-player-photo";
 import { useMyPlayer } from "@/components/sfl/player-provider";
 import { dateCourte, photosDuJoueur, type PhotoJournee } from "@/lib/sfl/photos-journees";
+import { Commentaires } from "@/components/sfl/actus/video";
+import { CoeurEclos, RailPhoto, useDoubleToucher, usePhotoSociale } from "@/components/sfl/photos/actions-photo";
+import { PartagePhoto } from "@/components/sfl/photos/partage-photo";
+import { useCardViewer } from "@/components/sfl/card-viewer";
+import { PlayerCard } from "@/components/sfl/player-card";
+import { useSeason } from "@/components/sfl/season-provider";
 import { choisirPhotosPrivees, usePhotosPrivees, usePhotosVisibles } from "@/lib/sfl/photos-privees";
 
 export function PhotosDuJoueur({ nom, className }: { nom: string; className?: string }) {
@@ -115,7 +121,7 @@ function PublicPrive({ nom, prive }: { nom: string; prive: boolean }) {
   );
 }
 
-function Visionneuse({ photos, depart, nom, onFermer }: { photos: PhotoJournee[]; depart: number; nom: string; onFermer: () => void }) {
+export function Visionneuse({ photos, depart, nom, onFermer }: { photos: PhotoJournee[]; depart: number; nom: string; onFermer: () => void }) {
   const rang = useRef<HTMLDivElement>(null);
   const [index, setIndex] = useState(depart);
   const p = photos[index];
@@ -148,6 +154,15 @@ function Visionneuse({ photos, depart, nom, onFermer }: { photos: PhotoJournee[]
   }, [aller, index, onFermer, photos.length]);
 
   const autres = p.joueurs.filter((j) => j !== nom);
+  // Comme sur un réseau social (28/11) : j'aime, commentaires, partage (photos/actions-photo.tsx).
+  const s = usePhotoSociale(p);
+  const [commentaires, setCommentaires] = useState(false);
+  const [partage, setPartage] = useState(false);
+  const [eclos, setEclos] = useState(0);
+  const doubleToucher = useDoubleToucher(() => {
+    s.aimer();
+    setEclos((n) => n + 1);
+  });
 
   return createPortal(
     <div role="dialog" aria-modal="true" aria-label={`J${p.journee}, photo ${index + 1} sur ${photos.length}`} className="dark fixed inset-0 z-[60] bg-black text-white">
@@ -158,6 +173,7 @@ function Visionneuse({ photos, depart, nom, onFermer }: { photos: PhotoJournee[]
           const el = e.currentTarget;
           setIndex(Math.round(el.scrollLeft / Math.max(1, el.clientWidth)));
         }}
+        onPointerUp={doubleToucher}
       >
         {photos.map((ph, i) => (
           <div key={ph.id} className="flex h-full w-full shrink-0 snap-center items-center justify-center">
@@ -168,6 +184,8 @@ function Visionneuse({ photos, depart, nom, onFermer }: { photos: PhotoJournee[]
           </div>
         ))}
       </div>
+
+      <CoeurEclos signal={eclos} />
 
       <div
         className="pointer-events-none absolute inset-x-0 top-0 flex items-center justify-between bg-gradient-to-b from-black/60 to-transparent px-3 pb-8"
@@ -212,13 +230,22 @@ function Visionneuse({ photos, depart, nom, onFermer }: { photos: PhotoJournee[]
         </>
       )}
 
+      <RailPhoto
+        s={s}
+        onCommentaires={() => setCommentaires(true)}
+        onPartager={() => setPartage(true)}
+        className="absolute right-3 bottom-[calc(env(safe-area-inset-bottom,0px)+96px)] z-[5] lg:right-24 lg:bottom-1/2 lg:translate-y-1/2"
+      />
+      {commentaires && <Commentaires echos={s.echos} onFermer={() => setCommentaires(false)} />}
+      {partage && <PartagePhoto p={p} onFermer={() => setPartage(false)} />}
+
       {autres.length > 0 && (
         <div
           className="pointer-events-none absolute inset-x-0 bottom-0 flex flex-wrap justify-center gap-2 bg-gradient-to-t from-black/70 to-transparent px-4 pt-10"
           style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 18px)" }}
         >
           {autres.map((j) => (
-            <Pastille key={j} nom={j} />
+            <Pastille key={j} nom={j} onOuvrir={onFermer} />
           ))}
         </div>
       )}
@@ -227,12 +254,38 @@ function Visionneuse({ photos, depart, nom, onFermer }: { photos: PhotoJournee[]
   );
 }
 
-function Pastille({ nom }: { nom: string }) {
+/**
+ * Un joueur de la photo (Bola, 28/11 : « en cliquant sur leur identification,
+ * tomber sur leur compte Bola ») : la visionneuse se ferme et sa carte s'ouvre,
+ * avec Suivre et son profil (card-viewer.tsx). Un nom hors de la saison reste
+ * une simple étiquette.
+ */
+function Pastille({ nom, onOuvrir }: { nom: string; onOuvrir: () => void }) {
   const src = usePlayerPhoto(nom);
   const identite = useIdentites();
   const [casse, setCasse] = useState(false);
+  const { allPlayers } = useSeason();
+  const { open } = useCardViewer();
+  const player = allPlayers.find((p) => p.name === nom);
+  const ouvrir = () => {
+    if (!player) return;
+    onOuvrir();
+    open({
+      cacheKey: `mini-${player.name}`,
+      mode: "simple",
+      title: player.name,
+      joueur: player.name,
+      render: (t) => <PlayerCard player={player} size={t} />,
+    });
+  };
   return (
-    <span className="flex items-center gap-2 rounded-full bg-white/12 py-1 pr-3.5 pl-1 text-[14px] font-semibold backdrop-blur-xl">
+    <button
+      type="button"
+      onClick={ouvrir}
+      disabled={!player}
+      aria-label={player ? `Voir le compte de ${identite.nom(nom)}` : undefined}
+      className="pointer-events-auto flex items-center gap-2 rounded-full bg-white/12 py-1 pr-3.5 pl-1 text-[14px] font-semibold backdrop-blur-xl transition-transform active:scale-95 disabled:pointer-events-none"
+    >
       <span className="flex size-7 items-center justify-center overflow-hidden rounded-full bg-white/15 text-[12px]">
         {casse ? (
           nom[0]
@@ -242,6 +295,6 @@ function Pastille({ nom }: { nom: string }) {
         )}
       </span>
       {identite.nom(nom)}
-    </span>
+    </button>
   );
 }

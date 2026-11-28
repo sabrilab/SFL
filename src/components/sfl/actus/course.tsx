@@ -76,7 +76,7 @@
 
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
 import type { Repere } from "@/components/sfl/pepites-flottantes";
 import { useJoueurBola, useMyPlayer } from "@/components/sfl/player-provider";
@@ -122,6 +122,10 @@ import { ContratALaUne } from "./contrat-a-la-une";
 import { RubriqueFlair } from "@/components/sfl/flair/mon-flair";
 import { journeeDeLaVideo, useVideos, VideosDuFil } from "./video";
 import { RangeePublications } from "./fil-vertical";
+import { BlocPhotos, FilDesPhotos, useFilDesPhotos } from "./photos-du-dimanche";
+import { usePhotosVisibles } from "@/lib/sfl/photos-privees";
+import { Visionneuse } from "@/components/sfl/photos-du-joueur";
+import { blocsDePhotos, photosDeLaJournee, repartirBlocs, type PhotoJournee } from "@/lib/sfl/photos-journees";
 import type { Video } from "@/lib/sfl/videos";
 import { VueClassements, VueMatchs } from "./vues";
 import { ChoixEpoque, useEpoques, type ChoixDEpoque, type Epoque, type Vue } from "./epoques";
@@ -150,6 +154,7 @@ function Dimanche({
   videos = [],
   avant,
   depliee = false,
+  avecPhotos = true,
 }: {
   j: number;
   journee?: Journee;
@@ -161,38 +166,60 @@ function Dimanche({
   avant?: React.ReactNode;
   /** Déplié depuis sa ligne (JourneeDAvant) : la ligne porte l'ancre et tient lieu de couverture. */
   depliee?: boolean;
+  /** Les photos de la journée (photos-journees.ts) sont celles de la saison en cours : pas sur une saison close. */
+  avecPhotos?: boolean;
 }) {
   const [terrain, terrainCollant] = useCollant();
   const { chapitre, rubriques } = useMemo(() => couverturesDuDimanche(j, scenes.map((a) => a.type)), [j, scenes]);
+  // Ses photos (photos-du-dimanche.tsx), glissées entre les rubriques au fil du défilement.
+  // Sans celles qu'un joueur dessus a mises en privé, sauf si j'y suis (photos-privees.ts).
+  const { me } = useMyPlayer();
+  const visible = usePhotosVisibles(me ?? null);
+  const photos = useMemo(() => (avecPhotos ? photosDeLaJournee(j).filter(visible) : []), [j, avecPhotos, visible]);
+  const places = useMemo(() => repartirBlocs(blocsDePhotos(photos), scenes.length), [photos, scenes.length]);
+  const [photoOuverte, setPhotoOuverte] = useState<number | null>(null);
+  const ouvrirPhoto = useCallback((p: PhotoJournee) => setPhotoOuverte(photos.indexOf(p)), [photos]);
+  // Relu à la fermeture de la visionneuse : les j'aime et commentaires posés dedans.
+  const fil = useFilDesPhotos(photos, ouvrirPhoto, photoOuverte === null);
+  const blocs = (i: number) => places[i]?.map((b) => <BlocPhotos key={b[0].id} bloc={b} className="my-2 md:col-span-full md:my-0" />);
   return (
-    <section
-      id={depliee ? undefined : `j${j}`}
-      className={cn(
-        "flex scroll-mt-[60px] flex-col gap-3 md:grid md:grid-cols-2 md:items-start md:gap-x-[var(--fib-21)] md:gap-y-[var(--fib-21)] xl:grid-cols-3",
-        !depliee && "md:border-t md:border-contraste/[0.08] md:pt-[var(--fib-34)]",
-      )}
-    >
-      {!depliee && <CouvertureDimanche j={j} journee={journee} c={chapitre} />}
-      {videos.length > 0 && <VideosDuFil videos={videos} className="md:col-span-full md:mx-auto md:w-full md:max-w-[560px]" />}
-      {journee && (
-        <div ref={terrain} className={cn("px-5 md:px-0", terrainCollant && "md:sticky md:top-[var(--fib-21)]")}>
-          <CarteJournee journee={journee} onOuvrir={ouvrir} />
-        </div>
-      )}
-      <div
+    <FilDesPhotos.Provider value={fil}>
+      <section
+        id={depliee ? undefined : `j${j}`}
         className={cn(
-          "flex flex-col gap-1 md:grid md:gap-[var(--fib-21)] xl:col-span-2 xl:grid-cols-2",
-          !journee && "md:col-span-full md:grid-cols-2 xl:grid-cols-3",
+          "flex scroll-mt-[60px] flex-col gap-3 md:grid md:grid-cols-2 md:items-start md:gap-x-[var(--fib-21)] md:gap-y-[var(--fib-21)] xl:grid-cols-3",
+          !depliee && "md:border-t md:border-contraste/[0.08] md:pt-[var(--fib-34)]",
         )}
       >
-        {avant}
-        {scenes.map((a, i) => (
-          <CouvertureRubrique.Provider key={a.id} value={rubriques[i]}>
-            <RubriqueActu a={a} />
-          </CouvertureRubrique.Provider>
-        ))}
-      </div>
-    </section>
+        {!depliee && <CouvertureDimanche j={j} journee={journee} c={chapitre} />}
+        {videos.length > 0 && <VideosDuFil videos={videos} className="md:col-span-full md:mx-auto md:w-full md:max-w-[560px]" />}
+        {journee && (
+          <div ref={terrain} className={cn("px-5 md:px-0", terrainCollant && "md:sticky md:top-[var(--fib-21)]")}>
+            <CarteJournee journee={journee} onOuvrir={ouvrir} />
+          </div>
+        )}
+        <div
+          className={cn(
+            "flex flex-col gap-1 md:grid md:gap-[var(--fib-21)] xl:col-span-2 xl:grid-cols-2",
+            !journee && "md:col-span-full md:grid-cols-2 xl:grid-cols-3",
+          )}
+        >
+          {avant}
+          {scenes.map((a, i) => (
+            <Fragment key={a.id}>
+              <CouvertureRubrique.Provider value={rubriques[i]}>
+                <RubriqueActu a={a} />
+              </CouvertureRubrique.Provider>
+              {blocs(i)}
+            </Fragment>
+          ))}
+          {scenes.length === 0 && blocs(0)}
+        </div>
+      </section>
+      {photoOuverte !== null && photoOuverte >= 0 && (
+        <Visionneuse photos={photos} depart={photoOuverte} nom="" onFermer={() => setPhotoOuverte(null)} />
+      )}
+    </FilDesPhotos.Provider>
   );
 }
 
@@ -1279,7 +1306,7 @@ function LectureSaison({
         <>
           {palmares && <CarteSaison s={palmares} titre="Le palmarès" lien={false} className="mx-5 md:mx-auto md:w-full md:max-w-[560px]" />}
           {dimanches.map((d) => (
-            <Dimanche key={d.j} j={d.j} journee={d.journee} scenes={d.scenes} ouvrir={() => recap(d.j)} />
+            <Dimanche key={d.j} j={d.j} journee={d.journee} scenes={d.scenes} ouvrir={() => recap(d.j)} avecPhotos={false} />
           ))}
         </>
       )}

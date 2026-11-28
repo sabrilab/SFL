@@ -170,7 +170,7 @@ for (const ouverte of ["/sfl", "/equipe/abc", "/p/ABC123", "/v/12", "/inscriptio
   verifier(estPublique(ouverte), `1 · ${ouverte} n'est plus ouverte à tous`);
 for (const fermee of ["/", "/map", "/s", "/sf", "/sflx", "/sfl-test", "/sfl/abc", "/SFL", "/saisons", "/stats", "/equipe", "/p", "/v", "/admin", "/profil", "", null, undefined])
   verifier(!estPublique(fermee), `1 · « ${fermee} » est ouverte à tous`);
-assert.deepEqual([...PUBLIC_ROUTES], ["/bienvenue", "/inscription", "/equipe/", "/p/", "/v/", "/confidentialite"], "1 · les débuts d'adresse ouverts à tous ont changé");
+assert.deepEqual([...PUBLIC_ROUTES], ["/bienvenue", "/inscription", "/equipe/", "/p/", "/v/", "/photo/", "/confidentialite"], "1 · les débuts d'adresse ouverts à tous ont changé");
 // /sfl, l'adresse entière, à la lettre ; en capitales, on y renvoie.
 assert.equal(CHEMIN_SFL, "/sfl");
 for (const [chemin, page, malEcrite] of [

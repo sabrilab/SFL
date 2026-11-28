@@ -2030,3 +2030,16 @@ html[dir="rtl"] [data-card-part] {
   direction: ltr;
   unicode-bidi: isolate;
 }
+
+/* Le cœur qui éclot sur une photo aimée par deux touchers (components/sfl/photos/actions-photo.tsx). */
+@keyframes coeur-eclos {
+  0% { transform: scale(0.2); opacity: 0; }
+  18% { transform: scale(1.12); opacity: 1; }
+  32% { transform: scale(0.94); }
+  46% { transform: scale(1); opacity: 1; }
+  100% { transform: scale(1.05) translateY(-14px); opacity: 0; }
+}
+.coeur-eclos { animation: coeur-eclos 0.75s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+@media (prefers-reduced-motion: reduce) {
+  .coeur-eclos { animation: none; opacity: 0.9; }
+}
