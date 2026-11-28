@@ -108,10 +108,89 @@ const PARENT: Matiere = { ...MATIERES_ARBITRE.craie, titre: "PARENT" };
 const DIRIGEANT: Matiere = { ...MATIERES_ARBITRE.raye, titre: "PRÉSIDENTE" };
 const ZERO = ST(0, 0, 0, 0, 0, 0);
 
+/* --------------------------- couleurs de l'équipe -------------------------- */
+
+type LigneJeu = "G" | "D" | "M" | "A";
+/** La ligne d'un poste : gardien, défense, milieu, attaque. */
+const ligneDe = (poste: string): LigneJeu => (poste === "G" ? "G" : poste.startsWith("D") ? "D" : poste.startsWith("M") ? "M" : "A");
+/** Une couleur par ligne, comme les maillots d'entraînement : or, bleu, vert, rouge. */
+const LIGNE: Record<LigneJeu, { nom: string; fond: string; encre: string; clair: string; fonce: string }> = {
+  G: { nom: "gardien", fond: "#F5B700", encre: "#1a1400", clair: "#fff3c2", fonce: "#f2c94c" },
+  D: { nom: "défense", fond: "#2F6BFF", encre: "#ffffff", clair: "#dfe8ff", fonce: "#9db8ff" },
+  M: { nom: "milieu", fond: "#16A34A", encre: "#ffffff", clair: "#d9f5e3", fonce: "#8fdcaa" },
+  A: { nom: "attaque", fond: "#F0443A", encre: "#ffffff", clair: "#ffe0dc", fonce: "#ff9f96" },
+};
+
+/** La carte d'un joueur du club, à la couleur de sa ligne. */
+function matiereLigne(l: LigneJeu): Matiere {
+  const c = LIGNE[l];
+  return {
+    ...MATIERES_ARBITRE.craie,
+    titre: c.nom.toUpperCase(),
+    papier: [
+      "radial-gradient(90% 55% at 50% 28%, rgba(255,255,255,0.85) 0%, rgba(255,255,255,0) 70%)",
+      `linear-gradient(162deg, ${c.clair} 0%, #ffffff 45%, ${c.fonce} 100%)`,
+    ].join(", "),
+    fond: c.clair,
+    etiquette: { fond: c.fond, bord: c.fond, texte: c.encre },
+    onglet: { fond: c.fond, encre: c.encre },
+    vive: c.fond,
+    cadre: `linear-gradient(152deg, ${c.clair} 0%, ${c.fond} 60%, ${c.fonce} 100%)`,
+    tranche: { couleur: c.fond, metal: 0.1, rugosite: 0.7 },
+  };
+}
+
+/** La note d'un match, sur 10 : vert au-dessus de 7, orange de 6 à 7, rouge en dessous. */
+function couleurNote(n: number): string {
+  if (n >= 8) return "#16A34A";
+  if (n >= 7) return "#65C466";
+  if (n >= 6) return "#FF8A4C";
+  return "#E5383B";
+}
+
+function NoteMatch({ n, grand }: { n: number; grand?: boolean }) {
+  return (
+    <span
+      className={cn("grid place-items-center rounded-[10px] font-[family-name:var(--font-anton)] leading-none text-white tabular-nums", grand ? "h-10 w-14 text-titre-m" : "h-7 w-10 text-lecture")}
+      style={{ background: couleurNote(n) }}
+    >
+      {n.toLocaleString("fr-FR")}
+    </span>
+  );
+}
+
+/** Les notes des cinq derniers matchs, colorées. */
+function DerniersMatchs({ titre }: { titre: string }) {
+  const m: [string, number][] = [
+    ["AE", 8.5],
+    ["USM", 7],
+    ["UM", 8],
+    ["SG", 6],
+    ["RE", 5.5],
+  ];
+  return (
+    <div className="flex flex-col gap-2">
+      <Rubrique droite="moyenne 7">{titre}</Rubrique>
+      <div className={cn(SURFACE, "grid grid-cols-5 gap-2 px-3 py-3.5")}>
+        {m.map(([a, n]) => (
+          <span key={a} className="flex flex-col items-center gap-1.5">
+            <NoteMatch n={n} />
+            <span className="text-petit text-encre-3">{a}</span>
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function CarteJoueur({ size, prenom = TIMEO.prenom, nom = TIMEO.nom, poste = TIMEO.poste, note = TIMEO.note }: { size: number; prenom?: string; nom?: string; poste?: string; note?: number }) {
   const photo = prenom === TIMEO.prenom ? "/maquette-club/u11-carre.webp" : null;
-  if (254 * size < 170) return <CartePhoto name={`${prenom} ${nom}`} affiche={prenom} position={poste} overall={note} size={size} photo={photo} />;
-  return <BolaCard name={`${prenom} ${nom}`} affiche={prenom} username="u13 · fc démo" position={poste} overall={note} stats={TIMEO.stats} size={size} photo={photo} numero={9} />;
+  const connu = U13.find((j) => j.p === prenom);
+  const p = connu?.poste ?? poste;
+  const n = connu?.note ?? note;
+  const l = ligneDe(p);
+  if (254 * size < 170) return <CartePhoto name={`${prenom} ${nom}`} affiche={prenom} position={p} overall={n} size={size} photo={photo} onglet={{ fond: LIGNE[l].fond, encre: LIGNE[l].encre }} />;
+  return <BolaCard name={`${prenom} ${nom}`} affiche={prenom} username="u13 · fc démo" position={p} overall={n} stats={TIMEO.stats} size={size} photo={photo} numero={9} edition="arbitre" matiere={matiereLigne(l)} />;
 }
 
 function CarteParent({ size }: { size: number }) {
@@ -593,6 +672,7 @@ function EcranCarte({ role }: { role: Role }) {
             <Rubrique droite="sept. → nov.">Ta note</Rubrique>
             <Courbe points={[70, 70, 71, 71, 72, 72, 73, 73]} de="sept." a="aujourd'hui" />
           </div>
+          <DerniersMatchs titre="Tes notes de match" />
           <div className="flex flex-col gap-2">
             <Rubrique>Ta saison</Rubrique>
             <Chiffres items={[["8", "matchs"], ["5", "buts"], ["3", "passes"], ["92%", "présence"]]} />
@@ -646,6 +726,7 @@ function EcranCarte({ role }: { role: Role }) {
             <Rubrique droite="sept. → nov.">Sa note</Rubrique>
             <Courbe points={[70, 70, 71, 71, 72, 72, 73, 73]} de="sept." a="aujourd'hui" />
           </div>
+          <DerniersMatchs titre="Ses notes de match" />
           <div className="flex flex-col gap-2">
             <Rubrique>Sa saison</Rubrique>
             <Chiffres items={[["8", "matchs"], ["5", "buts"], ["3", "passes"], ["92%", "présence"]]} />
@@ -1118,6 +1199,7 @@ function EcranJoueur() {
           <span className="text-corps font-medium text-[#1FA055]">Note 70 → 73 depuis septembre</span>
         </div>
       </div>
+      <DerniersMatchs titre="Ses notes de match" />
       <div className="flex flex-col gap-2">
         <Rubrique droite="pointillés : septembre">Profil</Rubrique>
         <div className={cn(SURFACE, "py-3")}>
@@ -1317,12 +1399,22 @@ function EcranCompo() {
           return (
             <span key={c.p} className="absolute flex -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-1" style={{ left: `${c.x}%`, top: `${c.y}%` }}>
               <CarteJoueur size={50 / 254} prenom={j.p} nom={j.n} poste={j.poste} note={j.note} />
-              <span className="rounded-full bg-black/55 px-1.5 py-px text-[11px] font-semibold text-white">{c.p}</span>
+              <span className="rounded-full px-1.5 py-px text-[11px] font-semibold" style={{ background: LIGNE[ligneDe(j.poste)].fond, color: LIGNE[ligneDe(j.poste)].encre }}>
+                {c.p}
+              </span>
             </span>
           );
         })}
         <span className="absolute top-3 right-3 rounded-full bg-black/45 px-2.5 py-1 text-petit font-semibold text-white tabular-nums">Moy. 70,6</span>
       </Terrain>
+      <div className="flex justify-center gap-4">
+        {(["G", "D", "M", "A"] as LigneJeu[]).map((l) => (
+          <span key={l} className="flex items-center gap-1.5 text-corps font-medium">
+            <span className="size-2.5 rounded-full" style={{ background: LIGNE[l].fond }} />
+            {LIGNE[l].nom}
+          </span>
+        ))}
+      </div>
       <div className="flex flex-col gap-2">
         <Rubrique droite="4">Remplaçants</Rubrique>
         <div className={cn(SURFACE, "flex justify-around px-3 py-3")}>
@@ -1431,14 +1523,14 @@ const de2 = (p: string) => U13.find((j) => j.p === p)?.note ?? 70;
 
 function EcranNotes() {
   const notes: [string, number, string?][] = [
-    ["Timéo", 8.5, "Homme du match"],
-    ["Marius", 8],
+    ["Timéo", 8.5, "Homme du match · 2 buts"],
+    ["Marius", 8, "1 but"],
     ["Basile", 7.5],
     ["Maël", 7],
-    ["Côme", 7],
-    ["Noé", 6],
-    ["Léandre", 6.5],
-    ["Eliott", 6.5],
+    ["Côme", 6.5],
+    ["Léandre", 6],
+    ["Eliott", 5.5],
+    ["Noé", 4.5, "Carton blanc"],
   ];
   return (
     <Page role="entraineur" actif="gestion">
@@ -1456,7 +1548,7 @@ function EcranNotes() {
               </span>
               <span className="flex items-center gap-1">
                 <span className="grid size-8 place-items-center rounded-full bg-foreground/[0.07] text-lecture">−</span>
-                <span className="w-10 text-center font-[family-name:var(--font-anton)] text-titre-m tabular-nums">{n.toLocaleString("fr-FR")}</span>
+                <NoteMatch n={n} grand />
                 <span className="grid size-8 place-items-center rounded-full bg-foreground/[0.07] text-lecture">+</span>
               </span>
             </div>
