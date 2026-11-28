@@ -257,7 +257,7 @@ function Tete({ titre, sous, droite }: { titre: string; sous?: string; droite?: 
   return (
     <header className="flex items-end justify-between gap-3 px-1 pt-[max(env(safe-area-inset-top),14px)]">
       <div className="flex min-w-0 flex-col">
-        <h1 className="text-titre-l font-bold tracking-tight">{titre}</h1>
+        <h1 className="club-titre text-[34px] leading-none">{titre}</h1>
         {sous && <span className="text-corps text-encre-3">{sous}</span>}
       </div>
       {droite}
@@ -396,7 +396,7 @@ function PlanClub({ role, choisi }: { role: Role; choisi: string | null }) {
               <div className="flex items-center gap-2 pr-2">
                 <Ecusson initiales={CLUB.initiales} fond="noir" blason={BLASON} taille={44} />
                 <span className="flex flex-col leading-tight">
-                  <span className="text-[15px] font-bold tracking-tight text-[#0a0b0d]">{CLUB.nom}</span>
+                  <span className="club-titre text-[18px] leading-none text-[#0a0b0d]">{CLUB.nom}</span>
                   <span className="text-[11.5px] font-medium text-[#0a0b0d]/55">la maison</span>
                 </span>
               </div>
@@ -475,7 +475,7 @@ function EcranMap({ role }: { role: Role }) {
         <div className="flex items-center gap-2.5 rounded-full bg-white/90 py-1.5 pr-4 pl-1.5 shadow-[0_4px_16px_rgba(20,12,4,0.1)] backdrop-blur-xl">
           <Ecusson initiales={CLUB.initiales} fond="noir" blason={BLASON} taille={32} />
           <span className="flex flex-col leading-tight text-[#0a0b0d]">
-            <span className="text-[14px] font-bold tracking-tight">Cette semaine</span>
+            <span className="club-titre text-[17px] leading-tight">Cette semaine</span>
             <span className="text-[11.5px] font-medium text-[#0a0b0d]/55">5 matchs · 2 à la maison</span>
           </span>
         </div>
@@ -506,7 +506,7 @@ function EcranMatch({ role }: { role: Role }) {
             <span className="text-[13px] font-semibold text-black/50">
               U13 · {m.jour} novembre · 14 h 00
             </span>
-            <span className="text-[24px] leading-tight font-bold tracking-tight">FC Démo – AS Exemple</span>
+            <span className="club-titre text-[28px] leading-tight">FC Démo – AS Exemple</span>
           </div>
           <span className="grid size-8 place-items-center rounded-full bg-black/6">
             <X className="size-4" />
@@ -1164,7 +1164,7 @@ function TeteEnfant({ sur, titre, sous, droite }: { sur: string; titre: string; 
         </span>
         {droite}
       </div>
-      <h1 className="text-titre-l leading-tight font-bold tracking-tight">{titre}</h1>
+      <h1 className="club-titre text-[34px] leading-none">{titre}</h1>
       <span className="-mt-1 text-corps text-encre-3">{sous}</span>
     </header>
   );
@@ -1477,7 +1477,7 @@ function EcranClub() {
       <div className={cn(SURFACE, "flex items-center gap-4 p-4")}>
         <Ecusson initiales={CLUB.initiales} fond="noir" blason={BLASON} taille={64} />
         <span className="flex min-w-0 flex-col gap-0.5">
-          <span className="text-titre-m font-bold tracking-tight">{CLUB.nom}</span>
+          <span className="club-titre text-[26px] leading-none">{CLUB.nom}</span>
           <span className="truncate text-corps text-encre-2">{CLUB.lieu}</span>
           <span className="truncate text-corps text-encre-3">{CLUB.adresse}</span>
         </span>
@@ -1573,6 +1573,11 @@ function EcranClub() {
 
 /* --------------------------------- page -------------------------------- */
 
+// Les titres de Bola Club : Libre Caslon Condensed en capitales serrées, comme
+// la landing getbola.app/club (choix de Bola le 27/11).
+const POLICE_TITRE = "https://fonts.googleapis.com/css2?family=Libre+Caslon+Condensed:wght@400..700&display=swap";
+const STYLE_TITRE = `:root .club-titre,:root[data-style] h1.club-titre,:root h1.club-titre{font-family:"Libre Caslon Condensed","Bodoni 72",Didot,serif!important;font-weight:400!important;font-style:normal!important;text-transform:uppercase!important;letter-spacing:-0.02em!important;text-shadow:none!important;-webkit-text-stroke:0!important}`;
+
 function Maquette() {
   const q = useSearchParams();
   const ecran = (q.get("ecran") ?? "map") as Ecran;
@@ -1594,6 +1599,9 @@ function Maquette() {
 export default function Page_() {
   return (
     <Suspense fallback={null}>
+      <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
+      <link rel="stylesheet" href={POLICE_TITRE} precedence="default" />
+      <style>{STYLE_TITRE}</style>
       <Maquette />
     </Suspense>
   );
