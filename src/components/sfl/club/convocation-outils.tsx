@@ -19,7 +19,11 @@ import { appliquerGroupe, enregistrerGroupe } from "@/lib/sfl/club/mutations";
 import { membreDe, seanceAVenir } from "@/lib/sfl/club/regles";
 import type { Membre, Seance } from "@/lib/sfl/club/types";
 import { cn } from "@/lib/utils";
-import { CHAMP, Feuille, puce } from "./puces";
+import { CHAMP, Feuille, NOMBRE, puce } from "./puces";
+
+/** La ligne d'un poste, pour sa couleur sur la feuille de match. */
+const LIGNE_POSTE = (poste: string) =>
+  poste === "G" ? "var(--th-gardien)" : /^D/.test(poste) ? "var(--th-technique)" : /^M/.test(poste) ? "var(--th-jeu)" : "var(--th-finition)";
 
 export function OutilsConvocation({ s }: { s: Seance }) {
   const { club, agir } = useClub();
@@ -87,16 +91,41 @@ export function OutilsConvocation({ s }: { s: Seance }) {
         </button>
       </Feuille>
       <Feuille titre="Feuille de match" open={liste} onOpenChange={setListe}>
+        <div className="grid grid-cols-2 gap-2">
+          <div className="flex flex-col gap-1 rounded-[20px] p-3.5" style={{ background: "color-mix(in srgb, var(--ok) 16%, transparent)" }}>
+            <span style={{ ...NOMBRE, fontSize: 32, color: "var(--ok)" }} className="tabular-nums">
+              {joueurs.filter((m) => s.reponses[m.id] === "present").length}
+            </span>
+            <span className="text-corps font-semibold text-encre-2">présents annoncés</span>
+          </div>
+          <div className="flex flex-col gap-1 rounded-[20px] p-3.5" style={{ background: "color-mix(in srgb, var(--attente) 16%, transparent)" }}>
+            <span style={{ ...NOMBRE, fontSize: 32, color: "var(--attente)" }} className="tabular-nums">
+              {joueurs.filter((m) => s.reponses[m.id] !== "present").length}
+            </span>
+            <span className="text-corps font-semibold text-encre-2">sans réponse</span>
+          </div>
+        </div>
         <ol className="flex flex-col">
-          {joueurs.map((m, i) => (
-            <li key={m.id} className="flex items-baseline gap-3 border-b border-foreground/[0.08] py-2.5 last:border-0">
-              <span className="mono-label w-5 shrink-0 text-encre-3 tabular-nums">{i + 1}</span>
-              <span className="min-w-0 flex-1 truncate text-lecture">
-                <span className="font-semibold">{m.nom.toUpperCase()}</span> {m.prenom}
-              </span>
-              <span className="mono-label shrink-0 text-encre-3">{s.reponses[m.id] === "present" ? m.poste : `${m.poste} · ?`}</span>
-            </li>
-          ))}
+          {joueurs.map((m, i) => {
+            const la = s.reponses[m.id] === "present";
+            return (
+              <li key={m.id} className="flex items-center gap-3 border-b border-foreground/[0.08] py-2.5 last:border-0">
+                <span style={{ ...NOMBRE, fontSize: 20 }} className="w-6 shrink-0 text-encre-3 tabular-nums">
+                  {i + 1}
+                </span>
+                <span aria-label={la ? "présent" : "sans réponse"} className="size-2.5 shrink-0 rounded-full" style={{ background: la ? "var(--ok)" : "var(--attente)" }} />
+                <span className="min-w-0 flex-1 truncate text-lecture">
+                  <span className="font-semibold">{m.nom.toUpperCase()}</span> {m.prenom}
+                </span>
+                <span
+                  className="teinte shrink-0 rounded-full px-2.5 py-1 text-petit font-bold"
+                  style={{ "--teinte": LIGNE_POSTE(m.poste) } as React.CSSProperties}
+                >
+                  {m.poste}
+                </span>
+              </li>
+            );
+          })}
         </ol>
         <button type="button" onClick={copier} className="bouton-principal flex h-12 items-center justify-center gap-2 text-[15px] font-semibold">
           <Copy className="size-4" strokeWidth={2.4} />

@@ -20,7 +20,8 @@ import {
   type ThemeExercice,
 } from "@/lib/sfl/club/types";
 import { cn } from "@/lib/utils";
-import { CHAMP, Compteur, Feuille, FICHE, PageEnfant, Puces } from "./puces";
+import { CHAMP, Compteur, Feuille, FICHE, PageEnfant, Puces, teinteDe } from "./puces";
+import { LegendeTerrain, TerrainExercice } from "./terrain-exercice";
 
 type Filtre = ThemeExercice | "tous";
 
@@ -42,6 +43,8 @@ export function DetailExercice({ e }: { e: Exercice }) {
     : null;
   return (
     <div className="flex flex-col gap-3">
+      <TerrainExercice e={e} />
+      <LegendeTerrain />
       <p className="text-lecture text-pretty">{e.but}</p>
       <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5">
         {(
@@ -94,7 +97,7 @@ function LigneExercice({
 }) {
   const [ouverte, setOuverte] = useState(false);
   return (
-    <li className={cn(FICHE, "flex flex-col")}>
+    <li className={cn(FICHE, "trait-teinte flex flex-col overflow-hidden")} style={teinteDe(e.theme)}>
       <div className="flex items-center gap-2 pr-3">
         <button
           type="button"
@@ -106,7 +109,10 @@ function LigneExercice({
             <span className="text-lecture font-semibold text-balance">
               {e.nom}
             </span>
-            <span className="mono-label text-encre-3">{exerciceDit(e)}</span>
+            <span className="mono-label text-encre-3">
+              <span className="text-[var(--teinte)]">{themeDit(e.theme)}</span>
+              {exerciceDit(e).slice(themeDit(e.theme).length)}
+            </span>
           </span>
           <ChevronDown
             className={cn(

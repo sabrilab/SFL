@@ -48,6 +48,8 @@ import {
   semaineDuPlanning,
 } from "../src/lib/sfl/club/planning";
 import { formeDuClub } from "../src/lib/sfl/club/store";
+import { PLANS, planDe } from "../src/lib/sfl/club/plans";
+import { clarte, variablesDuClub } from "../src/lib/sfl/club/couleurs";
 import { CHAMPS_DOSSIER_EQUIPE, dossierEquipe, ouvertureDe, semaineDe } from "../src/lib/sfl/club/agent-club";
 import { dossierBorne } from "../src/lib/sfl/agent-contexte";
 import {
@@ -520,6 +522,25 @@ eq(formeDuClub(ancien), false);
   eq(semaine.some((x) => /défaite|perdu|absent|retard/i.test(x.dit)), false, "rien de négatif");
   eq(ouvertureDe(club, "s-e1").includes("?"), true, "l'agent ouvre par une question");
   eq(ouvertureDe(club, "s-e1", "u17-03").includes("étape"), true);
+}
+
+// 12 · le terrain de chaque exercice, les couleurs du club
+{
+  for (const e of BIBLIOTHEQUE) {
+    const p = PLANS[e.id];
+    eq(!!p, true, `${e.id} : un terrain`);
+    const pts = [...(p.plots ?? []), ...(p.joueurs ?? []).map((j) => j.p), ...(p.ballons ?? []), ...(p.fleches ?? []).flatMap((f) => [f.de, f.a])];
+    eq(
+      pts.every(([x, y]) => x >= -2 && x <= p.l + 2 && y >= -2 && y <= p.h + 2),
+      true,
+      `${e.id} : tout tient dans le dessin`,
+    );
+    eq(p.dit.length > 0, true);
+  }
+  eq(planDe({ id: "c-1", theme: "jeu", espace: "Notre terrain" }).dit, "Notre terrain", "un exercice du club prend le plan de son thème");
+  const v = variablesDuClub(club.blason.couleurs);
+  eq(clarte(v["--club-accent"]) >= 0.4, true, "l'accent du club se lit sur le noir");
+  eq(clarte(v["--terrain-pelouse"]) < 0.3, true, "le terrain reste sombre sous la craie");
 }
 
 console.log(`club-planning: ok (${n} vérifications)`);

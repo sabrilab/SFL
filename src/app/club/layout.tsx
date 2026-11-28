@@ -6,6 +6,7 @@
 // configurer. La pastille « Démo » (club/pastille-demo.tsx) dit qu'on
 // regarde une démonstration et change de point de vue, en haut de la page.
 
+import "./couleurs.css";
 import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { PastilleDemo } from "@/components/sfl/club/pastille-demo";

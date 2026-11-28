@@ -8,7 +8,8 @@
 // gardé sur le téléphone (lib/sfl/club/store.ts). ?role=admin|entraineur|
 // joueur|parent fait de même (un lien direct, les captures). Elle pose aussi
 // le marqueur de la première visite (lib/sfl/club/marqueur.ts) : à partir de
-// là, le menu des ligues montre le club (choix-ligue.tsx).
+// là, le menu des ligues montre le club (choix-ligue.tsx). À côté, la
+// pastille des couleurs (couleurs-club.tsx) passe d'une version à l'autre.
 
 import { useEffect } from "react";
 import { useSearchParams } from "next/navigation";
@@ -16,6 +17,7 @@ import { useClub } from "@/hooks/use-club";
 import { marquerClubOuvert } from "@/lib/sfl/club/marqueur";
 import { choisirRole } from "@/lib/sfl/club/store";
 import { ROLES } from "@/lib/sfl/club/types";
+import { CouleursClub } from "./couleurs-club";
 
 export function PastilleDemo() {
   const { role } = useClub();
@@ -30,7 +32,7 @@ export function PastilleDemo() {
   const k = ROLES.findIndex((r) => r.id === role);
   const suivant = ROLES[(k + 1) % ROLES.length];
   return (
-    <div className="-mt-1.5 -mb-2.5 flex justify-center">
+    <div className="-mt-1.5 -mb-2.5 flex justify-center gap-1">
       <button
         type="button"
         onClick={() => choisirRole(suivant.id)}
@@ -39,6 +41,7 @@ export function PastilleDemo() {
       >
         <span className="rounded-full bg-foreground px-3.5 py-1.5 text-[12px] leading-none font-semibold text-background">Démo · {ROLES[k]?.label}</span>
       </button>
+      <CouleursClub />
     </div>
   );
 }

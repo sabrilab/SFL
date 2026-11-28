@@ -389,7 +389,7 @@ export function AgentClub() {
           <Link href="/club/planning" aria-label="Retour" className="bouton-discret grid size-10 place-items-center">
             <ChevronLeft className="size-6" strokeWidth={2.2} />
           </Link>
-          <h1 className="text-[26px] leading-none font-bold tracking-tight">Mon agent</h1>
+          <h1 className="club-titre text-[26px] leading-none font-bold tracking-tight">Mon agent</h1>
         </div>
         {siennes.length > 1 && <Puces nom="Catégorie" choix={siennes.map((c) => ({ id: c.id, label: c.nom }))} actif={categorie} onChange={setCat} />}
       </header>

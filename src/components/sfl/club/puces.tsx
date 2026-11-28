@@ -132,7 +132,7 @@ export function PageEnfant({ titre, sur, sous, children }: { titre: string; /** 
         <BoutonRetour />
         <div className="flex min-w-0 flex-col gap-1">
           {sur && <span className="mono-label text-encre-2">{sur}</span>}
-          <h1 className="text-[30px] leading-[1.05] font-bold tracking-tight text-balance">{titre}</h1>
+          <h1 className="club-titre text-[30px] leading-[1.05] font-bold tracking-tight text-balance">{titre}</h1>
           {sous && <span className="mono-label text-encre-3">{sous}</span>}
         </div>
       </div>
@@ -145,11 +145,14 @@ export function PageEnfant({ titre, sur, sous, children }: { titre: string; /** 
 export function TitreSection({ children, droite }: { children: React.ReactNode; droite?: React.ReactNode }) {
   return (
     <div className="flex items-end justify-between gap-3">
-      <h2 className="text-titre-fort leading-none font-bold tracking-tight">{children}</h2>
+      <h2 className="club-titre text-titre-fort leading-none font-bold tracking-tight">{children}</h2>
       {droite}
     </div>
   );
 }
+
+/** La couleur d'un thème d'exercice (app/club/couleurs.css, --th-*), pour .teinte et .trait-teinte. */
+export const teinteDe = (theme: string) => ({ "--teinte": `var(--th-${theme})` }) as React.CSSProperties;
 
 /** Le dessin d'une fiche : un bloc sur le fond de la page. */
 export const FICHE = "rounded-[22px] bg-card";

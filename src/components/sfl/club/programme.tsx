@@ -22,7 +22,8 @@ import type { Seance as SeanceClub } from "@/lib/sfl/club/types";
 import { cn } from "@/lib/utils";
 import { DetailExercice, exerciceDit, ListeExercices } from "./exercices";
 import { ProposerSeance } from "./proposer";
-import { Feuille, FICHE, NOMBRE } from "./puces";
+import { Feuille, FICHE, NOMBRE, teinteDe } from "./puces";
+import { TerrainExercice } from "./terrain-exercice";
 
 const ROND =
   "bouton-secondaire relative grid size-9 shrink-0 place-items-center after:absolute after:-inset-1 after:content-['']";
@@ -62,14 +63,15 @@ export function Programme({ s }: { s: SeanceClub }) {
           return (
             <li
               key={`${l.exercice}-${i}`}
-              className={cn(FICHE, "flex items-center gap-3 py-3 pr-3 pl-4")}
+              className={cn(FICHE, "trait-teinte flex items-center gap-3 py-3 pr-3 pl-3")}
+              style={e ? teinteDe(e.theme) : undefined}
             >
-              <span
-                style={{ ...NOMBRE, fontSize: 26 }}
-                className="w-6 shrink-0 text-center text-encre-3 tabular-nums"
-              >
-                {i + 1}
-              </span>
+              <button type="button" onClick={() => setFiche(i)} aria-label={`Terrain de ${e?.nom ?? "l'exercice"}`} className="relative w-[72px] shrink-0">
+                {e && <TerrainExercice e={e} vignette />}
+                <span style={{ ...NOMBRE, fontSize: 18 }} className="absolute top-1 left-1.5 text-white tabular-nums drop-shadow">
+                  {i + 1}
+                </span>
+              </button>
               <button
                 type="button"
                 onClick={() => setFiche(i)}
@@ -79,7 +81,7 @@ export function Programme({ s }: { s: SeanceClub }) {
                   {e?.nom ?? "Exercice retiré"}
                 </span>
                 {e && (
-                  <span className="mono-label text-encre-3">
+                  <span className="mono-label text-[var(--teinte)]">
                     {exerciceDit(e, l.minutes).split(" · ")[0]}
                   </span>
                 )}

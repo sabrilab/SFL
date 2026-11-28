@@ -81,13 +81,14 @@ function LigneSeance({ s }: { s: Seance }) {
         href={`/club/seance/${s.id}`}
         className={cn(
           FICHE,
-          "flex items-center gap-4 py-3.5 pr-3 pl-4 transition-transform active:scale-[0.99]",
+          "trait-teinte flex items-center gap-4 overflow-hidden py-3.5 pr-3 pl-4 transition-transform active:scale-[0.99]",
           passee && "opacity-60",
         )}
+        style={{ "--teinte": s.genre === "match" ? "var(--club-accent)" : "var(--th-jeu)" } as React.CSSProperties}
       >
         <span
           style={{ ...NOMBRE, fontSize: 26 }}
-          className="w-[4.25rem] shrink-0 tabular-nums"
+          className="w-[4.25rem] shrink-0 text-[var(--teinte)] tabular-nums"
         >
           {s.heure.replace("h", ":")}
         </span>
@@ -107,7 +108,8 @@ function LigneSeance({ s }: { s: Seance }) {
             {etat.aFaire && (
               <span
                 aria-hidden
-                className="size-1.5 rounded-full bg-foreground"
+                className="size-1.5 rounded-full"
+                style={{ background: "var(--attente, currentColor)" }}
               />
             )}
             {etat.texte}

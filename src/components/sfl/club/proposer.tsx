@@ -20,7 +20,8 @@ import { ageType, DUREES, objectifsPour, proposer, qualiteDite } from "@/lib/sfl
 import { dernierRessenti, enCroissanceParmi } from "@/lib/sfl/club/suivi";
 import type { Qualite, Seance } from "@/lib/sfl/club/types";
 import { cn } from "@/lib/utils";
-import { Feuille, FICHE, NOMBRE, Puces, Segment } from "./puces";
+import { Feuille, FICHE, NOMBRE, Puces, Segment, teinteDe } from "./puces";
+import { LegendeTerrain, TerrainExercice } from "./terrain-exercice";
 
 export function ProposerSeance({ s, principal }: { s: Seance; principal: boolean }) {
   const { club, agir } = useClub();
@@ -62,23 +63,27 @@ export function ProposerSeance({ s, principal }: { s: Seance; principal: boolean
       <Feuille titre="Séance proposée" open={ouvert} onOpenChange={setOuvert}>
         <Puces nom="Objectif" choix={objectifs.map((q) => ({ id: q, label: qualiteDite(q) }))} actif={objectif} onChange={(q) => (setObjectif(q), setEssai(0))} className="-mx-5" />
         <Segment nom="Durée" choix={DUREES.map((d) => ({ id: String(d), label: `${d} min` }))} actif={String(minutes)} onChange={(d) => (setMinutes(Number(d) as (typeof DUREES)[number]), setEssai(0))} />
-        <ol className="flex flex-col gap-2">
+        <ol className="flex flex-col gap-3">
           {p.lignes.map((l, i) => {
             const e = exerciceDe(club, l.exercice);
+            if (!e) return null;
             return (
-              <li key={l.exercice} className={cn(FICHE, "flex items-center gap-3 px-4 py-3")}>
-                <span style={{ ...NOMBRE, fontSize: 22 }} className="w-5 shrink-0 text-center text-encre-3 tabular-nums">
-                  {i + 1}
-                </span>
-                <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                  <span className="text-lecture font-semibold text-balance">{e?.nom}</span>
-                  {e && <span className="mono-label text-encre-3">{themeDit(e.theme)}</span>}
-                </span>
-                <span className="shrink-0 text-corps font-semibold tabular-nums">{l.minutes} min</span>
+              <li key={l.exercice} className={cn(FICHE, "trait-teinte flex flex-col gap-3 overflow-hidden p-4")} style={teinteDe(e.theme)}>
+                <div className="flex items-baseline gap-3">
+                  <span style={{ ...NOMBRE, fontSize: 22 }} className="w-5 shrink-0 text-[var(--teinte)] tabular-nums">
+                    {i + 1}
+                  </span>
+                  <span className="mono-label min-w-0 flex-1 text-[var(--teinte)]">{themeDit(e.theme)}</span>
+                  <span className="shrink-0 text-corps font-semibold tabular-nums">{l.minutes} min</span>
+                </div>
+                <span className="text-titre leading-tight font-bold text-balance">{e.nom}</span>
+                <TerrainExercice e={e} />
+                <p className="text-corps leading-snug text-encre-2 text-pretty">{e.but}</p>
               </li>
             );
           })}
         </ol>
+        <LegendeTerrain />
         <ul className="flex flex-col gap-1.5">
           {p.raisons.map((r) => (
             <li key={r} className="flex gap-2 text-corps text-encre-2">

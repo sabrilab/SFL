@@ -64,7 +64,7 @@ function MenuDuClub() {
         <span aria-hidden className="grid shrink-0">
           <Ecusson initiales={club.initiales} fond={fondDe(club.blason)} blason={club.blason} taille={40} />
         </span>
-        <span className="titre-lettrage truncate text-[22px] leading-none">{club.nom}</span>
+        <span className="titre-lettrage club-titre truncate text-[22px] leading-none">{club.nom}</span>
         <ChevronDown className={cn("size-[18px] shrink-0 opacity-50 transition-transform", ouvert && "rotate-180")} />
       </button>
       {ouvert && (
