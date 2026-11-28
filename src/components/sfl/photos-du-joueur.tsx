@@ -19,6 +19,9 @@ import { dateCourte, photosDuJoueur, type PhotoJournee } from "@/lib/sfl/photos-
 import { Commentaires } from "@/components/sfl/actus/video";
 import { CoeurEclos, RailPhoto, useDoubleToucher, usePhotoSociale } from "@/components/sfl/photos/actions-photo";
 import { PartagePhoto } from "@/components/sfl/photos/partage-photo";
+import { useCardViewer } from "@/components/sfl/card-viewer";
+import { PlayerCard } from "@/components/sfl/player-card";
+import { useSeason } from "@/components/sfl/season-provider";
 
 export function PhotosDuJoueur({ nom, className }: { nom: string; className?: string }) {
   const jours = useMemo(() => photosDuJoueur(nom), [nom]);
@@ -190,7 +193,7 @@ export function Visionneuse({ photos, depart, nom, onFermer }: { photos: PhotoJo
           style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 18px)" }}
         >
           {autres.map((j) => (
-            <Pastille key={j} nom={j} />
+            <Pastille key={j} nom={j} onOuvrir={onFermer} />
           ))}
         </div>
       )}
@@ -199,12 +202,38 @@ export function Visionneuse({ photos, depart, nom, onFermer }: { photos: PhotoJo
   );
 }
 
-function Pastille({ nom }: { nom: string }) {
+/**
+ * Un joueur de la photo (Bola, 28/11 : « en cliquant sur leur identification,
+ * tomber sur leur compte Bola ») : la visionneuse se ferme et sa carte s'ouvre,
+ * avec Suivre et son profil (card-viewer.tsx). Un nom hors de la saison reste
+ * une simple étiquette.
+ */
+function Pastille({ nom, onOuvrir }: { nom: string; onOuvrir: () => void }) {
   const src = usePlayerPhoto(nom);
   const identite = useIdentites();
   const [casse, setCasse] = useState(false);
+  const { allPlayers } = useSeason();
+  const { open } = useCardViewer();
+  const player = allPlayers.find((p) => p.name === nom);
+  const ouvrir = () => {
+    if (!player) return;
+    onOuvrir();
+    open({
+      cacheKey: `mini-${player.name}`,
+      mode: "simple",
+      title: player.name,
+      joueur: player.name,
+      render: (t) => <PlayerCard player={player} size={t} />,
+    });
+  };
   return (
-    <span className="flex items-center gap-2 rounded-full bg-white/12 py-1 pr-3.5 pl-1 text-[14px] font-semibold backdrop-blur-xl">
+    <button
+      type="button"
+      onClick={ouvrir}
+      disabled={!player}
+      aria-label={player ? `Voir le compte de ${identite.nom(nom)}` : undefined}
+      className="pointer-events-auto flex items-center gap-2 rounded-full bg-white/12 py-1 pr-3.5 pl-1 text-[14px] font-semibold backdrop-blur-xl transition-transform active:scale-95 disabled:pointer-events-none"
+    >
       <span className="flex size-7 items-center justify-center overflow-hidden rounded-full bg-white/15 text-[12px]">
         {casse ? (
           nom[0]
@@ -214,6 +243,6 @@ function Pastille({ nom }: { nom: string }) {
         )}
       </span>
       {identite.nom(nom)}
-    </span>
+    </button>
   );
 }
